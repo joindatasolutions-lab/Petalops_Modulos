@@ -1,0 +1,228 @@
+:root {
+  --rose-soft: #e6a5b6;
+  --rose-strong: #c97b94;
+  --bg: #f7f5f6;
+  --text: #2f2d31;
+}
+
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  font-family: Inter, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+}
+
+.hidden { display: none !important; }
+
+.orders-admin-view {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+.orders-admin-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.orders-admin-header h1 {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 600;
+}
+
+.orders-filters {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+input, select {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #dfd8dc;
+  border-radius: 10px;
+  font-size: 14px;
+  background: #fff;
+}
+
+.orders-message {
+  background: #fff;
+  border: 1px solid #e6dee2;
+  border-radius: 10px;
+  padding: 10px 12px;
+  margin-bottom: 10px;
+}
+
+.orders-table-wrap {
+  background: #fff;
+  border: 1px solid #e6dee2;
+  border-radius: 12px;
+  overflow: auto;
+}
+
+.orders-table {
+  width: 100%;
+  min-width: 1080px;
+  border-collapse: collapse;
+}
+
+.orders-table th,
+.orders-table td {
+  text-align: left;
+  padding: 10px 12px;
+  border-bottom: 1px solid #f0e8eb;
+  font-size: 13px;
+}
+
+.orders-table th {
+  background: #fcfafb;
+  color: #625b62;
+}
+
+.orders-pager {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.btn-primary,
+.btn-outline {
+  border-radius: 10px;
+  padding: 10px 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.btn-primary {
+  border: none;
+  background: var(--rose-soft);
+  color: #fff;
+}
+
+.btn-outline {
+  border: 1px solid var(--rose-soft);
+  background: #fff;
+  color: #6f5960;
+}
+
+.order-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.order-badge.is-pendiente { background: #f0eef0; color: #615b62; }
+.order-badge.is-aprobado { background: #e7f6ec; color: #2f6d47; }
+.order-badge.is-rechazado { background: #fbe8eb; color: #8b3e4b; }
+.order-badge.is-produccion { background: #e9f0fb; color: #3f5f88; }
+.order-badge.is-entrega { background: #efe8fb; color: #5c4d83; }
+.order-badge.is-entregado { background: #dff2e6; color: #2f6841; }
+
+.order-actions {
+  display: inline-flex;
+  gap: 6px;
+}
+
+.order-icon {
+  border: 1px solid #ead9de;
+  background: #fff;
+  border-radius: 8px;
+  width: 30px;
+  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.orders-drawer {
+  position: fixed;
+  right: -520px;
+  top: 0;
+  width: min(500px, 100vw);
+  height: 100vh;
+  background: #fff;
+  border-left: 1px solid #ead9de;
+  transition: right 0.2s ease;
+  z-index: 50;
+}
+
+.orders-drawer.open { right: 0; }
+
+.orders-drawer-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px;
+  border-bottom: 1px solid #f1e7ea;
+}
+
+.orders-drawer-head-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.orders-drawer-body {
+  padding: 12px;
+  overflow: auto;
+  height: calc(100vh - 58px);
+}
+
+.order-block {
+  border: 1px solid #efe4e8;
+  border-radius: 10px;
+  padding: 10px;
+  margin-bottom: 10px;
+}
+
+.order-block h4 {
+  margin: 0 0 8px;
+  font-size: 14px;
+}
+
+.order-block p {
+  margin: 4px 0;
+  font-size: 13px;
+}
+
+.order-products-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.order-products-list li {
+  display: flex;
+  justify-content: space-between;
+  border-bottom: 1px dashed #efe4e8;
+  padding: 6px 0;
+}
+
+.icon-btn {
+  border: 1px solid #ddd;
+  background: #fff;
+  border-radius: 8px;
+  width: 32px;
+  height: 32px;
+  cursor: pointer;
+}
+
+@media (max-width: 980px) {
+  .orders-filters { grid-template-columns: 1fr 1fr; }
+}
+
+@media (max-width: 640px) {
+  .orders-filters { grid-template-columns: 1fr; }
+}
