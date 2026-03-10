@@ -626,12 +626,6 @@ select:focus {
   flex-wrap: wrap;
 }
 
-.order-message-btn {
-  min-height: 30px;
-  padding: 6px 10px;
-  font-size: 12px;
-}
-
 .order-icon {
   border: 1px solid #ead9de;
   background: #fff;
@@ -662,96 +656,6 @@ select:focus {
   border-left: 1px solid #ead9de;
   transition: right 0.2s ease;
   z-index: 50;
-}
-
-.message-card-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 90;
-  background: rgba(33, 25, 29, 0.55);
-  display: grid;
-  place-items: center;
-  gap: 10px;
-  padding: 16px;
-}
-
-.message-card-panel {
-  width: min(820px, 96vw);
-  background: #fff;
-  border: 1px solid #e8dbe1;
-  border-radius: 14px;
-  box-shadow: 0 18px 38px rgba(47, 45, 49, 0.22);
-  padding: 0;
-}
-
-.message-card-toolbar {
-  padding: 14px;
-  border-bottom: 1px solid #eee2e7;
-}
-
-.message-card-toolbar h3 {
-  margin: 0 0 10px;
-}
-
-.message-card-controls {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-  gap: 10px;
-}
-
-.message-card-controls label {
-  display: grid;
-  gap: 6px;
-  font-size: 12px;
-  color: #6e5f66;
-}
-
-.message-card-actions {
-  margin-top: 10px;
-  display: flex;
-  gap: 8px;
-  justify-content: flex-end;
-}
-
-.message-card-canvas {
-  padding: 14px;
-}
-
-.message-card-content {
-  background: #fff;
-  border: 1px solid #dfd3d8;
-  border-radius: 14px;
-  padding: 34px 30px;
-  box-shadow: 0 10px 24px rgba(47, 45, 49, 0.14);
-}
-
-.message-card-destinatario,
-.message-card-message {
-  margin: 0 0 16px;
-  white-space: pre-wrap;
-}
-
-.message-card-meta {
-  margin: 0 0 14px;
-  font-size: 14px;
-  color: #5f5459;
-  font-family: "Manrope", "Segoe UI", sans-serif;
-}
-
-.message-card-destinatario-meta {
-  font-size: 14px;
-  color: #5f5459;
-  font-family: "Manrope", "Segoe UI", sans-serif;
-}
-
-.message-card-brand {
-  margin: 26px 0 0;
-  text-align: center;
-  font-size: 14px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: #5f5459;
-  font-family: "Manrope", "Segoe UI", sans-serif;
 }
 
 .orders-drawer.open { right: 0; }
@@ -1615,76 +1519,5 @@ select:focus {
 
   .production-capsule-grid p strong {
     text-align: left;
-  }
-}
-
-@media print {
-  @page {
-    margin: 8mm;
-  }
-
-  html,
-  body {
-    margin: 0 !important;
-    padding: 0 !important;
-    height: auto !important;
-    overflow: visible !important;
-    background: #fff !important;
-  }
-
-  body.print-message-card-mode .app-shell,
-  body.print-message-card-mode .orders-drawer,
-  body.print-message-card-mode .sidebar-overlay {
-    display: none !important;
-  }
-
-  body.print-message-card-mode .message-card-overlay {
-    position: static;
-    inset: auto;
-    display: block;
-    background: #fff;
-    padding: 0;
-    margin: 0;
-  }
-
-  body.print-message-card-mode .message-card-panel {
-    width: 100%;
-    max-width: 100%;
-    margin: 0;
-    border: 0;
-    border-radius: 0;
-    box-shadow: none;
-    padding: 0;
-    break-inside: avoid;
-    page-break-inside: avoid;
-  }
-
-  body.print-message-card-mode .message-card-canvas {
-    padding: 0;
-  }
-
-  body.print-message-card-mode .message-card-content {
-    border: 0;
-    border-radius: 0;
-    box-shadow: none;
-    width: 100%;
-    min-height: auto;
-    padding: 0;
-    page-break-inside: avoid;
-    break-inside: avoid;
-  }
-
-  body.print-message-card-mode .message-card-message {
-    margin: 8px 0 10px;
-    line-height: 1.35;
-  }
-
-  body.print-message-card-mode .message-card-meta,
-  body.print-message-card-mode .message-card-brand {
-    margin: 0 0 6px;
-  }
-
-  body.print-message-card-mode .no-print-card {
-    display: none !important;
   }
 }
