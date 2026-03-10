@@ -1,22 +1,42 @@
-# Petalops (Pedidos Admin)
+# Petalops (Pedidos Admin) - React
 
-Proyecto independiente para gestión administrativa de pedidos.
+Proyecto de gestión administrativa de pedidos migrado a React + Vite.
 
 ## Ejecutar
 
-Abre `index.html` con Live Server (o cualquier servidor estático).
+1. Instala dependencias:
 
-## Configuración
+	`npm install`
 
-Edita `app/core/config.js`:
+2. Levanta el entorno de desarrollo:
+
+	`npm run dev`
+
+3. Construye para producción:
+
+	`npm run build`
+
+4. Previsualiza build local:
+
+	`npm run preview`
+
+## Configuración de tenant
+
+Edita `src/config/tenantConfig.js`:
 
 - `apiBaseUrl`
 - `empresaId`
 - `sucursalId`
 
-## Arquitectura modular
+Esta configuración permite adaptar el panel para distintas floristerías (multi-tenant) cambiando el contexto del negocio.
 
-- `app/core/`: config, estado global, store
-- `app/infrastructure/`: cliente HTTP API
-- `app/domain/orders-admin/`: módulo de pedidos (tabla, drawer, acciones)
-- `app/shared/`: utilidades DOM y formato
+## Arquitectura actual
+
+- `src/domain/orders-admin/`: pantalla principal de pedidos y detalle
+- `src/infrastructure/`: cliente HTTP API
+- `src/shared/`: hooks y utilidades comunes
+- `src/config/`: configuración de tenant
+
+## Estado
+
+El repositorio queda enfocado 100% en React + Vite.

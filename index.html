@@ -5,71 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Petalops | Gestión de Pedidos</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
-  <main class="orders-admin-view">
-    <header class="orders-admin-header">
-      <h1>Gestión de Pedidos</h1>
-      <button id="ordersRefresh" type="button" class="btn-primary">Actualizar</button>
-    </header>
-
-    <section class="orders-filters">
-      <input id="ordersSearch" type="text" placeholder="Buscar pedido, cliente, destinatario...">
-      <select id="ordersEstado">
-        <option value="">Todos los estados</option>
-        <option value="CREADO">Pendiente</option>
-        <option value="PAGADO">Aprobado</option>
-        <option value="EN_PRODUCCION">En producción</option>
-        <option value="LISTO">En entrega</option>
-        <option value="ENTREGADO">Entregado</option>
-        <option value="CANCELADO">Rechazado</option>
-      </select>
-      <input id="ordersFechaDesde" type="date">
-      <input id="ordersFechaHasta" type="date">
-    </section>
-
-    <p id="ordersError" class="orders-message hidden"></p>
-    <p id="ordersLoading" class="orders-message hidden">Cargando pedidos...</p>
-    <p id="ordersEmpty" class="orders-message hidden">No hay pedidos para los filtros seleccionados.</p>
-
-    <section class="orders-table-wrap">
-      <table class="orders-table">
-        <thead>
-          <tr>
-            <th>Fecha</th>
-            <th>Número</th>
-            <th>Cliente</th>
-            <th>Destinatario</th>
-            <th>Producto(s)</th>
-            <th>Total</th>
-            <th>Método pago</th>
-            <th>Estado</th>
-            <th>Acciones</th>
-          </tr>
-        </thead>
-        <tbody id="ordersTableBody"></tbody>
-      </table>
-    </section>
-
-    <footer class="orders-pager">
-      <button id="ordersPrev" type="button" class="btn-outline">Anterior</button>
-      <span id="ordersPagerInfo">Página 1</span>
-      <button id="ordersNext" type="button" class="btn-outline">Siguiente</button>
-    </footer>
-  </main>
-
-  <aside id="ordersDrawer" class="orders-drawer">
-    <div class="orders-drawer-head">
-      <strong>Detalle pedido</strong>
-      <div class="orders-drawer-head-actions">
-        <button id="ordersDrawerReload" type="button" class="btn-outline">Recargar</button>
-        <button id="ordersDrawerClose" type="button" class="icon-btn">✕</button>
-      </div>
-    </div>
-    <div id="ordersDrawerBody" class="orders-drawer-body"></div>
-  </aside>
-
-  <script type="module" src="app/main.js"></script>
+  <div id="root"></div>
+  <script type="module" src="/src/main.jsx"></script>
 </body>
 </html>
