@@ -35,6 +35,13 @@ export function OrdersAdminPage({ session, canViewPedidos, canViewProduccion, ca
   const [selectedPedidoId, setSelectedPedidoId] = useState(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [detalle, setDetalle] = useState(null);
+  const [messageCardOpen, setMessageCardOpen] = useState(false);
+  const [messageCardData, setMessageCardData] = useState(null);
+  const [messageCardOrder, setMessageCardOrder] = useState(null);
+  const [cardFontFamily, setCardFontFamily] = useState("Georgia, serif");
+  const [cardFontSize, setCardFontSize] = useState(24);
+  const [cardTextColor, setCardTextColor] = useState("#1f2937");
+  const [cardTextAlign, setCardTextAlign] = useState("center");
   const [sidebarPinned, setSidebarPinned] = useState(false);
   const [sidebarMobileOpen, setSidebarMobileOpen] = useState(false);
 
@@ -89,6 +96,19 @@ export function OrdersAdminPage({ session, canViewPedidos, canViewProduccion, ca
     mediaQuery.addEventListener("change", handleChange);
     return () => mediaQuery.removeEventListener("change", handleChange);
   }, []);
+
+  useEffect(() => {
+    const body = document.body;
+    if (!body) return undefined;
+
+    if (messageCardOpen) {
+      body.classList.add("print-message-card-mode");
+    } else {
+      body.classList.remove("print-message-card-mode");
+    }
+
+    return () => body.classList.remove("print-message-card-mode");
+  }, [messageCardOpen]);
 
   const applyFilterValue = (name, value) => {
     setFilters(current => ({
@@ -167,6 +187,23 @@ export function OrdersAdminPage({ session, canViewPedidos, canViewProduccion, ca
       console.error("Error descargando factura:", nextError);
       globalThis.alert("No fue posible descargar la factura del pedido.");
     }
+  };
+
+  const openMessageCard = async item => {
+    const pedidoId = Number(item?.pedidoID);
+    setMessageCardOrder(item || null);
+    try {
+      const payload = await api.obtenerMensajeTarjeta(pedidoId);
+      setMessageCardData(payload);
+      setMessageCardOpen(true);
+    } catch (nextError) {
+      console.error("Error obteniendo mensaje de tarjeta:", nextError);
+      globalThis.alert(nextError?.detail || nextError?.message || "No fue posible consultar el mensaje del pedido.");
+    }
+  };
+
+  const closeMessageCard = () => {
+    setMessageCardOpen(false);
   };
 
   const refresh = () => loadOrders(false);
@@ -367,6 +404,7 @@ export function OrdersAdminPage({ session, canViewPedidos, canViewProduccion, ca
                   const waPhone = phone.replace(/\+/g, "");
                   const canAct = isPendingStatus(item.estado);
                   const canDownloadInvoice = canInvoiceStatus(item.estado);
+                  const canViewMessageCard = canMessageCardStatus(item.estado);
                   const pedidoId = Number(item.pedidoID);
                   const { fechaPedido, horaPedido } = splitDateTime(item.fechaPedido || item.fecha);
                   const { fechaPedido: fechaEntrega, horaPedido: horaEntrega } = splitDateTime(item.fechaEntrega);
@@ -393,6 +431,16 @@ export function OrdersAdminPage({ session, canViewPedidos, canViewProduccion, ca
                           <button type="button" className="order-icon" onClick={() => rejectOrder(pedidoId)} disabled={!canAct} title="Rechazar pedido">✖</button>
                           {canDownloadInvoice && (
                             <button type="button" className="order-icon" onClick={() => downloadInvoice(pedidoId)} title="Descargar factura">🧾</button>
+                          )}
+                          {canViewMessageCard && (
+                            <button
+                              type="button"
+                              className="btn-outline order-message-btn"
+                              onClick={() => openMessageCard(item)}
+                              title="Ver mensaje e imprimir tarjeta"
+                            >
+                              Ver mensaje / Imprimir tarjeta
+                            </button>
                           )}
                         </div>
                       </td>
@@ -449,6 +497,82 @@ export function OrdersAdminPage({ session, canViewPedidos, canViewProduccion, ca
           )}
         </div>
       </aside>
+
+      {messageCardOpen && (
+        <div className="message-card-overlay" role="dialog" aria-modal="true" aria-label="Tarjeta de mensaje floral">
+          <div className="message-card-panel">
+            <div className="message-card-toolbar no-print-card">
+              <h3>Tarjeta de mensaje floral</h3>
+              <div className="message-card-controls">
+                <label>
+                  Fuente
+                  <select value={cardFontFamily} onChange={event => setCardFontFamily(event.target.value)}>
+                    <option value="Georgia, serif">Georgia</option>
+                    <option value="'Times New Roman', serif">Times New Roman</option>
+                    <option value="'Trebuchet MS', sans-serif">Trebuchet MS</option>
+                    <option value="'Courier New', monospace">Courier New</option>
+                  </select>
+                </label>
+                <label>
+                  Tamaño
+                  <input
+                    type="range"
+                    min={14}
+                    max={48}
+                    step={1}
+                    value={cardFontSize}
+                    onChange={event => setCardFontSize(Number(event.target.value))}
+                  />
+                </label>
+                <label>
+                  Color
+                  <input type="color" value={cardTextColor} onChange={event => setCardTextColor(event.target.value)} />
+                </label>
+                <label>
+                  Alineación
+                  <select value={cardTextAlign} onChange={event => setCardTextAlign(event.target.value)}>
+                    <option value="left">Izquierda</option>
+                    <option value="center">Centro</option>
+                    <option value="right">Derecha</option>
+                  </select>
+                </label>
+              </div>
+              <div className="message-card-actions">
+                <button type="button" className="btn-primary" onClick={() => globalThis.print()}>Imprimir tarjeta</button>
+                <button type="button" className="btn-outline" onClick={closeMessageCard}>Cerrar</button>
+              </div>
+            </div>
+
+            <section className="message-card-canvas" aria-label="Tarjeta imprimible">
+              <div className="message-card-content" style={{ textAlign: cardTextAlign }}>
+              <p className="message-card-meta">
+                {String(messageCardOrder?.numeroPedido || "-")}
+              </p>
+              <p className="message-card-meta">
+                {formatFechaEntregaTarjeta(messageCardData?.fechaEntrega || messageCardOrder?.fechaEntrega)}
+              </p>
+              <p className="message-card-meta message-card-destinatario-meta">
+                {String(messageCardData?.destinatario || "Sin destinatario")}
+              </p>
+              <p
+                className="message-card-message"
+                style={{
+                  fontFamily: cardFontFamily,
+                  fontSize: `${cardFontSize}px`,
+                  color: cardTextColor,
+                }}
+              >
+                "{String(messageCardData?.mensaje || "Sin mensaje")}" 
+              </p>
+              <p className="message-card-meta">
+                {resolveFirmaTarjeta(messageCardData?.firma)}
+              </p>
+              <p className="message-card-brand">Flora Tienda de Flores</p>
+              </div>
+            </section>
+          </div>
+        </div>
+      )}
     </>
   );
 }
@@ -466,6 +590,11 @@ function isPendingStatus(status) {
 function canInvoiceStatus(status) {
   const key = normalizeStatus(status);
   return key === "APROBADO" || key === "PAGADO";
+}
+
+function canMessageCardStatus(status) {
+  const key = normalizeStatus(status);
+  return key === "APROBADO";
 }
 
 function OrderDetail({ detalle }) {
@@ -549,4 +678,24 @@ function splitDateTime(value) {
   }
 
   return { fechaPedido: text, horaPedido: "" };
+}
+
+function formatFechaEntregaTarjeta(value) {
+  const text = String(value || "").trim();
+  if (!text) return "-";
+  const parsed = new Date(text);
+  if (Number.isNaN(parsed.getTime())) return text;
+  return parsed.toLocaleString("es-CO", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+function resolveFirmaTarjeta(value) {
+  const text = String(value || "").trim();
+  if (text) return text;
+  return "Con carino, Flora";
 }

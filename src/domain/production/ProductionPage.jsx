@@ -500,7 +500,7 @@ export function ProductionPage({ session, canViewPedidos, canViewProduccion, can
                     <tr key={item.idProduccion}>
                       <td>
                         <button type="button" className="btn-outline" title="Abrir acciones del pedido" onClick={() => openActionsDrawer(item)}>
-                          {item.numeroPedido || item.pedidoID}
+                          {item.numeroPedido ?? "-"}
                         </button>
                       </td>
                       <td>{item.producto || "-"}</td>
@@ -528,7 +528,7 @@ export function ProductionPage({ session, canViewPedidos, canViewProduccion, can
               {items.map(item => (
                 <article key={`cap-${item.idProduccion}`} className="production-capsule">
                   <header className="production-capsule-head">
-                    <strong>{item.numeroPedido || item.pedidoID}</strong>
+                    <strong>{item.numeroPedido ?? "-"}</strong>
                     <span className={`order-badge ${statusBadgeClass(item.estado)}`}>{item.estado || "-"}</span>
                   </header>
 
@@ -643,7 +643,7 @@ export function ProductionPage({ session, canViewPedidos, canViewProduccion, can
             <>
               <section className="order-block">
                 <h4>📦 Pedido</h4>
-                <p><strong>Número:</strong> {selectedItem.numeroPedido || selectedItem.pedidoID}</p>
+                <p><strong>Número:</strong> {selectedItem.numeroPedido ?? "-"}</p>
                 <p><strong>Cliente:</strong> {selectedItem.cliente || "-"}</p>
                 <p><strong>Producto:</strong> {selectedItem.producto || "-"}</p>
                 <p><strong>Estado:</strong> {selectedItem.estado || "-"}</p>
