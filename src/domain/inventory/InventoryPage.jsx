@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+﻿import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { tenantConfig } from "../../config/tenantConfig.js";
 import { createApiClient } from "../../infrastructure/apiClient.js";
@@ -51,6 +51,7 @@ export function InventoryPage({
   canViewDomicilios,
   canViewInventario,
   canViewUsuariosPanel,
+  onGoPipeline,
   onGoPedidos,
   onGoProduccion,
   onGoDomicilios,
@@ -295,11 +296,17 @@ export function InventoryPage({
     <div className={`app-shell ${sidebarPinned ? "is-sidebar-pinned" : ""} ${sidebarMobileOpen ? "is-sidebar-mobile-open" : ""}`}>
       <aside className="app-sidebar">
         <div className="sidebar-brand">
-          <img src="/PetalOps.png" alt="PetalOps" className="sidebar-brand-logo-compact" />
-          <img src="/PetalOps%20Logo.png" alt="PetalOps" className="sidebar-brand-logo-full" />
+          <img src="/petalops-compact.png" alt="PetalOps" className="sidebar-brand-logo-compact" />
+          <img src="/petalops-logo-full.png" alt="PetalOps" className="sidebar-brand-logo-full" />
         </div>
 
-        <nav className="sidebar-nav" aria-label="Modulos">
+        <nav className="sidebar-nav" aria-label="Módulos">
+          <button type="button" className="sidebar-nav-btn" onClick={() => {
+            setSidebarMobileOpen(false);
+            onGoPipeline();
+          }}>
+            <span className="sidebar-nav-icon">▦</span><span className="sidebar-nav-text">Pipeline</span>
+          </button>
           {canViewPedidos ? (
             <button type="button" className="sidebar-nav-btn" onClick={() => {
               setSidebarMobileOpen(false);
@@ -315,7 +322,7 @@ export function InventoryPage({
               setSubmenuOpen(false);
               onGoProduccion();
             }}>
-              <span className="sidebar-nav-icon">🏭</span><span className="sidebar-nav-text">Produccion</span>
+              <span className="sidebar-nav-icon">🏭</span><span className="sidebar-nav-text">Producción</span>
             </button>
           ) : null}
           {canViewDomicilios ? (
@@ -366,26 +373,26 @@ export function InventoryPage({
               setSubmenuOpen(false);
               onGoUsuarios();
             }}>
-              <span className="sidebar-nav-icon">👥</span><span className="sidebar-nav-text">Gestion Usuarios</span>
+              <span className="sidebar-nav-icon">👥</span><span className="sidebar-nav-text">Gestión Usuarios</span>
             </button>
           ) : null}
         </nav>
 
-        <button type="button" className="btn-outline sidebar-logout-btn" onClick={onLogout} title="Cerrar sesion">
+        <button type="button" className="btn-outline sidebar-logout-btn" onClick={onLogout} title="Cerrar sesión">
           <span className="sidebar-logout-icon" aria-hidden="true">⏻</span>
-          <span className="sidebar-logout-text">Cerrar sesion</span>
+          <span className="sidebar-logout-text">Cerrar sesión</span>
         </button>
 
         <button type="button" className="sidebar-pin-btn" onClick={toggleSidebar}>{sidebarPinned ? "←" : "→"}</button>
         <p className="sidebar-caption">Control de inventario por empresa</p>
       </aside>
 
-      <button type="button" className="sidebar-overlay" aria-label="Cerrar menu" onClick={() => setSidebarMobileOpen(false)} />
+      <button type="button" className="sidebar-overlay" aria-label="Cerrar menú" onClick={() => setSidebarMobileOpen(false)} />
 
       <main className="orders-admin-view">
         <header className="orders-admin-header">
           <div>
-            <button type="button" className="sidebar-trigger" onClick={toggleSidebar}>☰ Menu</button>
+            <button type="button" className="sidebar-trigger" onClick={toggleSidebar}>☰ Menú</button>
             <h1>Inventario</h1>
             <p className="orders-admin-subtitle">Control de flores e insumos con estados inteligentes y trazabilidad por movimientos.</p>
           </div>
@@ -554,3 +561,5 @@ export function InventoryPage({
     </div>
   );
 }
+
+

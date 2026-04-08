@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+﻿import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { tenantConfig } from "../../config/tenantConfig.js";
 import { createApiClient } from "../../infrastructure/apiClient.js";
 import { normalizeStatus } from "../../shared/utils.js";
 
 const ESTADOS_UI = ["Pendiente", "EnProduccion", "ParaEntrega", "Cancelado"];
+const ESTADOS_FILTRO_DEFAULT = ["Pendiente", "EnProduccion"];
 const ESTADOS_FLORISTA = ["Activo", "Inactivo", "Incapacidad"];
 const DEFAULT_USER = "admin.demo";
 const LOOKER_STUDIO_URL = "https://lookerstudio.google.com/embed/reporting/d08a04af-ed8e-4dde-a83c-90888bfde39d/page/p_mp7qxa6dzd";
@@ -40,13 +41,40 @@ function statusBadgeClass(status) {
   return BADGE_CLASS_BY_STATUS[key] || "is-pendiente";
 }
 
-export function ProductionPage({ session, canViewPedidos, canViewProduccion, canViewDomicilios, canViewInventario, canViewUsuariosPanel, onLogout, onGoPedidos, onGoProduccion, onGoDomicilios, onGoInventario, onGoUsuarios }) {
+function nextFloristaStatus(status) {
+  const normalized = normalizeStatus(status).replace(/_/g, "");
+  if (normalized === "PENDIENTE") return "EnProduccion";
+  if (normalized === "ENPRODUCCION") return "ParaEntrega";
+  return null;
+}
+
+function nextFloristaLabel(status) {
+  const next = nextFloristaStatus(status);
+  if (next === "EnProduccion") return "Iniciar producción";
+  if (next === "ParaEntrega") return "Para entrega";
+  return null;
+}
+
+function normalizeRole(value) {
+  return String(value || "").trim().toLowerCase().replace(/\s+/g, "_");
+}
+
+export function ProductionPage({ session, canViewPedidos, canViewProduccion, canViewDomicilios, canViewInventario, canViewUsuariosPanel, onLogout, onGoPipeline, onGoPedidos, onGoProduccion, onGoDomicilios, onGoInventario, onGoUsuarios }) {
   const api = useMemo(() => createApiClient(tenantConfig), []);
   const empresaId = Number(session?.empresaID || tenantConfig.empresaId);
   const sucursalId = Number(session?.sucursalID || tenantConfig.sucursalId);
+  const normalizedRole = normalizeRole(session?.rol);
+  const isSuperAdmin = Boolean(session?.esGlobalJoin) || ["super_admin", "join_superadmin"].includes(normalizedRole);
+  const canManageProductionActions = Boolean(session?.esGlobalJoin) || ["admin", "empresa_admin"].includes(normalizedRole);
+  const canManageStateAndRecalculate = isSuperAdmin;
+  const canFloristaQuickState = !canManageProductionActions;
+  const visibleSubmenuOptions = useMemo(
+    () => (canManageProductionActions ? SUBMENU_OPTIONS : [{ key: "pedidos", label: "Pedidos" }]),
+    [canManageProductionActions]
+  );
 
   const [fecha, setFecha] = useState(todayIsoDate());
-  const [estado, setEstado] = useState("");
+  const [estadosFiltro, setEstadosFiltro] = useState(ESTADOS_FILTRO_DEFAULT);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [items, setItems] = useState([]);
@@ -75,6 +103,18 @@ export function ProductionPage({ session, canViewPedidos, canViewProduccion, can
   const [sidebarPinned, setSidebarPinned] = useState(false);
   const [sidebarMobileOpen, setSidebarMobileOpen] = useState(false);
 
+  const toggleEstadoFiltro = useCallback((estadoItem) => {
+    setEstadosFiltro(current => {
+      const exists = current.includes(estadoItem);
+      if (exists) {
+        // Mantener al menos un estado activo para evitar vista vacía accidental.
+        if (current.length === 1) return current;
+        return current.filter(item => item !== estadoItem);
+      }
+      return [...current, estadoItem];
+    });
+  }, []);
+
   const loadData = useCallback(async () => {
     setLoading(true);
     setError("");
@@ -85,7 +125,7 @@ export function ProductionPage({ session, canViewPedidos, canViewProduccion, can
           empresaId,
           sucursalId,
           fecha,
-          estado: estado || undefined,
+          estado: undefined,
           incluirCancelado: false
         }),
         api.listarFloristas({
@@ -95,7 +135,10 @@ export function ProductionPage({ session, canViewPedidos, canViewProduccion, can
         })
       ]);
 
-      const nextItems = Array.isArray(produccion.items) ? produccion.items : [];
+      const nextItemsRaw = Array.isArray(produccion.items) ? produccion.items : [];
+      const nextItems = nextItemsRaw.filter(item =>
+        estadosFiltro.some(estadoItem => normalizeStatus(estadoItem) === normalizeStatus(item.estado))
+      );
       const nextFloristas = Array.isArray(floristasData.items) ? floristasData.items : [];
 
       setItems(nextItems);
@@ -114,7 +157,7 @@ export function ProductionPage({ session, canViewPedidos, canViewProduccion, can
     } finally {
       setLoading(false);
     }
-  }, [api, fecha, estado, floristaGestionID, empresaId, sucursalId]);
+  }, [api, fecha, estadosFiltro, floristaGestionID, empresaId, sucursalId]);
 
   const loadInsights = useCallback(async () => {
     try {
@@ -157,6 +200,11 @@ export function ProductionPage({ session, canViewPedidos, canViewProduccion, can
       setSelectedItem(null);
     }
   }, [submenu]);
+
+  useEffect(() => {
+    if (visibleSubmenuOptions.some(item => item.key === submenu)) return;
+    setSubmenu("pedidos");
+  }, [submenu, visibleSubmenuOptions]);
 
   useEffect(() => {
     const handleDocumentClick = event => {
@@ -287,9 +335,30 @@ export function ProductionPage({ session, canViewPedidos, canViewProduccion, can
     }
   };
 
+  const cambiarEstadoFloristaRapido = async item => {
+    const nuevoEstado = nextFloristaStatus(item?.estado);
+    if (!nuevoEstado) return;
+    if (!item?.floristaAsignado) {
+      globalThis.alert("No puedes cambiar estado sin florista asignado.");
+      return;
+    }
+
+    try {
+      await api.cambiarEstadoProduccion({
+        produccionId: item.idProduccion,
+        nuevoEstado,
+        observacionesInternas: "Cambio de estado desde panel florista"
+      });
+      await loadData();
+    } catch (nextError) {
+      console.error("Error cambiando estado rápido de florista:", nextError);
+      globalThis.alert("No fue posible cambiar el estado.");
+    }
+  };
+
   const recalcularPedido = async item => {
     try {
-      await api.recalcularProduccionPedido({
+      await api.recalcularProduccinPedido({
         pedidoId: item.pedidoID,
         usuarioCambio,
         motivo: motivoAccion || "Recalculo desde front",
@@ -330,11 +399,23 @@ export function ProductionPage({ session, canViewPedidos, canViewProduccion, can
     <div className={`app-shell ${sidebarPinned ? "is-sidebar-pinned" : ""} ${sidebarMobileOpen ? "is-sidebar-mobile-open" : ""}`}>
       <aside className="app-sidebar">
         <div className="sidebar-brand">
-          <img src="/PetalOps.png" alt="PetalOps" className="sidebar-brand-logo-compact" />
-          <img src="/PetalOps%20Logo.png" alt="PetalOps" className="sidebar-brand-logo-full" />
+          <img src="/petalops-compact.png" alt="PetalOps" className="sidebar-brand-logo-compact" />
+          <img src="/petalops-logo-full.png" alt="PetalOps" className="sidebar-brand-logo-full" />
         </div>
 
         <nav className="sidebar-nav" aria-label="Módulos">
+          <button
+            type="button"
+            className="sidebar-nav-btn"
+            title="Pipeline"
+            onClick={() => {
+              setSidebarMobileOpen(false);
+              onGoPipeline();
+            }}
+          >
+            <span className="sidebar-nav-icon">▦</span>
+            <span className="sidebar-nav-text">Pipeline</span>
+          </button>
           {canViewPedidos ? (
             <button
               type="button"
@@ -358,16 +439,24 @@ export function ProductionPage({ session, canViewPedidos, canViewProduccion, can
                 title="Producción"
                 onClick={() => {
                   onGoProduccion();
-                  setSubmenuOpen(current => !current);
+                  if (canManageProductionActions) {
+                    setSubmenuOpen(current => !current);
+                  } else {
+                    setSubmenu("pedidos");
+                    setSubmenuOpen(false);
+                    setSidebarMobileOpen(false);
+                  }
                 }}
               >
                 <span className="sidebar-nav-icon">🏭</span>
-                <span className="sidebar-nav-text">Producción {submenuOpen ? "▾" : "▸"}</span>
+                <span className="sidebar-nav-text">
+                  Producción {canManageProductionActions ? (submenuOpen ? "▾" : "▸") : ""}
+                </span>
               </button>
 
-              {submenuOpen && (
+              {canManageProductionActions && submenuOpen && (
                 <div className="sidebar-submenu-panel">
-                  {SUBMENU_OPTIONS.map(item => (
+                  {visibleSubmenuOptions.map(item => (
                     <button
                       key={item.key}
                       type="button"
@@ -420,7 +509,7 @@ export function ProductionPage({ session, canViewPedidos, canViewProduccion, can
             <button
               type="button"
               className="sidebar-nav-btn"
-              title="Gestion Usuarios"
+              title="Gestin Usuarios"
               onClick={() => {
                 setSidebarMobileOpen(false);
                 setSubmenuOpen(false);
@@ -428,7 +517,7 @@ export function ProductionPage({ session, canViewPedidos, canViewProduccion, can
               }}
             >
               <span className="sidebar-nav-icon">👥</span>
-              <span className="sidebar-nav-text">Gestion Usuarios</span>
+              <span className="sidebar-nav-text">Gestión Usuarios</span>
             </button>
           ) : null}
         </nav>
@@ -452,26 +541,49 @@ export function ProductionPage({ session, canViewPedidos, canViewProduccion, can
           <div>
             <button type="button" className="sidebar-trigger" onClick={toggleSidebar} title="Abrir o cerrar menú">☰ Menú</button>
             <h1>Módulo de Producción</h1>
-            <p className="orders-admin-subtitle">Asignación inteligente, carga equitativa y control por fecha programada.</p>
+            <p className="orders-admin-subtitle">
+              {canManageProductionActions
+                ? "Asignación inteligente, carga equitativa y control por fecha programada."
+                : "Consulta operativa de tus pedidos asignados y su estado actual."}
+            </p>
           </div>
           <div className="header-actions">
-            <button type="button" className="btn-outline" title="Crear tareas desde pedidos aprobados/pagados" onClick={generarDesdePedidos}>Sincronizar pedidos</button>
+            {canManageProductionActions ? (
+              <button type="button" className="btn-outline" title="Crear tareas desde pedidos aprobados/pagados" onClick={generarDesdePedidos}>Sincronizar pedidos</button>
+            ) : null}
             <button type="button" className="btn-primary" title="Recargar vista" onClick={refreshAll}>Actualizar</button>
           </div>
         </header>
 
-        <section className="orders-filters">
-          <input type="text" value={usuarioCambio} onChange={event => setUsuarioCambio(event.target.value)} placeholder="usuarioCambio" title="Usuario de auditoría" />
-        </section>
+        {canManageProductionActions ? (
+          <section className="orders-filters">
+            <input type="text" value={usuarioCambio} onChange={event => setUsuarioCambio(event.target.value)} placeholder="usuarioCambio" title="Usuario de auditoría" />
+          </section>
+        ) : null}
 
         {submenu === "pedidos" && (
           <>
             <section className="orders-filters">
               <input type="date" value={fecha} onChange={event => setFecha(event.target.value)} title="Filtrar por fecha programada" />
-              <select value={estado} onChange={event => setEstado(event.target.value)} title="Filtrar por estado">
-                <option value="">Todos menos cancelados</option>
-                {ESTADOS_UI.map(item => <option key={item} value={item}>{item}</option>)}
-              </select>
+              <details className="estado-filtro-dropdown">
+                <summary className="estado-filtro-summary">
+                  Estados
+                </summary>
+                <div className="estado-filtro-panel">
+                  <div className="estado-filtro-list">
+                    {ESTADOS_UI.map(item => (
+                      <label key={item} className="estado-filtro-item">
+                        <input
+                          type="checkbox"
+                          checked={estadosFiltro.includes(item)}
+                          onChange={() => toggleEstadoFiltro(item)}
+                        />
+                        <span>{item}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              </details>
             </section>
 
             {error && <p className="orders-message">{error}</p>}
@@ -492,16 +604,21 @@ export function ProductionPage({ session, canViewPedidos, canViewProduccion, can
                     <th>Tiempo restante</th>
                     <th>Estimado/Real (min)</th>
                     <th>Prioridad</th>
-                    <th>Acciones Domicilios</th>
+                    {canManageProductionActions ? <th>Acciones Domicilios</th> : null}
+                    {canFloristaQuickState ? <th>Acción</th> : null}
                   </tr>
                 </thead>
                 <tbody>
                   {items.map(item => (
                     <tr key={item.idProduccion}>
                       <td>
-                        <button type="button" className="btn-outline" title="Abrir acciones del pedido" onClick={() => openActionsDrawer(item)}>
-                          {item.numeroPedido ?? "-"}
-                        </button>
+                        {canManageProductionActions ? (
+                          <button type="button" className="btn-outline" title="Abrir acciones del pedido" onClick={() => openActionsDrawer(item)}>
+                            {item.numeroPedido ?? "-"}
+                          </button>
+                        ) : (
+                          <span>{item.numeroPedido ?? "-"}</span>
+                        )}
                       </td>
                       <td>{item.producto || "-"}</td>
                       <td>{item.cliente || "-"}</td>
@@ -513,11 +630,29 @@ export function ProductionPage({ session, canViewPedidos, canViewProduccion, can
                       <td>{typeof item.tiempoRestanteHoras === "number" ? `${item.tiempoRestanteHoras} h` : "-"}</td>
                       <td>{`${item.tiempoEstimadoMin ?? "-"} / ${item.tiempoRealMin ?? "-"}`}</td>
                       <td>{item.prioridad || "MEDIA"}</td>
-                      <td>
-                        <button type="button" className="btn-outline" title="Abrir barra lateral de acciones" onClick={() => openActionsDrawer(item)}>
-                          Ver acciones
-                        </button>
-                      </td>
+                      {canManageProductionActions ? (
+                        <td>
+                          <button type="button" className="btn-outline" title="Abrir barra lateral de acciones" onClick={() => openActionsDrawer(item)}>
+                            Ver acciones
+                          </button>
+                        </td>
+                      ) : null}
+                      {canFloristaQuickState ? (
+                        <td>
+                          {nextFloristaStatus(item.estado) ? (
+                            <button
+                              type="button"
+                              className="btn-outline"
+                              title="Actualizar estado de producción"
+                              onClick={() => cambiarEstadoFloristaRapido(item)}
+                            >
+                              {nextFloristaLabel(item.estado)}
+                            </button>
+                          ) : (
+                            <span>-</span>
+                          )}
+                        </td>
+                      ) : null}
                     </tr>
                   ))}
                 </tbody>
@@ -545,9 +680,21 @@ export function ProductionPage({ session, canViewPedidos, canViewProduccion, can
                   </div>
 
                   <div className="production-capsule-actions">
-                    <button type="button" className="btn-outline" title="Abrir barra lateral de acciones" onClick={() => openActionsDrawer(item)}>
-                      Ver acciones
-                    </button>
+                    {canManageProductionActions ? (
+                      <button type="button" className="btn-outline" title="Abrir barra lateral de acciones" onClick={() => openActionsDrawer(item)}>
+                        Ver acciones
+                      </button>
+                    ) : null}
+                    {canFloristaQuickState && nextFloristaStatus(item.estado) ? (
+                      <button
+                        type="button"
+                        className="btn-outline"
+                        title="Actualizar estado de producción"
+                        onClick={() => cambiarEstadoFloristaRapido(item)}
+                      >
+                        {nextFloristaLabel(item.estado)}
+                      </button>
+                    ) : null}
                   </div>
                 </article>
               ))}
@@ -556,9 +703,9 @@ export function ProductionPage({ session, canViewPedidos, canViewProduccion, can
         )}
 
 
-        {submenu === "historial" && (
+        {canManageProductionActions && submenu === "historial" && (
           <section className="order-block" style={{ marginTop: 12 }}>
-            <h4>🧾 Historial de reasignaciones</h4>
+            <h4> Historial de reasignaciones</h4>
             <div className="order-actions" style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 8 }}>
               <input type="date" value={metricasDesde} onChange={event => setMetricasDesde(event.target.value)} title="Desde" />
               <input type="date" value={metricasHasta} onChange={event => setMetricasHasta(event.target.value)} title="Hasta" />
@@ -567,7 +714,7 @@ export function ProductionPage({ session, canViewPedidos, canViewProduccion, can
             <ul className="order-products-list">
               {historial.length === 0 ? <li>Sin datos</li> : historial.map((item, idx) => (
                 <li key={`${item.produccionID}-${item.fechaCambio}-${idx}`}>
-                  <span>P{item.produccionID} · {item.usuarioCambio} · {item.motivo}</span>
+                  <span>P{item.produccionID} Â· {item.usuarioCambio} Â· {item.motivo}</span>
                   <strong>{formatDateTime(item.fechaCambio)}</strong>
                 </li>
               ))}
@@ -575,7 +722,7 @@ export function ProductionPage({ session, canViewPedidos, canViewProduccion, can
           </section>
         )}
 
-        {submenu === "incapacidad" && (
+        {canManageProductionActions && submenu === "incapacidad" && (
           <section className="order-block" style={{ marginTop: 12 }}>
             <h4>🩺 Gestión de incapacidad</h4>
             <div className="order-actions" style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
@@ -594,10 +741,10 @@ export function ProductionPage({ session, canViewPedidos, canViewProduccion, can
           </section>
         )}
 
-        {submenu === "looker" && (
+        {canManageProductionActions && submenu === "looker" && (
           <section className="order-block looker-block" style={{ marginTop: 12 }}>
             <div className="looker-header">
-              <h4>📊 Looker Studio</h4>
+              <h4> Looker Studio</h4>
               <a
                 href={LOOKER_STUDIO_URL}
                 target="_blank"
@@ -628,11 +775,12 @@ export function ProductionPage({ session, canViewPedidos, canViewProduccion, can
         )}
       </main>
 
+      {canManageProductionActions ? (
       <aside className={`orders-drawer ${drawerOpen && submenu === "pedidos" ? "open" : ""}`}>
         <div className="orders-drawer-head">
           <strong>Acciones Domicilios</strong>
           <div className="orders-drawer-head-actions">
-            <button type="button" className="icon-btn" onClick={closeActionsDrawer} title="Cerrar barra lateral">✕</button>
+            <button type="button" className="icon-btn" onClick={closeActionsDrawer} title="Cerrar barra lateral"></button>
           </div>
         </div>
 
@@ -652,7 +800,7 @@ export function ProductionPage({ session, canViewPedidos, canViewProduccion, can
               </section>
 
               <section className="order-block">
-                <h4>📝 Auditoría acción</h4>
+                <h4>Auditoría acción</h4>
                 <input
                   type="text"
                   value={motivoAccion}
@@ -680,33 +828,41 @@ export function ProductionPage({ session, canViewPedidos, canViewProduccion, can
                 </div>
               </section>
 
-              <section className="order-block">
-                <h4>🔄 Estado</h4>
-                <div className="order-actions" style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                  <select
-                    value={selectedEstadoById[selectedItem.idProduccion] || ""}
-                    onChange={event => setSelectedEstadoById(current => ({ ...current, [selectedItem.idProduccion]: event.target.value }))}
-                    title="Seleccionar nuevo estado"
-                  >
-                    <option value="">Estado...</option>
-                    {ESTADOS_UI.filter(state => normalizeStatus(state) !== normalizeStatus(selectedItem.estado)).map(state => (
-                      <option key={state} value={state}>{state}</option>
-                    ))}
-                  </select>
-                  <button type="button" className="btn-outline" title="Aplicar cambio de estado" onClick={() => cambiarEstado(selectedItem)}>Cambiar estado</button>
-                </div>
-              </section>
+              {canManageStateAndRecalculate ? (
+                <>
+                  <section className="order-block">
+                    <h4> Estado</h4>
+                    <div className="order-actions" style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                      <select
+                        value={selectedEstadoById[selectedItem.idProduccion] || ""}
+                        onChange={event => setSelectedEstadoById(current => ({ ...current, [selectedItem.idProduccion]: event.target.value }))}
+                        title="Seleccionar nuevo estado"
+                      >
+                        <option value="">Estado...</option>
+                        {ESTADOS_UI.filter(state => normalizeStatus(state) !== normalizeStatus(selectedItem.estado)).map(state => (
+                          <option key={state} value={state}>{state}</option>
+                        ))}
+                      </select>
+                      <button type="button" className="btn-outline" title="Aplicar cambio de estado" onClick={() => cambiarEstado(selectedItem)}>Cambiar estado</button>
+                    </div>
+                  </section>
 
-              <section className="order-block">
-                <h4>♻️ Recalcular pedido</h4>
-                <button type="button" className="btn-outline" title="Recalcular impacto del pedido" onClick={() => recalcularPedido(selectedItem)}>
-                  Recalcular producción
-                </button>
-              </section>
+                  <section className="order-block">
+                    <h4>ï¸ Recalcular pedido</h4>
+                    <button type="button" className="btn-outline" title="Recalcular impacto del pedido" onClick={() => recalcularPedido(selectedItem)}>
+                      Recalcular producción
+                    </button>
+                  </section>
+                </>
+              ) : null}
             </>
           )}
         </div>
       </aside>
+      ) : null}
     </div>
   );
 }
+
+
+

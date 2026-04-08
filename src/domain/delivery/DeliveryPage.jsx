@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+﻿import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { tenantConfig } from "../../config/tenantConfig.js";
 import { createApiClient } from "../../infrastructure/apiClient.js";
@@ -59,6 +59,7 @@ export function DeliveryPage({
   canViewInventario,
   canViewUsuariosPanel,
   onLogout,
+  onGoPipeline,
   onGoPedidos,
   onGoProduccion,
   onGoDomicilios,
@@ -296,11 +297,15 @@ export function DeliveryPage({
     <div className={`app-shell ${sidebarPinned ? "is-sidebar-pinned" : ""} ${sidebarMobileOpen ? "is-sidebar-mobile-open" : ""}`}>
       <aside className="app-sidebar">
         <div className="sidebar-brand">
-          <img src="/PetalOps.png" alt="PetalOps" className="sidebar-brand-logo-compact" />
-          <img src="/PetalOps%20Logo.png" alt="PetalOps" className="sidebar-brand-logo-full" />
+          <img src="/petalops-compact.png" alt="PetalOps" className="sidebar-brand-logo-compact" />
+          <img src="/petalops-logo-full.png" alt="PetalOps" className="sidebar-brand-logo-full" />
         </div>
 
-        <nav className="sidebar-nav" aria-label="Modulos">
+        <nav className="sidebar-nav" aria-label="Módulos">
+          <button type="button" className="sidebar-nav-btn" onClick={() => { setSidebarMobileOpen(false); onGoPipeline(); }}>
+            <span className="sidebar-nav-icon">▦</span>
+            <span className="sidebar-nav-text">Pipeline</span>
+          </button>
           {canViewPedidos ? (
             <button type="button" className="sidebar-nav-btn" onClick={() => { setSidebarMobileOpen(false); onGoPedidos(); }}>
               <span className="sidebar-nav-icon">🧾</span>
@@ -310,7 +315,7 @@ export function DeliveryPage({
           {canViewProduccion ? (
             <button type="button" className="sidebar-nav-btn" onClick={() => { setSidebarMobileOpen(false); onGoProduccion(); }}>
               <span className="sidebar-nav-icon">🏭</span>
-              <span className="sidebar-nav-text">Produccion</span>
+              <span className="sidebar-nav-text">Producción</span>
             </button>
           ) : null}
           {canViewDomicilios ? (
@@ -328,27 +333,27 @@ export function DeliveryPage({
           {canViewUsuariosPanel ? (
             <button type="button" className="sidebar-nav-btn" onClick={() => { setSidebarMobileOpen(false); onGoUsuarios(); }}>
               <span className="sidebar-nav-icon">👥</span>
-              <span className="sidebar-nav-text">Gestion Usuarios</span>
+              <span className="sidebar-nav-text">Gestión Usuarios</span>
             </button>
           ) : null}
         </nav>
 
-        <button type="button" className="btn-outline sidebar-logout-btn" onClick={onLogout} title="Cerrar sesion">
+        <button type="button" className="btn-outline sidebar-logout-btn" onClick={onLogout} title="Cerrar sesión">
           <span className="sidebar-logout-icon" aria-hidden="true">⏻</span>
-          <span className="sidebar-logout-text">Cerrar sesion</span>
+          <span className="sidebar-logout-text">Cerrar sesión</span>
         </button>
 
         <button type="button" className="sidebar-pin-btn" onClick={toggleSidebar}>{sidebarPinned ? "←" : "→"}</button>
-        <p className="sidebar-caption">Ultima milla simple y trazable</p>
+        <p className="sidebar-caption">Última milla simple y trazable</p>
       </aside>
 
-      <button type="button" className="sidebar-overlay" aria-label="Cerrar menu" onClick={() => setSidebarMobileOpen(false)} />
+      <button type="button" className="sidebar-overlay" aria-label="Cerrar menú" onClick={() => setSidebarMobileOpen(false)} />
 
       <main className="orders-admin-view">
         <header className="orders-admin-header">
           <div>
-            <button type="button" className="sidebar-trigger" onClick={toggleSidebar}>☰ Menu</button>
-            <h1>Modulo de Domicilios</h1>
+            <button type="button" className="sidebar-trigger" onClick={toggleSidebar}>☰ Menú</button>
+            <h1>Módulo de Domicilios</h1>
             <p className="orders-admin-subtitle">Desde ParaEntrega hasta Entregado, con evidencia y trazabilidad completa.</p>
           </div>
           <div className="header-actions">
@@ -434,7 +439,7 @@ export function DeliveryPage({
                 </div>
 
                 <p className="delivery-address">{item.direccion || "Sin direccion"}</p>
-                <p className="delivery-meta">{item.barrio || ""} {item.horaEntrega ? `· ${item.horaEntrega}` : ""}</p>
+                <p className="delivery-meta">{item.barrio || ""} {item.horaEntrega ? `Â· ${item.horaEntrega}` : ""}</p>
 
                 <div className="delivery-courier-actions">
                   <button type="button" className="btn-outline" onClick={() => openMaps(item)}>Abrir en Maps</button>
@@ -455,3 +460,5 @@ export function DeliveryPage({
     </div>
   );
 }
+
+

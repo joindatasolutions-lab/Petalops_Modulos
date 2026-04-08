@@ -17,7 +17,7 @@ export function LoginPage({ onSubmit, error, loading }) {
       <section className="auth-card">
         <div className="auth-glow" aria-hidden="true" />
         <header className="auth-hero">
-          <img src="/PetalOps%20Logo.png" alt="PetalOps" className="auth-logo" />
+          <img src="/petalops-logo-full.png" alt="PetalOps" className="auth-logo" />
           <p className="auth-kicker">Acceso seguro para equipos de floristeria</p>
           <h1 className="auth-title">Ingreso por Empresa</h1>
           <p className="auth-subtitle">Accede con tu usuario unico y contrasena. Tu empresa y sucursal se detectan automaticamente.</p>

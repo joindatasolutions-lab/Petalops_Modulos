@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+﻿import { useCallback, useEffect, useMemo, useState } from "react";
 import { tenantConfig } from "../../config/tenantConfig.js";
 import { createApiClient } from "../../infrastructure/apiClient.js";
 import { formatearCOP, normalizeStatus, toIsoDateEnd, toIsoDateStart } from "../../shared/utils.js";
@@ -8,13 +8,7 @@ const BADGE_CLASS_BY_STATUS = {
   PENDIENTE: "is-pendiente",
   CREADO: "is-pendiente",
   APROBADO: "is-aprobado",
-  PAGADO: "is-aprobado",
-  RECHAZADO: "is-rechazado",
   CANCELADO: "is-rechazado",
-  EN_PRODUCCION: "is-produccion",
-  LISTO: "is-entrega",
-  EN_ENTREGA: "is-entrega",
-  ENTREGADO: "is-entregado"
 };
 
 const initialFilters = {
@@ -26,7 +20,7 @@ const initialFilters = {
   pageSize: 20
 };
 
-export function OrdersAdminPage({ session, canViewPedidos, canViewProduccion, canViewDomicilios, canViewInventario, canViewUsuariosPanel, onLogout, onGoPedidos, onGoProduccion, onGoDomicilios, onGoInventario, onGoUsuarios }) {
+export function OrdersAdminPage({ session, canViewPedidos, canViewProduccion, canViewDomicilios, canViewInventario, canViewUsuariosPanel, onLogout, onGoPipeline, onGoPedidos, onGoProduccion, onGoDomicilios, onGoInventario, onGoUsuarios }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [items, setItems] = useState([]);
@@ -238,11 +232,23 @@ export function OrdersAdminPage({ session, canViewPedidos, canViewProduccion, ca
       <div className={`app-shell ${sidebarPinned ? "is-sidebar-pinned" : ""} ${sidebarMobileOpen ? "is-sidebar-mobile-open" : ""}`}>
         <aside className="app-sidebar">
           <div className="sidebar-brand">
-            <img src="/PetalOps.png" alt="PetalOps" className="sidebar-brand-logo-compact" />
-            <img src="/PetalOps%20Logo.png" alt="PetalOps" className="sidebar-brand-logo-full" />
+            <img src="/petalops-compact.png" alt="PetalOps" className="sidebar-brand-logo-compact" />
+            <img src="/petalops-logo-full.png" alt="PetalOps" className="sidebar-brand-logo-full" />
           </div>
 
           <nav className="sidebar-nav" aria-label="Módulos">
+            <button
+              type="button"
+              className="sidebar-nav-btn"
+              title="Pipeline"
+              onClick={() => {
+                setSidebarMobileOpen(false);
+                onGoPipeline();
+              }}
+            >
+              <span className="sidebar-nav-icon">▦</span>
+              <span className="sidebar-nav-text">Pipeline</span>
+            </button>
             {canViewPedidos ? (
               <button
                 type="button"
@@ -303,14 +309,14 @@ export function OrdersAdminPage({ session, canViewPedidos, canViewProduccion, ca
               <button
                 type="button"
                 className="sidebar-nav-btn"
-                title="Gestion Usuarios"
+                title="Gestión Usuarios"
                 onClick={() => {
                   setSidebarMobileOpen(false);
                   onGoUsuarios();
                 }}
               >
                 <span className="sidebar-nav-icon">👥</span>
-                <span className="sidebar-nav-text">Gestion Usuarios</span>
+                <span className="sidebar-nav-text">Gestión Usuarios</span>
               </button>
             ) : null}
           </nav>
@@ -353,12 +359,9 @@ export function OrdersAdminPage({ session, canViewPedidos, canViewProduccion, ca
             />
             <select value={filters.estado} onChange={event => applyFilterValue("estado", event.target.value)}>
               <option value="">Todos los estados</option>
-              <option value="CREADO">Pendiente</option>
-              <option value="PAGADO">Aprobado</option>
-              <option value="EN_PRODUCCION">En producción</option>
-              <option value="LISTO">En entrega</option>
-              <option value="ENTREGADO">Entregado</option>
-              <option value="CANCELADO">Rechazado</option>
+              <option value="CREADO">Creado</option>
+              <option value="APROBADO">Aprobado</option>
+              <option value="CANCELADO">Cancelado</option>
             </select>
             <input
               type="date"
@@ -589,7 +592,7 @@ function isPendingStatus(status) {
 
 function canInvoiceStatus(status) {
   const key = normalizeStatus(status);
-  return key === "APROBADO" || key === "PAGADO";
+  return key === "APROBADO";
 }
 
 function canMessageCardStatus(status) {
@@ -699,3 +702,7 @@ function resolveFirmaTarjeta(value) {
   if (text) return text;
   return "Con carino, Flora";
 }
+
+
+
+

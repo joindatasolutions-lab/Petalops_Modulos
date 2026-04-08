@@ -5,7 +5,11 @@ export function createApiClient(config) {
     let detail = "";
     try {
       const payload = await response.json();
-      detail = String(payload?.detail || "").trim();
+      if (payload?.error?.message) {
+        detail = String(payload.error.message || "").trim();
+      } else {
+        detail = String(payload?.detail || "").trim();
+      }
     } catch {
       detail = "";
     }
@@ -45,13 +49,16 @@ export function createApiClient(config) {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          login,
-          password,
-        }),
-      });
-      if (!response.ok) throw await toHttpError(response);
-      return response.json();
+        body: JSON.stringify({ login, password }),
+      });    
+
+      if (!response.ok) throw await toHttpError(response);     
+
+      const data = await response.json();    
+
+      localStorage.setItem("petalops_access_token", data.accessToken);     
+
+      return data;
     },
 
     async me() {
@@ -113,6 +120,41 @@ export function createApiClient(config) {
           "Content-Type": "application/json"
         },
         body: JSON.stringify({ estado })
+      });
+    },
+
+    async obtenerUsuarioGestion({ userId }) {
+      return requestJson(`/auth/usuarios/id/${userId}`);
+    },
+
+    async actualizarUsuarioGestion({ userId, nombre, login, password = "", email, rolID, sucursalID, estado = "Activo", modulosAcceso = null }) {
+      const payload = {
+        nombre,
+        login,
+        email,
+        rolID,
+        sucursalID,
+        estado,
+        modulosAcceso,
+      };
+      if (password && String(password).trim()) {
+        payload.password = password;
+      }
+      return requestJson(`/auth/usuarios/id/${userId}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(payload)
+      });
+    },
+
+    async eliminarUsuarioGestion({ userId }) {
+      return requestJson(`/auth/usuarios/id/${userId}`, {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json"
+        },
       });
     },
 
@@ -264,6 +306,36 @@ export function createApiClient(config) {
       params.set("pageSize", String(pageSize || 20));
 
       return requestJson(`/pedidos?${params.toString()}`);
+    },
+
+    async listarPipelinePedidos({
+      empresaId,
+      sucursalId,
+      fecha,
+      domiciliarioId,
+      floristaId,
+      numeroPedido,
+      soloHoy = false,
+      soloAtrasados = false,
+      soloEnProduccion = false,
+    }) {
+      const params = new URLSearchParams();
+      params.set("empresaID", String(empresaId));
+      if (sucursalId != null) params.set("sucursalID", String(sucursalId));
+      if (fecha) params.set("fecha", String(fecha));
+      if (domiciliarioId != null) params.set("domiciliarioID", String(domiciliarioId));
+      if (floristaId != null) params.set("floristaID", String(floristaId));
+      if (numeroPedido) params.set("numeroPedido", String(numeroPedido));
+      params.set("soloHoy", soloHoy ? "true" : "false");
+      params.set("soloAtrasados", soloAtrasados ? "true" : "false");
+      params.set("soloEnProduccion", soloEnProduccion ? "true" : "false");
+      return requestJson(`/pipeline/pedidos?${params.toString()}`);
+    },
+
+    async cambiarEstadoPedidoPipeline({ pedidoId, nuevoEstadoId }) {
+      return requestJson(`/pedido/${pedidoId}/estado/${nuevoEstadoId}`, {
+        method: "PUT"
+      });
     },
 
     async obtenerDetallePedido(pedidoId) {
