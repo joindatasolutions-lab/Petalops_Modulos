@@ -121,6 +121,31 @@ Módulos activos por empresa (override del plan). PK compuesta (empresa_id, modu
 
 ---
 
+### empresa_menu
+Configuración dinámica de campos, selectores y reglas operativas por empresa. Permite activar
+campos personalizados sin hardcodearlos en frontend o backend.
+
+| columna | tipo | null | descripción |
+|---|---|---|---|
+| id_empresa_menu | bigint | NO | PK |
+| empresa_id | bigint | NO | FK → empresa |
+| codigo | varchar(80) | NO | Identificador técnico del campo/configuración |
+| titulo | varchar(120) | NO | Label visible en UI |
+| seccion | varchar(80) | NO | Contexto de uso. Ej: `pedido_detalle` |
+| tipo_control | varchar(40) | NO | `select`, `multi_select`, etc. |
+| opciones_json | jsonb | SÍ | Lista de opciones visibles |
+| requerido_aprobacion | boolean | NO | Si bloquea aprobación del pedido cuando falta valor |
+| activo | boolean | NO | |
+| orden | integer | NO | Orden de despliegue |
+| created_at | timestamp | NO | |
+| updated_at | timestamp | SÍ | |
+
+**Uso actual:** Flora (`empresa_id = 3`) define aquí `pedido_metodos_pago` y `pedido_canal_venta`.
+Otras empresas pueden activar sus propios campos sin cambios de código si el frontend/backend ya
+soportan ese `tipo_control` y esa `seccion`.
+
+---
+
 ### rol
 Roles de acceso al sistema, definidos por empresa.
 

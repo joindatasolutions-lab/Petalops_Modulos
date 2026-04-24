@@ -20,13 +20,6 @@ const initialFilters = {
   pageSize: 20
 };
 
-const TENANT_ORDER_RULES = {
-  3: {
-    requirePaymentBeforeApproval: true,
-    requireSalesChannelBeforeApproval: true,
-  },
-};
-
 export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canViewProduccion, canViewDomicilios, canViewInventario, canViewUsuariosPanel, onLogout, onGoPipeline, onGoPedidos, onGoProduccion, onGoDomicilios, onGoInventario, onGoUsuarios }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -39,6 +32,9 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
   const [messageCardOpen, setMessageCardOpen] = useState(false);
   const [messageCardData, setMessageCardData] = useState(null);
   const [messageCardOrder, setMessageCardOrder] = useState(null);
+  const [messageCardDraft, setMessageCardDraft] = useState("");
+  const [messageCardSaving, setMessageCardSaving] = useState(false);
+  const [messageCardError, setMessageCardError] = useState("");
   const [cardFontFamily, setCardFontFamily] = useState("Georgia, serif");
   const [cardFontSize, setCardFontSize] = useState(24);
   const [cardTextColor, setCardTextColor] = useState("#1f2937");
@@ -69,11 +65,18 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
   const debouncedQuery = useDebouncedValue(filters.q, 300);
   const empresaId = Number(session?.empresaID || tenantConfig.empresaId);
   const sucursalId = Number(session?.sucursalID || tenantConfig.sucursalId);
-  const tenantRules = TENANT_ORDER_RULES[empresaId] || {};
-  const requiresApprovalData = Boolean(
-    tenantRules.requirePaymentBeforeApproval || tenantRules.requireSalesChannelBeforeApproval
+  const pedidoMenuFields = useMemo(
+    () => (Array.isArray(detalle?.camposEmpresa?.pedidoDetalle) ? detalle.camposEmpresa.pedidoDetalle : []),
+    [detalle]
   );
-  const isFlora = requiresApprovalData;
+  const paymentFieldConfig = useMemo(
+    () => pedidoMenuFields.find(field => field?.codigo === "pedido_metodos_pago" && field?.activo),
+    [pedidoMenuFields]
+  );
+  const salesChannelFieldConfig = useMemo(
+    () => pedidoMenuFields.find(field => field?.codigo === "pedido_canal_venta" && field?.activo),
+    [pedidoMenuFields]
+  );
 
   const loadOrders = useCallback(async (silent = false) => {
     if (!silent) {
@@ -306,6 +309,8 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
     try {
       const payload = await api.obtenerMensajeTarjeta(pedidoId);
       setMessageCardData(payload);
+      setMessageCardDraft(String(payload?.mensaje || ""));
+      setMessageCardError("");
       setMessageCardOpen(true);
     } catch (nextError) {
       console.error("Error obteniendo mensaje de tarjeta:", nextError);
@@ -315,6 +320,40 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
 
   const closeMessageCard = () => {
     setMessageCardOpen(false);
+    setMessageCardDraft("");
+    setMessageCardSaving(false);
+    setMessageCardError("");
+  };
+
+  const saveMessageCard = async () => {
+    const pedidoId = Number(messageCardOrder?.pedidoID || selectedPedidoId || 0);
+    if (!pedidoId || messageCardSaving) return;
+    setMessageCardSaving(true);
+    setMessageCardError("");
+    try {
+      await api.actualizarDetallePedidoPipeline({
+        pedidoId,
+        mensajeTarjeta: messageCardDraft,
+      });
+      setMessageCardData(current => ({
+        ...(current || {}),
+        mensaje: messageCardDraft,
+      }));
+      if (Number(selectedPedidoId) === pedidoId) {
+        setDetalle(current => current ? ({
+          ...current,
+          destinatario: {
+            ...(current.destinatario || {}),
+            mensajeTarjeta: messageCardDraft,
+          },
+        }) : current);
+      }
+      await loadOrders(true);
+    } catch (nextError) {
+      setMessageCardError(nextError?.message || "No fue posible guardar el mensaje.");
+    } finally {
+      setMessageCardSaving(false);
+    }
   };
 
   const refresh = () => loadOrders(false);
@@ -375,8 +414,8 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
         direccion: detailEditDireccion,
         barrioNombre: detailEditBarrioNombre,
         mensajeTarjeta: detailEditMensajeTarjeta,
-        metodosPago: isFlora ? detailEditMetodosPago : null,
-        canalFlora: isFlora ? detailEditCanalFlora : null,
+        metodosPago: paymentFieldConfig ? detailEditMetodosPago : null,
+        canalFlora: salesChannelFieldConfig ? detailEditCanalFlora : null,
       });
       await reloadDrawer();
       setIsEditingDetail(false);
@@ -845,12 +884,13 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
                     />
                   </label>
 
-                  {isFlora ? (
+                  {paymentFieldConfig || salesChannelFieldConfig ? (
                     <>
-                      <div className="order-detail-edit-label">
-                        <span>Métodos de pago</span>
-                        <div className="order-detail-edit-checklist">
-                          {FLORA_PAYMENT_METHODS.map(option => (
+                      {paymentFieldConfig ? (
+                        <div className="order-detail-edit-label">
+                          <span>{paymentFieldConfig.titulo || "Métodos de pago"}</span>
+                          <div className="order-detail-edit-checklist">
+                            {(Array.isArray(paymentFieldConfig.opciones) ? paymentFieldConfig.opciones : []).map(option => (
                             <label key={option} className="order-detail-edit-checkitem">
                               <input
                                 type="checkbox"
@@ -863,19 +903,22 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
                               />
                               <span>{option}</span>
                             </label>
-                          ))}
+                            ))}
+                          </div>
                         </div>
-                      </div>
+                      ) : null}
 
-                      <label className="order-detail-edit-label">
-                        Celular Flora
-                        <select value={detailEditCanalFlora} onChange={event => setDetailEditCanalFlora(event.target.value)}>
-                          <option value="">Selecciona un canal</option>
-                          {FLORA_SALES_CHANNELS.map(option => (
+                      {salesChannelFieldConfig ? (
+                        <label className="order-detail-edit-label">
+                          {salesChannelFieldConfig.titulo || "Canal"}
+                          <select value={detailEditCanalFlora} onChange={event => setDetailEditCanalFlora(event.target.value)}>
+                            <option value="">Selecciona una opción</option>
+                            {(Array.isArray(salesChannelFieldConfig.opciones) ? salesChannelFieldConfig.opciones : []).map(option => (
                             <option key={option} value={option}>{option}</option>
-                          ))}
-                        </select>
-                      </label>
+                            ))}
+                          </select>
+                        </label>
+                      ) : null}
                     </>
                   ) : null}
 
@@ -930,18 +973,30 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
                   <select value={cardTextAlign} onChange={event => setCardTextAlign(event.target.value)}>
                     <option value="left">Izquierda</option>
                     <option value="center">Centro</option>
-                    <option value="right">Derecha</option>
                   </select>
                 </label>
+                <label className="message-card-message-editor">
+                  Mensaje
+                  <textarea
+                    rows={4}
+                    value={messageCardDraft}
+                    onChange={event => setMessageCardDraft(event.target.value)}
+                    placeholder="Escribe o corrige el mensaje"
+                  />
+                </label>
               </div>
+              {messageCardError ? <p className="orders-message">{messageCardError}</p> : null}
               <div className="message-card-actions">
+                <button type="button" className="btn-outline" onClick={saveMessageCard} disabled={messageCardSaving}>
+                  {messageCardSaving ? "Guardando..." : "Guardar mensaje"}
+                </button>
                 <button type="button" className="btn-primary" onClick={() => globalThis.print()}>Imprimir tarjeta</button>
                 <button type="button" className="btn-outline" onClick={closeMessageCard}>Cerrar</button>
               </div>
             </div>
 
             <section className="message-card-canvas" aria-label="Tarjeta imprimible">
-              <div className="message-card-content" style={{ textAlign: cardTextAlign }}>
+              <div className="message-card-content">
               <p className="message-card-meta">
                 {formatFechaEntregaTarjeta(messageCardData?.fechaEntrega || messageCardOrder?.fechaEntrega)}
               </p>
@@ -954,14 +1009,14 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
                   fontFamily: cardFontFamily,
                   fontSize: `${cardFontSize}px`,
                   color: cardTextColor,
+                  textAlign: cardTextAlign,
                 }}
               >
-                "{String(messageCardData?.mensaje || "Sin mensaje")}" 
+                "{String(messageCardDraft || "Sin mensaje")}" 
               </p>
-              <p className="message-card-meta">
+              <p className="message-card-meta message-card-signature">
                 {resolveFirmaTarjeta(messageCardData?.firma)}
               </p>
-              <p className="message-card-brand">Flora Tienda de Flores</p>
               </div>
             </section>
           </div>
@@ -1143,41 +1198,6 @@ function resolveFirmaTarjeta(value) {
   return "Con carino, Flora";
 }
 
-const FLORA_PAYMENT_METHODS = [
-  "Cuenta por cobrar",
-  "Efectivo",
-  "Canje",
-  "Contraentrega",
-  "Cotizacion",
-  "Obsequio",
-  "Paypal",
-  "Link bold",
-  "Link payu",
-  "Link wompi",
-  "Datafono credibanco",
-  "Datafono Bold",
-  "Transferencia 0257",
-  "Transferencia 0005",
-  "Transferencia 3220",
-  "Transferencia 4038",
-  "Transferencia 4966",
-  "Transferencia 3671",
-  "Transferencia 6913",
-  "Transferencia 5431",
-  "Transferencia 1340",
-  "Transferencia Jaque",
-  "Transferencia QR",
-  "Anulado",
-];
-
-const FLORA_SALES_CHANNELS = [
-  "Huawei",
-  "Samsung",
-  "Andrea",
-  "Página Web",
-  "Presencial",
-  "Rappi",
-];
 
 
 
