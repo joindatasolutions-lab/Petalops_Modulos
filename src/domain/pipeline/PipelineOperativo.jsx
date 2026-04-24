@@ -138,6 +138,29 @@ export function PipelineOperativo({
     setSelectedDetail(null);
   };
 
+  const onSavePedidoEdit = async ({ pedidoId, productoID, fechaEntrega, horaEntrega }) => {
+    await api.actualizarDetallePedidoPipeline({
+      pedidoId,
+      productoID,
+      fechaEntrega,
+      horaEntrega,
+    });
+
+    const [detail] = await Promise.all([
+      api.obtenerDetallePedido(pedidoId),
+      loadBoard(),
+    ]);
+
+    setSelectedDetail(detail);
+    setSelected(current => {
+      if (!current || Number(current.id_pedido) !== Number(pedidoId)) return current;
+      return {
+        ...current,
+        hora_entrega: horaEntrega || current.hora_entrega,
+      };
+    });
+  };
+
   const onDragStart = (event, item) => {
     event.dataTransfer.setData("pedidoId", String(item.id_pedido));
   };
@@ -215,7 +238,15 @@ export function PipelineOperativo({
         </section>
       </main>
 
-      <PedidoModal item={selected} detail={selectedDetail} onClose={onCloseModal} />
+      <PedidoModal
+        item={selected}
+        detail={selectedDetail}
+        onClose={onCloseModal}
+        api={api}
+        empresaId={empresaId}
+        sucursalId={filters.sucursalID ?? sucursalFromSession}
+        onSaveEdit={onSavePedidoEdit}
+      />
     </div>
   );
 }

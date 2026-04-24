@@ -342,6 +342,28 @@ export function createApiClient(config) {
       return requestJson(`/pedido/${pedidoId}/detalle`);
     },
 
+    async buscarArreglosCatalogo({ empresaId, sucursalId, q = "" }) {
+      const params = new URLSearchParams();
+      params.set("empresaID", String(empresaId));
+      if (sucursalId != null) params.set("sucursalID", String(sucursalId));
+      if (q) params.set("q", String(q));
+      return requestJson(`/catalogo/productos?${params.toString()}`);
+    },
+
+    async actualizarDetallePedidoPipeline({ pedidoId, productoID, fechaEntrega, horaEntrega }) {
+      return requestJson(`/pedido/${pedidoId}/detalle`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          productoID: productoID != null ? Number(productoID) : null,
+          fechaEntrega: fechaEntrega || null,
+          horaEntrega: horaEntrega || null,
+        })
+      });
+    },
+
     async obtenerMensajeTarjeta(pedidoId) {
       return requestJson(`/entregas/pedido/${pedidoId}/mensaje`);
     },

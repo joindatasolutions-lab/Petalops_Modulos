@@ -38,6 +38,18 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
   const [cardTextAlign, setCardTextAlign] = useState("center");
   const [sidebarPinned, setSidebarPinned] = useState(false);
   const [sidebarMobileOpen, setSidebarMobileOpen] = useState(false);
+  const [isEditingDetail, setIsEditingDetail] = useState(false);
+  const [detailEditFilterText, setDetailEditFilterText] = useState("");
+  const [detailEditCatalog, setDetailEditCatalog] = useState([]);
+  const [detailEditCatalogLoading, setDetailEditCatalogLoading] = useState(false);
+  const [detailEditProductoID, setDetailEditProductoID] = useState("");
+  const [detailEditNombreArreglo, setDetailEditNombreArreglo] = useState("");
+  const [detailEditPrecio, setDetailEditPrecio] = useState(null);
+  const [detailEditFechaEntrega, setDetailEditFechaEntrega] = useState("");
+  const [detailEditHoraEntrega, setDetailEditHoraEntrega] = useState("");
+  const [detailEditSaving, setDetailEditSaving] = useState(false);
+  const [detailEditError, setDetailEditError] = useState("");
+  const [detailEditDropdownOpen, setDetailEditDropdownOpen] = useState(false);
 
   const api = useMemo(() => createApiClient(tenantConfig), []);
   const debouncedQuery = useDebouncedValue(filters.q, 300);
@@ -103,6 +115,72 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
 
     return () => body.classList.remove("print-message-card-mode");
   }, [messageCardOpen]);
+
+  useEffect(() => {
+    if (!detalle || detalle.error) {
+      setIsEditingDetail(false);
+      setDetailEditFilterText("");
+      setDetailEditCatalog([]);
+      setDetailEditProductoID("");
+      setDetailEditNombreArreglo("");
+      setDetailEditPrecio(null);
+      setDetailEditFechaEntrega("");
+      setDetailEditHoraEntrega("");
+      setDetailEditError("");
+      setDetailEditDropdownOpen(false);
+      return;
+    }
+
+    const firstProduct = Array.isArray(detalle.productos) && detalle.productos.length > 0
+      ? detalle.productos[0]
+      : null;
+    const productoId = getProductoId(firstProduct);
+    const productoNombre = firstProduct
+      ? String(firstProduct.nombreProducto || firstProduct.nombre || "").trim()
+      : "";
+    const productoPrecio = firstProduct ? Number(firstProduct.precioUnitario || firstProduct.precio || firstProduct.subtotal || 0) : null;
+
+    setDetailEditProductoID(productoId != null ? String(productoId) : "");
+    setDetailEditNombreArreglo(productoNombre);
+    setDetailEditPrecio(productoPrecio);
+    setDetailEditFechaEntrega(toDateInput(detalle.destinatario?.fechaEntrega));
+    setDetailEditHoraEntrega(normalizeTime(detalle.destinatario?.horaEntrega));
+
+    const initialCatalog = (Array.isArray(detalle.productos) ? detalle.productos : [])
+      .map(item => normalizeCatalogItem(item))
+      .filter(Boolean);
+    setDetailEditCatalog(dedupeCatalogItems(initialCatalog));
+    setDetailEditError("");
+  }, [detalle]);
+
+  useEffect(() => {
+    if (!drawerOpen) {
+      setIsEditingDetail(false);
+      setDetailEditError("");
+    }
+  }, [drawerOpen]);
+
+  useEffect(() => {
+    if (!isEditingDetail) return;
+    // Carga el catálogo completo al abrir modo edición.
+    let disposed = false;
+    setDetailEditCatalogLoading(true);
+    api.buscarArreglosCatalogo({ empresaId, sucursalId, q: "" })
+      .then(payload => {
+        if (disposed) return;
+        const rows = Array.isArray(payload?.items)
+          ? payload.items
+          : Array.isArray(payload)
+            ? payload
+            : [];
+        const loaded = rows.map(item => normalizeCatalogItem(item)).filter(Boolean);
+        setDetailEditCatalog(current => dedupeCatalogItems([...current, ...loaded]));
+      })
+      .catch(() => {})
+      .finally(() => { if (!disposed) setDetailEditCatalogLoading(false); });
+
+    return () => { disposed = true; };
+  }, [api, empresaId, isEditingDetail, sucursalId]);
 
   const applyFilterValue = (name, value) => {
     setFilters(current => ({
@@ -205,6 +283,62 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
   const closeDrawer = () => {
     setDrawerOpen(false);
     setSelectedPedidoId(null);
+  };
+
+  const filteredDetailCatalog = useMemo(() => {
+    const q = String(detailEditFilterText || "").trim().toLowerCase();
+    if (!q) return detailEditCatalog;
+    return detailEditCatalog.filter(item => {
+      const codigo = String(item.codigo || "").toLowerCase();
+      const nombre = String(item.nombre || "").toLowerCase();
+      return codigo.includes(q) || nombre.includes(q);
+    });
+  }, [detailEditCatalog, detailEditFilterText]);
+
+  const onSearchCatalog = async () => {
+    const q = String(detailEditFilterText || "").trim();
+    if (!q) return;
+    setDetailEditCatalogLoading(true);
+    try {
+      const payload = await api.buscarArreglosCatalogo({ empresaId, sucursalId, q });
+      const rows = Array.isArray(payload?.items)
+        ? payload.items
+        : Array.isArray(payload)
+          ? payload
+          : [];
+      const loaded = rows.map(item => normalizeCatalogItem(item)).filter(Boolean);
+      setDetailEditCatalog(current => dedupeCatalogItems([...current, ...loaded]));
+    } catch {
+      // Silencioso.
+    } finally {
+      setDetailEditCatalogLoading(false);
+    }
+  };
+
+  const onToggleDetailEdit = () => {
+    if (detailEditSaving) return;
+    setDetailEditError("");
+    setIsEditingDetail(current => !current);
+  };
+
+  const onSaveDetailEdit = async () => {
+    if (!selectedPedidoId || detailEditSaving) return;
+    setDetailEditError("");
+    setDetailEditSaving(true);
+    try {
+      await api.actualizarDetallePedidoPipeline({
+        pedidoId: selectedPedidoId,
+        productoID: detailEditProductoID ? Number(detailEditProductoID) : null,
+        fechaEntrega: detailEditFechaEntrega,
+        horaEntrega: detailEditHoraEntrega,
+      });
+      await reloadDrawer();
+      setIsEditingDetail(false);
+    } catch (nextError) {
+      setDetailEditError(nextError?.message || "No fue posible guardar la edición del pedido.");
+    } finally {
+      setDetailEditSaving(false);
+    }
   };
 
   const reloadDrawer = async () => {
@@ -482,6 +616,11 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
         <div className="orders-drawer-head">
           <strong>Detalle pedido</strong>
           <div className="orders-drawer-head-actions">
+            {!detalle?.error && detalle ? (
+              <button type="button" className="btn-outline" onClick={onToggleDetailEdit} title="Editar arreglo y entrega">
+                {isEditingDetail ? "Cancelar edición" : "Editar"}
+              </button>
+            ) : null}
             {canInvoiceStatus(detalle?.estado) && selectedPedidoId && (
               <button type="button" className="btn-outline" onClick={() => downloadInvoice(selectedPedidoId)} title="Descargar factura en PDF">Descargar factura</button>
             )}
@@ -496,7 +635,125 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
           ) : detalle.error ? (
             <p className="order-drawer-empty">No fue posible cargar el detalle.</p>
           ) : (
-            <OrderDetail detalle={detalle} />
+            <>
+              {isEditingDetail ? (
+                <section className="order-block order-detail-edit-box">
+                  <h4>Editar pedido</h4>
+
+                  <div className="order-detail-edit-label">
+                    <span>Arreglo actual</span>
+                    <input
+                      type="text"
+                      value={detailEditNombreArreglo || "(sin arreglo)"}
+                      readOnly
+                      className="order-detail-edit-readonly"
+                    />
+                  </div>
+
+                  {detailEditPrecio != null ? (
+                    <div className="order-detail-edit-label">
+                      <span>Precio arreglo</span>
+                      <input
+                        type="text"
+                        value={`$${formatearCOP(detailEditPrecio)}`}
+                        readOnly
+                        className="order-detail-edit-readonly"
+                      />
+                    </div>
+                  ) : null}
+
+                  <div className="order-detail-edit-label">
+                    Cambiar arreglo
+                    <div className="order-combobox">
+                      <button
+                        type="button"
+                        className="order-combobox-trigger"
+                        onClick={() => setDetailEditDropdownOpen(open => !open)}
+                      >
+                        <span>{detailEditProductoID
+                          ? buildProductoLabel(detailEditCatalog.find(i => String(i.id) === detailEditProductoID) || {})
+                          : "— Selecciona un arreglo —"}
+                        </span>
+                        <span className="order-combobox-arrow">{detailEditDropdownOpen ? "▲" : "▼"}</span>
+                      </button>
+
+                      {detailEditDropdownOpen ? (
+                        <div className="order-combobox-panel">
+                          <div className="order-combobox-search-row">
+                            <input
+                              autoFocus
+                              type="text"
+                              value={detailEditFilterText}
+                              onChange={event => setDetailEditFilterText(event.target.value)}
+                              onKeyDown={event => { if (event.key === "Enter") onSearchCatalog(); }}
+                              placeholder="Buscar por código o nombre..."
+                              className="order-combobox-search"
+                            />
+                            <button
+                              type="button"
+                              className="btn-outline order-detail-search-btn"
+                              onClick={onSearchCatalog}
+                              disabled={detailEditCatalogLoading}
+                            >
+                              {detailEditCatalogLoading ? "..." : "Buscar"}
+                            </button>
+                          </div>
+                          <ul className="order-combobox-list">
+                            {filteredDetailCatalog.length === 0 ? (
+                              <li className="order-combobox-empty">Sin resultados</li>
+                            ) : filteredDetailCatalog.map(item => (
+                              <li
+                                key={item.id}
+                                className={`order-combobox-option${String(item.id) === detailEditProductoID ? " is-selected" : ""}`}
+                                onClick={() => {
+                                  setDetailEditProductoID(String(item.id));
+                                  setDetailEditNombreArreglo(String(item.nombre || ""));
+                                  setDetailEditPrecio(item.precio != null ? Number(item.precio) : null);
+                                  setDetailEditDropdownOpen(false);
+                                  setDetailEditFilterText("");
+                                }}
+                              >
+                                {buildProductoLabel(item)}
+                                {item.precio != null ? <span className="order-combobox-price">${formatearCOP(Number(item.precio))}</span> : null}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      ) : null}
+                    </div>
+                  </div>
+
+                  <div className="order-detail-edit-grid">
+                    <label className="order-detail-edit-label">
+                      Fecha entrega
+                      <input
+                        type="date"
+                        value={detailEditFechaEntrega}
+                        onChange={event => setDetailEditFechaEntrega(event.target.value)}
+                      />
+                    </label>
+                    <label className="order-detail-edit-label">
+                      Hora entrega
+                      <input
+                        type="time"
+                        value={detailEditHoraEntrega}
+                        onChange={event => setDetailEditHoraEntrega(event.target.value)}
+                      />
+                    </label>
+                  </div>
+
+                  {detailEditError ? <p className="orders-message">{detailEditError}</p> : null}
+
+                  <div className="order-detail-edit-actions">
+                    <button type="button" className="btn-primary" onClick={onSaveDetailEdit} disabled={detailEditSaving}>
+                      {detailEditSaving ? "Guardando..." : "Guardar cambios"}
+                    </button>
+                  </div>
+                </section>
+              ) : null}
+
+              <OrderDetail detalle={detalle} />
+            </>
           )}
         </div>
       </aside>
@@ -660,6 +917,70 @@ function OrderDetail({ detalle }) {
       </section>
     </>
   );
+}
+
+function normalizeCatalogItem(raw) {
+  const id = getProductoId(raw);
+  if (id == null) return null;
+  const precio = raw?.precio != null
+    ? Number(raw.precio)
+    : raw?.precioUnitario != null
+      ? Number(raw.precioUnitario)
+      : null;
+  return {
+    id,
+    codigo: String(raw?.codigoProducto || raw?.codigo || raw?.sku || "").trim(),
+    nombre: String(raw?.nombreProducto || raw?.nombre || raw?.descripcion || "").trim(),
+    precio,
+  };
+}
+
+function getProductoId(raw) {
+  if (!raw || typeof raw !== "object") return null;
+  const candidates = [raw.productoID, raw.productoId, raw.id_producto, raw.idProducto, raw.id];
+  for (const value of candidates) {
+    if (value == null || value === "") continue;
+    const num = Number(value);
+    if (!Number.isNaN(num)) return num;
+  }
+  return null;
+}
+
+function dedupeCatalogItems(items) {
+  const map = new Map();
+  for (const item of items) {
+    if (!item || item.id == null) continue;
+    map.set(String(item.id), item);
+  }
+  return Array.from(map.values());
+}
+
+function buildProductoLabel(producto) {
+  const codigo = String(producto?.codigo || "").trim();
+  const nombre = String(producto?.nombre || "").trim();
+  if (codigo && nombre) return `${codigo} - ${nombre}`;
+  if (nombre) return nombre;
+  if (codigo) return codigo;
+  return "Producto sin nombre";
+}
+
+function toDateInput(value) {
+  const text = String(value || "").trim();
+  if (!text) return "";
+  if (/^\d{4}-\d{2}-\d{2}$/.test(text)) return text;
+  const parsed = new Date(text);
+  if (Number.isNaN(parsed.getTime())) return "";
+  const y = parsed.getFullYear();
+  const m = String(parsed.getMonth() + 1).padStart(2, "0");
+  const d = String(parsed.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
+function normalizeTime(value) {
+  const text = String(value || "").trim();
+  if (!text) return "";
+  const match = text.match(/^(\d{2}:\d{2})/);
+  return match ? match[1] : "";
 }
 
 

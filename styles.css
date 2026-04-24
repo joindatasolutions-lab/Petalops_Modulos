@@ -899,6 +899,165 @@ select:focus {
   font-size: 13px;
 }
 
+.order-detail-edit-readonly {
+  background: #f3eef0 !important;
+  color: #7a6b71 !important;
+  cursor: default !important;
+}
+
+.order-detail-edit-search-row {
+  display: flex;
+  gap: 6px;
+}
+
+.order-detail-edit-search-row input {
+  flex: 1;
+}
+
+.order-detail-search-btn {
+  min-width: 68px;
+  white-space: nowrap;
+  padding: 0 10px;
+}
+
+/* Combobox con búsqueda integrada */
+.order-combobox {
+  position: relative;
+}
+
+.order-combobox-trigger {
+  width: 100%;
+  min-height: 38px;
+  border: 1px solid #e5d3da;
+  border-radius: 9px;
+  padding: 8px 12px;
+  background: #fff;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-size: 0.88rem;
+  text-align: left;
+}
+
+.order-combobox-trigger:hover {
+  border-color: #c9a8b5;
+}
+
+.order-combobox-arrow {
+  font-size: 0.7rem;
+  color: #9d7e88;
+  flex-shrink: 0;
+}
+
+.order-combobox-panel {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  background: #fff;
+  border: 1px solid #e2cfd6;
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(47, 30, 38, 0.13);
+  z-index: 200;
+  overflow: hidden;
+}
+
+.order-combobox-search-row {
+  display: flex;
+  gap: 6px;
+  padding: 8px;
+  border-bottom: 1px solid #f0e4e8;
+}
+
+.order-combobox-search {
+  flex: 1;
+  min-height: 32px;
+  border: 1px solid #e5d3da;
+  border-radius: 7px;
+  padding: 6px 10px;
+  font-size: 0.86rem;
+}
+
+.order-combobox-list {
+  list-style: none;
+  margin: 0;
+  padding: 4px 0;
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.order-combobox-option {
+  padding: 9px 14px;
+  font-size: 0.87rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+  gap: 10px;
+}
+
+.order-combobox-option:hover {
+  background: #fdf0f3;
+}
+
+.order-combobox-option.is-selected {
+  background: #fbe8ee;
+  font-weight: 600;
+}
+
+.order-combobox-price {
+  font-size: 0.82rem;
+  color: #b5536a;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.order-combobox-empty {
+  padding: 12px 14px;
+  color: #9d7e88;
+  font-size: 0.86rem;
+}
+
+.order-detail-edit-box {
+  border-color: #e6d4db;
+  background: #fdf9fb;
+}
+
+.order-detail-edit-box h4 {
+  margin-bottom: 10px;
+}
+
+.order-detail-edit-label {
+  display: grid;
+  gap: 6px;
+  font-size: 12px;
+  color: #5f5459;
+  margin-bottom: 10px;
+}
+
+.order-detail-edit-label input,
+.order-detail-edit-label select {
+  min-height: 36px;
+  border: 1px solid #e5d3da;
+  border-radius: 9px;
+  padding: 8px 10px;
+  background: #fff;
+}
+
+.order-detail-edit-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.order-detail-edit-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 6px;
+}
+
 .production-capsules {
   display: none;
 }
@@ -1207,6 +1366,10 @@ select:focus {
   flex-wrap: wrap;
   gap: 8px;
   margin: 0 0 12px;
+}
+
+.production-header-tabs {
+  margin-top: 0;
 }
 
 .inventory-tab-btn {
@@ -2177,8 +2340,59 @@ select:focus {
   align-items: center;
 }
 
+.pipeline-modal-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
 .pipeline-modal-body {
   padding: 1rem;
+}
+
+.pipeline-edit-box {
+  margin-top: 0.95rem;
+  border: 1px solid #dbeafe;
+  border-radius: 12px;
+  padding: 0.85rem;
+  background: #f8fbff;
+}
+
+.pipeline-edit-box h4 {
+  margin: 0 0 0.6rem;
+  font-size: 0.98rem;
+  color: #1e3a8a;
+}
+
+.pipeline-edit-label {
+  display: grid;
+  gap: 0.4rem;
+  margin-bottom: 0.65rem;
+  font-weight: 600;
+  font-size: 0.86rem;
+  color: #0f172a;
+}
+
+.pipeline-edit-label input,
+.pipeline-edit-label select {
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  min-height: 38px;
+  padding: 0.45rem 0.65rem;
+  font-size: 0.9rem;
+  background: #fff;
+}
+
+.pipeline-edit-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.7rem;
+}
+
+.pipeline-edit-actions {
+  margin-top: 0.4rem;
+  display: flex;
+  justify-content: flex-end;
 }
 
 .pipeline-modal-img {
@@ -2188,6 +2402,18 @@ select:focus {
   border-radius: 12px;
   border: 1px solid #e2e8f0;
   margin-top: 0.75rem;
+}
+
+@media (max-width: 680px) {
+  .order-detail-edit-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 720px) {
+  .pipeline-edit-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 
