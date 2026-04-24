@@ -344,6 +344,7 @@ export function createApiClient(config) {
 
     async buscarArreglosCatalogo({ empresaId, sucursalId, q = "" }) {
       const params = new URLSearchParams();
+      if (sucursalId != null) params.set("sucursalId", String(sucursalId));
       if (q) params.set("q", q);
       return requestJson(`/catalogo/${empresaId}${params.toString() ? `?${params.toString()}` : ""}`);
     },
