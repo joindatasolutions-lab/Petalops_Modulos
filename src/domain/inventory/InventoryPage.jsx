@@ -15,17 +15,44 @@ const INVENTORY_SUBMENU_OPTIONS = [
   { key: "general", label: "Inventario General" },
   { key: "crear", label: "Crear Item" },
   { key: "ajustar", label: "Ajustar Stock" },
+  { key: "proveedores", label: "Proveedores" },
+];
+
+const INVENTORY_TYPE_OPTIONS = [
+  "Flor",
+  "Follaje",
+  "Base floral",
+  "Empaque",
+  "Cinta",
+  "Accesorio",
+  "Espuma floral",
+  "Tarjeta",
+  "Herramienta",
+  "Otro",
+];
+
+const COLOR_OPTIONS = [
+  "",
+  "Rojo",
+  "Rosado",
+  "Blanco",
+  "Amarillo",
+  "Naranja",
+  "Lila",
+  "Morado",
+  "Azul",
+  "Verde",
+  "Dorado",
+  "Plateado",
+  "Multicolor",
 ];
 
 const initialCreateForm = {
   codigo: "",
   nombre: "",
   categoria: "Flor",
-  subcategoria: "",
   color: "",
-  descripcion: "",
   proveedorID: "",
-  codigoProveedor: "",
   stockActual: "0",
   stockMinimo: "5",
   valorUnitario: "0",
@@ -39,6 +66,12 @@ const initialStockForm = {
   motivo: "",
 };
 
+const initialProveedorForm = {
+  nombre: "",
+  codigoProveedor: "",
+  activo: true,
+};
+
 function statusClass(estadoStock) {
   const key = normalizeStatus(estadoStock);
   return INVENTORY_STATUS_CLASS[key] || "is-pendiente";
@@ -46,6 +79,7 @@ function statusClass(estadoStock) {
 
 export function InventoryPage({
   session,
+  canViewPipeline,
   canViewPedidos,
   canViewProduccion,
   canViewDomicilios,
@@ -81,13 +115,13 @@ export function InventoryPage({
 
   const [createForm, setCreateForm] = useState(initialCreateForm);
   const [stockForm, setStockForm] = useState(initialStockForm);
+  const [proveedorForm, setProveedorForm] = useState(initialProveedorForm);
   const [creating, setCreating] = useState(false);
   const [savingStock, setSavingStock] = useState(false);
+  const [savingProveedor, setSavingProveedor] = useState(false);
 
   const [showMovimientos, setShowMovimientos] = useState(false);
   const [submenu, setSubmenu] = useState("general");
-  const [submenuOpen, setSubmenuOpen] = useState(true);
-  const submenuRef = useRef(null);
 
   const categorias = useMemo(() => {
     const values = Array.from(new Set(items.map(item => String(item.categoria || "").trim()).filter(Boolean)));
@@ -158,20 +192,6 @@ export function InventoryPage({
     return () => mediaQuery.removeEventListener("change", handleChange);
   }, []);
 
-  useEffect(() => {
-    const handleDocumentClick = event => {
-      if (!submenuOpen) return;
-      const submenuNode = submenuRef.current;
-      if (!submenuNode) return;
-      if (!submenuNode.contains(event.target)) {
-        setSubmenuOpen(false);
-      }
-    };
-
-    document.addEventListener("mousedown", handleDocumentClick);
-    return () => document.removeEventListener("mousedown", handleDocumentClick);
-  }, [submenuOpen]);
-
   const toggleSidebar = () => {
     const isMobile = globalThis.matchMedia("(max-width: 980px)").matches;
     if (isMobile) {
@@ -179,6 +199,13 @@ export function InventoryPage({
       return;
     }
     setSidebarPinned(current => !current);
+  };
+
+  const cancelCreate = () => {
+    setCreateForm(initialCreateForm);
+    setError("");
+    setInfo("");
+    setSubmenu("general");
   };
 
   const submitCreate = async event => {
@@ -192,11 +219,8 @@ export function InventoryPage({
         codigo: String(createForm.codigo || "").trim(),
         nombre: String(createForm.nombre || "").trim(),
         categoria: String(createForm.categoria || "").trim(),
-        subcategoria: String(createForm.subcategoria || "").trim() || null,
         color: String(createForm.color || "").trim() || null,
-        descripcion: String(createForm.descripcion || "").trim() || null,
         proveedorID: createForm.proveedorID ? Number(createForm.proveedorID) : null,
-        codigoProveedor: String(createForm.codigoProveedor || "").trim() || null,
         stockActual: Number(createForm.stockActual || 0),
         stockMinimo: Number(createForm.stockMinimo || 0),
         valorUnitario: Number(createForm.valorUnitario || 0),
@@ -242,6 +266,29 @@ export function InventoryPage({
       setError(nextError?.message || "No fue posible ajustar stock.");
     } finally {
       setSavingStock(false);
+    }
+  };
+
+  const submitProveedor = async event => {
+    event.preventDefault();
+    setSavingProveedor(true);
+    setError("");
+    setInfo("");
+    try {
+      await api.crearProveedorInventario({
+        empresaId,
+        nombre: String(proveedorForm.nombre || "").trim(),
+        codigoProveedor: String(proveedorForm.codigoProveedor || "").trim() || null,
+        activo: Boolean(proveedorForm.activo),
+      });
+      setProveedorForm(initialProveedorForm);
+      await loadProveedores();
+      setInfo("Proveedor creado correctamente.");
+    } catch (nextError) {
+      console.error("Error creando proveedor:", nextError);
+      setError(nextError?.message || "No fue posible crear proveedor.");
+    } finally {
+      setSavingProveedor(false);
     }
   };
 
@@ -301,16 +348,17 @@ export function InventoryPage({
         </div>
 
         <nav className="sidebar-nav" aria-label="Módulos">
-          <button type="button" className="sidebar-nav-btn" onClick={() => {
-            setSidebarMobileOpen(false);
-            onGoPipeline();
-          }}>
-            <span className="sidebar-nav-icon">▦</span><span className="sidebar-nav-text">Pipeline</span>
-          </button>
+          {canViewPipeline ? (
+            <button type="button" className="sidebar-nav-btn" onClick={() => {
+              setSidebarMobileOpen(false);
+              onGoPipeline();
+            }}>
+              <span className="sidebar-nav-icon">▦</span><span className="sidebar-nav-text">Pipeline</span>
+            </button>
+          ) : null}
           {canViewPedidos ? (
             <button type="button" className="sidebar-nav-btn" onClick={() => {
               setSidebarMobileOpen(false);
-              setSubmenuOpen(false);
               onGoPedidos();
             }}>
               <span className="sidebar-nav-icon">🧾</span><span className="sidebar-nav-text">Pedidos</span>
@@ -319,7 +367,6 @@ export function InventoryPage({
           {canViewProduccion ? (
             <button type="button" className="sidebar-nav-btn" onClick={() => {
               setSidebarMobileOpen(false);
-              setSubmenuOpen(false);
               onGoProduccion();
             }}>
               <span className="sidebar-nav-icon">🏭</span><span className="sidebar-nav-text">Producción</span>
@@ -328,49 +375,44 @@ export function InventoryPage({
           {canViewDomicilios ? (
             <button type="button" className="sidebar-nav-btn" onClick={() => {
               setSidebarMobileOpen(false);
-              setSubmenuOpen(false);
               onGoDomicilios();
             }}>
               <span className="sidebar-nav-icon">🛵</span><span className="sidebar-nav-text">Domicilios</span>
             </button>
           ) : null}
           {canViewInventario ? (
-            <div ref={submenuRef} className="sidebar-submenu-wrap">
+            <div className="sidebar-submenu-wrap">
               <button
                 type="button"
                 className="sidebar-nav-btn is-active"
                 onClick={() => {
                   onGoInventario();
-                  setSubmenuOpen(current => !current);
+                  setSidebarMobileOpen(false);
                 }}
               >
-                <span className="sidebar-nav-icon">📦</span><span className="sidebar-nav-text">Inventario {submenuOpen ? "▾" : "▸"}</span>
+                <span className="sidebar-nav-icon">📦</span><span className="sidebar-nav-text">Inventario</span>
               </button>
 
-              {submenuOpen ? (
-                <div className="sidebar-submenu-panel">
-                  {INVENTORY_SUBMENU_OPTIONS.map(option => (
-                    <button
-                      key={option.key}
-                      type="button"
-                      className={`sidebar-submenu-btn ${submenu === option.key ? "is-active" : ""}`}
-                      onClick={() => {
-                        setSubmenu(option.key);
-                        setSubmenuOpen(false);
-                        setSidebarMobileOpen(false);
-                      }}
-                    >
-                      {option.label}
-                    </button>
-                  ))}
-                </div>
-              ) : null}
+              <div className="sidebar-submenu-panel is-inline">
+                {INVENTORY_SUBMENU_OPTIONS.map(option => (
+                  <button
+                    key={option.key}
+                    type="button"
+                    className={`sidebar-submenu-btn ${submenu === option.key ? "is-active" : ""}`}
+                    onClick={() => {
+                      setSubmenu(option.key);
+                      setSidebarMobileOpen(false);
+                    }}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
             </div>
           ) : null}
           {canViewUsuariosPanel ? (
             <button type="button" className="sidebar-nav-btn" onClick={() => {
               setSidebarMobileOpen(false);
-              setSubmenuOpen(false);
               onGoUsuarios();
             }}>
               <span className="sidebar-nav-icon">👥</span><span className="sidebar-nav-text">Gestión Usuarios</span>
@@ -498,24 +540,56 @@ export function InventoryPage({
           <section className="inventory-grid-layout inventory-single-layout">
             <article className="order-block inventory-panel inventory-form-panel">
               <h4>Crear item</h4>
+              <p className="inventory-form-help">
+                Usa este formulario para registrar un nuevo insumo. "Flor" se refiere al tipo de insumo.
+              </p>
               <form className="users-create-form" onSubmit={submitCreate}>
-                <input type="text" placeholder="Codigo" value={createForm.codigo} onChange={event => setCreateForm(current => ({ ...current, codigo: event.target.value }))} required />
-                <input type="text" placeholder="Nombre" value={createForm.nombre} onChange={event => setCreateForm(current => ({ ...current, nombre: event.target.value }))} required />
-                <input type="text" placeholder="Categoria" value={createForm.categoria} onChange={event => setCreateForm(current => ({ ...current, categoria: event.target.value }))} required />
-                <input type="text" placeholder="Subcategoria" value={createForm.subcategoria} onChange={event => setCreateForm(current => ({ ...current, subcategoria: event.target.value }))} />
-                <input type="text" placeholder="Color" value={createForm.color} onChange={event => setCreateForm(current => ({ ...current, color: event.target.value }))} />
-                <textarea className="inventory-textarea" placeholder="Descripcion" value={createForm.descripcion} onChange={event => setCreateForm(current => ({ ...current, descripcion: event.target.value }))} />
+                <label className="inventory-field">
+                  <span>Código interno</span>
+                  <input type="text" placeholder="Ej: ROSA-ROJA-001" value={createForm.codigo} onChange={event => setCreateForm(current => ({ ...current, codigo: event.target.value }))} required />
+                </label>
+                <label className="inventory-field">
+                  <span>Nombre del insumo</span>
+                  <input type="text" placeholder="Ej: Rosa roja premium" value={createForm.nombre} onChange={event => setCreateForm(current => ({ ...current, nombre: event.target.value }))} required />
+                </label>
+                <label className="inventory-field">
+                  <span>Tipo de insumo</span>
+                  <select value={createForm.categoria} onChange={event => setCreateForm(current => ({ ...current, categoria: event.target.value }))} required>
+                    {INVENTORY_TYPE_OPTIONS.map(option => <option key={option} value={option}>{option}</option>)}
+                  </select>
+                </label>
+                <label className="inventory-field">
+                  <span>Color principal</span>
+                  <select value={createForm.color} onChange={event => setCreateForm(current => ({ ...current, color: event.target.value }))}>
+                    <option value="">Sin color especifico</option>
+                    {COLOR_OPTIONS.filter(Boolean).map(option => <option key={option} value={option}>{option}</option>)}
+                  </select>
+                </label>
+                <label className="inventory-field">
+                  <span>Proveedor</span>
                 <select value={createForm.proveedorID} onChange={event => setCreateForm(current => ({ ...current, proveedorID: event.target.value }))}>
                   <option value="">Sin proveedor</option>
-                  {proveedores.map(item => <option key={item.idProveedor} value={item.idProveedor}>{item.nombre}</option>)}
+                  {proveedores.map(item => <option key={item.idProveedor} value={item.idProveedor}>{item.nombre}{item.codigoProveedor ? ` - ${item.codigoProveedor}` : ""}</option>)}
                 </select>
-                <input type="text" placeholder="Codigo proveedor" value={createForm.codigoProveedor} onChange={event => setCreateForm(current => ({ ...current, codigoProveedor: event.target.value }))} />
+                </label>
                 <div className="inventory-two-cols">
-                  <input type="number" min="0" step="0.01" placeholder="Stock actual" value={createForm.stockActual} onChange={event => setCreateForm(current => ({ ...current, stockActual: event.target.value }))} required />
-                  <input type="number" min="0" step="0.01" placeholder="Stock minimo" value={createForm.stockMinimo} onChange={event => setCreateForm(current => ({ ...current, stockMinimo: event.target.value }))} required />
+                  <label className="inventory-field">
+                    <span>Stock inicial</span>
+                    <input type="number" min="0" step="0.01" placeholder="Cantidad con la que entra al inventario" value={createForm.stockActual} onChange={event => setCreateForm(current => ({ ...current, stockActual: event.target.value }))} required />
+                  </label>
+                  <label className="inventory-field">
+                    <span>Stock mínimo</span>
+                    <input type="number" min="0" step="0.01" placeholder="Cantidad para alerta de reposición" value={createForm.stockMinimo} onChange={event => setCreateForm(current => ({ ...current, stockMinimo: event.target.value }))} required />
+                  </label>
                 </div>
-                <input type="number" min="0" step="0.01" placeholder="Valor unitario" value={createForm.valorUnitario} onChange={event => setCreateForm(current => ({ ...current, valorUnitario: event.target.value }))} required />
-                <button type="submit" className="btn-primary" disabled={creating}>{creating ? "Guardando..." : "Crear item"}</button>
+                <label className="inventory-field">
+                  <span>Costo unitario</span>
+                  <input type="number" min="0" step="0.01" placeholder="Valor de compra por unidad" value={createForm.valorUnitario} onChange={event => setCreateForm(current => ({ ...current, valorUnitario: event.target.value }))} required />
+                </label>
+                <div className="order-actions">
+                  <button type="submit" className="btn-primary" disabled={creating}>{creating ? "Guardando..." : "Crear item"}</button>
+                  <button type="button" className="btn-outline" onClick={cancelCreate} disabled={creating}>Cancelar</button>
+                </div>
               </form>
             </article>
           </section>
@@ -555,6 +629,98 @@ export function InventoryPage({
             </article>
 
             {movimientosTable}
+          </section>
+        ) : null}
+
+        {submenu === "proveedores" ? (
+          <section className="inventory-grid-layout inventory-single-layout inventory-provider-layout">
+            <article className="order-block inventory-panel inventory-form-panel inventory-provider-panel">
+              <h4>Administrar proveedores</h4>
+              <p className="inventory-form-help">
+                Este formulario solo guarda los campos que hoy existen en la tabla <code>petalops.proveedor</code>:
+                nombre, codigo y estado activo. Al crear uno nuevo, queda disponible de inmediato en
+                <strong> Crear item</strong>.
+              </p>
+              <form className="users-create-form inventory-provider-form" onSubmit={submitProveedor}>
+                <label className="inventory-field">
+                  <span>Nombre proveedor</span>
+                  <small className="inventory-field-hint">Nombre visible en inventario y en el selector de proveedores.</small>
+                  <input
+                    type="text"
+                    placeholder="Ej: Flores de la Sabana"
+                    value={proveedorForm.nombre}
+                    onChange={event => setProveedorForm(current => ({ ...current, nombre: event.target.value }))}
+                    required
+                  />
+                </label>
+                <label className="inventory-field">
+                  <span>Código proveedor</span>
+                  <small className="inventory-field-hint">Opcional. Sirve para identificar al proveedor con un consecutivo interno.</small>
+                  <input
+                    type="text"
+                    placeholder="Ej: PROV-FLO-003"
+                    value={proveedorForm.codigoProveedor}
+                    onChange={event => setProveedorForm(current => ({ ...current, codigoProveedor: event.target.value }))}
+                  />
+                </label>
+                <label className="inventory-field inventory-checkbox-field">
+                  <input
+                    type="checkbox"
+                    checked={proveedorForm.activo}
+                    onChange={event => setProveedorForm(current => ({ ...current, activo: event.target.checked }))}
+                  />
+                  <span>Dejar proveedor activo</span>
+                </label>
+                <div className="order-actions inventory-provider-actions">
+                  <button type="submit" className="btn-primary" disabled={savingProveedor}>
+                    {savingProveedor ? "Guardando..." : "Crear proveedor"}
+                  </button>
+                  <button
+                    type="button"
+                    className="btn-outline"
+                    disabled={savingProveedor}
+                    onClick={() => {
+                      setProveedorForm(initialProveedorForm);
+                      setError("");
+                      setInfo("");
+                    }}
+                  >
+                    Limpiar
+                  </button>
+                </div>
+              </form>
+            </article>
+
+            <article className="orders-table-wrap users-table-wrap users-table-panel inventory-provider-table-panel">
+              <div className="inventory-section-title">
+                <h4>Proveedores registrados</h4>
+                <p>Lista base usada por el formulario de inventario para asociar items a un proveedor.</p>
+              </div>
+              <table className="orders-table users-table inventory-table">
+                <thead>
+                  <tr>
+                    <th>ID</th>
+                    <th>Nombre</th>
+                    <th>Código</th>
+                    <th>Estado</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {proveedores.map(item => (
+                    <tr key={item.idProveedor}>
+                      <td data-label="ID">{item.idProveedor}</td>
+                      <td data-label="Nombre">{item.nombre}</td>
+                      <td data-label="Código">{item.codigoProveedor || "-"}</td>
+                      <td data-label="Estado">
+                        <span className={`order-badge ${item.activo ? "is-entregado" : "is-cancelado"}`}>
+                          {item.activo ? "Activo" : "Inactivo"}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </article>
           </section>
         ) : null}
       </main>

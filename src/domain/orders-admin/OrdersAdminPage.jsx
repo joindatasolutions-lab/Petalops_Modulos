@@ -1,7 +1,7 @@
 ﻿import { useCallback, useEffect, useMemo, useState } from "react";
 import { tenantConfig } from "../../config/tenantConfig.js";
 import { createApiClient } from "../../infrastructure/apiClient.js";
-import { formatearCOP, normalizeStatus, toIsoDateEnd, toIsoDateStart } from "../../shared/utils.js";
+import { formatearCOP, normalizeStatus, splitDateTimeParts, toIsoDateEnd, toIsoDateStart } from "../../shared/utils.js";
 import { useDebouncedValue } from "../../shared/useDebouncedValue.js";
 
 const BADGE_CLASS_BY_STATUS = {
@@ -20,7 +20,7 @@ const initialFilters = {
   pageSize: 20
 };
 
-export function OrdersAdminPage({ session, canViewPedidos, canViewProduccion, canViewDomicilios, canViewInventario, canViewUsuariosPanel, onLogout, onGoPipeline, onGoPedidos, onGoProduccion, onGoDomicilios, onGoInventario, onGoUsuarios }) {
+export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canViewProduccion, canViewDomicilios, canViewInventario, canViewUsuariosPanel, onLogout, onGoPipeline, onGoPedidos, onGoProduccion, onGoDomicilios, onGoInventario, onGoUsuarios }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [items, setItems] = useState([]);
@@ -237,18 +237,20 @@ export function OrdersAdminPage({ session, canViewPedidos, canViewProduccion, ca
           </div>
 
           <nav className="sidebar-nav" aria-label="Módulos">
-            <button
-              type="button"
-              className="sidebar-nav-btn"
-              title="Pipeline"
-              onClick={() => {
-                setSidebarMobileOpen(false);
-                onGoPipeline();
-              }}
-            >
-              <span className="sidebar-nav-icon">▦</span>
-              <span className="sidebar-nav-text">Pipeline</span>
-            </button>
+            {canViewPipeline ? (
+              <button
+                type="button"
+                className="sidebar-nav-btn"
+                title="Pipeline"
+                onClick={() => {
+                  setSidebarMobileOpen(false);
+                  onGoPipeline();
+                }}
+              >
+                <span className="sidebar-nav-icon">▦</span>
+                <span className="sidebar-nav-text">Pipeline</span>
+              </button>
+            ) : null}
             {canViewPedidos ? (
               <button
                 type="button"
@@ -403,14 +405,13 @@ export function OrdersAdminPage({ session, canViewPedidos, canViewProduccion, ca
                 {items.map(item => {
                   const statusClass = statusBadgeClass(item.estado);
                   const productText = (item.productos || []).slice(0, 2).join(", ");
-                  const phone = String(item.telefonoCompleto || item.telefono || "").trim();
-                  const waPhone = phone.replace(/\+/g, "");
+                  const waPhone = String(item.telefonoCompleto || item.telefono || "").trim().replace(/\+/g, "");
                   const canAct = isPendingStatus(item.estado);
                   const canDownloadInvoice = canInvoiceStatus(item.estado);
                   const canViewMessageCard = canMessageCardStatus(item.estado);
                   const pedidoId = Number(item.pedidoID);
-                  const { fechaPedido, horaPedido } = splitDateTime(item.fechaPedido || item.fecha);
-                  const { fechaPedido: fechaEntrega, horaPedido: horaEntrega } = splitDateTime(item.fechaEntrega);
+                  const { date: fechaPedido, time: horaPedido } = splitDateTimeParts(item.fechaPedido || item.fecha);
+                  const { date: fechaEntrega, time: horaEntrega } = splitDateTimeParts(item.fechaEntrega);
 
                   return (
                     <tr key={pedidoId || `${item.numeroPedido}-${item.fecha}`}>
@@ -427,7 +428,6 @@ export function OrdersAdminPage({ session, canViewPedidos, canViewProduccion, ca
                       <td data-label="Estado"><span className={`order-badge ${statusClass}`}>{item.estado || "-"}</span></td>
                       <td data-label="Acciones">
                         <div className="order-actions">
-                          <a href={`tel:${phone}`} className="order-icon" title="Llamar">📞</a>
                           <a href={`https://wa.me/${waPhone}`} target="_blank" rel="noreferrer" className="order-icon" title="WhatsApp">💬</a>
                           <button type="button" className="order-icon" onClick={() => openDetail(pedidoId)} title="Ver detalle">👁</button>
                           <button type="button" className="order-icon" onClick={() => approveOrder(pedidoId)} disabled={!canAct} title="Aprobar pedido">✔</button>
@@ -549,9 +549,6 @@ export function OrdersAdminPage({ session, canViewPedidos, canViewProduccion, ca
             <section className="message-card-canvas" aria-label="Tarjeta imprimible">
               <div className="message-card-content" style={{ textAlign: cardTextAlign }}>
               <p className="message-card-meta">
-                {String(messageCardOrder?.numeroPedido || "-")}
-              </p>
-              <p className="message-card-meta">
                 {formatFechaEntregaTarjeta(messageCardData?.fechaEntrega || messageCardOrder?.fechaEntrega)}
               </p>
               <p className="message-card-meta message-card-destinatario-meta">
@@ -602,7 +599,8 @@ function canMessageCardStatus(status) {
 
 function OrderDetail({ detalle }) {
   const productos = Array.isArray(detalle.productos) ? detalle.productos : [];
-  const { fechaPedido, horaPedido } = splitDateTime(detalle.fechaPedido || detalle.fecha);
+  const { date: fechaPedido, time: horaPedido } = splitDateTimeParts(detalle.fechaPedido || detalle.fecha);
+  const { date: fechaEntrega, time: horaEntrega } = splitDateTimeParts(detalle.destinatario?.fechaEntrega);
 
   return (
     <>
@@ -630,8 +628,8 @@ function OrderDetail({ detalle }) {
         <p><strong>Teléfono:</strong> {detalle.destinatario?.telefono || "-"}</p>
         <p><strong>Dirección:</strong> {detalle.destinatario?.direccion || "-"}</p>
         <p><strong>Barrio:</strong> {detalle.destinatario?.barrio || "-"}</p>
-        <p><strong>Fecha entrega:</strong> {detalle.destinatario?.fechaEntrega || "-"}</p>
-        <p><strong>Hora entrega:</strong> {detalle.destinatario?.horaEntrega || "-"}</p>
+        <p><strong>Fecha entrega:</strong> {fechaEntrega || "-"}</p>
+        <p><strong>Hora entrega:</strong> {detalle.destinatario?.horaEntrega || horaEntrega || "-"}</p>
         <p><strong>Mensaje:</strong> {detalle.destinatario?.mensajeTarjeta || "-"}</p>
       </section>
 
@@ -664,24 +662,6 @@ function OrderDetail({ detalle }) {
   );
 }
 
-function splitDateTime(value) {
-  const text = String(value || "").trim();
-  if (!text) {
-    return { fechaPedido: "", horaPedido: "" };
-  }
-
-  if (text.includes("T")) {
-    const [datePart, timePart = ""] = text.split("T");
-    return { fechaPedido: datePart || "", horaPedido: timePart.slice(0, 8) };
-  }
-
-  if (text.includes(" ")) {
-    const [datePart, timePart = ""] = text.split(" ");
-    return { fechaPedido: datePart || "", horaPedido: timePart.slice(0, 8) };
-  }
-
-  return { fechaPedido: text, horaPedido: "" };
-}
 
 function formatFechaEntregaTarjeta(value) {
   const text = String(value || "").trim();

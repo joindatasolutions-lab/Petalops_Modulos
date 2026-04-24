@@ -1,7 +1,7 @@
 ﻿import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { tenantConfig } from "../../config/tenantConfig.js";
 import { createApiClient } from "../../infrastructure/apiClient.js";
-import { normalizeStatus } from "../../shared/utils.js";
+import { formatDateOnly, formatDateTimeCompact, normalizeStatus } from "../../shared/utils.js";
 
 const ESTADOS_UI = ["Pendiente", "EnProduccion", "ParaEntrega", "Cancelado"];
 const ESTADOS_FILTRO_DEFAULT = ["Pendiente", "EnProduccion"];
@@ -24,16 +24,6 @@ const BADGE_CLASS_BY_STATUS = {
 
 function todayIsoDate() {
   return new Date().toISOString().slice(0, 10);
-}
-
-function formatDateTime(value) {
-  const text = String(value || "").trim();
-  if (!text) return "-";
-  if (text.includes("T")) {
-    const [datePart, timePart = ""] = text.split("T");
-    return `${datePart} ${timePart.slice(0, 5)}`.trim();
-  }
-  return text;
 }
 
 function statusBadgeClass(status) {
@@ -59,7 +49,7 @@ function normalizeRole(value) {
   return String(value || "").trim().toLowerCase().replace(/\s+/g, "_");
 }
 
-export function ProductionPage({ session, canViewPedidos, canViewProduccion, canViewDomicilios, canViewInventario, canViewUsuariosPanel, onLogout, onGoPipeline, onGoPedidos, onGoProduccion, onGoDomicilios, onGoInventario, onGoUsuarios }) {
+export function ProductionPage({ session, canViewPipeline, canViewPedidos, canViewProduccion, canViewDomicilios, canViewInventario, canViewUsuariosPanel, onLogout, onGoPipeline, onGoPedidos, onGoProduccion, onGoDomicilios, onGoInventario, onGoUsuarios }) {
   const api = useMemo(() => createApiClient(tenantConfig), []);
   const empresaId = Number(session?.empresaID || tenantConfig.empresaId);
   const sucursalId = Number(session?.sucursalID || tenantConfig.sucursalId);
@@ -97,8 +87,6 @@ export function ProductionPage({ session, canViewPedidos, canViewProduccion, can
   const [metricasHasta, setMetricasHasta] = useState(todayIsoDate());
   const [historial, setHistorial] = useState([]);
   const [submenu, setSubmenu] = useState("pedidos");
-  const [submenuOpen, setSubmenuOpen] = useState(true);
-  const submenuRef = useRef(null);
 
   const [sidebarPinned, setSidebarPinned] = useState(false);
   const [sidebarMobileOpen, setSidebarMobileOpen] = useState(false);
@@ -205,20 +193,6 @@ export function ProductionPage({ session, canViewPedidos, canViewProduccion, can
     if (visibleSubmenuOptions.some(item => item.key === submenu)) return;
     setSubmenu("pedidos");
   }, [submenu, visibleSubmenuOptions]);
-
-  useEffect(() => {
-    const handleDocumentClick = event => {
-      if (!submenuOpen) return;
-      const submenuNode = submenuRef.current;
-      if (!submenuNode) return;
-      if (!submenuNode.contains(event.target)) {
-        setSubmenuOpen(false);
-      }
-    };
-
-    document.addEventListener("mousedown", handleDocumentClick);
-    return () => document.removeEventListener("mousedown", handleDocumentClick);
-  }, [submenuOpen]);
 
   const toggleSidebar = () => {
     const isMobile = globalThis.matchMedia("(max-width: 980px)").matches;
@@ -404,18 +378,20 @@ export function ProductionPage({ session, canViewPedidos, canViewProduccion, can
         </div>
 
         <nav className="sidebar-nav" aria-label="Módulos">
-          <button
-            type="button"
-            className="sidebar-nav-btn"
-            title="Pipeline"
-            onClick={() => {
-              setSidebarMobileOpen(false);
-              onGoPipeline();
-            }}
-          >
-            <span className="sidebar-nav-icon">▦</span>
-            <span className="sidebar-nav-text">Pipeline</span>
-          </button>
+          {canViewPipeline ? (
+            <button
+              type="button"
+              className="sidebar-nav-btn"
+              title="Pipeline"
+              onClick={() => {
+                setSidebarMobileOpen(false);
+                onGoPipeline();
+              }}
+            >
+              <span className="sidebar-nav-icon">▦</span>
+              <span className="sidebar-nav-text">Pipeline</span>
+            </button>
+          ) : null}
           {canViewPedidos ? (
             <button
               type="button"
@@ -423,7 +399,6 @@ export function ProductionPage({ session, canViewPedidos, canViewProduccion, can
               title="Pedidos"
               onClick={() => {
                 setSidebarMobileOpen(false);
-                setSubmenuOpen(false);
                 onGoPedidos();
               }}
             >
@@ -432,47 +407,37 @@ export function ProductionPage({ session, canViewPedidos, canViewProduccion, can
             </button>
           ) : null}
           {canViewProduccion ? (
-            <div ref={submenuRef} className="sidebar-submenu-wrap">
+            <div className="sidebar-submenu-wrap">
               <button
                 type="button"
                 className="sidebar-nav-btn is-active"
                 title="Producción"
                 onClick={() => {
                   onGoProduccion();
-                  if (canManageProductionActions) {
-                    setSubmenuOpen(current => !current);
-                  } else {
-                    setSubmenu("pedidos");
-                    setSubmenuOpen(false);
-                    setSidebarMobileOpen(false);
-                  }
+                  setSubmenu("pedidos");
+                  setSidebarMobileOpen(false);
                 }}
               >
                 <span className="sidebar-nav-icon">🏭</span>
-                <span className="sidebar-nav-text">
-                  Producción {canManageProductionActions ? (submenuOpen ? "▾" : "▸") : ""}
-                </span>
+                <span className="sidebar-nav-text">Producción</span>
               </button>
 
-              {canManageProductionActions && submenuOpen && (
-                <div className="sidebar-submenu-panel">
-                  {visibleSubmenuOptions.map(item => (
-                    <button
-                      key={item.key}
-                      type="button"
-                      className={`sidebar-submenu-btn ${submenu === item.key ? "is-active" : ""}`}
-                      title={`Ir a ${item.label}`}
-                      onClick={() => {
-                        setSubmenu(item.key);
-                        setSubmenuOpen(false);
-                        setSidebarMobileOpen(false);
-                      }}
-                    >
-                      {item.label}
-                    </button>
-                  ))}
-                </div>
-              )}
+              <div className="sidebar-submenu-panel is-inline">
+                {visibleSubmenuOptions.map(item => (
+                  <button
+                    key={item.key}
+                    type="button"
+                    className={`sidebar-submenu-btn ${submenu === item.key ? "is-active" : ""}`}
+                    title={`Ir a ${item.label}`}
+                    onClick={() => {
+                      setSubmenu(item.key);
+                      setSidebarMobileOpen(false);
+                    }}
+                  >
+                    {item.label}
+                  </button>
+                ))}
+              </div>
             </div>
           ) : null}
           {canViewDomicilios ? (
@@ -482,7 +447,6 @@ export function ProductionPage({ session, canViewPedidos, canViewProduccion, can
               title="Domicilios"
               onClick={() => {
                 setSidebarMobileOpen(false);
-                setSubmenuOpen(false);
                 onGoDomicilios();
               }}
             >
@@ -497,7 +461,6 @@ export function ProductionPage({ session, canViewPedidos, canViewProduccion, can
               title="Inventario"
               onClick={() => {
                 setSidebarMobileOpen(false);
-                setSubmenuOpen(false);
                 onGoInventario();
               }}
             >
@@ -512,7 +475,6 @@ export function ProductionPage({ session, canViewPedidos, canViewProduccion, can
               title="Gestin Usuarios"
               onClick={() => {
                 setSidebarMobileOpen(false);
-                setSubmenuOpen(false);
                 onGoUsuarios();
               }}
             >
@@ -622,11 +584,11 @@ export function ProductionPage({ session, canViewPedidos, canViewProduccion, can
                       </td>
                       <td>{item.producto || "-"}</td>
                       <td>{item.cliente || "-"}</td>
-                      <td>{formatDateTime(item.fechaEntrega)}</td>
+                      <td>{formatDateOnly(item.fechaEntrega) || "-"}</td>
                       <td>{item.horaEntrega || "-"}</td>
                       <td>{item.floristaAsignado || "Sin asignar"}</td>
                       <td><span className={`order-badge ${statusBadgeClass(item.estado)}`}>{item.estado || "-"}</span></td>
-                      <td>{formatDateTime(item.fechaAsignacion)}</td>
+                      <td>{formatDateTimeCompact(item.fechaAsignacion) || "-"}</td>
                       <td>{typeof item.tiempoRestanteHoras === "number" ? `${item.tiempoRestanteHoras} h` : "-"}</td>
                       <td>{`${item.tiempoEstimadoMin ?? "-"} / ${item.tiempoRealMin ?? "-"}`}</td>
                       <td>{item.prioridad || "MEDIA"}</td>
@@ -670,10 +632,10 @@ export function ProductionPage({ session, canViewPedidos, canViewProduccion, can
                   <div className="production-capsule-grid">
                     <p><span>Producto</span><strong>{item.producto || "-"}</strong></p>
                     <p><span>Cliente</span><strong>{item.cliente || "-"}</strong></p>
-                    <p><span>Fecha entrega</span><strong>{formatDateTime(item.fechaEntrega)}</strong></p>
+                    <p><span>Fecha entrega</span><strong>{formatDateOnly(item.fechaEntrega) || "-"}</strong></p>
                     <p><span>Hora entrega</span><strong>{item.horaEntrega || "-"}</strong></p>
                     <p><span>Florista</span><strong>{item.floristaAsignado || "Sin asignar"}</strong></p>
-                    <p><span>Asignación</span><strong>{formatDateTime(item.fechaAsignacion)}</strong></p>
+                    <p><span>Asignación</span><strong>{formatDateTimeCompact(item.fechaAsignacion) || "-"}</strong></p>
                     <p><span>Tiempo</span><strong>{typeof item.tiempoRestanteHoras === "number" ? `${item.tiempoRestanteHoras} h` : "-"}</strong></p>
                     <p><span>Estimado/Real</span><strong>{`${item.tiempoEstimadoMin ?? "-"} / ${item.tiempoRealMin ?? "-"}`}</strong></p>
                     <p><span>Prioridad</span><strong>{item.prioridad || "MEDIA"}</strong></p>
@@ -715,7 +677,7 @@ export function ProductionPage({ session, canViewPedidos, canViewProduccion, can
               {historial.length === 0 ? <li>Sin datos</li> : historial.map((item, idx) => (
                 <li key={`${item.produccionID}-${item.fechaCambio}-${idx}`}>
                   <span>P{item.produccionID} Â· {item.usuarioCambio} Â· {item.motivo}</span>
-                  <strong>{formatDateTime(item.fechaCambio)}</strong>
+                  <strong>{formatDateTimeCompact(item.fechaCambio) || "-"}</strong>
                 </li>
               ))}
             </ul>
@@ -780,7 +742,7 @@ export function ProductionPage({ session, canViewPedidos, canViewProduccion, can
         <div className="orders-drawer-head">
           <strong>Acciones Domicilios</strong>
           <div className="orders-drawer-head-actions">
-            <button type="button" className="icon-btn" onClick={closeActionsDrawer} title="Cerrar barra lateral"></button>
+            <button type="button" className="icon-btn" onClick={closeActionsDrawer} title="Cerrar barra lateral">✕</button>
           </div>
         </div>
 
@@ -795,7 +757,7 @@ export function ProductionPage({ session, canViewPedidos, canViewProduccion, can
                 <p><strong>Cliente:</strong> {selectedItem.cliente || "-"}</p>
                 <p><strong>Producto:</strong> {selectedItem.producto || "-"}</p>
                 <p><strong>Estado:</strong> {selectedItem.estado || "-"}</p>
-                <p><strong>Fecha Entrega:</strong> {formatDateTime(selectedItem.fechaEntrega)}</p>
+                <p><strong>Fecha Entrega:</strong> {formatDateOnly(selectedItem.fechaEntrega) || "-"}</p>
                 <p><strong>Hora Entrega:</strong> {selectedItem.horaEntrega || "-"}</p>
               </section>
 

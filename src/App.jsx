@@ -27,6 +27,21 @@ function isEmpresaAdminRole(session) {
   return role === "admin" || role === "empresa_admin";
 }
 
+function canAccessPipeline(session) {
+  return Boolean(session?.esGlobalJoin || isEmpresaAdminRole(session));
+}
+
+function resolveDefaultView(session) {
+  if (!session) return "pipeline";
+  if (canAccessPipeline(session)) return "pipeline";
+  if (hasModuleAccess(session, "pedidos")) return "pedidos";
+  if (hasModuleAccess(session, "produccion")) return "produccion";
+  if (hasModuleAccess(session, "domicilios")) return "domicilios";
+  if (hasModuleAccess(session, "inventario")) return "inventario";
+  if (session?.esGlobalJoin || isEmpresaAdminRole(session)) return "usuarios";
+  return "pedidos";
+}
+
 export default function App() {
   const api = useMemo(() => createApiClient(tenantConfig), []);
   const [session, setSession] = useState(null);
@@ -59,19 +74,14 @@ export default function App() {
   const canProduccion = hasModuleAccess(session, "produccion");
   const canDomicilios = hasModuleAccess(session, "domicilios");
   const canInventario = hasModuleAccess(session, "inventario");
+  const canPipeline = canAccessPipeline(session);
   const canUsuariosGlobal = Boolean(session?.esGlobalJoin);
   const canUsuariosPanel = Boolean(canUsuariosGlobal || isEmpresaAdminRole(session));
 
   useEffect(() => {
     if (!session) return;
-    if (view === "pipeline" && !canPedidos && !canProduccion && !canDomicilios) {
-      if (canPedidos) {
-        setView("pedidos");
-      } else if (canProduccion) {
-        setView("produccion");
-      } else if (canDomicilios) {
-        setView("domicilios");
-      }
+    if (view === "pipeline" && !canPipeline) {
+      setView(resolveDefaultView(session));
       return;
     }
     if (view === "pedidos" && !canPedidos) {
@@ -121,7 +131,7 @@ export default function App() {
         setView("domicilios");
       }
     }
-  }, [session, view, canPedidos, canProduccion, canDomicilios, canInventario, canUsuariosPanel]);
+  }, [session, view, canPipeline, canPedidos, canProduccion, canDomicilios, canInventario, canUsuariosPanel]);
 
   const handleLogin = async ({ login, password }) => {
     setAuthError("");
@@ -130,19 +140,7 @@ export default function App() {
       const response = await api.login({ login, password });
       globalThis.localStorage?.setItem(TOKEN_KEY, response.accessToken);
       setSession(response.user);
-      if (hasModuleAccess(response.user, "pedidos") || hasModuleAccess(response.user, "produccion") || hasModuleAccess(response.user, "domicilios")) {
-        setView("pipeline");
-      } else if (!hasModuleAccess(response.user, "pedidos") && hasModuleAccess(response.user, "produccion")) {
-        setView("produccion");
-      } else if (!hasModuleAccess(response.user, "pedidos") && !hasModuleAccess(response.user, "produccion") && hasModuleAccess(response.user, "domicilios")) {
-        setView("domicilios");
-      } else if (!hasModuleAccess(response.user, "pedidos") && !hasModuleAccess(response.user, "produccion") && !hasModuleAccess(response.user, "domicilios") && hasModuleAccess(response.user, "inventario")) {
-        setView("inventario");
-      } else if (response.user?.esGlobalJoin || isEmpresaAdminRole(response.user)) {
-        setView("usuarios");
-      } else {
-        setView("pedidos");
-      }
+      setView(resolveDefaultView(response.user));
     } catch (error) {
       const message = error?.message;
       setAuthError(
@@ -185,13 +183,14 @@ export default function App() {
     ? (
       <PipelineOperativo
         session={session}
+        canViewPipeline={canPipeline}
         canViewPedidos={canPedidos}
         canViewProduccion={canProduccion}
         canViewDomicilios={canDomicilios}
         canViewInventario={canInventario}
         canViewUsuariosPanel={canUsuariosPanel}
         onLogout={handleLogout}
-        onGoPipeline={() => setView("pipeline")}
+        onGoPipeline={() => canPipeline && setView("pipeline")}
         onGoPedidos={() => canPedidos && setView("pedidos")}
         onGoProduccion={() => canProduccion && setView("produccion")}
         onGoDomicilios={() => canDomicilios && setView("domicilios")}
@@ -203,13 +202,14 @@ export default function App() {
     ? (
       <OrdersAdminPage
         session={session}
+        canViewPipeline={canPipeline}
         canViewPedidos={canPedidos}
         canViewProduccion={canProduccion}
         canViewDomicilios={canDomicilios}
         canViewInventario={canInventario}
         canViewUsuariosPanel={canUsuariosPanel}
         onLogout={handleLogout}
-        onGoPipeline={() => setView("pipeline")}
+        onGoPipeline={() => canPipeline && setView("pipeline")}
         onGoPedidos={() => canPedidos && setView("pedidos")}
         onGoProduccion={() => canProduccion && setView("produccion")}
         onGoDomicilios={() => canDomicilios && setView("domicilios")}
@@ -221,13 +221,14 @@ export default function App() {
       ? (
       <ProductionPage
         session={session}
+        canViewPipeline={canPipeline}
         canViewPedidos={canPedidos}
         canViewProduccion={canProduccion}
         canViewDomicilios={canDomicilios}
         canViewInventario={canInventario}
         canViewUsuariosPanel={canUsuariosPanel}
         onLogout={handleLogout}
-        onGoPipeline={() => setView("pipeline")}
+        onGoPipeline={() => canPipeline && setView("pipeline")}
         onGoPedidos={() => canPedidos && setView("pedidos")}
         onGoProduccion={() => canProduccion && setView("produccion")}
         onGoDomicilios={() => canDomicilios && setView("domicilios")}
@@ -239,13 +240,14 @@ export default function App() {
         ? (
         <DeliveryPage
           session={session}
+          canViewPipeline={canPipeline}
           canViewPedidos={canPedidos}
           canViewProduccion={canProduccion}
           canViewDomicilios={canDomicilios}
           canViewInventario={canInventario}
           canViewUsuariosPanel={canUsuariosPanel}
           onLogout={handleLogout}
-          onGoPipeline={() => setView("pipeline")}
+          onGoPipeline={() => canPipeline && setView("pipeline")}
           onGoPedidos={() => canPedidos && setView("pedidos")}
           onGoProduccion={() => canProduccion && setView("produccion")}
           onGoDomicilios={() => canDomicilios && setView("domicilios")}
@@ -257,12 +259,13 @@ export default function App() {
           ? (
           <InventoryPage
             session={session}
+            canViewPipeline={canPipeline}
             canViewPedidos={canPedidos}
             canViewProduccion={canProduccion}
             canViewDomicilios={canDomicilios}
             canViewInventario={canInventario}
             canViewUsuariosPanel={canUsuariosPanel}
-            onGoPipeline={() => setView("pipeline")}
+            onGoPipeline={() => canPipeline && setView("pipeline")}
             onGoPedidos={() => canPedidos && setView("pedidos")}
             onGoProduccion={() => canProduccion && setView("produccion")}
             onGoDomicilios={() => canDomicilios && setView("domicilios")}
@@ -274,12 +277,13 @@ export default function App() {
         : (
           <UsersManagementPage
             session={session}
+            canViewPipeline={canPipeline}
             canViewPedidos={canPedidos}
             canViewProduccion={canProduccion}
             canViewDomicilios={canDomicilios}
             canViewInventario={canInventario}
             canViewUsuariosGlobal={canUsuariosGlobal}
-            onGoPipeline={() => setView("pipeline")}
+            onGoPipeline={() => canPipeline && setView("pipeline")}
             onGoPedidos={() => canPedidos && setView("pedidos")}
             onGoProduccion={() => canProduccion && setView("produccion")}
             onGoDomicilios={() => canDomicilios && setView("domicilios")}

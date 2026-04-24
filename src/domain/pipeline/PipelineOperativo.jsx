@@ -38,6 +38,7 @@ const INITIAL_FILTERS = {
 
 export function PipelineOperativo({
   session,
+  canViewPipeline,
   canViewPedidos,
   canViewProduccion,
   canViewDomicilios,
@@ -69,7 +70,6 @@ export function PipelineOperativo({
   const [selectedDetail, setSelectedDetail] = useState(null);
   const [sidebarPinned, setSidebarPinned] = useState(false);
   const [sidebarMobileOpen, setSidebarMobileOpen] = useState(false);
-  const [isExpanded, setIsExpanded] = useState(false);
 
   const empresaId = Number(session?.empresaID || tenantConfig.empresaId);
   const sucursalFromSession = session?.sucursalID != null ? Number(session.sucursalID) : null;
@@ -163,10 +163,12 @@ export function PipelineOperativo({
           <img src="/petalops-logo-full.png" alt="PetalOps" className="sidebar-brand-logo-full" />
         </div>
         <nav className="sidebar-nav" aria-label="Módulos">
-          <button type="button" className="sidebar-nav-btn is-active" onClick={() => { setSidebarMobileOpen(false); onGoPipeline?.(); }}>
-            <span className="sidebar-nav-icon">▦</span>
-            <span className="sidebar-nav-text">Pipeline</span>
-          </button>
+          {canViewPipeline ? (
+            <button type="button" className="sidebar-nav-btn is-active" onClick={() => { setSidebarMobileOpen(false); onGoPipeline?.(); }}>
+              <span className="sidebar-nav-icon">▦</span>
+              <span className="sidebar-nav-text">Pipeline</span>
+            </button>
+          ) : null}
           {canViewPedidos ? <button type="button" className="sidebar-nav-btn" onClick={() => { setSidebarMobileOpen(false); onGoPedidos(); }}><span className="sidebar-nav-icon">🧾</span><span className="sidebar-nav-text">Pedidos</span></button> : null}
           {canViewProduccion ? <button type="button" className="sidebar-nav-btn" onClick={() => { setSidebarMobileOpen(false); onGoProduccion(); }}><span className="sidebar-nav-icon">🏭</span><span className="sidebar-nav-text">Producción</span></button> : null}
           {canViewDomicilios ? <button type="button" className="sidebar-nav-btn" onClick={() => { setSidebarMobileOpen(false); onGoDomicilios(); }}><span className="sidebar-nav-icon">🛵</span><span className="sidebar-nav-text">Domicilios</span></button> : null}
@@ -182,13 +184,10 @@ export function PipelineOperativo({
 
       <button type="button" className="sidebar-overlay" aria-label="Cerrar menú" onClick={() => setSidebarMobileOpen(false)} />
 
-      <main className={`pipeline-view ${isExpanded ? "is-expanded" : ""}`}>
+      <main className="pipeline-view">
         <header className="pipeline-header">
           <div className="pipeline-header-top">
             <button type="button" className="sidebar-trigger" onClick={toggleSidebar} title="Abrir o cerrar menú">☰ Menú</button>
-            <button type="button" className="btn-outline pipeline-expand-btn" onClick={() => setIsExpanded(current => !current)}>
-              {isExpanded ? "Contraer pipeline" : "Expandir pipeline"}
-            </button>
           </div>
           <div>
             <h1>Pipeline Operativo</h1>
@@ -201,7 +200,7 @@ export function PipelineOperativo({
         {loading ? <p className="orders-message">Cargando pipeline...</p> : null}
         {error ? <p className="orders-message">{error}</p> : null}
 
-        <section className={`pipeline-board ${isExpanded ? "is-expanded" : ""}`}>
+        <section className="pipeline-board">
           {PIPELINE_COLUMNS.map(column => (
             <PipelineColumn
               key={column.key}

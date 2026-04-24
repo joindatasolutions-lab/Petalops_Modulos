@@ -250,7 +250,6 @@ select {
 }
 
 .sidebar-submenu-wrap {
-  position: relative;
   display: grid;
   gap: 6px;
 }
@@ -259,6 +258,15 @@ select {
   display: grid;
   gap: 6px;
   margin-top: 2px;
+}
+
+.sidebar-submenu-panel.is-inline {
+  position: static;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
 }
 
 .sidebar-submenu-btn {
@@ -406,17 +414,15 @@ select {
 }
 
 .app-shell:not(.is-sidebar-pinned) .sidebar-submenu-panel {
-  position: absolute;
-  left: calc(100% + 10px);
-  top: 0;
-  width: 220px;
-  margin-top: 0;
-  padding: 10px;
-  border: 1px solid #ead9de;
-  border-radius: 12px;
-  background: #fff;
-  box-shadow: 0 12px 24px rgba(47, 45, 49, 0.12);
-  z-index: 80;
+  position: static;
+  width: 100%;
+  margin-top: 2px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  z-index: auto;
 }
 
 .orders-admin-view {
@@ -1230,7 +1236,16 @@ select:focus {
 }
 
 .inventory-form-panel {
-  width: min(760px, 100%);
+  width: min(1040px, 100%);
+}
+
+.inventory-provider-layout {
+  gap: 16px;
+  justify-items: stretch;
+}
+
+.inventory-provider-panel {
+  width: min(980px, 100%);
 }
 
 .inventory-two-cols {
@@ -1265,6 +1280,71 @@ select:focus {
   outline: none;
   border-color: #cf7995;
   box-shadow: 0 0 0 3px rgba(201, 123, 148, 0.16);
+}
+
+.inventory-form-help {
+  margin: 0 0 12px;
+  color: #75686f;
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.inventory-field {
+  display: grid;
+  gap: 6px;
+}
+
+.inventory-field span {
+  font-size: 13px;
+  font-weight: 700;
+  color: #69585f;
+}
+
+.inventory-field-hint {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.45;
+  color: #887980;
+}
+
+.inventory-checkbox-field {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.inventory-checkbox-field input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  min-height: auto;
+}
+
+.inventory-provider-form {
+  gap: 14px;
+}
+
+.inventory-provider-actions {
+  margin-top: 6px;
+}
+
+.inventory-provider-table-panel {
+  width: 100%;
+}
+
+.inventory-section-title {
+  display: grid;
+  gap: 4px;
+  margin: 0 0 14px;
+}
+
+.inventory-section-title h4 {
+  margin: 0;
+}
+
+.inventory-section-title p {
+  margin: 0;
+  color: #75686f;
+  font-size: 13px;
 }
 
 .users-module-chip-wrap {
@@ -1390,10 +1470,13 @@ select:focus {
 .icon-btn {
   border: 1px solid #ddd;
   background: #fff;
+  color: #000;
   border-radius: 8px;
   width: 32px;
   height: 32px;
   cursor: pointer;
+  font-size: 18px;
+  line-height: 1;
 }
 
 @media (max-width: 980px) {
@@ -1799,10 +1882,6 @@ select:focus {
   background: transparent;
 }
 
-.pipeline-view.is-expanded {
-  padding: 16px 18px;
-}
-
 .pipeline-header h1 {
   margin: 0;
   font-family: "Playfair Display", Georgia, serif;
@@ -1830,11 +1909,6 @@ select:focus {
   gap: 0.5rem;
   align-items: center;
   margin-bottom: 0.6rem;
-}
-
-.pipeline-expand-btn {
-  border-radius: 10px;
-  padding: 0.5rem 0.8rem;
 }
 
 .pipeline-header p {
@@ -1937,10 +2011,6 @@ select:focus {
   overscroll-behavior-x: contain;
   max-width: 100%;
   padding-bottom: 0.5rem;
-}
-
-.pipeline-board.is-expanded {
-  grid-auto-columns: minmax(300px, 360px);
 }
 
 .pipeline-column {

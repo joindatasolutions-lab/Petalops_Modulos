@@ -679,7 +679,8 @@ Log de todos los cambios de stock. Registro inmutable — nunca editar ni borrar
 ---
 
 ### proveedor
-Proveedores de insumos. Global por ahora — pendiente agregar empresa_id para multitenant completo.
+Proveedores de insumos. La tabla ya admite `empresa_id` nullable, por lo que puede guardar
+proveedores globales (`empresa_id = NULL`) o asociados a una empresa específica.
 
 | columna | tipo | null | descripción |
 |---|---|---|---|
@@ -689,8 +690,11 @@ Proveedores de insumos. Global por ahora — pendiente agregar empresa_id para m
 | activo | integer | NO | |
 | created_at | timestamp | SÍ | |
 | updated_at | timestamp | SÍ | |
+| empresa_id | bigint | SÍ | FK → empresa. `NULL` = proveedor global |
 
-**Deuda técnica:** Falta `empresa_id` para aislar proveedores por empresa. Pendiente antes de escalar a múltiples empresas en producción.
+**Uso actual en UI:** El formulario de proveedores del módulo Inventario solo debe persistir
+`nombre_proveedor`, `codigo_proveedor` y `activo`. `empresa_id` se define desde el contexto
+autenticado o puede quedar `NULL` para proveedores globales.
 
 ---
 

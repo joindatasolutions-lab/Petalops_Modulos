@@ -2,6 +2,7 @@
 
 import { tenantConfig } from "../../config/tenantConfig.js";
 import { createApiClient } from "../../infrastructure/apiClient.js";
+import { formatDateOnly, formatTimeOnly } from "../../shared/utils.js";
 
 const FILTROS = [
   { value: "hoy", label: "Hoy" },
@@ -13,16 +14,6 @@ const FILTROS = [
 
 function todayIso() {
   return new Date().toISOString().slice(0, 10);
-}
-
-function fmtDateTime(value) {
-  if (!value) return "-";
-  const text = String(value);
-  if (text.includes("T")) {
-    const [datePart, timePart = ""] = text.split("T");
-    return `${datePart} ${timePart.slice(0, 5)}`.trim();
-  }
-  return text;
 }
 
 function stateBadgeClass(estado) {
@@ -53,6 +44,7 @@ async function getCurrentCoords() {
 
 export function DeliveryPage({
   session,
+  canViewPipeline,
   canViewPedidos,
   canViewProduccion,
   canViewDomicilios,
@@ -302,10 +294,12 @@ export function DeliveryPage({
         </div>
 
         <nav className="sidebar-nav" aria-label="Módulos">
-          <button type="button" className="sidebar-nav-btn" onClick={() => { setSidebarMobileOpen(false); onGoPipeline(); }}>
-            <span className="sidebar-nav-icon">▦</span>
-            <span className="sidebar-nav-text">Pipeline</span>
-          </button>
+          {canViewPipeline ? (
+            <button type="button" className="sidebar-nav-btn" onClick={() => { setSidebarMobileOpen(false); onGoPipeline(); }}>
+              <span className="sidebar-nav-icon">▦</span>
+              <span className="sidebar-nav-text">Pipeline</span>
+            </button>
+          ) : null}
           {canViewPedidos ? (
             <button type="button" className="sidebar-nav-btn" onClick={() => { setSidebarMobileOpen(false); onGoPedidos(); }}>
               <span className="sidebar-nav-icon">🧾</span>
@@ -402,7 +396,7 @@ export function DeliveryPage({
                     <td data-label="Cliente">{item.cliente || "-"}</td>
                     <td data-label="Direccion">{item.direccion || "-"}</td>
                     <td data-label="Barrio">{item.barrio || "-"}</td>
-                    <td data-label="Hora entrega">{item.horaEntrega || fmtDateTime(item.fechaEntregaProgramada)}</td>
+                    <td data-label="Hora entrega">{item.horaEntrega || formatTimeOnly(item.fechaEntregaProgramada) || "-"}</td>
                     <td data-label="Domiciliario">
                       <select
                         value={selectedDomiciliarioByEntrega[item.idEntrega] ?? (item.domiciliarioID || "")}
@@ -439,11 +433,16 @@ export function DeliveryPage({
                 </div>
 
                 <p className="delivery-address">{item.direccion || "Sin direccion"}</p>
-                <p className="delivery-meta">{item.barrio || ""} {item.horaEntrega ? `Â· ${item.horaEntrega}` : ""}</p>
+                <p className="delivery-meta">
+                  {item.barrio || ""}
+                  {item.fechaEntregaProgramada ? ` · ${formatDateOnly(item.fechaEntregaProgramada) || "-"}` : ""}
+                  {(item.horaEntrega || formatTimeOnly(item.fechaEntregaProgramada))
+                    ? ` · ${item.horaEntrega || formatTimeOnly(item.fechaEntregaProgramada)}`
+                    : ""}
+                </p>
 
                 <div className="delivery-courier-actions">
                   <button type="button" className="btn-outline" onClick={() => openMaps(item)}>Abrir en Maps</button>
-                  <a className="btn-outline" href={`tel:${item.telefonoDestino || ""}`}>Llamar</a>
                   <button type="button" className="btn-outline" onClick={() => openWhatsApp(item)}>Mensaje</button>
                 </div>
 
