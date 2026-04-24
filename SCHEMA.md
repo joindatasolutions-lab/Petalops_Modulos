@@ -451,6 +451,78 @@ Registro de pago asociado a un pedido. Un pedido tiene máximo un pago (UNIQUE p
 
 ---
 
+**Nota Fase 2 Flora:** Para `empresa_id = 3`, los mÃ©todos de pago mÃºltiples se normalizan en
+`pago_metodo` y el canal/origen de venta se normaliza en `pedido_canal_venta`. El campo
+`metodo_pago` se conserva como snapshot legible y compatibilidad hacia atrÃ¡s.
+
+---
+
+### metodo_pago_catalogo
+CatÃ¡logo normalizado de mÃ©todos de pago por empresa.
+
+| columna | tipo | null | descripciÃ³n |
+|---|---|---|---|
+| id_metodo_pago | bigint | NO | PK |
+| empresa_id | bigint | NO | FK â†’ empresa |
+| codigo | varchar(80) | NO | CÃ³digo estable por empresa |
+| nombre | varchar(120) | NO | Nombre visible |
+| orden | integer | NO | Orden sugerido de despliegue |
+| activo | boolean | NO | |
+| created_at | timestamp | NO | |
+| updated_at | timestamp | SÃ | |
+
+**Uso actual:** En Flora (`empresa_id = 3`) contiene opciones como `Efectivo`, `Transferencia 3671`,
+`Link wompi`, etc.
+
+---
+
+### pago_metodo
+RelaciÃ³n entre `pago` y `metodo_pago_catalogo`, permitiendo mÃ¡s de un mÃ©todo por pedido.
+
+| columna | tipo | null | descripciÃ³n |
+|---|---|---|---|
+| id_pago_metodo | bigint | NO | PK |
+| empresa_id | bigint | NO | FK â†’ empresa |
+| pago_id | bigint | NO | FK â†’ pago |
+| pedido_id | bigint | NO | FK â†’ pedido |
+| metodo_pago_id | bigint | NO | FK â†’ metodo_pago_catalogo |
+| orden | integer | NO | Orden de selecciÃ³n |
+| created_at | timestamp | NO | |
+| updated_at | timestamp | SÃ | |
+
+---
+
+### canal_venta
+CatÃ¡logo de canales de venta por empresa. Para Flora corresponde al campo operativo llamado
+`Celular Flora`, es decir, el medio por el cual se efectuÃ³ la venta.
+
+| columna | tipo | null | descripciÃ³n |
+|---|---|---|---|
+| id_canal_venta | bigint | NO | PK |
+| empresa_id | bigint | NO | FK â†’ empresa |
+| codigo | varchar(80) | NO | CÃ³digo estable |
+| nombre | varchar(120) | NO | Nombre visible |
+| orden | integer | NO | Orden sugerido |
+| activo | boolean | NO | |
+| created_at | timestamp | NO | |
+| updated_at | timestamp | SÃ | |
+
+---
+
+### pedido_canal_venta
+Canal de venta asociado a un pedido. Un pedido puede tener un Ãºnico canal vigente.
+
+| columna | tipo | null | descripciÃ³n |
+|---|---|---|---|
+| id_pedido_canal_venta | bigint | NO | PK |
+| empresa_id | bigint | NO | FK â†’ empresa |
+| pedido_id | bigint | NO | FK â†’ pedido. UNIQUE por empresa |
+| canal_venta_id | bigint | NO | FK â†’ canal_venta |
+| created_at | timestamp | NO | |
+| updated_at | timestamp | SÃ | |
+
+---
+
 ### factura
 Factura generada para un pedido. Un pedido tiene máximo una factura.
 
