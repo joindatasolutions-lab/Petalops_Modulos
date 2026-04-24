@@ -349,7 +349,17 @@ export function createApiClient(config) {
       return requestJson(`/catalogo/${empresaId}${params.toString() ? `?${params.toString()}` : ""}`);
     },
 
-    async actualizarDetallePedidoPipeline({ pedidoId, productoID, fechaEntrega, horaEntrega }) {
+    async actualizarDetallePedidoPipeline({
+      pedidoId,
+      productoID,
+      fechaEntrega,
+      horaEntrega,
+      destinatarioNombre,
+      telefonoDestino,
+      direccion,
+      barrioNombre,
+      mensajeTarjeta,
+    }) {
       return requestJson(`/pedido/${pedidoId}/detalle`, {
         method: "PUT",
         headers: {
@@ -359,6 +369,11 @@ export function createApiClient(config) {
           productoID: productoID != null ? Number(productoID) : null,
           fechaEntrega: fechaEntrega || null,
           horaEntrega: horaEntrega || null,
+          destinatarioNombre: destinatarioNombre ?? null,
+          telefonoDestino: telefonoDestino ?? null,
+          direccion: direccion ?? null,
+          barrioNombre: barrioNombre ?? null,
+          mensajeTarjeta: mensajeTarjeta ?? null,
         })
       });
     },

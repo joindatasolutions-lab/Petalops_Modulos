@@ -47,6 +47,11 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
   const [detailEditPrecio, setDetailEditPrecio] = useState(null);
   const [detailEditFechaEntrega, setDetailEditFechaEntrega] = useState("");
   const [detailEditHoraEntrega, setDetailEditHoraEntrega] = useState("");
+  const [detailEditDestinatarioNombre, setDetailEditDestinatarioNombre] = useState("");
+  const [detailEditTelefonoDestino, setDetailEditTelefonoDestino] = useState("");
+  const [detailEditDireccion, setDetailEditDireccion] = useState("");
+  const [detailEditBarrioNombre, setDetailEditBarrioNombre] = useState("");
+  const [detailEditMensajeTarjeta, setDetailEditMensajeTarjeta] = useState("");
   const [detailEditSaving, setDetailEditSaving] = useState(false);
   const [detailEditError, setDetailEditError] = useState("");
   const [detailEditDropdownOpen, setDetailEditDropdownOpen] = useState(false);
@@ -126,6 +131,11 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
       setDetailEditPrecio(null);
       setDetailEditFechaEntrega("");
       setDetailEditHoraEntrega("");
+      setDetailEditDestinatarioNombre("");
+      setDetailEditTelefonoDestino("");
+      setDetailEditDireccion("");
+      setDetailEditBarrioNombre("");
+      setDetailEditMensajeTarjeta("");
       setDetailEditError("");
       setDetailEditDropdownOpen(false);
       return;
@@ -145,6 +155,11 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
     setDetailEditPrecio(productoPrecio);
     setDetailEditFechaEntrega(toDateInput(detalle.destinatario?.fechaEntrega));
     setDetailEditHoraEntrega(normalizeTime(detalle.destinatario?.horaEntrega));
+    setDetailEditDestinatarioNombre(String(detalle.destinatario?.nombre || ""));
+    setDetailEditTelefonoDestino(String(detalle.destinatario?.telefono || ""));
+    setDetailEditDireccion(String(detalle.destinatario?.direccion || ""));
+    setDetailEditBarrioNombre(String(detalle.destinatario?.barrio || ""));
+    setDetailEditMensajeTarjeta(String(detalle.destinatario?.mensajeTarjeta || ""));
 
     const initialCatalog = (Array.isArray(detalle.productos) ? detalle.productos : [])
       .map(item => normalizeCatalogItem(item))
@@ -331,6 +346,11 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
         productoID: detailEditProductoID ? Number(detailEditProductoID) : null,
         fechaEntrega: detailEditFechaEntrega,
         horaEntrega: detailEditHoraEntrega,
+        destinatarioNombre: detailEditDestinatarioNombre,
+        telefonoDestino: detailEditTelefonoDestino,
+        direccion: detailEditDireccion,
+        barrioNombre: detailEditBarrioNombre,
+        mensajeTarjeta: detailEditMensajeTarjeta,
       });
       await reloadDrawer();
       setIsEditingDetail(false);
@@ -741,6 +761,58 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
                       />
                     </label>
                   </div>
+
+                  <div className="order-detail-edit-grid">
+                    <label className="order-detail-edit-label">
+                      Nombre destinatario
+                      <input
+                        type="text"
+                        value={detailEditDestinatarioNombre}
+                        onChange={event => setDetailEditDestinatarioNombre(event.target.value)}
+                        placeholder="Nombre de quien recibe"
+                      />
+                    </label>
+                    <label className="order-detail-edit-label">
+                      Teléfono destinatario
+                      <input
+                        type="text"
+                        value={detailEditTelefonoDestino}
+                        onChange={event => setDetailEditTelefonoDestino(event.target.value)}
+                        placeholder="Teléfono de contacto"
+                      />
+                    </label>
+                  </div>
+
+                  <div className="order-detail-edit-grid">
+                    <label className="order-detail-edit-label">
+                      Dirección
+                      <input
+                        type="text"
+                        value={detailEditDireccion}
+                        onChange={event => setDetailEditDireccion(event.target.value)}
+                        placeholder="Dirección de entrega"
+                      />
+                    </label>
+                    <label className="order-detail-edit-label">
+                      Barrio
+                      <input
+                        type="text"
+                        value={detailEditBarrioNombre}
+                        onChange={event => setDetailEditBarrioNombre(event.target.value)}
+                        placeholder="Barrio de entrega"
+                      />
+                    </label>
+                  </div>
+
+                  <label className="order-detail-edit-label">
+                    Mensaje tarjeta
+                    <textarea
+                      rows={3}
+                      value={detailEditMensajeTarjeta}
+                      onChange={event => setDetailEditMensajeTarjeta(event.target.value)}
+                      placeholder="Mensaje para la tarjeta floral"
+                    />
+                  </label>
 
                   {detailEditError ? <p className="orders-message">{detailEditError}</p> : null}
 
