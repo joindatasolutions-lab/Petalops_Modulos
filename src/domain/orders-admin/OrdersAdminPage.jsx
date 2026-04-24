@@ -20,6 +20,13 @@ const initialFilters = {
   pageSize: 20
 };
 
+const TENANT_ORDER_RULES = {
+  3: {
+    requirePaymentBeforeApproval: true,
+    requireSalesChannelBeforeApproval: true,
+  },
+};
+
 export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canViewProduccion, canViewDomicilios, canViewInventario, canViewUsuariosPanel, onLogout, onGoPipeline, onGoPedidos, onGoProduccion, onGoDomicilios, onGoInventario, onGoUsuarios }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -62,7 +69,11 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
   const debouncedQuery = useDebouncedValue(filters.q, 300);
   const empresaId = Number(session?.empresaID || tenantConfig.empresaId);
   const sucursalId = Number(session?.sucursalID || tenantConfig.sucursalId);
-  const isFlora = empresaId === 3;
+  const tenantRules = TENANT_ORDER_RULES[empresaId] || {};
+  const requiresApprovalData = Boolean(
+    tenantRules.requirePaymentBeforeApproval || tenantRules.requireSalesChannelBeforeApproval
+  );
+  const isFlora = requiresApprovalData;
 
   const loadOrders = useCallback(async (silent = false) => {
     if (!silent) {
@@ -238,6 +249,12 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
   };
 
   const approveOrder = async pedidoId => {
+    const item = items.find(current => Number(current.pedidoID) === Number(pedidoId));
+    if (item?.puedeAprobar === false) {
+      globalThis.alert(item.motivoBloqueoAprobacion || "Completa la información requerida antes de aprobar.");
+      return;
+    }
+
     const ok = globalThis.confirm("¿Aprobar este pedido?");
     if (!ok) return;
 
@@ -570,6 +587,11 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
                   const productText = (item.productos || []).slice(0, 2).join(", ");
                   const waPhone = String(item.telefonoCompleto || item.telefono || "").trim().replace(/\+/g, "");
                   const canAct = isPendingStatus(item.estado);
+                  const approvalBlockedByTenant = canAct && item?.puedeAprobar === false;
+                  const approveDisabled = !canAct || approvalBlockedByTenant;
+                  const approveTitle = approvalBlockedByTenant
+                    ? (item.motivoBloqueoAprobacion || "Completa la información requerida antes de aprobar")
+                    : "Aprobar pedido";
                   const canDownloadInvoice = canInvoiceStatus(item.estado);
                   const canViewMessageCard = canMessageCardStatus(item.estado);
                   const pedidoId = Number(item.pedidoID);
@@ -593,7 +615,7 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
                         <div className="order-actions">
                           <a href={`https://wa.me/${waPhone}`} target="_blank" rel="noreferrer" className="order-icon" title="WhatsApp">💬</a>
                           <button type="button" className="order-icon" onClick={() => openDetail(pedidoId)} title="Ver detalle">👁</button>
-                          <button type="button" className="order-icon" onClick={() => approveOrder(pedidoId)} disabled={!canAct} title="Aprobar pedido">✔</button>
+                          <button type="button" className="order-icon" onClick={() => approveOrder(pedidoId)} disabled={approveDisabled} title={approveTitle}>✔</button>
                           <button type="button" className="order-icon" onClick={() => rejectOrder(pedidoId)} disabled={!canAct} title="Rechazar pedido">✖</button>
                           {canDownloadInvoice && (
                             <button type="button" className="order-icon" onClick={() => downloadInvoice(pedidoId)} title="Descargar factura">🧾</button>

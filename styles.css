@@ -1061,7 +1061,7 @@ select:focus {
 .order-detail-edit-checklist {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
+  gap: 10px 16px;
   padding: 10px;
   border: 1px solid #ead9de;
   border-radius: 12px;
@@ -1069,15 +1069,26 @@ select:focus {
 }
 
 .order-detail-edit-checkitem {
-  display: flex;
-  align-items: center;
-  gap: 8px;
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr);
+  align-items: start;
+  gap: 10px;
   font-size: 13px;
   color: #4f4449;
+  line-height: 1.35;
 }
 
 .order-detail-edit-checkitem input {
   min-height: auto;
+  margin: 2px 0 0;
+  width: 18px;
+  height: 18px;
+}
+
+.order-detail-edit-checkitem span {
+  display: block;
+  text-align: left;
+  word-break: break-word;
 }
 
 .order-detail-edit-actions {
@@ -1797,6 +1808,10 @@ select:focus {
     gap: 10px;
     width: min(760px, 100%);
     margin: 0 auto;
+  }
+
+  .order-detail-edit-checklist {
+    grid-template-columns: 1fr;
   }
 }
 
