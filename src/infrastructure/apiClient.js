@@ -359,6 +359,8 @@ export function createApiClient(config) {
       direccion,
       barrioNombre,
       mensajeTarjeta,
+      metodosPago,
+      canalFlora,
     }) {
       return requestJson(`/pedido/${pedidoId}/detalle`, {
         method: "PUT",
@@ -374,6 +376,8 @@ export function createApiClient(config) {
           direccion: direccion ?? null,
           barrioNombre: barrioNombre ?? null,
           mensajeTarjeta: mensajeTarjeta ?? null,
+          metodosPago: Array.isArray(metodosPago) ? metodosPago : null,
+          canalFlora: canalFlora ?? null,
         })
       });
     },

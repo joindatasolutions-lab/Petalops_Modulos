@@ -52,6 +52,8 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
   const [detailEditDireccion, setDetailEditDireccion] = useState("");
   const [detailEditBarrioNombre, setDetailEditBarrioNombre] = useState("");
   const [detailEditMensajeTarjeta, setDetailEditMensajeTarjeta] = useState("");
+  const [detailEditMetodosPago, setDetailEditMetodosPago] = useState([]);
+  const [detailEditCanalFlora, setDetailEditCanalFlora] = useState("");
   const [detailEditSaving, setDetailEditSaving] = useState(false);
   const [detailEditError, setDetailEditError] = useState("");
   const [detailEditDropdownOpen, setDetailEditDropdownOpen] = useState(false);
@@ -60,6 +62,7 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
   const debouncedQuery = useDebouncedValue(filters.q, 300);
   const empresaId = Number(session?.empresaID || tenantConfig.empresaId);
   const sucursalId = Number(session?.sucursalID || tenantConfig.sucursalId);
+  const isFlora = empresaId === 3;
 
   const loadOrders = useCallback(async (silent = false) => {
     if (!silent) {
@@ -136,6 +139,8 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
       setDetailEditDireccion("");
       setDetailEditBarrioNombre("");
       setDetailEditMensajeTarjeta("");
+      setDetailEditMetodosPago([]);
+      setDetailEditCanalFlora("");
       setDetailEditError("");
       setDetailEditDropdownOpen(false);
       return;
@@ -160,6 +165,8 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
     setDetailEditDireccion(String(detalle.destinatario?.direccion || ""));
     setDetailEditBarrioNombre(String(detalle.destinatario?.barrio || ""));
     setDetailEditMensajeTarjeta(String(detalle.destinatario?.mensajeTarjeta || ""));
+    setDetailEditMetodosPago(Array.isArray(detalle.financiero?.metodosPago) ? detalle.financiero.metodosPago.map(item => String(item)) : []);
+    setDetailEditCanalFlora(String(detalle.financiero?.canalFlora || ""));
 
     const initialCatalog = (Array.isArray(detalle.productos) ? detalle.productos : [])
       .map(item => normalizeCatalogItem(item))
@@ -351,6 +358,8 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
         direccion: detailEditDireccion,
         barrioNombre: detailEditBarrioNombre,
         mensajeTarjeta: detailEditMensajeTarjeta,
+        metodosPago: isFlora ? detailEditMetodosPago : null,
+        canalFlora: isFlora ? detailEditCanalFlora : null,
       });
       await reloadDrawer();
       setIsEditingDetail(false);
@@ -814,6 +823,40 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
                     />
                   </label>
 
+                  {isFlora ? (
+                    <>
+                      <div className="order-detail-edit-label">
+                        <span>Métodos de pago</span>
+                        <div className="order-detail-edit-checklist">
+                          {FLORA_PAYMENT_METHODS.map(option => (
+                            <label key={option} className="order-detail-edit-checkitem">
+                              <input
+                                type="checkbox"
+                                checked={detailEditMetodosPago.includes(option)}
+                                onChange={() => {
+                                  setDetailEditMetodosPago(current => current.includes(option)
+                                    ? current.filter(item => item !== option)
+                                    : [...current, option]);
+                                }}
+                              />
+                              <span>{option}</span>
+                            </label>
+                          ))}
+                        </div>
+                      </div>
+
+                      <label className="order-detail-edit-label">
+                        Celular Flora
+                        <select value={detailEditCanalFlora} onChange={event => setDetailEditCanalFlora(event.target.value)}>
+                          <option value="">Selecciona un canal</option>
+                          {FLORA_SALES_CHANNELS.map(option => (
+                            <option key={option} value={option}>{option}</option>
+                          ))}
+                        </select>
+                      </label>
+                    </>
+                  ) : null}
+
                   {detailEditError ? <p className="orders-message">{detailEditError}</p> : null}
 
                   <div className="order-detail-edit-actions">
@@ -969,7 +1012,9 @@ function OrderDetail({ detalle }) {
         <p><strong>Domicilio:</strong> ${formatearCOP(Number(detalle.financiero?.domicilio || 0))}</p>
         <p><strong>Total:</strong> ${formatearCOP(Number(detalle.financiero?.total || 0))}</p>
         <p><strong>Estado pago:</strong> {detalle.financiero?.estadoPago || "-"}</p>
+        <p><strong>Método pago:</strong> {detalle.financiero?.metodoPago || "-"}</p>
         <p><strong>Cuenta bancaria:</strong> {detalle.financiero?.cuentaBancaria || "-"}</p>
+        <p><strong>Celular Flora:</strong> {detalle.financiero?.canalFlora || "-"}</p>
       </section>
 
       <section className="order-block">
@@ -1075,6 +1120,42 @@ function resolveFirmaTarjeta(value) {
   if (text) return text;
   return "Con carino, Flora";
 }
+
+const FLORA_PAYMENT_METHODS = [
+  "Cuenta por cobrar",
+  "Efectivo",
+  "Canje",
+  "Contraentrega",
+  "Cotizacion",
+  "Obsequio",
+  "Paypal",
+  "Link bold",
+  "Link payu",
+  "Link wompi",
+  "Datafono credibanco",
+  "Datafono Bold",
+  "Transferencia 0257",
+  "Transferencia 0005",
+  "Transferencia 3220",
+  "Transferencia 4038",
+  "Transferencia 4966",
+  "Transferencia 3671",
+  "Transferencia 6913",
+  "Transferencia 5431",
+  "Transferencia 1340",
+  "Transferencia Jaque",
+  "Transferencia QR",
+  "Anulado",
+];
+
+const FLORA_SALES_CHANNELS = [
+  "Huawei",
+  "Samsung",
+  "Andrea",
+  "Página Web",
+  "Presencial",
+  "Rappi",
+];
 
 
 

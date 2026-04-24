@@ -1038,7 +1038,8 @@ select:focus {
 }
 
 .order-detail-edit-label input,
-.order-detail-edit-label select {
+.order-detail-edit-label select,
+.order-detail-edit-label textarea {
   min-height: 36px;
   border: 1px solid #e5d3da;
   border-radius: 9px;
@@ -1046,10 +1047,37 @@ select:focus {
   background: #fff;
 }
 
+.order-detail-edit-label textarea {
+  resize: vertical;
+  min-height: 88px;
+}
+
 .order-detail-edit-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
+}
+
+.order-detail-edit-checklist {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid #ead9de;
+  border-radius: 12px;
+  background: #fff;
+}
+
+.order-detail-edit-checkitem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: #4f4449;
+}
+
+.order-detail-edit-checkitem input {
+  min-height: auto;
 }
 
 .order-detail-edit-actions {
