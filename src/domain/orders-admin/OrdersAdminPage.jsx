@@ -50,10 +50,13 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
   const [detailEditPrecio, setDetailEditPrecio] = useState(null);
   const [detailEditFechaEntrega, setDetailEditFechaEntrega] = useState("");
   const [detailEditHoraEntrega, setDetailEditHoraEntrega] = useState("");
+  const [detailEditClienteTipoIdent, setDetailEditClienteTipoIdent] = useState("");
+  const [detailEditClienteIdentificacion, setDetailEditClienteIdentificacion] = useState("");
   const [detailEditDestinatarioNombre, setDetailEditDestinatarioNombre] = useState("");
   const [detailEditTelefonoDestino, setDetailEditTelefonoDestino] = useState("");
   const [detailEditDireccion, setDetailEditDireccion] = useState("");
   const [detailEditBarrioNombre, setDetailEditBarrioNombre] = useState("");
+  const [detailEditFirma, setDetailEditFirma] = useState("");
   const [detailEditMensajeTarjeta, setDetailEditMensajeTarjeta] = useState("");
   const [detailEditMetodosPago, setDetailEditMetodosPago] = useState([]);
   const [detailEditCanalFlora, setDetailEditCanalFlora] = useState("");
@@ -148,10 +151,13 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
       setDetailEditPrecio(null);
       setDetailEditFechaEntrega("");
       setDetailEditHoraEntrega("");
+      setDetailEditClienteTipoIdent("");
+      setDetailEditClienteIdentificacion("");
       setDetailEditDestinatarioNombre("");
       setDetailEditTelefonoDestino("");
       setDetailEditDireccion("");
       setDetailEditBarrioNombre("");
+      setDetailEditFirma("");
       setDetailEditMensajeTarjeta("");
       setDetailEditMetodosPago([]);
       setDetailEditCanalFlora("");
@@ -174,10 +180,13 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
     setDetailEditPrecio(productoPrecio);
     setDetailEditFechaEntrega(toDateInput(detalle.destinatario?.fechaEntrega));
     setDetailEditHoraEntrega(normalizeTime(detalle.destinatario?.horaEntrega));
+    setDetailEditClienteTipoIdent(normalizeIdentType(detalle.cliente?.tipoIdent));
+    setDetailEditClienteIdentificacion(String(detalle.cliente?.identificacion || ""));
     setDetailEditDestinatarioNombre(String(detalle.destinatario?.nombre || ""));
     setDetailEditTelefonoDestino(String(detalle.destinatario?.telefono || ""));
     setDetailEditDireccion(String(detalle.destinatario?.direccion || ""));
     setDetailEditBarrioNombre(String(detalle.destinatario?.barrio || ""));
+    setDetailEditFirma(String(detalle.destinatario?.firma || ""));
     setDetailEditMensajeTarjeta(String(detalle.destinatario?.mensajeTarjeta || ""));
     setDetailEditMetodosPago(Array.isArray(detalle.financiero?.metodosPago) ? detalle.financiero.metodosPago.map(item => String(item)) : []);
     setDetailEditCanalFlora(String(detalle.financiero?.canalFlora || ""));
@@ -409,10 +418,13 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
         productoID: detailEditProductoID ? Number(detailEditProductoID) : null,
         fechaEntrega: detailEditFechaEntrega,
         horaEntrega: detailEditHoraEntrega,
+        clienteTipoIdent: detailEditClienteTipoIdent,
+        clienteIdentificacion: detailEditClienteIdentificacion,
         destinatarioNombre: detailEditDestinatarioNombre,
         telefonoDestino: detailEditTelefonoDestino,
         direccion: detailEditDireccion,
         barrioNombre: detailEditBarrioNombre,
+        firma: detailEditFirma,
         mensajeTarjeta: detailEditMensajeTarjeta,
         metodosPago: paymentFieldConfig ? detailEditMetodosPago : null,
         canalFlora: salesChannelFieldConfig ? detailEditCanalFlora : null,
@@ -834,6 +846,33 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
 
                   <div className="order-detail-edit-grid">
                     <label className="order-detail-edit-label">
+                      Tipo documento cliente
+                      <select
+                        value={detailEditClienteTipoIdent}
+                        onChange={event => setDetailEditClienteTipoIdent(event.target.value)}
+                      >
+                        <option value="">Selecciona una opción</option>
+                        <option value="CC">Cédula</option>
+                        <option value="NIT">NIT</option>
+                      </select>
+                    </label>
+                    <label className="order-detail-edit-label">
+                      Cédula / NIT cliente
+                      <input
+                        type="text"
+                        value={detailEditClienteIdentificacion}
+                        onChange={event => setDetailEditClienteIdentificacion(event.target.value)}
+                        placeholder="Número de documento"
+                      />
+                    </label>
+                  </div>
+
+                  <p className="order-detail-edit-hint">
+                    Si corriges el documento a NIT, el pedido recalcula IVA con la configuración fiscal disponible.
+                  </p>
+
+                  <div className="order-detail-edit-grid">
+                    <label className="order-detail-edit-label">
                       Nombre destinatario
                       <input
                         type="text"
@@ -873,6 +912,16 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
                       />
                     </label>
                   </div>
+
+                  <label className="order-detail-edit-label">
+                    Firma tarjeta
+                    <input
+                      type="text"
+                      value={detailEditFirma}
+                      onChange={event => setDetailEditFirma(event.target.value)}
+                      placeholder="Ej: Con cariño, Flora"
+                    />
+                  </label>
 
                   <label className="order-detail-edit-label">
                     Mensaje tarjeta
@@ -932,7 +981,11 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
                 </section>
               ) : null}
 
-              <OrderDetail detalle={detalle} />
+              <OrderDetail
+                detalle={detalle}
+                paymentTitle={paymentFieldConfig?.titulo || "Método de pago"}
+                salesChannelTitle={salesChannelFieldConfig?.titulo || "Celular Flora"}
+              />
             </>
           )}
         </div>
@@ -1046,10 +1099,11 @@ function canMessageCardStatus(status) {
   return key === "APROBADO";
 }
 
-function OrderDetail({ detalle }) {
+function OrderDetail({ detalle, paymentTitle = "Método de pago", salesChannelTitle = "Celular Flora" }) {
   const productos = Array.isArray(detalle.productos) ? detalle.productos : [];
   const { date: fechaPedido, time: horaPedido } = splitDateTimeParts(detalle.fechaPedido || detalle.fecha);
   const { date: fechaEntrega, time: horaEntrega } = splitDateTimeParts(detalle.destinatario?.fechaEntrega);
+  const identificacionCliente = formatClienteDocumento(detalle.cliente);
 
   return (
     <>
@@ -1059,8 +1113,6 @@ function OrderDetail({ detalle }) {
         <p><strong>Fecha Pedido:</strong> {fechaPedido || "-"}</p>
         <p><strong>Hora Pedido:</strong> {detalle.horaPedido || horaPedido || "-"}</p>
         <p><strong>Estado:</strong> {detalle.estado || "-"}</p>
-        <p><strong>Empresa:</strong> {detalle.empresaID || "-"}</p>
-        <p><strong>Sucursal:</strong> {detalle.sucursalID || "-"}</p>
         {detalle.motivoRechazo && <p><strong>Motivo rechazo:</strong> {detalle.motivoRechazo}</p>}
       </section>
 
@@ -1069,6 +1121,7 @@ function OrderDetail({ detalle }) {
         <p><strong>Nombre:</strong> {detalle.cliente?.nombre || "-"}</p>
         <p><strong>Teléfono:</strong> {detalle.cliente?.telefonoCompleto || detalle.cliente?.telefono || "-"}</p>
         <p><strong>Email:</strong> {detalle.cliente?.email || "-"}</p>
+        <p><strong>Cédula / NIT:</strong> {identificacionCliente}</p>
       </section>
 
       <section className="order-block">
@@ -1079,6 +1132,7 @@ function OrderDetail({ detalle }) {
         <p><strong>Barrio:</strong> {detalle.destinatario?.barrio || "-"}</p>
         <p><strong>Fecha entrega:</strong> {fechaEntrega || "-"}</p>
         <p><strong>Hora entrega:</strong> {detalle.destinatario?.horaEntrega || horaEntrega || "-"}</p>
+        <p><strong>Firma:</strong> {detalle.destinatario?.firma || "-"}</p>
         <p><strong>Mensaje:</strong> {detalle.destinatario?.mensajeTarjeta || "-"}</p>
       </section>
 
@@ -1089,9 +1143,9 @@ function OrderDetail({ detalle }) {
         <p><strong>Domicilio:</strong> ${formatearCOP(Number(detalle.financiero?.domicilio || 0))}</p>
         <p><strong>Total:</strong> ${formatearCOP(Number(detalle.financiero?.total || 0))}</p>
         <p><strong>Estado pago:</strong> {detalle.financiero?.estadoPago || "-"}</p>
-        <p><strong>Método pago:</strong> {detalle.financiero?.metodoPago || "-"}</p>
+        <p><strong>{paymentTitle}:</strong> {formatMetodoPago(detalle.financiero)}</p>
         <p><strong>Cuenta bancaria:</strong> {detalle.financiero?.cuentaBancaria || "-"}</p>
-        <p><strong>Celular Flora:</strong> {detalle.financiero?.canalFlora || "-"}</p>
+        <p><strong>{salesChannelTitle}:</strong> {detalle.financiero?.canalFlora || "-"}</p>
       </section>
 
       <section className="order-block">
@@ -1156,6 +1210,30 @@ function buildProductoLabel(producto) {
   if (nombre) return nombre;
   if (codigo) return codigo;
   return "Producto sin nombre";
+}
+
+function normalizeIdentType(value) {
+  const raw = String(value || "").trim().toUpperCase();
+  if (raw === "CC" || raw === "CEDULA" || raw === "CÉDULA") return "CC";
+  if (raw === "NIT") return "NIT";
+  return raw;
+}
+
+function formatClienteDocumento(cliente) {
+  const tipo = normalizeIdentType(cliente?.tipoIdent);
+  const numero = String(cliente?.identificacion || "").trim();
+  if (!numero) return "-";
+  if (tipo === "NIT") return `NIT ${numero}`;
+  if (tipo === "CC") return `Cédula ${numero}`;
+  return numero;
+}
+
+function formatMetodoPago(financiero) {
+  const methods = Array.isArray(financiero?.metodosPago)
+    ? financiero.metodosPago.map(item => String(item || "").trim()).filter(Boolean)
+    : [];
+  if (methods.length > 0) return methods.join(", ");
+  return financiero?.metodoPago || "-";
 }
 
 function toDateInput(value) {
