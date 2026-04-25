@@ -45,6 +45,10 @@ function nextFloristaLabel(status) {
   return null;
 }
 
+function arregloCodeLabel(item) {
+  return item?.codigoArreglo || "-";
+}
+
 function normalizeRole(value) {
   return String(value || "").trim().toLowerCase().replace(/\s+/g, "_");
 }
@@ -75,7 +79,7 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
   const [selectedItem, setSelectedItem] = useState(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
 
-  const [usuarioCambio, setUsuarioCambio] = useState(DEFAULT_USER);
+  const [usuarioCambio] = useState(() => String(session?.email || session?.nombre || DEFAULT_USER));
   const [motivoAccion, setMotivoAccion] = useState("");
 
   const [floristaGestionID, setFloristaGestionID] = useState("");
@@ -407,38 +411,19 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
             </button>
           ) : null}
           {canViewProduccion ? (
-            <div className="sidebar-submenu-wrap">
-              <button
-                type="button"
-                className="sidebar-nav-btn is-active"
-                title="Producción"
-                onClick={() => {
-                  onGoProduccion();
-                  setSubmenu("pedidos");
-                  setSidebarMobileOpen(false);
-                }}
-              >
-                <span className="sidebar-nav-icon">🏭</span>
-                <span className="sidebar-nav-text">Producción</span>
-              </button>
-
-              <div className="sidebar-submenu-panel is-inline">
-                {visibleSubmenuOptions.map(item => (
-                  <button
-                    key={item.key}
-                    type="button"
-                    className={`sidebar-submenu-btn ${submenu === item.key ? "is-active" : ""}`}
-                    title={`Ir a ${item.label}`}
-                    onClick={() => {
-                      setSubmenu(item.key);
-                      setSidebarMobileOpen(false);
-                    }}
-                  >
-                    {item.label}
-                  </button>
-                ))}
-              </div>
-            </div>
+            <button
+              type="button"
+              className="sidebar-nav-btn is-active"
+              title="Producción"
+              onClick={() => {
+                onGoProduccion();
+                setSubmenu("pedidos");
+                setSidebarMobileOpen(false);
+              }}
+            >
+              <span className="sidebar-nav-icon">🏭</span>
+              <span className="sidebar-nav-text">Producción</span>
+            </button>
           ) : null}
           {canViewDomicilios ? (
             <button
@@ -518,8 +503,17 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
         </header>
 
         {canManageProductionActions ? (
-          <section className="orders-filters">
-            <input type="text" value={usuarioCambio} onChange={event => setUsuarioCambio(event.target.value)} placeholder="usuarioCambio" title="Usuario de auditoría" />
+          <section className="inventory-header-tabs production-header-tabs" aria-label="Submenu producción">
+            {visibleSubmenuOptions.map(item => (
+              <button
+                key={item.key}
+                type="button"
+                className={`btn-outline inventory-tab-btn ${submenu === item.key ? "is-active" : ""}`}
+                onClick={() => setSubmenu(item.key)}
+              >
+                {item.label}
+              </button>
+            ))}
           </section>
         ) : null}
 
@@ -601,18 +595,26 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
                       ) : null}
                       {canFloristaQuickState ? (
                         <td>
-                          {nextFloristaStatus(item.estado) ? (
+                          <div className="production-inline-actions">
                             <button
                               type="button"
                               className="btn-outline"
-                              title="Actualizar estado de producción"
-                              onClick={() => cambiarEstadoFloristaRapido(item)}
+                              title="Ver detalle del arreglo"
+                              onClick={() => openActionsDrawer(item)}
                             >
-                              {nextFloristaLabel(item.estado)}
+                              Ver detalle
                             </button>
-                          ) : (
-                            <span>-</span>
-                          )}
+                            {nextFloristaStatus(item.estado) ? (
+                              <button
+                                type="button"
+                                className="btn-outline"
+                                title="Actualizar estado de producción"
+                                onClick={() => cambiarEstadoFloristaRapido(item)}
+                              >
+                                {nextFloristaLabel(item.estado)}
+                              </button>
+                            ) : null}
+                          </div>
                         </td>
                       ) : null}
                     </tr>
@@ -647,15 +649,27 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
                         Ver acciones
                       </button>
                     ) : null}
-                    {canFloristaQuickState && nextFloristaStatus(item.estado) ? (
-                      <button
-                        type="button"
-                        className="btn-outline"
-                        title="Actualizar estado de producción"
-                        onClick={() => cambiarEstadoFloristaRapido(item)}
-                      >
-                        {nextFloristaLabel(item.estado)}
-                      </button>
+                    {canFloristaQuickState ? (
+                      <>
+                        <button
+                          type="button"
+                          className="btn-outline"
+                          title="Ver detalle del arreglo"
+                          onClick={() => openActionsDrawer(item)}
+                        >
+                          Ver detalle
+                        </button>
+                        {nextFloristaStatus(item.estado) ? (
+                          <button
+                            type="button"
+                            className="btn-outline"
+                            title="Actualizar estado de producción"
+                            onClick={() => cambiarEstadoFloristaRapido(item)}
+                          >
+                            {nextFloristaLabel(item.estado)}
+                          </button>
+                        ) : null}
+                      </>
                     ) : null}
                   </div>
                 </article>
@@ -737,10 +751,9 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
         )}
       </main>
 
-      {canManageProductionActions ? (
       <aside className={`orders-drawer ${drawerOpen && submenu === "pedidos" ? "open" : ""}`}>
         <div className="orders-drawer-head">
-          <strong>Acciones Domicilios</strong>
+          <strong>{canManageProductionActions ? "Acciones Producción" : "Detalle Producción"}</strong>
           <div className="orders-drawer-head-actions">
             <button type="button" className="icon-btn" onClick={closeActionsDrawer} title="Cerrar barra lateral">✕</button>
           </div>
@@ -752,15 +765,20 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
           ) : (
             <>
               <section className="order-block">
-                <h4>📦 Pedido</h4>
+                <h4>📦 Ver detalle</h4>
                 <p><strong>Número:</strong> {selectedItem.numeroPedido ?? "-"}</p>
                 <p><strong>Cliente:</strong> {selectedItem.cliente || "-"}</p>
-                <p><strong>Producto:</strong> {selectedItem.producto || "-"}</p>
-                <p><strong>Estado:</strong> {selectedItem.estado || "-"}</p>
+                <p><strong>Código o número del arreglo:</strong> {arregloCodeLabel(selectedItem)}</p>
+                <p><strong>Nombre del arreglo:</strong> {selectedItem.nombreArreglo || selectedItem.producto || "-"}</p>
                 <p><strong>Fecha Entrega:</strong> {formatDateOnly(selectedItem.fechaEntrega) || "-"}</p>
                 <p><strong>Hora Entrega:</strong> {selectedItem.horaEntrega || "-"}</p>
+                <p><strong>Barrio:</strong> {selectedItem.barrio || "-"}</p>
+                <p><strong>Estado del arreglo:</strong> {selectedItem.estado || "-"}</p>
+                <p><strong>Observaciones:</strong> {selectedItem.observaciones || "-"}</p>
+                <p><strong>Florista asignado:</strong> {selectedItem.floristaAsignado || "Sin asignar"}</p>
               </section>
 
+              {canManageProductionActions ? (
               <section className="order-block">
                 <h4>Auditoría acción</h4>
                 <input
@@ -771,7 +789,9 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
                   title="Motivo"
                 />
               </section>
+              ) : null}
 
+              {canManageProductionActions ? (
               <section className="order-block">
                 <h4>👩‍🎨 Asignación</h4>
                 <div className="order-actions" style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
@@ -789,6 +809,7 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
                   <button type="button" className="btn-outline" title="Reasignación auditada" onClick={() => reasignarAuditable(selectedItem)}>Reasignar auditado</button>
                 </div>
               </section>
+              ) : null}
 
               {canManageStateAndRecalculate ? (
                 <>
@@ -821,7 +842,6 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
           )}
         </div>
       </aside>
-      ) : null}
     </div>
   );
 }

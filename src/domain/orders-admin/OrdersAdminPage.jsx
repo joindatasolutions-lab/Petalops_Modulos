@@ -56,6 +56,10 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
   const [detailEditTelefonoDestino, setDetailEditTelefonoDestino] = useState("");
   const [detailEditDireccion, setDetailEditDireccion] = useState("");
   const [detailEditBarrioNombre, setDetailEditBarrioNombre] = useState("");
+  const [detailEditBarrioQuery, setDetailEditBarrioQuery] = useState("");
+  const [detailEditBarrios, setDetailEditBarrios] = useState([]);
+  const [detailEditBarriosLoading, setDetailEditBarriosLoading] = useState(false);
+  const [detailEditBarrioDropdownOpen, setDetailEditBarrioDropdownOpen] = useState(false);
   const [detailEditFirma, setDetailEditFirma] = useState("");
   const [detailEditMensajeTarjeta, setDetailEditMensajeTarjeta] = useState("");
   const [detailEditMetodosPago, setDetailEditMetodosPago] = useState([]);
@@ -157,6 +161,10 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
       setDetailEditTelefonoDestino("");
       setDetailEditDireccion("");
       setDetailEditBarrioNombre("");
+      setDetailEditBarrioQuery("");
+      setDetailEditBarrios([]);
+      setDetailEditBarriosLoading(false);
+      setDetailEditBarrioDropdownOpen(false);
       setDetailEditFirma("");
       setDetailEditMensajeTarjeta("");
       setDetailEditMetodosPago([]);
@@ -186,6 +194,11 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
     setDetailEditTelefonoDestino(String(detalle.destinatario?.telefono || ""));
     setDetailEditDireccion(String(detalle.destinatario?.direccion || ""));
     setDetailEditBarrioNombre(String(detalle.destinatario?.barrio || ""));
+    setDetailEditBarrioQuery("");
+    setDetailEditBarrios(dedupeBarrioItems([
+      normalizeBarrioItem({ nombreBarrio: detalle.destinatario?.barrio }),
+    ].filter(Boolean)));
+    setDetailEditBarrioDropdownOpen(false);
     setDetailEditFirma(String(detalle.destinatario?.firma || ""));
     setDetailEditMensajeTarjeta(String(detalle.destinatario?.mensajeTarjeta || ""));
     setDetailEditMetodosPago(Array.isArray(detalle.financiero?.metodosPago) ? detalle.financiero.metodosPago.map(item => String(item)) : []);
@@ -226,6 +239,39 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
 
     return () => { disposed = true; };
   }, [api, empresaId, isEditingDetail, sucursalId]);
+
+  useEffect(() => {
+    if (!isEditingDetail) return;
+    const query = String(detailEditBarrioQuery || "").trim();
+
+    let disposed = false;
+    setDetailEditBarriosLoading(true);
+    api.buscarBarrios({ empresaId, sucursalId, q: query })
+      .then(payload => {
+        if (disposed) return;
+        const rows = Array.isArray(payload) ? payload : [];
+        const loaded = rows.map(item => normalizeBarrioItem(item)).filter(Boolean);
+        setDetailEditBarrios(current => dedupeBarrioItems([
+          normalizeBarrioItem({ nombreBarrio: detailEditBarrioNombre }),
+          ...current,
+          ...loaded,
+        ].filter(Boolean)));
+      })
+      .catch(() => {
+        if (disposed) return;
+        setDetailEditBarrios(current => dedupeBarrioItems([
+          normalizeBarrioItem({ nombreBarrio: detailEditBarrioNombre }),
+          ...current,
+        ].filter(Boolean)));
+      })
+      .finally(() => {
+        if (!disposed) setDetailEditBarriosLoading(false);
+      });
+
+    return () => {
+      disposed = true;
+    };
+  }, [api, detailEditBarrioNombre, detailEditBarrioQuery, empresaId, isEditingDetail, sucursalId]);
 
   const applyFilterValue = (name, value) => {
     setFilters(current => ({
@@ -381,6 +427,12 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
       return codigo.includes(q) || nombre.includes(q);
     });
   }, [detailEditCatalog, detailEditFilterText]);
+
+  const filteredBarrioOptions = useMemo(() => {
+    const q = String(detailEditBarrioQuery || "").trim().toLowerCase();
+    if (!q) return detailEditBarrios;
+    return detailEditBarrios.filter(item => String(item?.nombre || "").toLowerCase().includes(q));
+  }, [detailEditBarrioQuery, detailEditBarrios]);
 
   const onSearchCatalog = async () => {
     const q = String(detailEditFilterText || "").trim();
@@ -904,12 +956,57 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
                     </label>
                     <label className="order-detail-edit-label">
                       Barrio
-                      <input
-                        type="text"
-                        value={detailEditBarrioNombre}
-                        onChange={event => setDetailEditBarrioNombre(event.target.value)}
-                        placeholder="Barrio de entrega"
-                      />
+                      <div className="order-combobox">
+                        <button
+                          type="button"
+                          className="order-combobox-trigger"
+                          onClick={() => setDetailEditBarrioDropdownOpen(open => !open)}
+                        >
+                          <span>{detailEditBarrioNombre || "— Selecciona un barrio —"}</span>
+                          <span className="order-combobox-arrow">{detailEditBarrioDropdownOpen ? "▲" : "▼"}</span>
+                        </button>
+
+                        {detailEditBarrioDropdownOpen ? (
+                          <div className="order-combobox-panel">
+                            <div className="order-combobox-search-row">
+                              <input
+                                autoFocus
+                                type="text"
+                                value={detailEditBarrioQuery}
+                                onChange={event => setDetailEditBarrioQuery(event.target.value)}
+                                placeholder="Busca un barrio..."
+                                className="order-combobox-search"
+                              />
+                              <button
+                                type="button"
+                                className="btn-outline order-detail-search-btn"
+                                onClick={() => setDetailEditBarrioDropdownOpen(false)}
+                              >
+                                Cerrar
+                              </button>
+                            </div>
+                            <ul className="order-combobox-list">
+                              {filteredBarrioOptions.length === 0 ? (
+                                <li className="order-combobox-empty">
+                                  {detailEditBarriosLoading ? "Buscando..." : "Sin barrios disponibles"}
+                                </li>
+                              ) : filteredBarrioOptions.map(item => (
+                                <li
+                                  key={`${item.id || "manual"}-${item.nombre}`}
+                                  className={`order-combobox-option${item.nombre === detailEditBarrioNombre ? " is-selected" : ""}`}
+                                  onClick={() => {
+                                    setDetailEditBarrioNombre(item.nombre);
+                                    setDetailEditBarrioDropdownOpen(false);
+                                    setDetailEditBarrioQuery("");
+                                  }}
+                                >
+                                  {item.nombre}
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        ) : null}
+                      </div>
                     </label>
                   </div>
 
@@ -1103,7 +1200,8 @@ function OrderDetail({ detalle, paymentTitle = "Método de pago", salesChannelTi
   const productos = Array.isArray(detalle.productos) ? detalle.productos : [];
   const { date: fechaPedido, time: horaPedido } = splitDateTimeParts(detalle.fechaPedido || detalle.fecha);
   const { date: fechaEntrega, time: horaEntrega } = splitDateTimeParts(detalle.destinatario?.fechaEntrega);
-  const identificacionCliente = formatClienteDocumento(detalle.cliente);
+  const tipoDocumentoCliente = formatClienteTipoDocumento(detalle.cliente);
+  const numeroDocumentoCliente = formatClienteNumeroDocumento(detalle.cliente);
 
   return (
     <>
@@ -1121,7 +1219,8 @@ function OrderDetail({ detalle, paymentTitle = "Método de pago", salesChannelTi
         <p><strong>Nombre:</strong> {detalle.cliente?.nombre || "-"}</p>
         <p><strong>Teléfono:</strong> {detalle.cliente?.telefonoCompleto || detalle.cliente?.telefono || "-"}</p>
         <p><strong>Email:</strong> {detalle.cliente?.email || "-"}</p>
-        <p><strong>Cédula / NIT:</strong> {identificacionCliente}</p>
+        <p><strong>Tipo documento:</strong> {tipoDocumentoCliente}</p>
+        <p><strong>N documento:</strong> {numeroDocumentoCliente}</p>
       </section>
 
       <section className="order-block">
@@ -1134,6 +1233,7 @@ function OrderDetail({ detalle, paymentTitle = "Método de pago", salesChannelTi
         <p><strong>Hora entrega:</strong> {detalle.destinatario?.horaEntrega || horaEntrega || "-"}</p>
         <p><strong>Firma:</strong> {detalle.destinatario?.firma || "-"}</p>
         <p><strong>Mensaje:</strong> {detalle.destinatario?.mensajeTarjeta || "-"}</p>
+        <p><strong>Observación:</strong> {detalle.destinatario?.observacionGeneral || "-"}</p>
       </section>
 
       <section className="order-block">
@@ -1219,13 +1319,16 @@ function normalizeIdentType(value) {
   return raw;
 }
 
-function formatClienteDocumento(cliente) {
+function formatClienteTipoDocumento(cliente) {
   const tipo = normalizeIdentType(cliente?.tipoIdent);
+  if (tipo === "NIT") return "NIT";
+  if (tipo === "CC") return "Cédula";
+  return tipo || "-";
+}
+
+function formatClienteNumeroDocumento(cliente) {
   const numero = String(cliente?.identificacion || "").trim();
-  if (!numero) return "-";
-  if (tipo === "NIT") return `NIT ${numero}`;
-  if (tipo === "CC") return `Cédula ${numero}`;
-  return numero;
+  return numero || "-";
 }
 
 function formatMetodoPago(financiero) {
@@ -1234,6 +1337,26 @@ function formatMetodoPago(financiero) {
     : [];
   if (methods.length > 0) return methods.join(", ");
   return financiero?.metodoPago || "-";
+}
+
+function normalizeBarrioItem(raw) {
+  const nombre = String(raw?.nombreBarrio || raw?.nombre || "").trim();
+  if (!nombre) return null;
+  const idValue = raw?.idBarrio ?? raw?.id ?? null;
+  const id = idValue == null || idValue === "" ? null : Number(idValue);
+  return {
+    id: Number.isNaN(id) ? null : id,
+    nombre,
+  };
+}
+
+function dedupeBarrioItems(items) {
+  const map = new Map();
+  for (const item of items) {
+    if (!item?.nombre) continue;
+    map.set(item.nombre.toLowerCase(), item);
+  }
+  return Array.from(map.values());
 }
 
 function toDateInput(value) {

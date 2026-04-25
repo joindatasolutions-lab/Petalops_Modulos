@@ -349,6 +349,14 @@ export function createApiClient(config) {
       return requestJson(`/catalogo/${empresaId}${params.toString() ? `?${params.toString()}` : ""}`);
     },
 
+    async buscarBarrios({ empresaId, sucursalId, q }) {
+      const params = new URLSearchParams();
+      params.set("empresa_id", String(empresaId));
+      params.set("sucursal_id", String(sucursalId));
+      params.set("q", String(q || ""));
+      return requestJson(`/barrios/search?${params.toString()}`);
+    },
+
     async actualizarDetallePedidoPipeline({
       pedidoId,
       productoID,

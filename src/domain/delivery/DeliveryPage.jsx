@@ -76,6 +76,8 @@ export function DeliveryPage({
   const [modo, setModo] = useState("admin");
   const [domiciliarioId, setDomiciliarioId] = useState("");
   const [courierItems, setCourierItems] = useState([]);
+  const [selectedDeliveryItem, setSelectedDeliveryItem] = useState(null);
+  const [deliveryDrawerOpen, setDeliveryDrawerOpen] = useState(false);
 
   const toggleSidebar = () => {
     const isMobile = globalThis.matchMedia("(max-width: 980px)").matches;
@@ -285,6 +287,17 @@ export function DeliveryPage({
     globalThis.open(`https://wa.me/${phone}?text=${msg}`, "_blank", "noreferrer");
   };
 
+  const openDeliveryDetail = item => {
+    if (!item) return;
+    setSelectedDeliveryItem(item);
+    setDeliveryDrawerOpen(true);
+  };
+
+  const closeDeliveryDetail = () => {
+    setDeliveryDrawerOpen(false);
+    setSelectedDeliveryItem(null);
+  };
+
   return (
     <div className={`app-shell ${sidebarPinned ? "is-sidebar-pinned" : ""} ${sidebarMobileOpen ? "is-sidebar-mobile-open" : ""}`}>
       <aside className="app-sidebar">
@@ -413,6 +426,7 @@ export function DeliveryPage({
                       <div className="order-actions">
                         <button type="button" className="btn-outline" onClick={() => onAsignar(item)}>Asignar</button>
                         <button type="button" className="btn-outline" onClick={() => onEnRuta(item.idEntrega)}>EnRuta</button>
+                        <button type="button" className="btn-outline" onClick={() => openDeliveryDetail(item)}>Ver detalle</button>
                         <button type="button" className="btn-outline" onClick={() => openMaps(item)}>Ver ubicacion</button>
                       </div>
                     </td>
@@ -442,6 +456,7 @@ export function DeliveryPage({
                 </p>
 
                 <div className="delivery-courier-actions">
+                  <button type="button" className="btn-outline" onClick={() => openDeliveryDetail(item)}>Ver detalle</button>
                   <button type="button" className="btn-outline" onClick={() => openMaps(item)}>Abrir en Maps</button>
                   <button type="button" className="btn-outline" onClick={() => openWhatsApp(item)}>Mensaje</button>
                 </div>
@@ -456,6 +471,36 @@ export function DeliveryPage({
           </section>
         )}
       </main>
+
+      <aside className={`orders-drawer ${deliveryDrawerOpen ? "open" : ""}`}>
+        <div className="orders-drawer-head">
+          <strong>Detalle Domicilio</strong>
+          <div className="orders-drawer-head-actions">
+            <button type="button" className="icon-btn" onClick={closeDeliveryDetail} title="Cerrar barra lateral">✕</button>
+          </div>
+        </div>
+
+        <div className="orders-drawer-body">
+          {!deliveryDrawerOpen || !selectedDeliveryItem ? (
+            <p className="order-drawer-empty">Selecciona un pedido para ver detalle.</p>
+          ) : (
+            <section className="order-block">
+              <h4>📦 Ver detalle</h4>
+              <p><strong>Número del pedido:</strong> {selectedDeliveryItem.numeroPedido || "-"}</p>
+              <p><strong>Cliente:</strong> {selectedDeliveryItem.cliente || selectedDeliveryItem.destinatario || "-"}</p>
+              <p><strong>Destinatario:</strong> {selectedDeliveryItem.destinatario || "-"}</p>
+              <p><strong>Dirección:</strong> {selectedDeliveryItem.direccion || "-"}</p>
+              <p><strong>Barrio:</strong> {selectedDeliveryItem.barrio || "-"}</p>
+              <p><strong>Fecha de entrega:</strong> {formatDateOnly(selectedDeliveryItem.fechaEntregaProgramada) || "-"}</p>
+              <p><strong>Hora de entrega:</strong> {selectedDeliveryItem.horaEntrega || formatTimeOnly(selectedDeliveryItem.fechaEntregaProgramada) || "-"}</p>
+              <p><strong>Estado:</strong> {selectedDeliveryItem.estado || "-"}</p>
+              <p><strong>Domiciliario:</strong> {selectedDeliveryItem.domiciliario || "-"}</p>
+              <p><strong>Teléfono:</strong> {selectedDeliveryItem.telefonoDestino || "-"}</p>
+              <p><strong>Mensaje:</strong> {selectedDeliveryItem.mensaje || "-"}</p>
+            </section>
+          )}
+        </div>
+      </aside>
     </div>
   );
 }

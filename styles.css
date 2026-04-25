@@ -1156,10 +1156,22 @@ select:focus {
 
 .production-capsule-actions {
   margin-top: 10px;
+  display: grid;
+  gap: 8px;
 }
 
 .production-capsule-actions .btn-outline {
   width: 100%;
+}
+
+.production-inline-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.production-inline-actions .btn-outline {
+  flex: 1 1 140px;
 }
 
 .order-products-list {
