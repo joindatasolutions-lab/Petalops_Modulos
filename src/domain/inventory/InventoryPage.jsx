@@ -84,12 +84,14 @@ export function InventoryPage({
   canViewProduccion,
   canViewDomicilios,
   canViewInventario,
+  canViewClientesPanel,
   canViewUsuariosPanel,
   onGoPipeline,
   onGoPedidos,
   onGoProduccion,
   onGoDomicilios,
   onGoInventario,
+  onGoClientes,
   onGoUsuarios,
   onLogout,
 }) {
@@ -381,34 +383,24 @@ export function InventoryPage({
             </button>
           ) : null}
           {canViewInventario ? (
-            <div className="sidebar-submenu-wrap">
-              <button
-                type="button"
-                className="sidebar-nav-btn is-active"
-                onClick={() => {
-                  onGoInventario();
-                  setSidebarMobileOpen(false);
-                }}
-              >
-                <span className="sidebar-nav-icon">📦</span><span className="sidebar-nav-text">Inventario</span>
-              </button>
-
-              <div className="sidebar-submenu-panel is-inline">
-                {INVENTORY_SUBMENU_OPTIONS.map(option => (
-                  <button
-                    key={option.key}
-                    type="button"
-                    className={`sidebar-submenu-btn ${submenu === option.key ? "is-active" : ""}`}
-                    onClick={() => {
-                      setSubmenu(option.key);
-                      setSidebarMobileOpen(false);
-                    }}
-                  >
-                    {option.label}
-                  </button>
-                ))}
-              </div>
-            </div>
+            <button
+              type="button"
+              className="sidebar-nav-btn is-active"
+              onClick={() => {
+                onGoInventario();
+                setSidebarMobileOpen(false);
+              }}
+            >
+              <span className="sidebar-nav-icon">📦</span><span className="sidebar-nav-text">Inventario</span>
+            </button>
+          ) : null}
+          {canViewClientesPanel ? (
+            <button type="button" className="sidebar-nav-btn" onClick={() => {
+              setSidebarMobileOpen(false);
+              onGoClientes();
+            }}>
+              <span className="sidebar-nav-icon">💐</span><span className="sidebar-nav-text">Clientes</span>
+            </button>
           ) : null}
           {canViewUsuariosPanel ? (
             <button type="button" className="sidebar-nav-btn" onClick={() => {

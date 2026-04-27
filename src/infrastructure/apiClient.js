@@ -174,6 +174,58 @@ export function createApiClient(config) {
       return requestJson("/auth/usuarios/empresas");
     },
 
+    async listarClientes({ empresaId, q = "", soloActivos = false }) {
+      const params = new URLSearchParams();
+      params.set("empresaID", String(empresaId));
+      if (q) params.set("q", String(q));
+      if (soloActivos) params.set("soloActivos", "true");
+      return requestJson(`/clientes?${params.toString()}`);
+    },
+
+    async crearCliente({ empresaID, tipoIdent, identificacion, indicativo, nombreCompleto, telefono, telefonoCompleto, email, fechaCumpleanos, fechaAniversario, activo = true }) {
+      return requestJson("/clientes", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          empresaID,
+          tipoIdent,
+          identificacion,
+          indicativo,
+          nombreCompleto,
+          telefono,
+          telefonoCompleto,
+          email,
+          fechaCumpleanos,
+          fechaAniversario,
+          activo,
+        })
+      });
+    },
+
+    async actualizarCliente({ clienteId, empresaID, tipoIdent, identificacion, indicativo, nombreCompleto, telefono, telefonoCompleto, email, fechaCumpleanos, fechaAniversario, activo = true }) {
+      return requestJson(`/clientes/${clienteId}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          empresaID,
+          tipoIdent,
+          identificacion,
+          indicativo,
+          nombreCompleto,
+          telefono,
+          telefonoCompleto,
+          email,
+          fechaCumpleanos,
+          fechaAniversario,
+          activo,
+        })
+      });
+    },
+
     async listarEmpresasModulosGestion() {
       return requestJson("/auth/usuarios/empresas/modulos");
     },
@@ -357,9 +409,56 @@ export function createApiClient(config) {
       return requestJson(`/barrios/search?${params.toString()}`);
     },
 
+    async listarBarriosDomicilios({ sucursalId }) {
+      const params = new URLSearchParams();
+      params.set("sucursalID", String(sucursalId));
+      return requestJson(`/barrios?${params.toString()}`);
+    },
+
+    async crearBarrioDomicilios({ sucursalID, zonaID, nombreBarrio, costoDomicilio, activo }) {
+      return requestJson("/barrios", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          sucursalID,
+          zonaID,
+          nombreBarrio,
+          costoDomicilio,
+          activo,
+        })
+      });
+    },
+
+    async actualizarBarrioDomicilios({ barrioId, sucursalID, nombreBarrio, costoDomicilio }) {
+      return requestJson(`/barrios/${barrioId}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          sucursalID,
+          nombreBarrio,
+          costoDomicilio,
+        })
+      });
+    },
+
+    async crearPedidoCheckout(payload) {
+      return requestJson("/pedido/checkout", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(payload)
+      });
+    },
+
     async actualizarDetallePedidoPipeline({
       pedidoId,
       productoID,
+      productoObservaciones,
       fechaEntrega,
       horaEntrega,
       clienteTipoIdent,
@@ -370,6 +469,7 @@ export function createApiClient(config) {
       barrioNombre,
       firma,
       mensajeTarjeta,
+      observacionGeneral,
       metodosPago,
       canalFlora,
     }) {
@@ -380,6 +480,7 @@ export function createApiClient(config) {
         },
         body: JSON.stringify({
           productoID: productoID != null ? Number(productoID) : null,
+          productoObservaciones: productoObservaciones ?? null,
           fechaEntrega: fechaEntrega || null,
           horaEntrega: horaEntrega || null,
           clienteTipoIdent: clienteTipoIdent ?? null,
@@ -390,6 +491,7 @@ export function createApiClient(config) {
           barrioNombre: barrioNombre ?? null,
           firma: firma ?? null,
           mensajeTarjeta: mensajeTarjeta ?? null,
+          observacionGeneral: observacionGeneral ?? null,
           metodosPago: Array.isArray(metodosPago) ? metodosPago : null,
           canalFlora: canalFlora ?? null,
         })

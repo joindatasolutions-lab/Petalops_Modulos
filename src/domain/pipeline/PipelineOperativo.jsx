@@ -43,12 +43,14 @@ export function PipelineOperativo({
   canViewProduccion,
   canViewDomicilios,
   canViewInventario,
+  canViewClientesPanel,
   canViewUsuariosPanel,
   onGoPipeline,
   onGoPedidos,
   onGoProduccion,
   onGoDomicilios,
   onGoInventario,
+  onGoClientes,
   onGoUsuarios,
   onLogout
 }) {
@@ -196,6 +198,7 @@ export function PipelineOperativo({
           {canViewProduccion ? <button type="button" className="sidebar-nav-btn" onClick={() => { setSidebarMobileOpen(false); onGoProduccion(); }}><span className="sidebar-nav-icon">🏭</span><span className="sidebar-nav-text">Producción</span></button> : null}
           {canViewDomicilios ? <button type="button" className="sidebar-nav-btn" onClick={() => { setSidebarMobileOpen(false); onGoDomicilios(); }}><span className="sidebar-nav-icon">🛵</span><span className="sidebar-nav-text">Domicilios</span></button> : null}
           {canViewInventario ? <button type="button" className="sidebar-nav-btn" onClick={() => { setSidebarMobileOpen(false); onGoInventario(); }}><span className="sidebar-nav-icon">📦</span><span className="sidebar-nav-text">Inventario</span></button> : null}
+          {canViewClientesPanel ? <button type="button" className="sidebar-nav-btn" onClick={() => { setSidebarMobileOpen(false); onGoClientes(); }}><span className="sidebar-nav-icon">💐</span><span className="sidebar-nav-text">Clientes</span></button> : null}
           {canViewUsuariosPanel ? <button type="button" className="sidebar-nav-btn" onClick={() => { setSidebarMobileOpen(false); onGoUsuarios(); }}><span className="sidebar-nav-icon">👥</span><span className="sidebar-nav-text">Usuarios</span></button> : null}
         </nav>
         <button type="button" className="btn-outline sidebar-logout-btn" onClick={onLogout} title="Cerrar sesión">
@@ -250,5 +253,4 @@ export function PipelineOperativo({
     </div>
   );
 }
-
 

@@ -53,7 +53,7 @@ function normalizeRole(value) {
   return String(value || "").trim().toLowerCase().replace(/\s+/g, "_");
 }
 
-export function ProductionPage({ session, canViewPipeline, canViewPedidos, canViewProduccion, canViewDomicilios, canViewInventario, canViewUsuariosPanel, onLogout, onGoPipeline, onGoPedidos, onGoProduccion, onGoDomicilios, onGoInventario, onGoUsuarios }) {
+export function ProductionPage({ session, canViewPipeline, canViewPedidos, canViewProduccion, canViewDomicilios, canViewInventario, canViewClientesPanel, canViewUsuariosPanel, onLogout, onGoPipeline, onGoPedidos, onGoProduccion, onGoDomicilios, onGoInventario, onGoClientes, onGoUsuarios }) {
   const api = useMemo(() => createApiClient(tenantConfig), []);
   const empresaId = Number(session?.empresaID || tenantConfig.empresaId);
   const sucursalId = Number(session?.sucursalID || tenantConfig.sucursalId);
@@ -453,6 +453,19 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
               <span className="sidebar-nav-text">Inventario</span>
             </button>
           ) : null}
+          {canViewClientesPanel ? (
+            <button
+              type="button"
+              className="sidebar-nav-btn"
+              onClick={() => {
+                setSidebarMobileOpen(false);
+                onGoClientes();
+              }}
+            >
+              <span className="sidebar-nav-icon">💐</span>
+              <span className="sidebar-nav-text">Clientes</span>
+            </button>
+          ) : null}
           {canViewUsuariosPanel ? (
             <button
               type="button"
@@ -774,7 +787,7 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
                 <p><strong>Hora Entrega:</strong> {selectedItem.horaEntrega || "-"}</p>
                 <p><strong>Barrio:</strong> {selectedItem.barrio || "-"}</p>
                 <p><strong>Estado del arreglo:</strong> {selectedItem.estado || "-"}</p>
-                <p><strong>Observaciones:</strong> {selectedItem.observaciones || "-"}</p>
+                <p><strong>Observación:</strong> {selectedItem.observacion || "-"}</p>
                 <p><strong>Florista asignado:</strong> {selectedItem.floristaAsignado || "Sin asignar"}</p>
               </section>
 

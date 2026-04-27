@@ -12,6 +12,12 @@ const FILTROS = [
   { value: "noentregado", label: "No entregado" },
 ];
 
+const DELIVERY_VIEWS = [
+  { value: "admin", label: "Vista Admin" },
+  { value: "courier", label: "Vista Domiciliario" },
+  { value: "barrios", label: "Barrios" },
+];
+
 function todayIso() {
   return new Date().toISOString().slice(0, 10);
 }
@@ -49,6 +55,7 @@ export function DeliveryPage({
   canViewProduccion,
   canViewDomicilios,
   canViewInventario,
+  canViewClientesPanel,
   canViewUsuariosPanel,
   onLogout,
   onGoPipeline,
@@ -56,6 +63,7 @@ export function DeliveryPage({
   onGoProduccion,
   onGoDomicilios,
   onGoInventario,
+  onGoClientes,
   onGoUsuarios,
 }) {
   const api = useMemo(() => createApiClient(tenantConfig), []);
@@ -78,6 +86,19 @@ export function DeliveryPage({
   const [courierItems, setCourierItems] = useState([]);
   const [selectedDeliveryItem, setSelectedDeliveryItem] = useState(null);
   const [deliveryDrawerOpen, setDeliveryDrawerOpen] = useState(false);
+  const [barriosItems, setBarriosItems] = useState([]);
+  const [barrioForm, setBarrioForm] = useState({
+    zonaID: "",
+    nombreBarrio: "",
+    costoDomicilio: "",
+    activo: true,
+  });
+  const [barrioSaving, setBarrioSaving] = useState(false);
+  const [editingBarrioId, setEditingBarrioId] = useState(null);
+  const [barrioEditForm, setBarrioEditForm] = useState({
+    nombreBarrio: "",
+    costoDomicilio: "",
+  });
 
   const toggleSidebar = () => {
     const isMobile = globalThis.matchMedia("(max-width: 980px)").matches;
@@ -138,6 +159,21 @@ export function DeliveryPage({
     }
   }, [api, empresaId, sucursalId, domiciliarioId, fechaFiltro]);
 
+  const loadBarrios = useCallback(async () => {
+    setLoading(true);
+    setError("");
+    try {
+      const data = await api.listarBarriosDomicilios({ sucursalId });
+      setBarriosItems(Array.isArray(data.items) ? data.items : []);
+    } catch (nextError) {
+      console.error("Error cargando barrios:", nextError);
+      setBarriosItems([]);
+      setError(nextError?.detail || nextError?.message || "No fue posible cargar barrios.");
+    } finally {
+      setLoading(false);
+    }
+  }, [api, sucursalId]);
+
   useEffect(() => {
     loadDomiciliarios().catch(() => {});
   }, [loadDomiciliarios]);
@@ -145,10 +181,12 @@ export function DeliveryPage({
   useEffect(() => {
     if (modo === "admin") {
       loadAdmin().catch(() => {});
+    } else if (modo === "barrios") {
+      loadBarrios().catch(() => {});
     } else {
       loadCourier().catch(() => {});
     }
-  }, [modo, loadAdmin, loadCourier]);
+  }, [modo, loadAdmin, loadBarrios, loadCourier]);
 
   useEffect(() => {
     const mediaQuery = globalThis.matchMedia("(max-width: 980px)");
@@ -163,6 +201,8 @@ export function DeliveryPage({
     await loadDomiciliarios();
     if (modo === "admin") {
       await loadAdmin();
+    } else if (modo === "barrios") {
+      await loadBarrios();
     } else {
       await loadCourier();
     }
@@ -298,6 +338,78 @@ export function DeliveryPage({
     setSelectedDeliveryItem(null);
   };
 
+  const onChangeBarrioForm = (field, value) => {
+    setBarrioForm(current => ({
+      ...current,
+      [field]: value,
+    }));
+  };
+
+  const onCrearBarrio = async () => {
+    if (barrioSaving) return;
+    setBarrioSaving(true);
+    setError("");
+    try {
+      await api.crearBarrioDomicilios({
+        sucursalID: sucursalId,
+        zonaID: Number(barrioForm.zonaID || 0),
+        nombreBarrio: barrioForm.nombreBarrio,
+        costoDomicilio: Number(barrioForm.costoDomicilio || 0),
+        activo: Boolean(barrioForm.activo),
+      });
+      setBarrioForm({
+        zonaID: "",
+        nombreBarrio: "",
+        costoDomicilio: "",
+        activo: true,
+      });
+      await loadBarrios();
+    } catch (nextError) {
+      console.error("Error creando barrio:", nextError);
+      setError(nextError?.detail || nextError?.message || "No fue posible crear el barrio.");
+    } finally {
+      setBarrioSaving(false);
+    }
+  };
+
+  const onStartEditBarrio = item => {
+    setEditingBarrioId(item?.idBarrio ?? null);
+    setBarrioEditForm({
+      nombreBarrio: String(item?.nombreBarrio || ""),
+      costoDomicilio: String(item?.costoDomicilio ?? ""),
+    });
+    setError("");
+  };
+
+  const onCancelEditBarrio = () => {
+    setEditingBarrioId(null);
+    setBarrioEditForm({
+      nombreBarrio: "",
+      costoDomicilio: "",
+    });
+  };
+
+  const onSaveEditBarrio = async barrioId => {
+    if (barrioSaving) return;
+    setBarrioSaving(true);
+    setError("");
+    try {
+      await api.actualizarBarrioDomicilios({
+        barrioId: Number(barrioId),
+        sucursalID: sucursalId,
+        nombreBarrio: String(barrioEditForm.nombreBarrio || "").trim(),
+        costoDomicilio: Number(barrioEditForm.costoDomicilio || 0),
+      });
+      onCancelEditBarrio();
+      await loadBarrios();
+    } catch (nextError) {
+      console.error("Error actualizando barrio:", nextError);
+      setError(nextError?.detail || nextError?.message || "No fue posible actualizar el barrio.");
+    } finally {
+      setBarrioSaving(false);
+    }
+  };
+
   return (
     <div className={`app-shell ${sidebarPinned ? "is-sidebar-pinned" : ""} ${sidebarMobileOpen ? "is-sidebar-mobile-open" : ""}`}>
       <aside className="app-sidebar">
@@ -337,6 +449,12 @@ export function DeliveryPage({
               <span className="sidebar-nav-text">Inventario</span>
             </button>
           ) : null}
+          {canViewClientesPanel ? (
+            <button type="button" className="sidebar-nav-btn" onClick={() => { setSidebarMobileOpen(false); onGoClientes(); }}>
+              <span className="sidebar-nav-icon">💐</span>
+              <span className="sidebar-nav-text">Clientes</span>
+            </button>
+          ) : null}
           {canViewUsuariosPanel ? (
             <button type="button" className="sidebar-nav-btn" onClick={() => { setSidebarMobileOpen(false); onGoUsuarios(); }}>
               <span className="sidebar-nav-icon">👥</span>
@@ -364,23 +482,36 @@ export function DeliveryPage({
             <p className="orders-admin-subtitle">Desde ParaEntrega hasta Entregado, con evidencia y trazabilidad completa.</p>
           </div>
           <div className="header-actions">
-            <button type="button" className={`btn-outline ${modo === "admin" ? "is-selected" : ""}`} onClick={() => setModo("admin")}>Vista Admin</button>
-            <button type="button" className={`btn-outline ${modo === "courier" ? "is-selected" : ""}`} onClick={() => setModo("courier")}>Vista Domiciliario</button>
             <button type="button" className="btn-primary" onClick={refreshAll}>Actualizar</button>
           </div>
         </header>
 
-        <section className="orders-filters">
-          <select value={filtro} onChange={event => setFiltro(event.target.value)}>
-            {FILTROS.map(item => <option key={item.value} value={item.value}>{item.label}</option>)}
-          </select>
-          <input type="date" value={fechaFiltro} onChange={event => setFechaFiltro(event.target.value)} />
-          <select value={domiciliarioId} onChange={event => setDomiciliarioId(event.target.value)}>
-            <option value="">Domiciliario...</option>
-            {domiciliarios.map(item => <option key={item.idDomiciliario} value={item.idDomiciliario}>{item.nombre}</option>)}
-          </select>
-          <div className="delivery-filter-hint">Modo: {modo === "admin" ? "Administrador" : "Domiciliario"}</div>
+        <section className="inventory-header-tabs" aria-label="Submenu domicilios">
+          {DELIVERY_VIEWS.map(item => (
+            <button
+              key={item.value}
+              type="button"
+              className={`btn-outline inventory-tab-btn ${modo === item.value ? "is-active" : ""}`}
+              onClick={() => setModo(item.value)}
+            >
+              {item.label}
+            </button>
+          ))}
         </section>
+
+        {modo !== "barrios" ? (
+          <section className="orders-filters">
+            <select value={filtro} onChange={event => setFiltro(event.target.value)}>
+              {FILTROS.map(item => <option key={item.value} value={item.value}>{item.label}</option>)}
+            </select>
+            <input type="date" value={fechaFiltro} onChange={event => setFechaFiltro(event.target.value)} />
+            <select value={domiciliarioId} onChange={event => setDomiciliarioId(event.target.value)}>
+              <option value="">Domiciliario...</option>
+              {domiciliarios.map(item => <option key={item.idDomiciliario} value={item.idDomiciliario}>{item.nombre}</option>)}
+            </select>
+            <div className="delivery-filter-hint">Modo: {modo === "admin" ? "Administrador" : "Domiciliario"}</div>
+          </section>
+        ) : null}
 
         {error ? <p className="orders-message">{error}</p> : null}
         {loading ? <p className="orders-message">Cargando domicilios...</p> : null}
@@ -435,7 +566,7 @@ export function DeliveryPage({
               </tbody>
             </table>
           </section>
-        ) : (
+        ) : modo === "courier" ? (
           <section className="delivery-courier-cards">
             {courierItems.length === 0 ? (
               <p className="orders-message">No hay entregas asignadas para este domiciliario en la fecha seleccionada.</p>
@@ -469,6 +600,130 @@ export function DeliveryPage({
               </article>
             ))}
           </section>
+        ) : (
+          <section className="delivery-barrios-layout">
+            <article className="order-block users-top-panel delivery-barrios-form-panel">
+              <h4>Crear barrio</h4>
+              <div className="users-create-user-form">
+                <label className="order-detail-edit-label">
+                  Zona ID
+                  <input
+                    type="number"
+                    min="0"
+                    value={barrioForm.zonaID}
+                    onChange={event => onChangeBarrioForm("zonaID", event.target.value)}
+                    placeholder="Ej: 1"
+                  />
+                </label>
+                <label className="order-detail-edit-label">
+                  Nombre barrio
+                  <input
+                    type="text"
+                    value={barrioForm.nombreBarrio}
+                    onChange={event => onChangeBarrioForm("nombreBarrio", event.target.value)}
+                    placeholder="Nombre del barrio"
+                  />
+                </label>
+                <label className="order-detail-edit-label">
+                  Costo domicilio
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={barrioForm.costoDomicilio}
+                    onChange={event => onChangeBarrioForm("costoDomicilio", event.target.value)}
+                    placeholder="0"
+                  />
+                </label>
+                <label className="order-detail-edit-label">
+                  Activo
+                  <select
+                    value={barrioForm.activo ? "1" : "0"}
+                    onChange={event => onChangeBarrioForm("activo", event.target.value === "1")}
+                  >
+                    <option value="1">Sí</option>
+                    <option value="0">No</option>
+                  </select>
+                </label>
+                <button type="button" className="btn-primary" onClick={onCrearBarrio} disabled={barrioSaving}>
+                  {barrioSaving ? "Guardando..." : "Crear barrio"}
+                </button>
+              </div>
+            </article>
+
+            <article className="order-block users-table-panel delivery-barrios-table-panel">
+              <h4>Barrios registrados</h4>
+              <div className="orders-table-wrap">
+                <table className="orders-table delivery-admin-table">
+                  <thead>
+                    <tr>
+                      <th>Zona ID</th>
+                      <th>Nombre barrio</th>
+                      <th>Costo domicilio</th>
+                      <th>Activo</th>
+                      <th>Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {barriosItems.length === 0 ? (
+                      <tr>
+                        <td colSpan={5}>No hay barrios cargados para esta sucursal.</td>
+                      </tr>
+                    ) : barriosItems.map(item => (
+                      <tr key={item.idBarrio}>
+                        <td>{item.zonaID ?? "-"}</td>
+                        <td>
+                          {editingBarrioId === item.idBarrio ? (
+                            <input
+                              type="text"
+                              value={barrioEditForm.nombreBarrio}
+                              onChange={event => setBarrioEditForm(current => ({ ...current, nombreBarrio: event.target.value }))}
+                              placeholder="Nombre del barrio"
+                            />
+                          ) : (
+                            item.nombreBarrio || "-"
+                          )}
+                        </td>
+                        <td>
+                          {editingBarrioId === item.idBarrio ? (
+                            <input
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              value={barrioEditForm.costoDomicilio}
+                              onChange={event => setBarrioEditForm(current => ({ ...current, costoDomicilio: event.target.value }))}
+                              placeholder="0"
+                            />
+                          ) : (
+                            Number(item.costoDomicilio || 0)
+                          )}
+                        </td>
+                        <td>{item.activo ? "Sí" : "No"}</td>
+                        <td>
+                          <div className="order-actions">
+                            {editingBarrioId === item.idBarrio ? (
+                              <>
+                                <button type="button" className="btn-primary" onClick={() => onSaveEditBarrio(item.idBarrio)} disabled={barrioSaving}>
+                                  {barrioSaving ? "Guardando..." : "Guardar"}
+                                </button>
+                                <button type="button" className="btn-outline" onClick={onCancelEditBarrio} disabled={barrioSaving}>
+                                  Cancelar
+                                </button>
+                              </>
+                            ) : (
+                              <button type="button" className="btn-outline" onClick={() => onStartEditBarrio(item)}>
+                                Editar
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </article>
+          </section>
         )}
       </main>
 
@@ -497,6 +752,7 @@ export function DeliveryPage({
               <p><strong>Domiciliario:</strong> {selectedDeliveryItem.domiciliario || "-"}</p>
               <p><strong>Teléfono:</strong> {selectedDeliveryItem.telefonoDestino || "-"}</p>
               <p><strong>Mensaje:</strong> {selectedDeliveryItem.mensaje || "-"}</p>
+              <p><strong>Observación:</strong> {selectedDeliveryItem.observacion || "-"}</p>
             </section>
           )}
         </div>

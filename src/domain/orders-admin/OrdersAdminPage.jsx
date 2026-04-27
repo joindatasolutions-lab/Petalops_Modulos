@@ -20,7 +20,7 @@ const initialFilters = {
   pageSize: 20
 };
 
-export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canViewProduccion, canViewDomicilios, canViewInventario, canViewUsuariosPanel, onLogout, onGoPipeline, onGoPedidos, onGoProduccion, onGoDomicilios, onGoInventario, onGoUsuarios }) {
+export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canViewProduccion, canViewDomicilios, canViewInventario, canViewClientesPanel, canViewUsuariosPanel, onLogout, onGoPipeline, onGoPedidos, onGoProduccion, onGoDomicilios, onGoInventario, onGoClientes, onGoUsuarios }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [items, setItems] = useState([]);
@@ -42,11 +42,14 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
   const [sidebarPinned, setSidebarPinned] = useState(false);
   const [sidebarMobileOpen, setSidebarMobileOpen] = useState(false);
   const [isEditingDetail, setIsEditingDetail] = useState(false);
+  const [isDuplicatingDetail, setIsDuplicatingDetail] = useState(false);
   const [detailEditFilterText, setDetailEditFilterText] = useState("");
   const [detailEditCatalog, setDetailEditCatalog] = useState([]);
   const [detailEditCatalogLoading, setDetailEditCatalogLoading] = useState(false);
   const [detailEditProductoID, setDetailEditProductoID] = useState("");
   const [detailEditNombreArreglo, setDetailEditNombreArreglo] = useState("");
+  const [detailEditProductoCodigo, setDetailEditProductoCodigo] = useState("");
+  const [detailEditProductoObservaciones, setDetailEditProductoObservaciones] = useState("");
   const [detailEditPrecio, setDetailEditPrecio] = useState(null);
   const [detailEditFechaEntrega, setDetailEditFechaEntrega] = useState("");
   const [detailEditHoraEntrega, setDetailEditHoraEntrega] = useState("");
@@ -62,6 +65,7 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
   const [detailEditBarrioDropdownOpen, setDetailEditBarrioDropdownOpen] = useState(false);
   const [detailEditFirma, setDetailEditFirma] = useState("");
   const [detailEditMensajeTarjeta, setDetailEditMensajeTarjeta] = useState("");
+  const [detailEditObservacionGeneral, setDetailEditObservacionGeneral] = useState("");
   const [detailEditMetodosPago, setDetailEditMetodosPago] = useState([]);
   const [detailEditCanalFlora, setDetailEditCanalFlora] = useState("");
   const [detailEditSaving, setDetailEditSaving] = useState(false);
@@ -84,6 +88,30 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
     () => pedidoMenuFields.find(field => field?.codigo === "pedido_canal_venta" && field?.activo),
     [pedidoMenuFields]
   );
+
+  const loadBarrioOptions = useCallback(async (query = "") => {
+    const text = String(query || "").trim();
+    setDetailEditBarriosLoading(true);
+    try {
+      const payload = await api.buscarBarrios({ empresaId, sucursalId, q: text });
+      const rows = Array.isArray(payload) ? payload : [];
+      const loaded = rows.map(item => normalizeBarrioItem(item)).filter(Boolean);
+      setDetailEditBarrios(current => dedupeBarrioItems([
+        normalizeBarrioItem({ nombreBarrio: "Recoger en tienda" }),
+        normalizeBarrioItem({ nombreBarrio: detailEditBarrioNombre }),
+        ...current,
+        ...loaded,
+      ].filter(Boolean)));
+    } catch {
+      setDetailEditBarrios(current => dedupeBarrioItems([
+        normalizeBarrioItem({ nombreBarrio: "Recoger en tienda" }),
+        normalizeBarrioItem({ nombreBarrio: detailEditBarrioNombre }),
+        ...current,
+      ].filter(Boolean)));
+    } finally {
+      setDetailEditBarriosLoading(false);
+    }
+  }, [api, detailEditBarrioNombre, empresaId, sucursalId]);
 
   const loadOrders = useCallback(async (silent = false) => {
     if (!silent) {
@@ -152,6 +180,8 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
       setDetailEditCatalog([]);
       setDetailEditProductoID("");
       setDetailEditNombreArreglo("");
+      setDetailEditProductoCodigo("");
+      setDetailEditProductoObservaciones("");
       setDetailEditPrecio(null);
       setDetailEditFechaEntrega("");
       setDetailEditHoraEntrega("");
@@ -167,10 +197,12 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
       setDetailEditBarrioDropdownOpen(false);
       setDetailEditFirma("");
       setDetailEditMensajeTarjeta("");
+      setDetailEditObservacionGeneral("");
       setDetailEditMetodosPago([]);
       setDetailEditCanalFlora("");
       setDetailEditError("");
       setDetailEditDropdownOpen(false);
+      setIsDuplicatingDetail(false);
       return;
     }
 
@@ -178,13 +210,21 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
       ? detalle.productos[0]
       : null;
     const productoId = getProductoId(firstProduct);
+    const productoCodigo = firstProduct
+      ? String(firstProduct.codigoProducto || firstProduct.codigo || "").trim()
+      : "";
     const productoNombre = firstProduct
       ? String(firstProduct.nombreProducto || firstProduct.nombre || "").trim()
+      : "";
+    const productoObservaciones = firstProduct
+      ? String(firstProduct.observaciones || firstProduct.descripcion || "").trim()
       : "";
     const productoPrecio = firstProduct ? Number(firstProduct.precioUnitario || firstProduct.precio || firstProduct.subtotal || 0) : null;
 
     setDetailEditProductoID(productoId != null ? String(productoId) : "");
+    setDetailEditProductoCodigo(productoCodigo);
     setDetailEditNombreArreglo(productoNombre);
+    setDetailEditProductoObservaciones(productoObservaciones);
     setDetailEditPrecio(productoPrecio);
     setDetailEditFechaEntrega(toDateInput(detalle.destinatario?.fechaEntrega));
     setDetailEditHoraEntrega(normalizeTime(detalle.destinatario?.horaEntrega));
@@ -196,11 +236,13 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
     setDetailEditBarrioNombre(String(detalle.destinatario?.barrio || ""));
     setDetailEditBarrioQuery("");
     setDetailEditBarrios(dedupeBarrioItems([
+      normalizeBarrioItem({ nombreBarrio: "Recoger en tienda" }),
       normalizeBarrioItem({ nombreBarrio: detalle.destinatario?.barrio }),
     ].filter(Boolean)));
     setDetailEditBarrioDropdownOpen(false);
     setDetailEditFirma(String(detalle.destinatario?.firma || ""));
     setDetailEditMensajeTarjeta(String(detalle.destinatario?.mensajeTarjeta || ""));
+    setDetailEditObservacionGeneral(String(detalle.destinatario?.observacionGeneral || ""));
     setDetailEditMetodosPago(Array.isArray(detalle.financiero?.metodosPago) ? detalle.financiero.metodosPago.map(item => String(item)) : []);
     setDetailEditCanalFlora(String(detalle.financiero?.canalFlora || ""));
 
@@ -214,6 +256,7 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
   useEffect(() => {
     if (!drawerOpen) {
       setIsEditingDetail(false);
+      setIsDuplicatingDetail(false);
       setDetailEditError("");
     }
   }, [drawerOpen]);
@@ -243,35 +286,8 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
   useEffect(() => {
     if (!isEditingDetail) return;
     const query = String(detailEditBarrioQuery || "").trim();
-
-    let disposed = false;
-    setDetailEditBarriosLoading(true);
-    api.buscarBarrios({ empresaId, sucursalId, q: query })
-      .then(payload => {
-        if (disposed) return;
-        const rows = Array.isArray(payload) ? payload : [];
-        const loaded = rows.map(item => normalizeBarrioItem(item)).filter(Boolean);
-        setDetailEditBarrios(current => dedupeBarrioItems([
-          normalizeBarrioItem({ nombreBarrio: detailEditBarrioNombre }),
-          ...current,
-          ...loaded,
-        ].filter(Boolean)));
-      })
-      .catch(() => {
-        if (disposed) return;
-        setDetailEditBarrios(current => dedupeBarrioItems([
-          normalizeBarrioItem({ nombreBarrio: detailEditBarrioNombre }),
-          ...current,
-        ].filter(Boolean)));
-      })
-      .finally(() => {
-        if (!disposed) setDetailEditBarriosLoading(false);
-      });
-
-    return () => {
-      disposed = true;
-    };
-  }, [api, detailEditBarrioNombre, detailEditBarrioQuery, empresaId, isEditingDetail, sucursalId]);
+    Promise.resolve(loadBarrioOptions(query)).catch(() => {});
+  }, [detailEditBarrioQuery, isEditingDetail, loadBarrioOptions]);
 
   const applyFilterValue = (name, value) => {
     setFilters(current => ({
@@ -416,6 +432,7 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
   const closeDrawer = () => {
     setDrawerOpen(false);
     setSelectedPedidoId(null);
+    setIsDuplicatingDetail(false);
   };
 
   const filteredDetailCatalog = useMemo(() => {
@@ -457,7 +474,74 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
   const onToggleDetailEdit = () => {
     if (detailEditSaving) return;
     setDetailEditError("");
-    setIsEditingDetail(current => !current);
+    setIsEditingDetail(current => {
+      const next = !current;
+      if (!next) setIsDuplicatingDetail(false);
+      return next;
+    });
+  };
+
+  const onStartDuplicateDetail = () => {
+    if (!detalle || detalle.error || detailEditSaving) return;
+    setDetailEditError("");
+    setIsDuplicatingDetail(true);
+    setIsEditingDetail(true);
+  };
+
+  const normalizeDuplicateMetodosPago = () => (
+    Array.isArray(detailEditMetodosPago)
+      ? detailEditMetodosPago.map(item => String(item || "").trim()).filter(Boolean)
+      : []
+  );
+
+  const normalizeDuplicateCanalFlora = () => {
+    const value = String(detailEditCanalFlora || "").trim();
+    return value || null;
+  };
+
+  const buildDuplicateCheckoutPayload = () => {
+    const productos = Array.isArray(detalle?.productos) ? detalle.productos : [];
+    if (!productos.length) {
+      throw new Error("El pedido original no tiene productos para duplicar.");
+    }
+
+    const fechaEntrega = detailEditFechaEntrega || toDateInput(detalle?.destinatario?.fechaEntrega);
+    if (!fechaEntrega) {
+      throw new Error("Debes definir la fecha de entrega antes de duplicar.");
+    }
+
+    const horaEntrega = normalizeTime(detailEditHoraEntrega || detalle?.destinatario?.horaEntrega) || "00:00";
+    const barrioSeleccionado = String(detailEditBarrioNombre || detalle?.destinatario?.barrio || "").trim() || null;
+    const tipoEntrega = normalizeDeliveryType(barrioSeleccionado);
+
+    return {
+      empresaID: empresaId,
+      sucursalID: Number(detalle?.sucursalID || sucursalId),
+      productos: productos.map((item, index) => ({
+        productoID: index === 0 && detailEditProductoID ? Number(detailEditProductoID) : Number(item.productoID),
+        cantidad: Number(item.cantidad || 1),
+      })),
+      cliente: {
+        tipoIdent: detailEditClienteTipoIdent || null,
+        identificacion: detailEditClienteIdentificacion || null,
+        indicativo: extractIndicativo(detalle?.cliente?.telefonoCompleto),
+        nombreCompleto: String(detalle?.cliente?.nombre || "").trim(),
+        telefono: String(detalle?.cliente?.telefono || "").trim(),
+        email: detalle?.cliente?.email || null,
+      },
+      entrega: {
+        tipoEntrega,
+        destinatario: detailEditDestinatarioNombre || detalle?.destinatario?.nombre || null,
+        telefonoDestino: detailEditTelefonoDestino || detalle?.destinatario?.telefono || null,
+        direccion: detailEditDireccion || detalle?.destinatario?.direccion || "",
+        barrioNombre: barrioSeleccionado,
+        fechaEntrega: `${fechaEntrega}T${horaEntrega}:00`,
+        rangoHora: detailEditHoraEntrega || null,
+        mensaje: detailEditMensajeTarjeta || null,
+        firma: detailEditFirma || null,
+        observacionGeneral: detailEditObservacionGeneral || null,
+      },
+    };
   };
 
   const onSaveDetailEdit = async () => {
@@ -465,26 +549,57 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
     setDetailEditError("");
     setDetailEditSaving(true);
     try {
-      await api.actualizarDetallePedidoPipeline({
-        pedidoId: selectedPedidoId,
-        productoID: detailEditProductoID ? Number(detailEditProductoID) : null,
-        fechaEntrega: detailEditFechaEntrega,
-        horaEntrega: detailEditHoraEntrega,
-        clienteTipoIdent: detailEditClienteTipoIdent,
-        clienteIdentificacion: detailEditClienteIdentificacion,
-        destinatarioNombre: detailEditDestinatarioNombre,
-        telefonoDestino: detailEditTelefonoDestino,
-        direccion: detailEditDireccion,
-        barrioNombre: detailEditBarrioNombre,
-        firma: detailEditFirma,
-        mensajeTarjeta: detailEditMensajeTarjeta,
-        metodosPago: paymentFieldConfig ? detailEditMetodosPago : null,
-        canalFlora: salesChannelFieldConfig ? detailEditCanalFlora : null,
-      });
-      await reloadDrawer();
+      if (isDuplicatingDetail) {
+        const created = await api.crearPedidoCheckout(buildDuplicateCheckoutPayload());
+        const duplicateMetodosPago = paymentFieldConfig ? normalizeDuplicateMetodosPago() : null;
+        const duplicateCanalFlora = salesChannelFieldConfig ? normalizeDuplicateCanalFlora() : null;
+        await api.actualizarDetallePedidoPipeline({
+          pedidoId: created.pedidoID,
+          productoID: detailEditProductoID ? Number(detailEditProductoID) : null,
+          productoObservaciones: detailEditProductoObservaciones,
+          fechaEntrega: detailEditFechaEntrega,
+          horaEntrega: detailEditHoraEntrega,
+          clienteTipoIdent: detailEditClienteTipoIdent,
+          clienteIdentificacion: detailEditClienteIdentificacion,
+          destinatarioNombre: detailEditDestinatarioNombre,
+          telefonoDestino: detailEditTelefonoDestino,
+          direccion: detailEditDireccion,
+          barrioNombre: detailEditBarrioNombre,
+          firma: detailEditFirma,
+          mensajeTarjeta: detailEditMensajeTarjeta,
+          observacionGeneral: detailEditObservacionGeneral,
+          metodosPago: duplicateMetodosPago,
+          canalFlora: duplicateCanalFlora,
+        });
+        await loadOrders(true);
+        await openDetail(created.pedidoID);
+        setIsDuplicatingDetail(false);
+      } else {
+        await api.actualizarDetallePedidoPipeline({
+          pedidoId: selectedPedidoId,
+          productoID: detailEditProductoID ? Number(detailEditProductoID) : null,
+          productoObservaciones: detailEditProductoObservaciones,
+          fechaEntrega: detailEditFechaEntrega,
+          horaEntrega: detailEditHoraEntrega,
+          clienteTipoIdent: detailEditClienteTipoIdent,
+          clienteIdentificacion: detailEditClienteIdentificacion,
+          destinatarioNombre: detailEditDestinatarioNombre,
+          telefonoDestino: detailEditTelefonoDestino,
+          direccion: detailEditDireccion,
+          barrioNombre: detailEditBarrioNombre,
+          firma: detailEditFirma,
+          mensajeTarjeta: detailEditMensajeTarjeta,
+          observacionGeneral: detailEditObservacionGeneral,
+          metodosPago: paymentFieldConfig ? detailEditMetodosPago : null,
+          canalFlora: salesChannelFieldConfig ? detailEditCanalFlora : null,
+        });
+        await reloadDrawer();
+      }
       setIsEditingDetail(false);
     } catch (nextError) {
-      setDetailEditError(nextError?.message || "No fue posible guardar la edición del pedido.");
+      setDetailEditError(nextError?.message || (isDuplicatingDetail
+        ? "No fue posible crear el pedido duplicado."
+        : "No fue posible guardar la edición del pedido."));
     } finally {
       setDetailEditSaving(false);
     }
@@ -588,6 +703,20 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
               >
                 <span className="sidebar-nav-icon">📦</span>
                 <span className="sidebar-nav-text">Inventario</span>
+              </button>
+            ) : null}
+            {canViewClientesPanel ? (
+              <button
+                type="button"
+                className="sidebar-nav-btn"
+                title="Clientes"
+                onClick={() => {
+                  setSidebarMobileOpen(false);
+                  onGoClientes();
+                }}
+              >
+                <span className="sidebar-nav-icon">💐</span>
+                <span className="sidebar-nav-text">Clientes</span>
               </button>
             ) : null}
             {canViewUsuariosPanel ? (
@@ -769,16 +898,23 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
       <aside className={`orders-drawer ${drawerOpen ? "open" : ""}`}>
         <div className="orders-drawer-head">
           <strong>Detalle pedido</strong>
-          <div className="orders-drawer-head-actions">
+          <div className="orders-drawer-head-main-actions">
             {!detalle?.error && detalle ? (
               <button type="button" className="btn-outline" onClick={onToggleDetailEdit} title="Editar arreglo y entrega">
                 {isEditingDetail ? "Cancelar edición" : "Editar"}
+              </button>
+            ) : null}
+            {!detalle?.error && detalle ? (
+              <button type="button" className="btn-outline" onClick={onStartDuplicateDetail} title="Duplicar pedido usando este detalle como base">
+                Duplicar
               </button>
             ) : null}
             {canInvoiceStatus(detalle?.estado) && selectedPedidoId && (
               <button type="button" className="btn-outline" onClick={() => downloadInvoice(selectedPedidoId)} title="Descargar factura en PDF">Descargar factura</button>
             )}
             <button type="button" className="btn-outline" onClick={reloadDrawer} title="Recargar detalle del pedido">Recargar</button>
+          </div>
+          <div className="orders-drawer-head-close">
             <button type="button" className="icon-btn" onClick={closeDrawer} title="Cerrar detalle">✕</button>
           </div>
         </div>
@@ -792,7 +928,7 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
             <>
               {isEditingDetail ? (
                 <section className="order-block order-detail-edit-box">
-                  <h4>Editar pedido</h4>
+                  <h4>{isDuplicatingDetail ? "Duplicar pedido" : "Editar pedido"}</h4>
 
                   <div className="order-detail-edit-label">
                     <span>Arreglo actual</span>
@@ -802,6 +938,27 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
                       readOnly
                       className="order-detail-edit-readonly"
                     />
+                  </div>
+
+                  <div className="order-detail-edit-grid">
+                    <label className="order-detail-edit-label">
+                      Código de arreglo
+                      <input
+                        type="text"
+                        value={detailEditProductoCodigo}
+                        readOnly
+                        className="order-detail-edit-readonly"
+                      />
+                    </label>
+                    <label className="order-detail-edit-label">
+                      Cantidad
+                      <input
+                        type="text"
+                        value={Number(detalle?.productos?.[0]?.cantidad || 0)}
+                        readOnly
+                        className="order-detail-edit-readonly"
+                      />
+                    </label>
                   </div>
 
                   {detailEditPrecio != null ? (
@@ -859,12 +1016,14 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
                               <li
                                 key={item.id}
                                 className={`order-combobox-option${String(item.id) === detailEditProductoID ? " is-selected" : ""}`}
-                                onClick={() => {
-                                  setDetailEditProductoID(String(item.id));
-                                  setDetailEditNombreArreglo(String(item.nombre || ""));
-                                  setDetailEditPrecio(item.precio != null ? Number(item.precio) : null);
-                                  setDetailEditDropdownOpen(false);
-                                  setDetailEditFilterText("");
+                              onClick={() => {
+                                setDetailEditProductoID(String(item.id));
+                                setDetailEditProductoCodigo(String(item.codigo || ""));
+                                setDetailEditNombreArreglo(String(item.nombre || ""));
+                                setDetailEditProductoObservaciones(String(item.descripcion || ""));
+                                setDetailEditPrecio(item.precio != null ? Number(item.precio) : null);
+                                setDetailEditDropdownOpen(false);
+                                setDetailEditFilterText("");
                                 }}
                               >
                                 {buildProductoLabel(item)}
@@ -960,7 +1119,13 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
                         <button
                           type="button"
                           className="order-combobox-trigger"
-                          onClick={() => setDetailEditBarrioDropdownOpen(open => !open)}
+                          onClick={() => {
+                            const nextOpen = !detailEditBarrioDropdownOpen;
+                            setDetailEditBarrioDropdownOpen(nextOpen);
+                            if (nextOpen) {
+                              void loadBarrioOptions(detailEditBarrioQuery);
+                            }
+                          }}
                         >
                           <span>{detailEditBarrioNombre || "— Selecciona un barrio —"}</span>
                           <span className="order-combobox-arrow">{detailEditBarrioDropdownOpen ? "▲" : "▼"}</span>
@@ -1011,6 +1176,16 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
                   </div>
 
                   <label className="order-detail-edit-label">
+                    Observaciones del arreglo
+                    <textarea
+                      rows={4}
+                      value={detailEditProductoObservaciones}
+                      onChange={event => setDetailEditProductoObservaciones(event.target.value)}
+                      placeholder="Observaciones del arreglo personalizable"
+                    />
+                  </label>
+
+                  <label className="order-detail-edit-label">
                     Firma tarjeta
                     <input
                       type="text"
@@ -1027,6 +1202,16 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
                       value={detailEditMensajeTarjeta}
                       onChange={event => setDetailEditMensajeTarjeta(event.target.value)}
                       placeholder="Mensaje para la tarjeta floral"
+                    />
+                  </label>
+
+                  <label className="order-detail-edit-label">
+                    Observación
+                    <textarea
+                      rows={3}
+                      value={detailEditObservacionGeneral}
+                      onChange={event => setDetailEditObservacionGeneral(event.target.value)}
+                      placeholder="Observación general para Domicilio"
                     />
                   </label>
 
@@ -1072,7 +1257,7 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
 
                   <div className="order-detail-edit-actions">
                     <button type="button" className="btn-primary" onClick={onSaveDetailEdit} disabled={detailEditSaving}>
-                      {detailEditSaving ? "Guardando..." : "Guardar cambios"}
+                      {detailEditSaving ? (isDuplicatingDetail ? "Creando..." : "Guardando...") : (isDuplicatingDetail ? "Crear duplicado" : "Guardar cambios")}
                     </button>
                   </div>
                 </section>
@@ -1147,26 +1332,29 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
 
             <section className="message-card-canvas" aria-label="Tarjeta imprimible">
               <div className="message-card-content">
-              <p className="message-card-meta">
-                {formatFechaEntregaTarjeta(messageCardData?.fechaEntrega || messageCardOrder?.fechaEntrega)}
-              </p>
-              <p className="message-card-meta message-card-destinatario-meta">
-                {String(messageCardData?.destinatario || "Sin destinatario")}
-              </p>
-              <p
-                className="message-card-message"
-                style={{
-                  fontFamily: cardFontFamily,
-                  fontSize: `${cardFontSize}px`,
-                  color: cardTextColor,
-                  textAlign: cardTextAlign,
-                }}
-              >
-                "{String(messageCardDraft || "Sin mensaje")}" 
-              </p>
-              <p className="message-card-meta message-card-signature">
-                {resolveFirmaTarjeta(messageCardData?.firma)}
-              </p>
+                <p className="message-card-order-number">
+                  {messageCardOrder?.numeroPedido || messageCardOrder?.pedidoID || "-"}
+                </p>
+                <p className="message-card-meta message-card-date">
+                  {formatFechaEntregaTarjeta(messageCardData?.fechaEntrega || messageCardOrder?.fechaEntrega)}
+                </p>
+                <div className="message-card-message-row">
+                  <span className="message-card-message-label">Mensaje:</span>
+                  <p
+                    className="message-card-message"
+                    style={{
+                      fontFamily: cardFontFamily,
+                      fontSize: `${cardFontSize}px`,
+                      color: cardTextColor,
+                    }}
+                  >
+                    {String(messageCardDraft || "Sin mensaje")}
+                  </p>
+                </div>
+                <p className="message-card-closing">Con mucho cariño</p>
+                <p className="message-card-meta message-card-signature">
+                  {resolveFirmaTarjeta(messageCardData?.firma)}
+                </p>
               </div>
             </section>
           </div>
@@ -1194,6 +1382,21 @@ function canInvoiceStatus(status) {
 function canMessageCardStatus(status) {
   const key = normalizeStatus(status);
   return key === "APROBADO";
+}
+
+function detailEditBarrioNombreOrFallback(currentValue, originalValue) {
+  return String(currentValue || originalValue || "").trim() || null;
+}
+
+function normalizeDeliveryType(barrioNombre) {
+  const value = String(barrioNombre || "").trim().toLowerCase();
+  return value === "recoger en tienda" ? "recogida_en_tienda" : "domicilio";
+}
+
+function extractIndicativo(phone) {
+  const raw = String(phone || "").trim();
+  const match = raw.match(/^(\+\d{1,4})/);
+  return match ? match[1] : null;
 }
 
 function OrderDetail({ detalle, paymentTitle = "Método de pago", salesChannelTitle = "Celular Flora" }) {
@@ -1233,7 +1436,7 @@ function OrderDetail({ detalle, paymentTitle = "Método de pago", salesChannelTi
         <p><strong>Hora entrega:</strong> {detalle.destinatario?.horaEntrega || horaEntrega || "-"}</p>
         <p><strong>Firma:</strong> {detalle.destinatario?.firma || "-"}</p>
         <p><strong>Mensaje:</strong> {detalle.destinatario?.mensajeTarjeta || "-"}</p>
-        <p><strong>Observación:</strong> {detalle.destinatario?.observacionGeneral || "-"}</p>
+        <p><strong>Observación entrega:</strong> {detalle.destinatario?.observacionGeneral || "-"}</p>
       </section>
 
       <section className="order-block">
@@ -1250,18 +1453,19 @@ function OrderDetail({ detalle, paymentTitle = "Método de pago", salesChannelTi
 
       <section className="order-block">
         <h4>🧾 Productos</h4>
-        <ul className="order-products-list">
-          {productos.length === 0 ? (
-            <li>Sin productos</li>
-          ) : (
-            productos.map((producto, index) => (
-              <li key={`${producto.nombreProducto}-${index}`}>
-                <span>{producto.nombreProducto} x{Number(producto.cantidad || 0)}</span>
-                <strong>${formatearCOP(Number(producto.subtotal || 0))}</strong>
-              </li>
-            ))
-          )}
-        </ul>
+        {productos.length === 0 ? (
+          <p>Sin productos</p>
+        ) : (
+          productos.map((producto, index) => (
+            <div key={`${producto.productoID || producto.nombreProducto}-${index}`} className="order-block looker-block">
+              <p><strong>Código de arreglo:</strong> {producto.codigoProducto || "-"}</p>
+              <p><strong>Nombre del arreglo:</strong> {producto.nombreProducto || "-"}</p>
+              <p><strong>Cantidad:</strong> {Number(producto.cantidad || 0)}</p>
+              <p><strong>Observación personalizados:</strong> {producto.observaciones || "-"}</p>
+              <p><strong>Subtotal:</strong> ${formatearCOP(Number(producto.subtotal || 0))}</p>
+            </div>
+          ))
+        )}
       </section>
     </>
   );
@@ -1279,6 +1483,7 @@ function normalizeCatalogItem(raw) {
     id,
     codigo: String(raw?.codigoProducto || raw?.codigo || raw?.sku || "").trim(),
     nombre: String(raw?.nombreProducto || raw?.nombre || raw?.descripcion || "").trim(),
+    descripcion: String(raw?.descripcion || raw?.observaciones || "").trim(),
     precio,
   };
 }
@@ -1384,19 +1589,15 @@ function formatFechaEntregaTarjeta(value) {
   if (!text) return "-";
   const parsed = new Date(text);
   if (Number.isNaN(parsed.getTime())) return text;
-  return parsed.toLocaleString("es-CO", {
+  return parsed.toLocaleDateString("es-CO", {
     year: "numeric",
-    month: "2-digit",
+    month: "long",
     day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
   });
 }
 
 function resolveFirmaTarjeta(value) {
-  const text = String(value || "").trim();
-  if (text) return text;
-  return "Con carino, Flora";
+  return String(value || "").trim();
 }
 
 
