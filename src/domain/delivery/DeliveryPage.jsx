@@ -96,6 +96,7 @@ export function DeliveryPage({
   const [barrioSaving, setBarrioSaving] = useState(false);
   const [editingBarrioId, setEditingBarrioId] = useState(null);
   const [barrioEditForm, setBarrioEditForm] = useState({
+    zonaID: "",
     nombreBarrio: "",
     costoDomicilio: "",
   });
@@ -375,6 +376,7 @@ export function DeliveryPage({
   const onStartEditBarrio = item => {
     setEditingBarrioId(item?.idBarrio ?? null);
     setBarrioEditForm({
+      zonaID: String(item?.zonaID ?? ""),
       nombreBarrio: String(item?.nombreBarrio || ""),
       costoDomicilio: String(item?.costoDomicilio ?? ""),
     });
@@ -384,6 +386,7 @@ export function DeliveryPage({
   const onCancelEditBarrio = () => {
     setEditingBarrioId(null);
     setBarrioEditForm({
+      zonaID: "",
       nombreBarrio: "",
       costoDomicilio: "",
     });
@@ -397,6 +400,7 @@ export function DeliveryPage({
       await api.actualizarBarrioDomicilios({
         barrioId: Number(barrioId),
         sucursalID: sucursalId,
+        zonaID: Number(barrioEditForm.zonaID || 0),
         nombreBarrio: String(barrioEditForm.nombreBarrio || "").trim(),
         costoDomicilio: Number(barrioEditForm.costoDomicilio || 0),
       });
@@ -405,6 +409,29 @@ export function DeliveryPage({
     } catch (nextError) {
       console.error("Error actualizando barrio:", nextError);
       setError(nextError?.detail || nextError?.message || "No fue posible actualizar el barrio.");
+    } finally {
+      setBarrioSaving(false);
+    }
+  };
+
+  const onDeleteBarrio = async barrioId => {
+    if (barrioSaving) return;
+    const confirmed = globalThis.confirm("¿Seguro que deseas borrar este barrio?");
+    if (!confirmed) return;
+    setBarrioSaving(true);
+    setError("");
+    try {
+      await api.borrarBarrioDomicilios({
+        barrioId: Number(barrioId),
+        sucursalID: sucursalId,
+      });
+      if (editingBarrioId === barrioId) {
+        onCancelEditBarrio();
+      }
+      await loadBarrios();
+    } catch (nextError) {
+      console.error("Error borrando barrio:", nextError);
+      setError(nextError?.detail || nextError?.message || "No fue posible borrar el barrio.");
     } finally {
       setBarrioSaving(false);
     }
@@ -680,7 +707,19 @@ export function DeliveryPage({
                       </tr>
                     ) : barriosItems.map(item => (
                       <tr key={item.idBarrio}>
-                        <td>{item.zonaID ?? "-"}</td>
+                        <td>
+                          {editingBarrioId === item.idBarrio ? (
+                            <input
+                              type="number"
+                              min="0"
+                              value={barrioEditForm.zonaID}
+                              onChange={event => setBarrioEditForm(current => ({ ...current, zonaID: event.target.value }))}
+                              placeholder="Zona"
+                            />
+                          ) : (
+                            item.zonaID ?? "-"
+                          )}
+                        </td>
                         <td>
                           {editingBarrioId === item.idBarrio ? (
                             <input
@@ -718,11 +757,19 @@ export function DeliveryPage({
                                 <button type="button" className="btn-outline" onClick={onCancelEditBarrio} disabled={barrioSaving}>
                                   Cancelar
                                 </button>
+                                <button type="button" className="btn-outline" onClick={() => onDeleteBarrio(item.idBarrio)} disabled={barrioSaving}>
+                                  Borrar
+                                </button>
                               </>
                             ) : (
-                              <button type="button" className="btn-outline" onClick={() => onStartEditBarrio(item)}>
-                                Editar
-                              </button>
+                              <>
+                                <button type="button" className="btn-outline" onClick={() => onStartEditBarrio(item)}>
+                                  Editar
+                                </button>
+                                <button type="button" className="btn-outline" onClick={() => onDeleteBarrio(item.idBarrio)} disabled={barrioSaving}>
+                                  Borrar
+                                </button>
+                              </>
                             )}
                           </div>
                         </td>

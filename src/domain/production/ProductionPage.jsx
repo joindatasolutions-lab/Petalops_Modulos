@@ -12,6 +12,7 @@ const LOOKER_STUDIO_URL = "https://lookerstudio.google.com/embed/reporting/d08a0
 const SUBMENU_OPTIONS = [
   { key: "pedidos", label: "Pedidos" },
   { key: "historial", label: "Historial reasignaciones" },
+  { key: "disponibilidad", label: "Disponibilidad florista" },
   { key: "incapacidad", label: "Gestión incapacidad" },
   { key: "looker", label: "Looker" }
 ];
@@ -74,6 +75,7 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
   const [error, setError] = useState("");
   const [items, setItems] = useState([]);
   const [floristas, setFloristas] = useState([]);
+  const [floristasDisponibilidad, setFloristasDisponibilidad] = useState([]);
 
   const [selectedFloristaById, setSelectedFloristaById] = useState({});
   const [selectedEstadoById, setSelectedEstadoById] = useState({});
@@ -113,7 +115,7 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
     setError("");
 
     try {
-      const [produccion, floristasData] = await Promise.all([
+      const [produccion, floristasData, disponibilidadData] = await Promise.all([
         api.listarProduccion({
           empresaId,
           sucursalId,
@@ -125,6 +127,12 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
           empresaId,
           sucursalId,
           soloActivos: false
+        }),
+        api.listarFloristas({
+          empresaId,
+          sucursalId,
+          soloActivos: false,
+          incluirExternos: true,
         })
       ]);
 
@@ -133,9 +141,11 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
         estadosFiltro.some(estadoItem => normalizeStatus(estadoItem) === normalizeStatus(item.estado))
       );
       const nextFloristas = Array.isArray(floristasData.items) ? floristasData.items : [];
+      const nextFloristasDisponibilidad = Array.isArray(disponibilidadData.items) ? disponibilidadData.items : [];
 
       setItems(nextItems);
       setFloristas(nextFloristas);
+      setFloristasDisponibilidad(nextFloristasDisponibilidad);
       if (!floristaGestionID && nextFloristas.length > 0) {
         setFloristaGestionID(String(nextFloristas[0].idFlorista));
       }
@@ -145,6 +155,7 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
       console.error("Error cargando producción:", nextError);
       setItems([]);
       setFloristas([]);
+      setFloristasDisponibilidad([]);
       setError("No fue posible cargar el módulo de producción.");
       return [];
     } finally {
@@ -382,6 +393,23 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
     } catch (nextError) {
       console.error("Error actualizando estado del florista:", nextError);
       globalThis.alert("No fue posible actualizar el estado del florista.");
+    }
+  };
+
+  const actualizarDisponibilidadFlorista = async (floristaId, estadoObjetivo) => {
+    try {
+      await api.actualizarEstadoFlorista({
+        floristaId: Number(floristaId),
+        estado: estadoObjetivo,
+        fechaInicioIncapacidad: null,
+        fechaFinIncapacidad: null,
+        motivo: `Cambio rápido a ${estadoObjetivo} desde disponibilidad florista`,
+        usuarioCambio
+      });
+      await refreshAll();
+    } catch (nextError) {
+      console.error("Error actualizando disponibilidad del florista:", nextError);
+      globalThis.alert("No fue posible actualizar la disponibilidad del florista.");
     }
   };
 
@@ -726,6 +754,60 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
                 </li>
               ))}
             </ul>
+          </section>
+        )}
+
+        {canManageProductionActions && submenu === "disponibilidad" && (
+          <section className="order-block" style={{ marginTop: 12 }}>
+            <div className="inventory-section-title">
+              <h4>Disponibilidad florista</h4>
+              <p>Floristas internos numerados por la sucursal actual. Los demás aparecen como externos.</p>
+            </div>
+
+            <div className="production-availability-grid">
+              {floristasDisponibilidad.length === 0 ? (
+                <p className="orders-message" style={{ marginBottom: 0 }}>No hay floristas disponibles para mostrar.</p>
+              ) : floristasDisponibilidad.map(item => {
+                const estaActivo = String(item.estado || "").trim().toLowerCase() === "activo" && Boolean(item.activo);
+                const identificador = item.esExterno ? "Externo" : String(item.numeroFlorista ?? "-");
+                return (
+                  <article key={item.idFlorista} className={`production-availability-card ${item.esExterno ? "is-external" : ""}`}>
+                    <div className="production-availability-head">
+                      <div>
+                        <p className="production-availability-id">{identificador}</p>
+                        <strong>{item.nombre}</strong>
+                      </div>
+                      <span className={`order-badge ${estaActivo ? "is-entregado" : "is-cancelado"}`}>
+                        {estaActivo ? "Activo" : "Inactivo"}
+                      </span>
+                    </div>
+
+                    <div className="production-availability-meta">
+                      <p><span>Arreglos del día</span><strong>{item.arreglosHoy ?? 0}</strong></p>
+                      <p><span>Capacidad diaria</span><strong>{item.capacidadDiaria ?? 0}</strong></p>
+                      <p><span>Tipo</span><strong>{item.esExterno ? "Externo" : "Interno"}</strong></p>
+                    </div>
+
+                    <div className="production-inline-actions">
+                      <button
+                        type="button"
+                        className={`btn-outline ${estaActivo ? "is-selected" : ""}`}
+                        onClick={() => actualizarDisponibilidadFlorista(item.idFlorista, "Activo")}
+                      >
+                        Activo
+                      </button>
+                      <button
+                        type="button"
+                        className={`btn-outline ${!estaActivo ? "is-selected" : ""}`}
+                        onClick={() => actualizarDisponibilidadFlorista(item.idFlorista, "Inactivo")}
+                      >
+                        Inactivo
+                      </button>
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
           </section>
         )}
 

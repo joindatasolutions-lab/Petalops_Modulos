@@ -846,7 +846,7 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
                     <tr key={pedidoId || `${item.numeroPedido}-${item.fecha}`}>
                       <td data-label="Fecha Pedido">{fechaPedido || "-"}</td>
                       <td data-label="Hora Pedido">{item.horaPedido || horaPedido || "-"}</td>
-                      <td data-label="Número">{item.numeroPedido || "-"}</td>
+                      <td data-label="Número">{item.numeroPedido ?? "-"}</td>
                       <td data-label="Cliente">{item.cliente || "-"}</td>
                       <td data-label="Destinatario">{item.destinatario || "-"}</td>
                       <td data-label="Fecha Entrega">{fechaEntrega || "-"}</td>
@@ -1345,7 +1345,7 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
             <section className="message-card-canvas" aria-label="Tarjeta imprimible">
               <div className="message-card-content">
                 <p className="message-card-order-number">
-                  {messageCardOrder?.numeroPedido || messageCardOrder?.pedidoID || "-"}
+                  {messageCardOrder?.numeroPedido ?? "-"}
                 </p>
                 <p className="message-card-meta message-card-date">
                   {formatFechaEntregaTarjeta(messageCardData?.fechaEntrega || messageCardOrder?.fechaEntrega)}
@@ -1422,7 +1422,7 @@ function OrderDetail({ detalle, paymentTitle = "Método de pago", salesChannelTi
     <>
       <section className="order-block">
         <h4>📦 Información General</h4>
-        <p><strong>Número:</strong> {detalle.numeroPedido || "-"}</p>
+        <p><strong>Número:</strong> {detalle.numeroPedido ?? "-"}</p>
         <p><strong>Fecha Pedido:</strong> {fechaPedido || "-"}</p>
         <p><strong>Hora Pedido:</strong> {detalle.horaPedido || horaPedido || "-"}</p>
         <p><strong>Estado:</strong> {detalle.estado || "-"}</p>

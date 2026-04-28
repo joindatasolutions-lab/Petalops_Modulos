@@ -1286,6 +1286,70 @@ select:focus {
   flex: 1 1 140px;
 }
 
+.production-availability-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 12px;
+}
+
+.production-availability-card {
+  border: 1px solid #e9dce2;
+  border-radius: 14px;
+  background: #fff;
+  padding: 12px;
+  box-shadow: 0 4px 14px rgba(47, 45, 49, 0.06);
+}
+
+.production-availability-card.is-external {
+  background: #fff9fb;
+}
+
+.production-availability-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.production-availability-head strong {
+  display: block;
+  font-size: 16px;
+  color: #3f3138;
+}
+
+.production-availability-id {
+  margin: 0 0 4px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #8b6776;
+}
+
+.production-availability-meta {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.production-availability-meta p {
+  margin: 0;
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 13px;
+}
+
+.production-availability-meta p span {
+  color: #7f7278;
+}
+
+.production-availability-meta p strong {
+  color: #42363c;
+  text-align: right;
+}
+
 .order-products-list {
   list-style: none;
   margin: 0;

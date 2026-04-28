@@ -431,7 +431,7 @@ export function createApiClient(config) {
       });
     },
 
-    async actualizarBarrioDomicilios({ barrioId, sucursalID, nombreBarrio, costoDomicilio }) {
+    async actualizarBarrioDomicilios({ barrioId, sucursalID, zonaID, nombreBarrio, costoDomicilio }) {
       return requestJson(`/barrios/${barrioId}`, {
         method: "PUT",
         headers: {
@@ -439,9 +439,18 @@ export function createApiClient(config) {
         },
         body: JSON.stringify({
           sucursalID,
+          zonaID,
           nombreBarrio,
           costoDomicilio,
         })
+      });
+    },
+
+    async borrarBarrioDomicilios({ barrioId, sucursalID }) {
+      const params = new URLSearchParams();
+      params.set("sucursalID", String(sucursalID));
+      return requestJson(`/barrios/${barrioId}?${params.toString()}`, {
+        method: "DELETE",
       });
     },
 
@@ -554,11 +563,12 @@ export function createApiClient(config) {
       return requestJson(`/produccion?${params.toString()}`);
     },
 
-    async listarFloristas({ empresaId, sucursalId, soloActivos = true }) {
+    async listarFloristas({ empresaId, sucursalId, soloActivos = true, incluirExternos = false }) {
       const params = new URLSearchParams();
       params.set("empresaID", String(empresaId));
       if (sucursalId != null) params.set("sucursalID", String(sucursalId));
       params.set("soloActivos", soloActivos ? "true" : "false");
+      params.set("incluirExternos", incluirExternos ? "true" : "false");
 
       return requestJson(`/produccion/floristas?${params.toString()}`);
     },
