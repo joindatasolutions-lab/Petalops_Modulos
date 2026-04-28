@@ -765,28 +765,40 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
           </header>
 
           <section className="orders-filters">
-            <input
-              type="text"
-              placeholder="Buscar pedido, cliente, destinatario..."
-              value={filters.q}
-              onChange={event => applyFilterValue("q", event.target.value)}
-            />
-            <select value={filters.estado} onChange={event => applyFilterValue("estado", event.target.value)}>
-              <option value="">Todos los estados</option>
-              <option value="CREADO">Creado</option>
-              <option value="APROBADO">Aprobado</option>
-              <option value="CANCELADO">Cancelado</option>
-            </select>
-            <input
-              type="date"
-              value={filters.fechaDesde}
-              onChange={event => applyFilterValue("fechaDesde", event.target.value)}
-            />
-            <input
-              type="date"
-              value={filters.fechaHasta}
-              onChange={event => applyFilterValue("fechaHasta", event.target.value)}
-            />
+            <div className="filter-field filter-field--wide">
+              <span>Búsqueda</span>
+              <input
+                type="text"
+                placeholder="Buscar pedido, cliente, destinatario..."
+                value={filters.q}
+                onChange={event => applyFilterValue("q", event.target.value)}
+              />
+            </div>
+            <div className="filter-field">
+              <span>Estado</span>
+              <select value={filters.estado} onChange={event => applyFilterValue("estado", event.target.value)}>
+                <option value="">Todos los estados</option>
+                <option value="CREADO">Creado</option>
+                <option value="APROBADO">Aprobado</option>
+                <option value="CANCELADO">Cancelado</option>
+              </select>
+            </div>
+            <div className="filter-field">
+              <span>Fecha Inicio</span>
+              <input
+                type="date"
+                value={filters.fechaDesde}
+                onChange={event => applyFilterValue("fechaDesde", event.target.value)}
+              />
+            </div>
+            <div className="filter-field">
+              <span>Fecha Fin</span>
+              <input
+                type="date"
+                value={filters.fechaHasta}
+                onChange={event => applyFilterValue("fechaHasta", event.target.value)}
+              />
+            </div>
           </section>
 
           {error && <p className="orders-message">{error}</p>}

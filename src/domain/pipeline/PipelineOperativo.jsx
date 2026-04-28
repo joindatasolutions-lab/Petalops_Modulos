@@ -211,13 +211,13 @@ export function PipelineOperativo({
       <button type="button" className="sidebar-overlay" aria-label="Cerrar menú" onClick={() => setSidebarMobileOpen(false)} />
 
       <main className="pipeline-view">
-        <header className="pipeline-header">
+        <header className="pipeline-header orders-admin-header">
           <div className="pipeline-header-top">
             <button type="button" className="sidebar-trigger" onClick={toggleSidebar} title="Abrir o cerrar menú">☰ Menú</button>
           </div>
           <div>
-            <h1>Pipeline Operativo</h1>
-            <p>Centro de control de pedidos, producción y entrega</p>
+            <h1>Gestión de Pipeline</h1>
+            <p className="orders-admin-subtitle">Centro de control de pedidos, producción y entrega</p>
           </div>
         </header>
 
@@ -253,4 +253,3 @@ export function PipelineOperativo({
     </div>
   );
 }
-

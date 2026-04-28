@@ -427,7 +427,7 @@ export function InventoryPage({
         <header className="orders-admin-header">
           <div>
             <button type="button" className="sidebar-trigger" onClick={toggleSidebar}>☰ Menú</button>
-            <h1>Inventario</h1>
+            <h1>Gestión de Inventario</h1>
             <p className="orders-admin-subtitle">Control de flores e insumos con estados inteligentes y trazabilidad por movimientos.</p>
           </div>
           <div className="header-actions">
@@ -455,22 +455,34 @@ export function InventoryPage({
         {submenu === "general" ? (
           <>
             <section className="orders-filters inventory-filters">
-              <select value={categoriaFiltro} onChange={event => setCategoriaFiltro(event.target.value)}>
-                <option value="">Todas las categorias</option>
-                {categorias.map(categoria => <option key={categoria} value={categoria}>{categoria}</option>)}
-              </select>
-              <select value={estadoFiltro} onChange={event => setEstadoFiltro(event.target.value)}>
-                <option value="">Todos los estados</option>
-                <option value="Disponible">Disponible</option>
-                <option value="Bajo Stock">Bajo Stock</option>
-                <option value="Agotado">Agotado</option>
-                <option value="Inactivo">Inactivo</option>
-              </select>
-              <select value={proveedorFiltro} onChange={event => setProveedorFiltro(event.target.value)}>
-                <option value="">Todos los proveedores</option>
-                {proveedores.map(item => <option key={item.idProveedor} value={item.idProveedor}>{item.nombre}</option>)}
-              </select>
-              <input type="text" placeholder="Buscar por codigo, nombre, color o proveedor" value={q} onChange={event => setQ(event.target.value)} />
+              <div className="filter-field">
+                <span>Categoría</span>
+                <select value={categoriaFiltro} onChange={event => setCategoriaFiltro(event.target.value)}>
+                  <option value="">Todas las categorias</option>
+                  {categorias.map(categoria => <option key={categoria} value={categoria}>{categoria}</option>)}
+                </select>
+              </div>
+              <div className="filter-field">
+                <span>Estado</span>
+                <select value={estadoFiltro} onChange={event => setEstadoFiltro(event.target.value)}>
+                  <option value="">Todos los estados</option>
+                  <option value="Disponible">Disponible</option>
+                  <option value="Bajo Stock">Bajo Stock</option>
+                  <option value="Agotado">Agotado</option>
+                  <option value="Inactivo">Inactivo</option>
+                </select>
+              </div>
+              <div className="filter-field">
+                <span>Proveedor</span>
+                <select value={proveedorFiltro} onChange={event => setProveedorFiltro(event.target.value)}>
+                  <option value="">Todos los proveedores</option>
+                  {proveedores.map(item => <option key={item.idProveedor} value={item.idProveedor}>{item.nombre}</option>)}
+                </select>
+              </div>
+              <div className="filter-field filter-field--wide">
+                <span>Búsqueda</span>
+                <input type="text" placeholder="Buscar por codigo, nombre, color o proveedor" value={q} onChange={event => setQ(event.target.value)} />
+              </div>
               <button type="button" className={`btn-outline ${soloCriticos ? "is-selected" : ""}`} onClick={() => setSoloCriticos(current => !current)}>
                 {soloCriticos ? "Mostrando criticos" : "Solo criticos"}
               </button>

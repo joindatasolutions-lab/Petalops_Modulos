@@ -478,7 +478,7 @@ export function DeliveryPage({
         <header className="orders-admin-header">
           <div>
             <button type="button" className="sidebar-trigger" onClick={toggleSidebar}>☰ Menú</button>
-            <h1>Módulo de Domicilios</h1>
+            <h1>Gestión de Domicilios</h1>
             <p className="orders-admin-subtitle">Desde ParaEntrega hasta Entregado, con evidencia y trazabilidad completa.</p>
           </div>
           <div className="header-actions">
@@ -501,14 +501,23 @@ export function DeliveryPage({
 
         {modo !== "barrios" ? (
           <section className="orders-filters">
-            <select value={filtro} onChange={event => setFiltro(event.target.value)}>
-              {FILTROS.map(item => <option key={item.value} value={item.value}>{item.label}</option>)}
-            </select>
-            <input type="date" value={fechaFiltro} onChange={event => setFechaFiltro(event.target.value)} />
-            <select value={domiciliarioId} onChange={event => setDomiciliarioId(event.target.value)}>
-              <option value="">Domiciliario...</option>
-              {domiciliarios.map(item => <option key={item.idDomiciliario} value={item.idDomiciliario}>{item.nombre}</option>)}
-            </select>
+            <div className="filter-field">
+              <span>Vista</span>
+              <select value={filtro} onChange={event => setFiltro(event.target.value)}>
+                {FILTROS.map(item => <option key={item.value} value={item.value}>{item.label}</option>)}
+              </select>
+            </div>
+            <div className="filter-field">
+              <span>Fecha Inicio</span>
+              <input type="date" value={fechaFiltro} onChange={event => setFechaFiltro(event.target.value)} />
+            </div>
+            <div className="filter-field">
+              <span>Domiciliario</span>
+              <select value={domiciliarioId} onChange={event => setDomiciliarioId(event.target.value)}>
+                <option value="">Domiciliario...</option>
+                {domiciliarios.map(item => <option key={item.idDomiciliario} value={item.idDomiciliario}>{item.nombre}</option>)}
+              </select>
+            </div>
             <div className="delivery-filter-hint">Modo: {modo === "admin" ? "Administrador" : "Domiciliario"}</div>
           </section>
         ) : null}

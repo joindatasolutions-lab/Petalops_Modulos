@@ -202,7 +202,7 @@ export function ClientsPage({
         <header className="orders-admin-header">
           <div>
             <button type="button" className="sidebar-trigger" onClick={toggleSidebar}>☰ Menú</button>
-            <h1>Módulo de Clientes</h1>
+            <h1>Gestión de Clientes</h1>
             <p className="orders-admin-subtitle">Consulta y mantenimiento de clientes con datos de contacto y fechas clave.</p>
           </div>
           <div className="header-actions">
@@ -212,12 +212,15 @@ export function ClientsPage({
         </header>
 
         <section className="orders-filters">
-          <input
-            type="text"
-            placeholder="Buscar por nombre, documento, teléfono o email"
-            value={q}
-            onChange={event => setQ(event.target.value)}
-          />
+          <div className="filter-field filter-field--wide">
+            <span>Búsqueda</span>
+            <input
+              type="text"
+              placeholder="Buscar por nombre, documento, teléfono o email"
+              value={q}
+              onChange={event => setQ(event.target.value)}
+            />
+          </div>
           <button type="button" className={`btn-outline ${soloActivos ? "is-selected" : ""}`} onClick={() => setSoloActivos(current => !current)}>
             {soloActivos ? "Solo activos" : "Todos"}
           </button>

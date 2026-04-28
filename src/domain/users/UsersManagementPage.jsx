@@ -706,27 +706,42 @@ export function UsersManagementPage({
 
         <section className="orders-filters users-filters">
           {canViewUsuariosGlobal ? (
-            <select value={empresaID} onChange={event => setEmpresaID(Number(event.target.value))}>
-              {empresas.map(item => <option key={item.empresaID} value={item.empresaID}>{item.nombre}</option>)}
-            </select>
+            <div className="filter-field">
+              <span>Empresa</span>
+              <select value={empresaID} onChange={event => setEmpresaID(Number(event.target.value))}>
+                {empresas.map(item => <option key={item.empresaID} value={item.empresaID}>{item.nombre}</option>)}
+              </select>
+            </div>
           ) : (
-            <input
-              type="text"
-              value={empresaSeleccionadaNombre}
-              readOnly
-              title="Tu alcance esta limitado a tu empresa"
-            />
+            <div className="filter-field">
+              <span>Empresa</span>
+              <input
+                type="text"
+                value={empresaSeleccionadaNombre}
+                readOnly
+                title="Tu alcance esta limitado a tu empresa"
+              />
+            </div>
           )}
-          <select value={sucursalID} onChange={event => setSucursalID(event.target.value)}>
-            <option value="">Todas las sucursales</option>
-            {sucursales.map(item => <option key={item.sucursalID} value={item.sucursalID}>Sucursal {item.sucursalID}</option>)}
-          </select>
-          <select value={estadoFiltro} onChange={event => setEstadoFiltro(event.target.value)}>
-            <option value="">Todos los estados</option>
-            <option value="Activo">Activo</option>
-            <option value="Inactivo">Inactivo</option>
-          </select>
-          <input type="text" placeholder="Buscar por nombre, login o email" value={q} onChange={event => setQ(event.target.value)} />
+          <div className="filter-field">
+            <span>Sucursal</span>
+            <select value={sucursalID} onChange={event => setSucursalID(event.target.value)}>
+              <option value="">Todas las sucursales</option>
+              {sucursales.map(item => <option key={item.sucursalID} value={item.sucursalID}>Sucursal {item.sucursalID}</option>)}
+            </select>
+          </div>
+          <div className="filter-field">
+            <span>Estado</span>
+            <select value={estadoFiltro} onChange={event => setEstadoFiltro(event.target.value)}>
+              <option value="">Todos los estados</option>
+              <option value="Activo">Activo</option>
+              <option value="Inactivo">Inactivo</option>
+            </select>
+          </div>
+          <div className="filter-field filter-field--wide">
+            <span>Búsqueda</span>
+            <input type="text" placeholder="Buscar por nombre, login o email" value={q} onChange={event => setQ(event.target.value)} />
+          </div>
         </section>
 
         {error ? <p className="orders-message">{error}</p> : null}

@@ -6,6 +6,7 @@ import { formatDateOnly, formatDateTimeCompact, normalizeStatus } from "../../sh
 const ESTADOS_UI = ["Pendiente", "EnProduccion", "ParaEntrega", "Cancelado"];
 const ESTADOS_FILTRO_DEFAULT = ["Pendiente", "EnProduccion"];
 const ESTADOS_FLORISTA = ["Activo", "Inactivo", "Incapacidad"];
+const ESTADOS_FLORISTA_BASICOS = ["Activo", "Inactivo"];
 const DEFAULT_USER = "admin.demo";
 const LOOKER_STUDIO_URL = "https://lookerstudio.google.com/embed/reporting/d08a04af-ed8e-4dde-a83c-90888bfde39d/page/p_mp7qxa6dzd";
 const SUBMENU_OPTIONS = [
@@ -67,7 +68,7 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
     [canManageProductionActions]
   );
 
-  const [fecha, setFecha] = useState(todayIsoDate());
+  const [fecha, setFecha] = useState("");
   const [estadosFiltro, setEstadosFiltro] = useState(ESTADOS_FILTRO_DEFAULT);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -231,6 +232,13 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
   const openActionsDrawer = item => {
     if (!item) return;
     setSelectedItem(item);
+    setSelectedFloristaById(current => ({
+      ...current,
+      [item.idProduccion]: current[item.idProduccion] || (item.floristaID != null ? String(item.floristaID) : ""),
+    }));
+    if (item.floristaID != null) {
+      setFloristaGestionID(String(item.floristaID));
+    }
     setDrawerOpen(true);
     setMotivoAccion("");
   };
@@ -270,8 +278,12 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
 
   const reasignarAuditable = async item => {
     const floristaNuevoId = selectedFloristaById[item.idProduccion] || null;
-    const motivo = String(motivoAccion || "").trim();
-    if (!motivo) {
+    const motivo = String(motivoAccion || "").trim() || "Reasignación desde panel florista";
+    if (!floristaNuevoId) {
+      globalThis.alert("Selecciona un florista para reasignar.");
+      return;
+    }
+    if (canManageProductionActions && !String(motivoAccion || "").trim()) {
       globalThis.alert("Debes escribir un motivo para la reasignación auditada.");
       return;
     }
@@ -500,7 +512,7 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
         <header className="orders-admin-header">
           <div>
             <button type="button" className="sidebar-trigger" onClick={toggleSidebar} title="Abrir o cerrar menú">☰ Menú</button>
-            <h1>Módulo de Producción</h1>
+            <h1>Gestión de Producción</h1>
             <p className="orders-admin-subtitle">
               {canManageProductionActions
                 ? "Asignación inteligente, carga equitativa y control por fecha programada."
@@ -533,7 +545,10 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
         {submenu === "pedidos" && (
           <>
             <section className="orders-filters">
-              <input type="date" value={fecha} onChange={event => setFecha(event.target.value)} title="Filtrar por fecha programada" />
+              <div className="filter-field">
+                <span>Fecha Inicio</span>
+                <input type="date" value={fecha} onChange={event => setFecha(event.target.value)} title="Filtrar por fecha programada" />
+              </div>
               <details className="estado-filtro-dropdown">
                 <summary className="estado-filtro-summary">
                   Estados
@@ -779,15 +794,14 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
             <>
               <section className="order-block">
                 <h4>📦 Ver detalle</h4>
-                <p><strong>Número:</strong> {selectedItem.numeroPedido ?? "-"}</p>
+                <p><strong>Número del pedido:</strong> {selectedItem.numeroPedido ?? "-"}</p>
                 <p><strong>Cliente:</strong> {selectedItem.cliente || "-"}</p>
                 <p><strong>Código o número del arreglo:</strong> {arregloCodeLabel(selectedItem)}</p>
                 <p><strong>Nombre del arreglo:</strong> {selectedItem.nombreArreglo || selectedItem.producto || "-"}</p>
                 <p><strong>Fecha Entrega:</strong> {formatDateOnly(selectedItem.fechaEntrega) || "-"}</p>
                 <p><strong>Hora Entrega:</strong> {selectedItem.horaEntrega || "-"}</p>
-                <p><strong>Barrio:</strong> {selectedItem.barrio || "-"}</p>
                 <p><strong>Estado del arreglo:</strong> {selectedItem.estado || "-"}</p>
-                <p><strong>Observación:</strong> {selectedItem.observacion || "-"}</p>
+                <p><strong>Observaciones del arreglo:</strong> {selectedItem.observacion || "-"}</p>
                 <p><strong>Florista asignado:</strong> {selectedItem.floristaAsignado || "Sin asignar"}</p>
               </section>
 
@@ -820,6 +834,41 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
                   </select>
                   <button type="button" className="btn-outline" title="Asignar florista" onClick={() => asignar(selectedItem)}>Asignar</button>
                   <button type="button" className="btn-outline" title="Reasignación auditada" onClick={() => reasignarAuditable(selectedItem)}>Reasignar auditado</button>
+                </div>
+              </section>
+              ) : null}
+
+              {!canManageProductionActions ? (
+              <section className="order-block">
+                <h4>👩‍🎨 Reasignar florista</h4>
+                <div className="order-actions" style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                  <select
+                    value={selectedFloristaById[selectedItem.idProduccion] || ""}
+                    onChange={event => setSelectedFloristaById(current => ({ ...current, [selectedItem.idProduccion]: event.target.value }))}
+                    title="Seleccionar florista"
+                  >
+                    <option value="">Selecciona florista</option>
+                    {floristas.map(florista => (
+                      <option key={florista.idFlorista} value={florista.idFlorista}>{florista.nombre}</option>
+                    ))}
+                  </select>
+                  <button type="button" className="btn-outline" title="Reasignar florista" onClick={() => reasignarAuditable(selectedItem)}>
+                    Reasignar florista
+                  </button>
+                </div>
+              </section>
+              ) : null}
+
+              {!canManageProductionActions ? (
+              <section className="order-block">
+                <h4>Estado de florista</h4>
+                <div className="order-actions" style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                  <select value={floristaEstado} onChange={event => setFloristaEstado(event.target.value)} title="Estado del florista">
+                    {ESTADOS_FLORISTA_BASICOS.map(e => <option key={e} value={e}>{e}</option>)}
+                  </select>
+                  <button type="button" className="btn-outline" onClick={actualizarEstadoFlorista} title="Aplicar estado florista">
+                    Estado de florista
+                  </button>
                 </div>
               </section>
               ) : null}

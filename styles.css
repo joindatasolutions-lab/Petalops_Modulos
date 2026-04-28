@@ -482,6 +482,24 @@ select {
   padding: 10px;
 }
 
+.filter-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.filter-field label,
+.filter-field span {
+  color: #7f7278;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.filter-field--wide {
+  grid-column: span 2;
+}
+
 input, select {
   width: 100%;
   padding: 10px 12px;
@@ -2270,6 +2288,19 @@ select:focus {
   grid-template-columns: minmax(220px, 2fr) repeat(4, minmax(110px, 1fr)) auto auto;
   gap: 0.55rem;
   align-items: center;
+}
+
+.pipeline-filter-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.pipeline-filter-field span {
+  color: #7f7278;
+  font-size: 12px;
+  font-weight: 600;
 }
 
 .pipeline-filters input[type="text"],
