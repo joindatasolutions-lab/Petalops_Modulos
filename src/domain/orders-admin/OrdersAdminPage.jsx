@@ -1188,12 +1188,12 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
                   </div>
 
                   <label className="order-detail-edit-label">
-                    Observaciones del arreglo
+                    Observación personalizados - producción
                     <textarea
                       rows={4}
                       value={detailEditProductoObservaciones}
                       onChange={event => setDetailEditProductoObservaciones(event.target.value)}
-                      placeholder="Observaciones del arreglo personalizable"
+                      placeholder="Observaciones del arreglo para producción"
                     />
                   </label>
 
@@ -1218,12 +1218,12 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
                   </label>
 
                   <label className="order-detail-edit-label">
-                    Observación
+                    Observaciones - domicilio
                     <textarea
                       rows={3}
                       value={detailEditObservacionGeneral}
                       onChange={event => setDetailEditObservacionGeneral(event.target.value)}
-                      placeholder="Observación general para Domicilio"
+                      placeholder="Observaciones generales para domicilio"
                     />
                   </label>
 
@@ -1448,7 +1448,7 @@ function OrderDetail({ detalle, paymentTitle = "Método de pago", salesChannelTi
         <p><strong>Hora entrega:</strong> {detalle.destinatario?.horaEntrega || horaEntrega || "-"}</p>
         <p><strong>Firma:</strong> {detalle.destinatario?.firma || "-"}</p>
         <p><strong>Mensaje:</strong> {detalle.destinatario?.mensajeTarjeta || "-"}</p>
-        <p><strong>Observación entrega:</strong> {detalle.destinatario?.observacionGeneral || "-"}</p>
+        <p><strong>Observaciones - domicilio:</strong> {detalle.destinatario?.observacionGeneral || "-"}</p>
       </section>
 
       <section className="order-block">
@@ -1473,7 +1473,7 @@ function OrderDetail({ detalle, paymentTitle = "Método de pago", salesChannelTi
               <p><strong>Código de arreglo:</strong> {producto.codigoProducto || "-"}</p>
               <p><strong>Nombre del arreglo:</strong> {producto.nombreProducto || "-"}</p>
               <p><strong>Cantidad:</strong> {Number(producto.cantidad || 0)}</p>
-              <p><strong>Observación personalizados:</strong> {producto.observaciones || "-"}</p>
+              <p><strong>Observación personalizados - producción:</strong> {producto.observaciones || "-"}</p>
               <p><strong>Subtotal:</strong> ${formatearCOP(Number(producto.subtotal || 0))}</p>
             </div>
           ))
