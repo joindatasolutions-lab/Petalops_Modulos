@@ -55,6 +55,10 @@ function normalizeRole(value) {
   return String(value || "").trim().toLowerCase().replace(/\s+/g, "_");
 }
 
+function isFloristaActivo(item) {
+  return String(item?.estado || "").trim().toLowerCase() === "activo" && Boolean(item?.activo);
+}
+
 export function ProductionPage({ session, canViewPipeline, canViewPedidos, canViewProduccion, canViewDomicilios, canViewInventario, canViewClientesPanel, canViewUsuariosPanel, onLogout, onGoPipeline, onGoPedidos, onGoProduccion, onGoDomicilios, onGoInventario, onGoClientes, onGoUsuarios }) {
   const api = useMemo(() => createApiClient(tenantConfig), []);
   const empresaId = Number(session?.empresaID || tenantConfig.empresaId);
@@ -97,6 +101,11 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
 
   const [sidebarPinned, setSidebarPinned] = useState(false);
   const [sidebarMobileOpen, setSidebarMobileOpen] = useState(false);
+
+  const currentFloristaDisponibilidad = useMemo(() => {
+    if (!floristaGestionID) return null;
+    return floristasDisponibilidad.find(item => Number(item.idFlorista) === Number(floristaGestionID)) || null;
+  }, [floristaGestionID, floristasDisponibilidad]);
 
   const toggleEstadoFiltro = useCallback((estadoItem) => {
     setEstadosFiltro(current => {
@@ -410,6 +419,36 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
     } catch (nextError) {
       console.error("Error actualizando disponibilidad del florista:", nextError);
       globalThis.alert("No fue posible actualizar la disponibilidad del florista.");
+    }
+  };
+
+  const toggleDisponibilidadFlorista = async item => {
+    if (!item?.idFlorista) return;
+    const estadoObjetivo = isFloristaActivo(item) ? "Inactivo" : "Activo";
+    await actualizarDisponibilidadFlorista(item.idFlorista, estadoObjetivo);
+  };
+
+  const toggleEstadoFloristaPropio = async () => {
+    if (!floristaGestionID) {
+      globalThis.alert("No fue posible identificar el florista.");
+      return;
+    }
+
+    const estadoObjetivo = isFloristaActivo(currentFloristaDisponibilidad) ? "Inactivo" : "Activo";
+
+    try {
+      await api.actualizarEstadoFlorista({
+        floristaId: Number(floristaGestionID),
+        estado: estadoObjetivo,
+        fechaInicioIncapacidad: null,
+        fechaFinIncapacidad: null,
+        motivo: `Cambio rápido a ${estadoObjetivo} desde panel florista`,
+        usuarioCambio
+      });
+      await refreshAll();
+    } catch (nextError) {
+      console.error("Error alternando estado del florista:", nextError);
+      globalThis.alert("No fue posible actualizar el estado del florista.");
     }
   };
 
@@ -768,7 +807,7 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
               {floristasDisponibilidad.length === 0 ? (
                 <p className="orders-message" style={{ marginBottom: 0 }}>No hay floristas disponibles para mostrar.</p>
               ) : floristasDisponibilidad.map(item => {
-                const estaActivo = String(item.estado || "").trim().toLowerCase() === "activo" && Boolean(item.activo);
+                const estaActivo = isFloristaActivo(item);
                 const identificador = item.esExterno ? "Externo" : String(item.numeroFlorista ?? "-");
                 return (
                   <article key={item.idFlorista} className={`production-availability-card ${item.esExterno ? "is-external" : ""}`}>
@@ -791,17 +830,10 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
                     <div className="production-inline-actions">
                       <button
                         type="button"
-                        className={`btn-outline ${estaActivo ? "is-selected" : ""}`}
-                        onClick={() => actualizarDisponibilidadFlorista(item.idFlorista, "Activo")}
+                        className={`btn-outline ${estaActivo ? "" : "is-selected"}`}
+                        onClick={() => toggleDisponibilidadFlorista(item)}
                       >
-                        Activo
-                      </button>
-                      <button
-                        type="button"
-                        className={`btn-outline ${!estaActivo ? "is-selected" : ""}`}
-                        onClick={() => actualizarDisponibilidadFlorista(item.idFlorista, "Inactivo")}
-                      >
-                        Inactivo
+                        {estaActivo ? "Inactivar" : "Activar"}
                       </button>
                     </div>
                   </article>
@@ -914,7 +946,13 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
                   >
                     <option value="">Auto</option>
                     {floristas.map(florista => (
-                      <option key={florista.idFlorista} value={florista.idFlorista}>{florista.nombre}</option>
+                      <option
+                        key={florista.idFlorista}
+                        value={florista.idFlorista}
+                        disabled={!isFloristaActivo(florista)}
+                      >
+                        {florista.nombre}{isFloristaActivo(florista) ? "" : " (Inactivo)"}
+                      </option>
                     ))}
                   </select>
                   <button type="button" className="btn-outline" title="Asignar florista" onClick={() => asignar(selectedItem)}>Asignar</button>
@@ -934,7 +972,13 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
                   >
                     <option value="">Selecciona florista</option>
                     {floristas.map(florista => (
-                      <option key={florista.idFlorista} value={florista.idFlorista}>{florista.nombre}</option>
+                      <option
+                        key={florista.idFlorista}
+                        value={florista.idFlorista}
+                        disabled={!isFloristaActivo(florista)}
+                      >
+                        {florista.nombre}{isFloristaActivo(florista) ? "" : " (Inactivo)"}
+                      </option>
                     ))}
                   </select>
                   <button type="button" className="btn-outline" title="Reasignar florista" onClick={() => reasignarAuditable(selectedItem)}>
@@ -948,11 +992,11 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
               <section className="order-block">
                 <h4>Estado de florista</h4>
                 <div className="order-actions" style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                  <select value={floristaEstado} onChange={event => setFloristaEstado(event.target.value)} title="Estado del florista">
-                    {ESTADOS_FLORISTA_BASICOS.map(e => <option key={e} value={e}>{e}</option>)}
-                  </select>
-                  <button type="button" className="btn-outline" onClick={actualizarEstadoFlorista} title="Aplicar estado florista">
-                    Estado de florista
+                  <span className={`order-badge ${isFloristaActivo(currentFloristaDisponibilidad) ? "is-entregado" : "is-cancelado"}`}>
+                    {isFloristaActivo(currentFloristaDisponibilidad) ? "Activo" : "Inactivo"}
+                  </span>
+                  <button type="button" className="btn-outline" onClick={toggleEstadoFloristaPropio} title="Cambiar disponibilidad del florista">
+                    {isFloristaActivo(currentFloristaDisponibilidad) ? "Inactivar" : "Activar"}
                   </button>
                 </div>
               </section>
