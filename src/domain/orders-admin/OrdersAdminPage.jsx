@@ -758,14 +758,14 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
           <header className="orders-admin-header">
             <div>
               <button type="button" className="sidebar-trigger" onClick={toggleSidebar} title="Abrir o cerrar menú">☰ Menú</button>
-              <h1>Gestión de Pedidos</h1>
+              <h1>Módulo de Pedidos</h1>
               <p className="orders-admin-subtitle">Panel operativo para administrar pedidos de tus floristerías</p>
             </div>
             <button type="button" className="btn-primary" onClick={refresh} title="Actualizar pedidos">Actualizar</button>
           </header>
 
-          <section className="orders-filters">
-            <div className="filter-field filter-field--wide">
+          <section className="orders-filters orders-filters--four-col">
+            <div className="filter-field">
               <span>Búsqueda</span>
               <input
                 type="text"

@@ -478,7 +478,7 @@ export function DeliveryPage({
         <header className="orders-admin-header">
           <div>
             <button type="button" className="sidebar-trigger" onClick={toggleSidebar}>☰ Menú</button>
-            <h1>Gestión de Domicilios</h1>
+            <h1>Módulo de Domicilios</h1>
             <p className="orders-admin-subtitle">Desde ParaEntrega hasta Entregado, con evidencia y trazabilidad completa.</p>
           </div>
           <div className="header-actions">

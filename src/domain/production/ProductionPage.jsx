@@ -512,7 +512,7 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
         <header className="orders-admin-header">
           <div>
             <button type="button" className="sidebar-trigger" onClick={toggleSidebar} title="Abrir o cerrar menú">☰ Menú</button>
-            <h1>Gestión de Producción</h1>
+            <h1>Módulo de Producción</h1>
             <p className="orders-admin-subtitle">
               {canManageProductionActions
                 ? "Asignación inteligente, carga equitativa y control por fecha programada."
@@ -544,30 +544,33 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
 
         {submenu === "pedidos" && (
           <>
-            <section className="orders-filters">
+            <section className="orders-filters orders-filters--two-col">
               <div className="filter-field">
                 <span>Fecha Inicio</span>
                 <input type="date" value={fecha} onChange={event => setFecha(event.target.value)} title="Filtrar por fecha programada" />
               </div>
-              <details className="estado-filtro-dropdown">
-                <summary className="estado-filtro-summary">
-                  Estados
-                </summary>
-                <div className="estado-filtro-panel">
-                  <div className="estado-filtro-list">
-                    {ESTADOS_UI.map(item => (
-                      <label key={item} className="estado-filtro-item">
-                        <input
-                          type="checkbox"
-                          checked={estadosFiltro.includes(item)}
-                          onChange={() => toggleEstadoFiltro(item)}
-                        />
-                        <span>{item}</span>
-                      </label>
-                    ))}
+              <label className="filter-field">
+                <span>Estado</span>
+                <details className="estado-filtro-dropdown">
+                  <summary className="estado-filtro-summary">
+                    Estados
+                  </summary>
+                  <div className="estado-filtro-panel">
+                    <div className="estado-filtro-list">
+                      {ESTADOS_UI.map(item => (
+                        <label key={item} className="estado-filtro-item">
+                          <input
+                            type="checkbox"
+                            checked={estadosFiltro.includes(item)}
+                            onChange={() => toggleEstadoFiltro(item)}
+                          />
+                          <span>{item}</span>
+                        </label>
+                      ))}
+                    </div>
                   </div>
-                </div>
-              </details>
+                </details>
+              </label>
             </section>
 
             {error && <p className="orders-message">{error}</p>}

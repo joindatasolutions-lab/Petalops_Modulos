@@ -443,6 +443,11 @@ select {
   padding: 12px 14px;
 }
 
+.orders-admin-header > div:first-child {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
 .orders-admin-header h1 {
   margin: 0;
   font-family: "Playfair Display", Georgia, serif;
@@ -469,6 +474,7 @@ select {
   gap: 8px;
   flex-wrap: wrap;
   justify-content: flex-end;
+  flex: 0 1 auto;
 }
 
 .orders-filters {
@@ -480,6 +486,15 @@ select {
   border: 1px solid #ecdee4;
   border-radius: 12px;
   padding: 10px;
+}
+
+.orders-filters--four-col {
+  grid-template-columns: minmax(220px, 1.45fr) repeat(3, minmax(150px, 1fr));
+}
+
+.orders-filters--two-col {
+  grid-template-columns: repeat(2, minmax(180px, 1fr));
+  align-items: end;
 }
 
 .filter-field {
@@ -572,6 +587,7 @@ select:focus {
   max-width: 100%;
   overflow-x: auto;
   overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
 }
 
 .orders-table {
@@ -656,11 +672,13 @@ select:focus {
   display: inline-flex;
   gap: 6px;
   flex-wrap: wrap;
+  align-items: stretch;
 }
 
 .estado-filtro-dropdown {
   position: relative;
-  min-width: 220px;
+  min-width: 0;
+  width: 100%;
 }
 
 .estado-filtro-summary {
@@ -673,6 +691,9 @@ select:focus {
   color: #4b3f45;
   font-weight: 600;
   user-select: none;
+  min-height: 40px;
+  display: flex;
+  align-items: center;
 }
 
 .estado-filtro-summary::-webkit-details-marker {
@@ -945,6 +966,7 @@ select:focus {
   min-height: 38px;
   padding: 9px 12px;
   justify-content: center;
+  flex: 1 1 160px;
 }
 
 .orders-drawer-head-close {
@@ -1545,6 +1567,7 @@ select:focus {
   flex-wrap: wrap;
   gap: 8px;
   margin: 0 0 12px;
+  align-items: stretch;
 }
 
 .production-header-tabs {
@@ -1553,6 +1576,7 @@ select:focus {
 
 .inventory-tab-btn {
   min-width: 170px;
+  flex: 1 1 170px;
 }
 
 .inventory-tab-btn.is-active {
@@ -1600,6 +1624,8 @@ select:focus {
   margin-top: 10px;
   display: flex;
   justify-content: flex-start;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 .inventory-table {
@@ -1717,6 +1743,20 @@ select:focus {
 .users-create-form {
   display: grid;
   gap: 8px;
+}
+
+.users-create-form .order-actions,
+.inventory-provider-actions,
+.delivery-courier-actions,
+.production-inline-actions {
+  align-items: stretch;
+}
+
+.users-create-form .order-actions > *,
+.inventory-provider-actions > *,
+.inventory-sub-actions > *,
+.production-inline-actions > * {
+  flex: 1 1 160px;
 }
 
 .users-filters select,
@@ -1908,19 +1948,24 @@ select:focus {
     padding: 18px;
   }
 
-  .orders-filters { grid-template-columns: 1fr 1fr; }
+  .orders-filters { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+
+  .orders-filters--four-col,
+  .users-filters,
+  .inventory-filters {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .filter-field--wide {
+    grid-column: span 2;
+  }
 
   .users-grid-layout {
     grid-template-columns: 1fr;
   }
 
-  .inventory-filters {
-    grid-template-columns: 1fr 1fr;
-  }
-
   .inventory-tab-btn {
     min-width: 0;
-    width: 100%;
   }
 
   .inventory-grid-layout {
@@ -1948,6 +1993,26 @@ select:focus {
     gap: 10px;
     width: min(760px, 100%);
     margin: 0 auto;
+  }
+
+  .header-actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .header-actions .btn-primary,
+  .header-actions .btn-outline,
+  .inventory-header-tabs .btn-outline,
+  .order-actions > .btn-primary,
+  .order-actions > .btn-outline,
+  .order-actions > a,
+  .inventory-sub-actions > .btn-outline,
+  .inventory-sub-actions > .btn-primary {
+    flex: 1 1 160px;
+  }
+
+  .orders-drawer-head-main-actions {
+    width: 100%;
   }
 
   .order-detail-edit-checklist {
@@ -2035,6 +2100,17 @@ select:focus {
     gap: 8px;
   }
 
+  .orders-filters--four-col,
+  .orders-filters--two-col,
+  .users-filters,
+  .inventory-filters {
+    grid-template-columns: 1fr;
+  }
+
+  .filter-field--wide {
+    grid-column: auto;
+  }
+
   .delivery-admin-table .order-actions {
     grid-template-columns: 1fr;
   }
@@ -2118,6 +2194,25 @@ select:focus {
   .order-actions {
     display: flex;
     flex-wrap: wrap;
+  }
+
+  .header-actions .btn-primary,
+  .header-actions .btn-outline,
+  .inventory-header-tabs .btn-outline,
+  .orders-drawer-head-main-actions .btn-outline,
+  .order-actions > .btn-primary,
+  .order-actions > .btn-outline,
+  .order-actions > a,
+  .inventory-sub-actions > .btn-outline,
+  .inventory-sub-actions > .btn-primary {
+    flex: 1 1 100%;
+    min-width: 0;
+  }
+
+  .inventory-header-tabs,
+  .inventory-sub-actions,
+  .production-inline-actions {
+    width: 100%;
   }
 
   .orders-pager {

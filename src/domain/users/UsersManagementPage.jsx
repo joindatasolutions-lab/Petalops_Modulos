@@ -695,7 +695,7 @@ export function UsersManagementPage({
         <header className="orders-admin-header">
           <div>
             <button type="button" className="sidebar-trigger" onClick={toggleSidebar}>☰ Menú</button>
-            <h1>Gestión de Usuarios</h1>
+            <h1>Módulo de Usuarios</h1>
             <p className="orders-admin-subtitle">
               {canViewUsuariosGlobal
                 ? "Control global de administradores, usuarios operativos, domiciliarios y floristas."

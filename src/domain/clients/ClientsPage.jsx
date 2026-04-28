@@ -202,7 +202,7 @@ export function ClientsPage({
         <header className="orders-admin-header">
           <div>
             <button type="button" className="sidebar-trigger" onClick={toggleSidebar}>☰ Menú</button>
-            <h1>Gestión de Clientes</h1>
+            <h1>Módulo de Clientes</h1>
             <p className="orders-admin-subtitle">Consulta y mantenimiento de clientes con datos de contacto y fechas clave.</p>
           </div>
           <div className="header-actions">

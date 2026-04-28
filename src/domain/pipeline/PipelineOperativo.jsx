@@ -216,7 +216,7 @@ export function PipelineOperativo({
             <button type="button" className="sidebar-trigger" onClick={toggleSidebar} title="Abrir o cerrar menú">☰ Menú</button>
           </div>
           <div>
-            <h1>Gestión de Pipeline</h1>
+            <h1>Módulo de Pipeline</h1>
             <p className="orders-admin-subtitle">Centro de control de pedidos, producción y entrega</p>
           </div>
         </header>

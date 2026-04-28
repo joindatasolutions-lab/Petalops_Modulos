@@ -113,7 +113,6 @@ export function InventoryPage({
   const [estadoFiltro, setEstadoFiltro] = useState("");
   const [proveedorFiltro, setProveedorFiltro] = useState("");
   const [q, setQ] = useState("");
-  const [soloCriticos, setSoloCriticos] = useState(false);
 
   const [createForm, setCreateForm] = useState(initialCreateForm);
   const [stockForm, setStockForm] = useState(initialStockForm);
@@ -150,7 +149,6 @@ export function InventoryPage({
         estado: estadoFiltro || null,
         proveedorId: proveedorFiltro ? Number(proveedorFiltro) : null,
         q: q || null,
-        soloCriticos,
       });
       setItems(Array.isArray(data.items) ? data.items : []);
     } catch (nextError) {
@@ -160,7 +158,7 @@ export function InventoryPage({
     } finally {
       setLoading(false);
     }
-  }, [api, empresaId, categoriaFiltro, estadoFiltro, proveedorFiltro, q, soloCriticos]);
+  }, [api, empresaId, categoriaFiltro, estadoFiltro, proveedorFiltro, q]);
 
   const loadMovimientos = useCallback(async () => {
     if (!showMovimientos) return;
@@ -427,7 +425,7 @@ export function InventoryPage({
         <header className="orders-admin-header">
           <div>
             <button type="button" className="sidebar-trigger" onClick={toggleSidebar}>☰ Menú</button>
-            <h1>Gestión de Inventario</h1>
+            <h1>Módulo de Inventario</h1>
             <p className="orders-admin-subtitle">Control de flores e insumos con estados inteligentes y trazabilidad por movimientos.</p>
           </div>
           <div className="header-actions">
@@ -456,6 +454,10 @@ export function InventoryPage({
           <>
             <section className="orders-filters inventory-filters">
               <div className="filter-field">
+                <span>Búsqueda</span>
+                <input type="text" placeholder="Buscar por codigo, nombre, color o proveedor" value={q} onChange={event => setQ(event.target.value)} />
+              </div>
+              <div className="filter-field">
                 <span>Categoría</span>
                 <select value={categoriaFiltro} onChange={event => setCategoriaFiltro(event.target.value)}>
                   <option value="">Todas las categorias</option>
@@ -479,13 +481,6 @@ export function InventoryPage({
                   {proveedores.map(item => <option key={item.idProveedor} value={item.idProveedor}>{item.nombre}</option>)}
                 </select>
               </div>
-              <div className="filter-field filter-field--wide">
-                <span>Búsqueda</span>
-                <input type="text" placeholder="Buscar por codigo, nombre, color o proveedor" value={q} onChange={event => setQ(event.target.value)} />
-              </div>
-              <button type="button" className={`btn-outline ${soloCriticos ? "is-selected" : ""}`} onClick={() => setSoloCriticos(current => !current)}>
-                {soloCriticos ? "Mostrando criticos" : "Solo criticos"}
-              </button>
             </section>
 
             <section className="inventory-grid-layout">
