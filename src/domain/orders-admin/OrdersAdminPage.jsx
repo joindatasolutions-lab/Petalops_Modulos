@@ -20,7 +20,18 @@ const initialFilters = {
   pageSize: 20
 };
 
-export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canViewProduccion, canViewDomicilios, canViewInventario, canViewClientesPanel, canViewUsuariosPanel, onLogout, onGoPipeline, onGoPedidos, onGoProduccion, onGoDomicilios, onGoInventario, onGoClientes, onGoUsuarios }) {
+const MESSAGE_CARD_FONT_OPTIONS = [
+  { value: "Georgia, serif", label: "Georgia" },
+  { value: "'Times New Roman', serif", label: "Times New Roman" },
+  { value: "'Playfair Display', serif", label: "Playfair Display" },
+  { value: "'Cormorant Garamond', serif", label: "Cormorant Garamond" },
+  { value: "'EB Garamond', serif", label: "EB Garamond" },
+  { value: "'Libre Baskerville', serif", label: "Libre Baskerville" },
+  { value: "'Crimson Text', serif", label: "Crimson Text" },
+  { value: "'Great Vibes', cursive", label: "Great Vibes" }
+];
+
+export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canViewProduccion, canViewDomicilios, canViewInventario, canViewContabilidad, canViewClientesPanel, canViewUsuariosPanel, onLogout, onGoPipeline, onGoPedidos, onGoProduccion, onGoDomicilios, onGoInventario, onGoContabilidad, onGoClientes, onGoUsuarios }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [items, setItems] = useState([]);
@@ -39,6 +50,7 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
   const [cardFontSize, setCardFontSize] = useState(24);
   const [cardTextColor, setCardTextColor] = useState("#1f2937");
   const [cardTextAlign, setCardTextAlign] = useState("center");
+  const [cardSignatureAlign, setCardSignatureAlign] = useState("right");
   const [sidebarPinned, setSidebarPinned] = useState(false);
   const [sidebarMobileOpen, setSidebarMobileOpen] = useState(false);
   const [isEditingDetail, setIsEditingDetail] = useState(false);
@@ -67,6 +79,7 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
   const [detailEditMensajeTarjeta, setDetailEditMensajeTarjeta] = useState("");
   const [detailEditObservacionGeneral, setDetailEditObservacionGeneral] = useState("");
   const [detailEditMetodosPago, setDetailEditMetodosPago] = useState([]);
+  const [detailEditPaymentAmounts, setDetailEditPaymentAmounts] = useState({});
   const [detailEditCanalFlora, setDetailEditCanalFlora] = useState("");
   const [detailEditSaving, setDetailEditSaving] = useState(false);
   const [detailEditError, setDetailEditError] = useState("");
@@ -87,6 +100,26 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
   const salesChannelFieldConfig = useMemo(
     () => pedidoMenuFields.find(field => field?.codigo === "pedido_canal_venta" && field?.activo),
     [pedidoMenuFields]
+  );
+  const detailEditSelectedPaymentMethods = useMemo(
+    () => normalizePaymentMethods(detailEditMetodosPago),
+    [detailEditMetodosPago]
+  );
+  const detailEditIsCustomArrangement = useMemo(
+    () => isCustomArrangement({
+      codigo: detailEditProductoCodigo,
+      nombre: detailEditNombreArreglo,
+      observaciones: detailEditProductoObservaciones,
+    }),
+    [detailEditNombreArreglo, detailEditProductoCodigo, detailEditProductoObservaciones]
+  );
+  const detailEditHasCashPayment = useMemo(
+    () => detailEditSelectedPaymentMethods.some(method => isCashPaymentMethod(method)),
+    [detailEditSelectedPaymentMethods]
+  );
+  const detailEditRequiresPaymentBreakdown = useMemo(
+    () => detailEditSelectedPaymentMethods.length > 1 || detailEditHasCashPayment,
+    [detailEditSelectedPaymentMethods, detailEditHasCashPayment]
   );
 
   const loadBarrioOptions = useCallback(async (query = "") => {
@@ -217,7 +250,7 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
       ? String(firstProduct.nombreProducto || firstProduct.nombre || "").trim()
       : "";
     const productoObservaciones = firstProduct
-      ? String(firstProduct.observaciones || firstProduct.descripcion || "").trim()
+      ? String(firstProduct.observaciones || "").trim()
       : "";
     const productoPrecio = firstProduct ? Number(firstProduct.precioUnitario || firstProduct.precio || firstProduct.subtotal || 0) : null;
 
@@ -243,7 +276,11 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
     setDetailEditFirma(String(detalle.destinatario?.firma || ""));
     setDetailEditMensajeTarjeta(String(detalle.destinatario?.mensajeTarjeta || ""));
     setDetailEditObservacionGeneral(String(detalle.destinatario?.observacionGeneral || ""));
-    setDetailEditMetodosPago(Array.isArray(detalle.financiero?.metodosPago) ? detalle.financiero.metodosPago.map(item => String(item)) : []);
+    const initialPaymentMethods = Array.isArray(detalle.financiero?.metodosPago)
+      ? detalle.financiero.metodosPago.map(item => String(item))
+      : [];
+    setDetailEditMetodosPago(initialPaymentMethods);
+    setDetailEditPaymentAmounts(extractPaymentAmounts(detalle.financiero, initialPaymentMethods));
     setDetailEditCanalFlora(String(detalle.financiero?.canalFlora || ""));
 
     const initialCatalog = (Array.isArray(detalle.productos) ? detalle.productos : [])
@@ -489,14 +526,73 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
   };
 
   const normalizeDuplicateMetodosPago = () => (
-    Array.isArray(detailEditMetodosPago)
-      ? detailEditMetodosPago.map(item => String(item || "").trim()).filter(Boolean)
-      : []
+    normalizePaymentMethods(detailEditMetodosPago)
   );
 
   const normalizeDuplicateCanalFlora = () => {
     const value = String(detailEditCanalFlora || "").trim();
     return value || null;
+  };
+
+  const totalPedido = Number(detalle?.financiero?.total || 0);
+
+  const validatePaymentMethods = () => {
+    if (!paymentFieldConfig) {
+      return {
+        methods: null,
+        paymentBreakdown: null,
+        cashAmount: null,
+      };
+    }
+
+    const methods = normalizePaymentMethods(detailEditMetodosPago);
+    if (!methods.length) {
+      throw new Error("Debes seleccionar al menos un método de pago.");
+    }
+
+    const requiresBreakdown = methods.length > 1 || methods.some(method => isCashPaymentMethod(method));
+    if (!requiresBreakdown) {
+      return {
+        methods,
+        paymentBreakdown: null,
+        cashAmount: null,
+      };
+    }
+
+    const paymentBreakdown = [];
+    let breakdownTotal = 0;
+    let cashAmount = null;
+
+    for (const method of methods) {
+      const rawValue = detailEditPaymentAmounts?.[method];
+      const value = Number.parseFloat(String(rawValue ?? "").replace(",", "."));
+      if (!Number.isFinite(value) || value <= 0) {
+        throw new Error(`Debes indicar un monto válido para ${method}.`);
+      }
+
+      const roundedValue = roundCurrency(value);
+      breakdownTotal += roundedValue;
+      paymentBreakdown.push({
+        metodo: method,
+        monto: roundedValue,
+      });
+
+      if (isCashPaymentMethod(method)) {
+        cashAmount = roundedValue;
+      }
+    }
+
+    const roundedBreakdownTotal = roundCurrency(breakdownTotal);
+    const roundedOrderTotal = roundCurrency(totalPedido);
+    if (roundedOrderTotal > 0 && roundedBreakdownTotal !== roundedOrderTotal) {
+      throw new Error(`La suma de los pagos debe ser igual al total del pedido ($${formatearCOP(roundedOrderTotal)}).`);
+    }
+
+    return {
+      methods,
+      paymentBreakdown,
+      cashAmount,
+    };
   };
 
   const buildDuplicateCheckoutPayload = () => {
@@ -535,6 +631,8 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
         telefonoDestino: detailEditTelefonoDestino || detalle?.destinatario?.telefono || null,
         direccion: detailEditDireccion || detalle?.destinatario?.direccion || "",
         barrioNombre: barrioSeleccionado,
+        latitudDestino: detalle?.destinatario?.latitudDestino ?? null,
+        longitudDestino: detalle?.destinatario?.longitudDestino ?? null,
         fechaEntrega: `${fechaEntrega}T${horaEntrega}:00`,
         rangoHora: detailEditHoraEntrega || null,
         mensaje: detailEditMensajeTarjeta || null,
@@ -549,14 +647,15 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
     setDetailEditError("");
     setDetailEditSaving(true);
     try {
+      const paymentValidation = validatePaymentMethods();
       if (isDuplicatingDetail) {
         const created = await api.crearPedidoCheckout(buildDuplicateCheckoutPayload());
-        const duplicateMetodosPago = paymentFieldConfig ? normalizeDuplicateMetodosPago() : null;
         const duplicateCanalFlora = salesChannelFieldConfig ? normalizeDuplicateCanalFlora() : null;
         await api.actualizarDetallePedidoPipeline({
           pedidoId: created.pedidoID,
           productoID: detailEditProductoID ? Number(detailEditProductoID) : null,
           productoObservaciones: detailEditProductoObservaciones,
+          productoPrecio: detailEditIsCustomArrangement && detailEditPrecio != null ? Number(detailEditPrecio) : null,
           fechaEntrega: detailEditFechaEntrega,
           horaEntrega: detailEditHoraEntrega,
           clienteTipoIdent: detailEditClienteTipoIdent,
@@ -565,10 +664,14 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
           telefonoDestino: detailEditTelefonoDestino,
           direccion: detailEditDireccion,
           barrioNombre: detailEditBarrioNombre,
+          latitudDestino: detalle?.destinatario?.latitudDestino ?? null,
+          longitudDestino: detalle?.destinatario?.longitudDestino ?? null,
           firma: detailEditFirma,
           mensajeTarjeta: detailEditMensajeTarjeta,
           observacionGeneral: detailEditObservacionGeneral,
-          metodosPago: duplicateMetodosPago,
+          metodosPago: paymentValidation.methods,
+          detallePago: paymentValidation.paymentBreakdown,
+          montoEfectivo: paymentValidation.cashAmount,
           canalFlora: duplicateCanalFlora,
         });
         await loadOrders(true);
@@ -579,6 +682,7 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
           pedidoId: selectedPedidoId,
           productoID: detailEditProductoID ? Number(detailEditProductoID) : null,
           productoObservaciones: detailEditProductoObservaciones,
+          productoPrecio: detailEditIsCustomArrangement && detailEditPrecio != null ? Number(detailEditPrecio) : null,
           fechaEntrega: detailEditFechaEntrega,
           horaEntrega: detailEditHoraEntrega,
           clienteTipoIdent: detailEditClienteTipoIdent,
@@ -587,10 +691,14 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
           telefonoDestino: detailEditTelefonoDestino,
           direccion: detailEditDireccion,
           barrioNombre: detailEditBarrioNombre,
+          latitudDestino: detalle?.destinatario?.latitudDestino ?? null,
+          longitudDestino: detalle?.destinatario?.longitudDestino ?? null,
           firma: detailEditFirma,
           mensajeTarjeta: detailEditMensajeTarjeta,
           observacionGeneral: detailEditObservacionGeneral,
-          metodosPago: paymentFieldConfig ? detailEditMetodosPago : null,
+          metodosPago: paymentValidation.methods,
+          detallePago: paymentValidation.paymentBreakdown,
+          montoEfectivo: paymentValidation.cashAmount,
           canalFlora: salesChannelFieldConfig ? detailEditCanalFlora : null,
         });
         await reloadDrawer();
@@ -705,6 +813,20 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
                 <span className="sidebar-nav-text">Inventario</span>
               </button>
             ) : null}
+            {canViewContabilidad ? (
+              <button
+                type="button"
+                className="sidebar-nav-btn"
+                title="Contabilidad"
+                onClick={() => {
+                  setSidebarMobileOpen(false);
+                  onGoContabilidad();
+                }}
+              >
+                <span className="sidebar-nav-icon">📊</span>
+                <span className="sidebar-nav-text">Contabilidad</span>
+              </button>
+            ) : null}
             {canViewClientesPanel ? (
               <button
                 type="button"
@@ -758,7 +880,7 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
           <header className="orders-admin-header">
             <div>
               <button type="button" className="sidebar-trigger" onClick={toggleSidebar} title="Abrir o cerrar menú">☰ Menú</button>
-              <h1>Módulo de Pedidos</h1>
+              <h1>Pedidos</h1>
               <p className="orders-admin-subtitle">Panel operativo para administrar pedidos de tus floristerías</p>
             </div>
             <button type="button" className="btn-primary" onClick={refresh} title="Actualizar pedidos">Actualizar</button>
@@ -977,11 +1099,19 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
                     <div className="order-detail-edit-label">
                       <span>Precio arreglo</span>
                       <input
-                        type="text"
-                        value={`$${formatearCOP(detailEditPrecio)}`}
-                        readOnly
-                        className="order-detail-edit-readonly"
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={detailEditPrecio ?? ""}
+                        onChange={event => setDetailEditPrecio(event.target.value === "" ? null : Number(event.target.value))}
+                        readOnly={!detailEditIsCustomArrangement}
+                        className={detailEditIsCustomArrangement ? "" : "order-detail-edit-readonly"}
                       />
+                      <span className="order-detail-edit-hint">
+                        {detailEditIsCustomArrangement
+                          ? "Puedes ajustar el precio porque el arreglo es personalizado."
+                          : "El precio solo se puede cambiar cuando el arreglo es personalizado."}
+                      </span>
                     </div>
                   ) : null}
 
@@ -1032,7 +1162,7 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
                                 setDetailEditProductoID(String(item.id));
                                 setDetailEditProductoCodigo(String(item.codigo || ""));
                                 setDetailEditNombreArreglo(String(item.nombre || ""));
-                                setDetailEditProductoObservaciones(String(item.descripcion || ""));
+                                setDetailEditProductoObservaciones("");
                                 setDetailEditPrecio(item.precio != null ? Number(item.precio) : null);
                                 setDetailEditDropdownOpen(false);
                                 setDetailEditFilterText("");
@@ -1239,15 +1369,51 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
                                 type="checkbox"
                                 checked={detailEditMetodosPago.includes(option)}
                                 onChange={() => {
-                                  setDetailEditMetodosPago(current => current.includes(option)
+                                  const isSelected = detailEditMetodosPago.includes(option);
+                                  setDetailEditMetodosPago(current => isSelected
                                     ? current.filter(item => item !== option)
                                     : [...current, option]);
+                                  setDetailEditPaymentAmounts(current => {
+                                    if (isSelected) {
+                                      const next = { ...current };
+                                      delete next[option];
+                                      return next;
+                                    }
+                                    return current;
+                                  });
                                 }}
                               />
                               <span>{option}</span>
                             </label>
                             ))}
                           </div>
+                          {detailEditRequiresPaymentBreakdown ? (
+                            <div className="order-detail-edit-payment-grid">
+                              {detailEditSelectedPaymentMethods.map(method => (
+                                <label key={method} className="order-detail-edit-label">
+                                  {isCashPaymentMethod(method) ? "Monto recibido en efectivo" : `Monto para ${method}`}
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    step="0.01"
+                                    value={detailEditPaymentAmounts[method] ?? ""}
+                                    onChange={event => {
+                                      const nextValue = event.target.value;
+                                      setDetailEditPaymentAmounts(current => ({
+                                        ...current,
+                                        [method]: nextValue,
+                                      }));
+                                    }}
+                                    placeholder="0.00"
+                                    required
+                                  />
+                                </label>
+                              ))}
+                              <p className="order-detail-edit-hint">
+                                La suma de los montos debe coincidir con el total del pedido: ${formatearCOP(totalPedido)}.
+                              </p>
+                            </div>
+                          ) : null}
                         </div>
                       ) : null}
 
@@ -1294,10 +1460,11 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
                 <label>
                   Fuente
                   <select value={cardFontFamily} onChange={event => setCardFontFamily(event.target.value)}>
-                    <option value="Georgia, serif">Georgia</option>
-                    <option value="'Times New Roman', serif">Times New Roman</option>
-                    <option value="'Trebuchet MS', sans-serif">Trebuchet MS</option>
-                    <option value="'Courier New', monospace">Courier New</option>
+                    {MESSAGE_CARD_FONT_OPTIONS.map(option => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
                   </select>
                 </label>
                 <label>
@@ -1316,10 +1483,19 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
                   <input type="color" value={cardTextColor} onChange={event => setCardTextColor(event.target.value)} />
                 </label>
                 <label>
-                  Alineación
+                  Alineación mensaje
                   <select value={cardTextAlign} onChange={event => setCardTextAlign(event.target.value)}>
                     <option value="left">Izquierda</option>
                     <option value="center">Centro</option>
+                    <option value="justify">Justificado</option>
+                  </select>
+                </label>
+                <label>
+                  Alineación firma
+                  <select value={cardSignatureAlign} onChange={event => setCardSignatureAlign(event.target.value)}>
+                    <option value="left">Izquierda</option>
+                    <option value="center">Centro</option>
+                    <option value="right">Derecha</option>
                   </select>
                 </label>
                 <label className="message-card-message-editor">
@@ -1351,21 +1527,27 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
                   {formatFechaEntregaTarjeta(messageCardData?.fechaEntrega || messageCardOrder?.fechaEntrega)}
                 </p>
                 <div className="message-card-message-row">
-                  <span className="message-card-message-label">Mensaje:</span>
                   <p
                     className="message-card-message"
                     style={{
                       fontFamily: cardFontFamily,
                       fontSize: `${cardFontSize}px`,
                       color: cardTextColor,
+                      textAlign: cardTextAlign,
                     }}
                   >
                     {String(messageCardDraft || "Sin mensaje")}
                   </p>
                 </div>
-                <p className="message-card-closing">Con mucho cariño</p>
                 <p className="message-card-meta message-card-signature">
-                  {resolveFirmaTarjeta(messageCardData?.firma)}
+                  <span
+                    style={{
+                      fontFamily: cardFontFamily,
+                      textAlign: cardSignatureAlign
+                    }}
+                  >
+                    {resolveFirmaTarjeta(messageCardData?.firma)}
+                  </span>
                 </p>
               </div>
             </section>
@@ -1411,12 +1593,78 @@ function extractIndicativo(phone) {
   return match ? match[1] : null;
 }
 
+function normalizePaymentMethods(methods) {
+  return Array.isArray(methods)
+    ? methods.map(item => String(item || "").trim()).filter(Boolean)
+    : [];
+}
+
+function isCashPaymentMethod(method) {
+  return String(method || "").trim().toLowerCase().includes("efectivo");
+}
+
+function isCustomArrangement(producto) {
+  const text = [
+    producto?.codigo,
+    producto?.nombre,
+    producto?.observaciones,
+  ]
+    .map(value => String(value || "").trim().toLowerCase())
+    .filter(Boolean)
+    .join(" ");
+
+  return text.includes("personalizado") || text.includes("personalizada");
+}
+
+function roundCurrency(value) {
+  return Math.round(Number(value || 0) * 100) / 100;
+}
+
+function extractPaymentBreakdown(financiero) {
+  const sources = [
+    financiero?.detallePago,
+    financiero?.desglosePago,
+    financiero?.metodosPagoDetalle,
+    financiero?.paymentBreakdown,
+  ];
+  const rawItems = sources.find(Array.isArray) || [];
+  return rawItems
+    .map(item => {
+      const metodo = String(item?.metodo || item?.metodoPago || item?.nombre || "").trim();
+      const monto = Number(item?.monto ?? item?.valor ?? item?.amount);
+      if (!metodo || !Number.isFinite(monto)) return null;
+      return {
+        metodo,
+        monto: roundCurrency(monto),
+      };
+    })
+    .filter(Boolean);
+}
+
+function extractPaymentAmounts(financiero, paymentMethods = []) {
+  const amounts = {};
+  for (const item of extractPaymentBreakdown(financiero)) {
+    amounts[item.metodo] = String(item.monto);
+  }
+
+  const normalizedMethods = normalizePaymentMethods(paymentMethods);
+  if (normalizedMethods.length === 1 && isCashPaymentMethod(normalizedMethods[0])) {
+    const efectivoMonto = Number(financiero?.montoEfectivo ?? financiero?.efectivoMonto);
+    if (Number.isFinite(efectivoMonto) && efectivoMonto > 0) {
+      amounts[normalizedMethods[0]] = String(roundCurrency(efectivoMonto));
+    }
+  }
+
+  return amounts;
+}
+
 function OrderDetail({ detalle, paymentTitle = "Método de pago", salesChannelTitle = "Celular Flora" }) {
   const productos = Array.isArray(detalle.productos) ? detalle.productos : [];
   const { date: fechaPedido, time: horaPedido } = splitDateTimeParts(detalle.fechaPedido || detalle.fecha);
   const { date: fechaEntrega, time: horaEntrega } = splitDateTimeParts(detalle.destinatario?.fechaEntrega);
   const tipoDocumentoCliente = formatClienteTipoDocumento(detalle.cliente);
   const numeroDocumentoCliente = formatClienteNumeroDocumento(detalle.cliente);
+  const paymentBreakdown = extractPaymentBreakdown(detalle.financiero);
 
   return (
     <>
@@ -1459,6 +1707,9 @@ function OrderDetail({ detalle, paymentTitle = "Método de pago", salesChannelTi
         <p><strong>Total:</strong> ${formatearCOP(Number(detalle.financiero?.total || 0))}</p>
         <p><strong>Estado pago:</strong> {detalle.financiero?.estadoPago || "-"}</p>
         <p><strong>{paymentTitle}:</strong> {formatMetodoPago(detalle.financiero)}</p>
+        {paymentBreakdown.length > 0 ? (
+          <p><strong>Desglose pagos:</strong> {paymentBreakdown.map(item => `${item.metodo}: $${formatearCOP(item.monto)}`).join(" · ")}</p>
+        ) : null}
         <p><strong>Cuenta bancaria:</strong> {detalle.financiero?.cuentaBancaria || "-"}</p>
         <p><strong>{salesChannelTitle}:</strong> {detalle.financiero?.canalFlora || "-"}</p>
       </section>

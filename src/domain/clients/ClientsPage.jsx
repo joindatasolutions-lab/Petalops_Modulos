@@ -32,6 +32,7 @@ export function ClientsPage({
   canViewProduccion,
   canViewDomicilios,
   canViewInventario,
+  canViewContabilidad,
   canViewClientesPanel,
   canViewUsuariosPanel,
   onGoPipeline,
@@ -39,6 +40,7 @@ export function ClientsPage({
   onGoProduccion,
   onGoDomicilios,
   onGoInventario,
+  onGoContabilidad,
   onGoClientes,
   onGoUsuarios,
   onLogout,
@@ -185,6 +187,7 @@ export function ClientsPage({
           {canViewInventario ? <button type="button" className="sidebar-nav-btn" onClick={() => { setSidebarMobileOpen(false); onGoInventario(); }}><span className="sidebar-nav-icon">📦</span><span className="sidebar-nav-text">Inventario</span></button> : null}
           {canViewClientesPanel ? <button type="button" className="sidebar-nav-btn is-active" onClick={() => { setSidebarMobileOpen(false); onGoClientes(); }}><span className="sidebar-nav-icon">💐</span><span className="sidebar-nav-text">Clientes</span></button> : null}
           {canViewUsuariosPanel ? <button type="button" className="sidebar-nav-btn" onClick={() => { setSidebarMobileOpen(false); onGoUsuarios(); }}><span className="sidebar-nav-icon">👥</span><span className="sidebar-nav-text">Gestión Usuarios</span></button> : null}
+          {canViewContabilidad ? <button type="button" className="sidebar-nav-btn" onClick={() => { setSidebarMobileOpen(false); onGoContabilidad(); }}><span className="sidebar-nav-icon">📊</span><span className="sidebar-nav-text">Contabilidad</span></button> : null}
         </nav>
 
         <button type="button" className="btn-outline sidebar-logout-btn" onClick={onLogout} title="Cerrar sesión">
@@ -202,7 +205,7 @@ export function ClientsPage({
         <header className="orders-admin-header">
           <div>
             <button type="button" className="sidebar-trigger" onClick={toggleSidebar}>☰ Menú</button>
-            <h1>Módulo de Clientes</h1>
+            <h1>Clientes</h1>
             <p className="orders-admin-subtitle">Consulta y mantenimiento de clientes con datos de contacto y fechas clave.</p>
           </div>
           <div className="header-actions">

@@ -84,6 +84,7 @@ export function InventoryPage({
   canViewProduccion,
   canViewDomicilios,
   canViewInventario,
+  canViewContabilidad,
   canViewClientesPanel,
   canViewUsuariosPanel,
   onGoPipeline,
@@ -91,6 +92,7 @@ export function InventoryPage({
   onGoProduccion,
   onGoDomicilios,
   onGoInventario,
+  onGoContabilidad,
   onGoClientes,
   onGoUsuarios,
   onLogout,
@@ -408,6 +410,7 @@ export function InventoryPage({
               <span className="sidebar-nav-icon">👥</span><span className="sidebar-nav-text">Gestión Usuarios</span>
             </button>
           ) : null}
+          {canViewContabilidad ? <button type="button" className="sidebar-nav-btn" onClick={() => { setSidebarMobileOpen(false); onGoContabilidad(); }}><span className="sidebar-nav-icon">📊</span><span className="sidebar-nav-text">Contabilidad</span></button> : null}
         </nav>
 
         <button type="button" className="btn-outline sidebar-logout-btn" onClick={onLogout} title="Cerrar sesión">
@@ -425,7 +428,7 @@ export function InventoryPage({
         <header className="orders-admin-header">
           <div>
             <button type="button" className="sidebar-trigger" onClick={toggleSidebar}>☰ Menú</button>
-            <h1>Módulo de Inventario</h1>
+            <h1>Inventario</h1>
             <p className="orders-admin-subtitle">Control de flores e insumos con estados inteligentes y trazabilidad por movimientos.</p>
           </div>
           <div className="header-actions">

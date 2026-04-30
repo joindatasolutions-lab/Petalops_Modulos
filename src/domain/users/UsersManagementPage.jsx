@@ -7,6 +7,7 @@ const MODULE_HELP = {
   pedidos: "Permite gestionar pedidos, aprobaciones y consulta operativa.",
   produccion: "Permite planificar y ejecutar la produccion de arreglos.",
   domicilios: "Permite asignar, enrutar y cerrar entregas con evidencia.",
+  contabilidad: "Permite revisar resumen de ventas y cierre operativo de caja.",
   catalogo: "Permite consultar productos y referencias comerciales.",
   usuarios: "Permite acceso al panel de gestion de usuarios.",
 };
@@ -20,9 +21,9 @@ const ROLE_TYPE_LABELS = [
 ];
 
 const ROLE_MODULE_DEFAULTS = {
-  admin: ["pedidos", "produccion", "domicilios", "catalogo", "usuarios", "inventario"],
+  admin: ["pedidos", "produccion", "domicilios", "catalogo", "usuarios", "inventario", "contabilidad"],
   florista: ["produccion", "catalogo"],
-  pedidos: ["pedidos", "catalogo"],
+  pedidos: ["pedidos", "catalogo", "contabilidad"],
   domiciliario: ["domicilios"],
   inventarista: ["catalogo", "inventario"],
   operativo: ["pedidos", "produccion", "inventario"],
@@ -48,12 +49,14 @@ export function UsersManagementPage({
   canViewProduccion,
   canViewDomicilios,
   canViewInventario,
+  canViewContabilidad,
   canViewClientesPanel,
   onGoPipeline,
   onGoPedidos,
   onGoProduccion,
   onGoDomicilios,
   onGoInventario,
+  onGoContabilidad,
   onGoClientes,
   onGoUsuarios,
   onLogout,
@@ -678,6 +681,7 @@ export function UsersManagementPage({
           {canViewInventario ? <button type="button" className="sidebar-nav-btn" onClick={() => { setSidebarMobileOpen(false); onGoInventario(); }}><span className="sidebar-nav-icon">📦</span><span className="sidebar-nav-text">Inventario</span></button> : null}
           {canViewClientesPanel ? <button type="button" className="sidebar-nav-btn" onClick={() => { setSidebarMobileOpen(false); onGoClientes(); }}><span className="sidebar-nav-icon">💐</span><span className="sidebar-nav-text">Clientes</span></button> : null}
           <button type="button" className="sidebar-nav-btn is-active" onClick={() => { setSidebarMobileOpen(false); onGoUsuarios(); }}><span className="sidebar-nav-icon">👥</span><span className="sidebar-nav-text">Gestión Usuarios</span></button>
+          {canViewContabilidad ? <button type="button" className="sidebar-nav-btn" onClick={() => { setSidebarMobileOpen(false); onGoContabilidad(); }}><span className="sidebar-nav-icon">📊</span><span className="sidebar-nav-text">Contabilidad</span></button> : null}
         </nav>
 
         <button type="button" className="btn-outline sidebar-logout-btn" onClick={onLogout} title="Cerrar sesión">
@@ -695,7 +699,7 @@ export function UsersManagementPage({
         <header className="orders-admin-header">
           <div>
             <button type="button" className="sidebar-trigger" onClick={toggleSidebar}>☰ Menú</button>
-            <h1>Módulo de Usuarios</h1>
+            <h1>Usuarios</h1>
             <p className="orders-admin-subtitle">
               {canViewUsuariosGlobal
                 ? "Control global de administradores, usuarios operativos, domiciliarios y floristas."

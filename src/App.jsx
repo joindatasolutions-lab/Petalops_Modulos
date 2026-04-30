@@ -2,6 +2,7 @@ import { OrdersAdminPage } from "./domain/orders-admin/OrdersAdminPage.jsx";
 import { ProductionPage } from "./domain/production/ProductionPage.jsx";
 import { DeliveryPage } from "./domain/delivery/DeliveryPage.jsx";
 import { InventoryPage } from "./domain/inventory/InventoryPage.jsx";
+import { AccountingPage } from "./domain/accounting/AccountingPage.jsx";
 import { ClientsPage } from "./domain/clients/ClientsPage.jsx";
 import { UsersManagementPage } from "./domain/users/UsersManagementPage.jsx";
 import { PipelineOperativo } from "./domain/pipeline/PipelineOperativo.jsx";
@@ -39,6 +40,7 @@ function resolveDefaultView(session) {
   if (hasModuleAccess(session, "produccion")) return "produccion";
   if (hasModuleAccess(session, "domicilios")) return "domicilios";
   if (hasModuleAccess(session, "inventario")) return "inventario";
+  if (hasModuleAccess(session, "contabilidad")) return "contabilidad";
   if (hasModuleAccess(session, "pedidos")) return "clientes";
   if (session?.esGlobalJoin || isEmpresaAdminRole(session)) return "usuarios";
   return "pedidos";
@@ -77,6 +79,7 @@ export default function App() {
   const canDomicilios = hasModuleAccess(session, "domicilios");
   const canInventario = hasModuleAccess(session, "inventario");
   const canClientes = hasModuleAccess(session, "pedidos");
+  const canContabilidad = hasModuleAccess(session, "contabilidad");
   const canPipeline = canAccessPipeline(session);
   const canUsuariosGlobal = Boolean(session?.esGlobalJoin);
   const canUsuariosPanel = Boolean(canUsuariosGlobal || isEmpresaAdminRole(session));
@@ -125,6 +128,19 @@ export default function App() {
         setView("usuarios");
       }
     }
+    if (view === "contabilidad" && !canContabilidad) {
+      if (canPedidos) {
+        setView("pedidos");
+      } else if (canProduccion) {
+        setView("produccion");
+      } else if (canDomicilios) {
+        setView("domicilios");
+      } else if (canInventario) {
+        setView("inventario");
+      } else if (canUsuariosPanel) {
+        setView("usuarios");
+      }
+    }
     if (view === "clientes" && !canClientes) {
       if (canPedidos) {
         setView("pedidos");
@@ -147,7 +163,7 @@ export default function App() {
         setView("domicilios");
       }
     }
-  }, [session, view, canPipeline, canPedidos, canProduccion, canDomicilios, canInventario, canClientes, canUsuariosPanel]);
+  }, [session, view, canPipeline, canPedidos, canProduccion, canDomicilios, canInventario, canContabilidad, canClientes, canUsuariosPanel]);
 
   const handleLogin = async ({ login, password }) => {
     setAuthError("");
@@ -183,7 +199,7 @@ export default function App() {
     return <LoginPage onSubmit={handleLogin} loading={authLoading} error={authError} />;
   }
 
-  if (!canPedidos && !canProduccion && !canDomicilios && !canInventario && !canClientes && !canUsuariosPanel) {
+  if (!canPedidos && !canProduccion && !canDomicilios && !canInventario && !canContabilidad && !canClientes && !canUsuariosPanel) {
     return (
       <main className="auth-view">
         <section className="auth-card">
@@ -204,6 +220,7 @@ export default function App() {
         canViewProduccion={canProduccion}
         canViewDomicilios={canDomicilios}
         canViewInventario={canInventario}
+        canViewContabilidad={canContabilidad}
         canViewClientesPanel={canClientes}
         canViewUsuariosPanel={canUsuariosPanel}
         onLogout={handleLogout}
@@ -212,6 +229,7 @@ export default function App() {
         onGoProduccion={() => canProduccion && setView("produccion")}
         onGoDomicilios={() => canDomicilios && setView("domicilios")}
         onGoInventario={() => canInventario && setView("inventario")}
+        onGoContabilidad={() => canContabilidad && setView("contabilidad")}
         onGoClientes={() => canClientes && setView("clientes")}
         onGoUsuarios={() => canUsuariosPanel && setView("usuarios")}
       />
@@ -225,6 +243,7 @@ export default function App() {
         canViewProduccion={canProduccion}
         canViewDomicilios={canDomicilios}
         canViewInventario={canInventario}
+        canViewContabilidad={canContabilidad}
         canViewClientesPanel={canClientes}
         canViewUsuariosPanel={canUsuariosPanel}
         onLogout={handleLogout}
@@ -233,6 +252,7 @@ export default function App() {
         onGoProduccion={() => canProduccion && setView("produccion")}
         onGoDomicilios={() => canDomicilios && setView("domicilios")}
         onGoInventario={() => canInventario && setView("inventario")}
+        onGoContabilidad={() => canContabilidad && setView("contabilidad")}
         onGoClientes={() => canClientes && setView("clientes")}
         onGoUsuarios={() => canUsuariosPanel && setView("usuarios")}
       />
@@ -246,6 +266,7 @@ export default function App() {
         canViewProduccion={canProduccion}
         canViewDomicilios={canDomicilios}
         canViewInventario={canInventario}
+        canViewContabilidad={canContabilidad}
         canViewClientesPanel={canClientes}
         canViewUsuariosPanel={canUsuariosPanel}
         onLogout={handleLogout}
@@ -254,6 +275,7 @@ export default function App() {
         onGoProduccion={() => canProduccion && setView("produccion")}
         onGoDomicilios={() => canDomicilios && setView("domicilios")}
         onGoInventario={() => canInventario && setView("inventario")}
+        onGoContabilidad={() => canContabilidad && setView("contabilidad")}
         onGoClientes={() => canClientes && setView("clientes")}
         onGoUsuarios={() => canUsuariosPanel && setView("usuarios")}
       />
@@ -267,6 +289,7 @@ export default function App() {
           canViewProduccion={canProduccion}
           canViewDomicilios={canDomicilios}
           canViewInventario={canInventario}
+          canViewContabilidad={canContabilidad}
           canViewClientesPanel={canClientes}
           canViewUsuariosPanel={canUsuariosPanel}
           onLogout={handleLogout}
@@ -275,6 +298,7 @@ export default function App() {
           onGoProduccion={() => canProduccion && setView("produccion")}
           onGoDomicilios={() => canDomicilios && setView("domicilios")}
           onGoInventario={() => canInventario && setView("inventario")}
+          onGoContabilidad={() => canContabilidad && setView("contabilidad")}
           onGoClientes={() => canClientes && setView("clientes")}
           onGoUsuarios={() => canUsuariosPanel && setView("usuarios")}
         />
@@ -288,6 +312,7 @@ export default function App() {
             canViewProduccion={canProduccion}
             canViewDomicilios={canDomicilios}
             canViewInventario={canInventario}
+            canViewContabilidad={canContabilidad}
             canViewClientesPanel={canClientes}
             canViewUsuariosPanel={canUsuariosPanel}
             onGoPipeline={() => canPipeline && setView("pipeline")}
@@ -295,6 +320,30 @@ export default function App() {
             onGoProduccion={() => canProduccion && setView("produccion")}
             onGoDomicilios={() => canDomicilios && setView("domicilios")}
             onGoInventario={() => canInventario && setView("inventario")}
+            onGoContabilidad={() => canContabilidad && setView("contabilidad")}
+            onGoClientes={() => canClientes && setView("clientes")}
+            onGoUsuarios={() => canUsuariosPanel && setView("usuarios")}
+            onLogout={handleLogout}
+          />
+          )
+        : view === "contabilidad"
+          ? (
+          <AccountingPage
+            session={session}
+            canViewPipeline={canPipeline}
+            canViewPedidos={canPedidos}
+            canViewProduccion={canProduccion}
+            canViewDomicilios={canDomicilios}
+            canViewInventario={canInventario}
+            canViewContabilidad={canContabilidad}
+            canViewClientesPanel={canClientes}
+            canViewUsuariosPanel={canUsuariosPanel}
+            onGoPipeline={() => canPipeline && setView("pipeline")}
+            onGoPedidos={() => canPedidos && setView("pedidos")}
+            onGoProduccion={() => canProduccion && setView("produccion")}
+            onGoDomicilios={() => canDomicilios && setView("domicilios")}
+            onGoInventario={() => canInventario && setView("inventario")}
+            onGoContabilidad={() => canContabilidad && setView("contabilidad")}
             onGoClientes={() => canClientes && setView("clientes")}
             onGoUsuarios={() => canUsuariosPanel && setView("usuarios")}
             onLogout={handleLogout}
@@ -309,6 +358,7 @@ export default function App() {
             canViewProduccion={canProduccion}
             canViewDomicilios={canDomicilios}
             canViewInventario={canInventario}
+            canViewContabilidad={canContabilidad}
             canViewClientesPanel={canClientes}
             canViewUsuariosPanel={canUsuariosPanel}
             onGoPipeline={() => canPipeline && setView("pipeline")}
@@ -316,6 +366,7 @@ export default function App() {
             onGoProduccion={() => canProduccion && setView("produccion")}
             onGoDomicilios={() => canDomicilios && setView("domicilios")}
             onGoInventario={() => canInventario && setView("inventario")}
+            onGoContabilidad={() => canContabilidad && setView("contabilidad")}
             onGoClientes={() => canClientes && setView("clientes")}
             onGoUsuarios={() => canUsuariosPanel && setView("usuarios")}
             onLogout={handleLogout}
@@ -329,6 +380,7 @@ export default function App() {
             canViewProduccion={canProduccion}
             canViewDomicilios={canDomicilios}
             canViewInventario={canInventario}
+            canViewContabilidad={canContabilidad}
             canViewClientesPanel={canClientes}
             canViewUsuariosGlobal={canUsuariosGlobal}
             onGoPipeline={() => canPipeline && setView("pipeline")}
@@ -336,6 +388,7 @@ export default function App() {
             onGoProduccion={() => canProduccion && setView("produccion")}
             onGoDomicilios={() => canDomicilios && setView("domicilios")}
             onGoInventario={() => canInventario && setView("inventario")}
+            onGoContabilidad={() => canContabilidad && setView("contabilidad")}
             onGoClientes={() => canClientes && setView("clientes")}
             onGoUsuarios={() => canUsuariosPanel && setView("usuarios")}
             onLogout={handleLogout}

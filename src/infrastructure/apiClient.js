@@ -468,6 +468,7 @@ export function createApiClient(config) {
       pedidoId,
       productoID,
       productoObservaciones,
+      productoPrecio,
       fechaEntrega,
       horaEntrega,
       clienteTipoIdent,
@@ -476,10 +477,14 @@ export function createApiClient(config) {
       telefonoDestino,
       direccion,
       barrioNombre,
+      latitudDestino,
+      longitudDestino,
       firma,
       mensajeTarjeta,
       observacionGeneral,
       metodosPago,
+      detallePago,
+      montoEfectivo,
       canalFlora,
     }) {
       return requestJson(`/pedido/${pedidoId}/detalle`, {
@@ -490,6 +495,7 @@ export function createApiClient(config) {
         body: JSON.stringify({
           productoID: productoID != null ? Number(productoID) : null,
           productoObservaciones: productoObservaciones ?? null,
+          productoPrecio: productoPrecio != null ? Number(productoPrecio) : null,
           fechaEntrega: fechaEntrega || null,
           horaEntrega: horaEntrega || null,
           clienteTipoIdent: clienteTipoIdent ?? null,
@@ -498,10 +504,14 @@ export function createApiClient(config) {
           telefonoDestino: telefonoDestino ?? null,
           direccion: direccion ?? null,
           barrioNombre: barrioNombre ?? null,
+          latitudDestino: latitudDestino != null ? Number(latitudDestino) : null,
+          longitudDestino: longitudDestino != null ? Number(longitudDestino) : null,
           firma: firma ?? null,
           mensajeTarjeta: mensajeTarjeta ?? null,
           observacionGeneral: observacionGeneral ?? null,
           metodosPago: Array.isArray(metodosPago) ? metodosPago : null,
+          detallePago: Array.isArray(detallePago) ? detallePago : null,
+          montoEfectivo: montoEfectivo != null ? Number(montoEfectivo) : null,
           canalFlora: canalFlora ?? null,
         })
       });
@@ -701,6 +711,34 @@ export function createApiClient(config) {
       return requestJson(`/domicilios/mis-entregas?${params.toString()}`);
     },
 
+    async listarMisPedidos({ empresaId, sucursalId, fecha }) {
+      const params = new URLSearchParams();
+      params.set("empresaID", String(empresaId));
+      if (sucursalId != null) params.set("sucursalID", String(sucursalId));
+      if (fecha) params.set("fecha", String(fecha));
+      return requestJson(`/domicilios/mis-pedidos?${params.toString()}`);
+    },
+
+    async listarPedidosDisponibles({ empresaId, sucursalId, fecha, latitud, longitud }) {
+      const params = new URLSearchParams();
+      params.set("empresaID", String(empresaId));
+      if (sucursalId != null) params.set("sucursalID", String(sucursalId));
+      if (fecha) params.set("fecha", String(fecha));
+      if (latitud != null) params.set("latitud", String(latitud));
+      if (longitud != null) params.set("longitud", String(longitud));
+      return requestJson(`/domicilios/pedidos-disponibles?${params.toString()}`);
+    },
+
+    async tomarEntrega({ entregaId, usuarioCambio }) {
+      return requestJson(`/domicilios/${entregaId}/tomar`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ usuarioCambio })
+      });
+    },
+
     async asignarDomiciliarioEntrega({ entregaId, domiciliarioID, usuarioCambio }) {
       return requestJson(`/domicilios/${entregaId}/asignar`, {
         method: "PUT",
@@ -729,27 +767,35 @@ export function createApiClient(config) {
       usuarioCambio,
       firmaNombre,
       firmaDocumento,
+      firmaImagenFile,
       firmaImagenUrl,
+      evidenciaFotoFile,
       evidenciaFotoUrl,
       latitudEntrega,
       longitudEntrega,
       observaciones,
     }) {
+      const form = new FormData();
+      form.append("usuarioCambio", usuarioCambio);
+      form.append("firmaNombre", firmaNombre);
+      form.append("firmaDocumento", firmaDocumento);
+      if (firmaImagenFile) {
+        form.append("firmaImagen", firmaImagenFile);
+      } else if (firmaImagenUrl) {
+        form.append("firmaImagenUrl", firmaImagenUrl);
+      }
+      if (evidenciaFotoFile) {
+        form.append("evidenciaFoto", evidenciaFotoFile);
+      } else if (evidenciaFotoUrl) {
+        form.append("evidenciaFotoUrl", evidenciaFotoUrl);
+      }
+      form.append("latitudEntrega", String(latitudEntrega));
+      form.append("longitudEntrega", String(longitudEntrega));
+      form.append("observaciones", observaciones || "");
+
       return requestJson(`/domicilios/${entregaId}/entregado`, {
         method: "PUT",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          usuarioCambio,
-          firmaNombre,
-          firmaDocumento,
-          firmaImagenUrl,
-          evidenciaFotoUrl: evidenciaFotoUrl || null,
-          latitudEntrega,
-          longitudEntrega,
-          observaciones: observaciones || null,
-        })
+        body: form,
       });
     },
 

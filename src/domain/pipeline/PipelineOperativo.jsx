@@ -43,6 +43,7 @@ export function PipelineOperativo({
   canViewProduccion,
   canViewDomicilios,
   canViewInventario,
+  canViewContabilidad,
   canViewClientesPanel,
   canViewUsuariosPanel,
   onGoPipeline,
@@ -50,6 +51,7 @@ export function PipelineOperativo({
   onGoProduccion,
   onGoDomicilios,
   onGoInventario,
+  onGoContabilidad,
   onGoClientes,
   onGoUsuarios,
   onLogout
@@ -200,6 +202,7 @@ export function PipelineOperativo({
           {canViewInventario ? <button type="button" className="sidebar-nav-btn" onClick={() => { setSidebarMobileOpen(false); onGoInventario(); }}><span className="sidebar-nav-icon">📦</span><span className="sidebar-nav-text">Inventario</span></button> : null}
           {canViewClientesPanel ? <button type="button" className="sidebar-nav-btn" onClick={() => { setSidebarMobileOpen(false); onGoClientes(); }}><span className="sidebar-nav-icon">💐</span><span className="sidebar-nav-text">Clientes</span></button> : null}
           {canViewUsuariosPanel ? <button type="button" className="sidebar-nav-btn" onClick={() => { setSidebarMobileOpen(false); onGoUsuarios(); }}><span className="sidebar-nav-icon">👥</span><span className="sidebar-nav-text">Usuarios</span></button> : null}
+          {canViewContabilidad ? <button type="button" className="sidebar-nav-btn" onClick={() => { setSidebarMobileOpen(false); onGoContabilidad(); }}><span className="sidebar-nav-icon">📊</span><span className="sidebar-nav-text">Contabilidad</span></button> : null}
         </nav>
         <button type="button" className="btn-outline sidebar-logout-btn" onClick={onLogout} title="Cerrar sesión">
           <span className="sidebar-logout-icon" aria-hidden="true">⏻</span>
@@ -211,12 +214,10 @@ export function PipelineOperativo({
       <button type="button" className="sidebar-overlay" aria-label="Cerrar menú" onClick={() => setSidebarMobileOpen(false)} />
 
       <main className="pipeline-view">
-        <header className="pipeline-header orders-admin-header">
-          <div className="pipeline-header-top">
-            <button type="button" className="sidebar-trigger" onClick={toggleSidebar} title="Abrir o cerrar menú">☰ Menú</button>
-          </div>
+        <header className="orders-admin-header">
           <div>
-            <h1>Módulo de Pipeline</h1>
+            <button type="button" className="sidebar-trigger" onClick={toggleSidebar} title="Abrir o cerrar menú">☰ Menú</button>
+            <h1>Pipeline</h1>
             <p className="orders-admin-subtitle">Centro de control de pedidos, producción y entrega</p>
           </div>
         </header>

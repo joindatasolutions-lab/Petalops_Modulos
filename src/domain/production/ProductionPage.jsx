@@ -28,6 +28,55 @@ function todayIsoDate() {
   return new Date().toISOString().slice(0, 10);
 }
 
+function normalizeSearchText(value) {
+  return String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .toLowerCase();
+}
+
+function toIsoDate(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw;
+  const parsed = new Date(raw);
+  if (Number.isNaN(parsed.getTime())) return "";
+  return parsed.toISOString().slice(0, 10);
+}
+
+function resolveProgrammedDate(item) {
+  return toIsoDate(item?.fechaProgramadaProduccion || item?.fechaEntrega);
+}
+
+function hasAssignedFlorista(item) {
+  if (item?.floristaID != null && item?.floristaID !== "") return true;
+  return String(item?.floristaAsignado || "").trim().length > 0;
+}
+
+function inferCurrentFloristaId(session, floristaItems) {
+  const sessionUserId = Number(session?.userID || session?.usuarioID || session?.idUsuario || 0);
+  const sessionLogin = normalizeSearchText(session?.login);
+  const sessionEmail = normalizeSearchText(session?.email);
+  const sessionName = normalizeSearchText(session?.nombre);
+
+  const found = floristaItems.find(item => {
+    const candidateUserId = Number(item?.usuarioID || item?.userID || item?.idUsuario || 0);
+    if (sessionUserId > 0 && candidateUserId > 0 && candidateUserId === sessionUserId) return true;
+
+    const candidateLogin = normalizeSearchText(item?.login || item?.usuario);
+    if (sessionLogin && candidateLogin && candidateLogin === sessionLogin) return true;
+
+    const candidateEmail = normalizeSearchText(item?.email);
+    if (sessionEmail && candidateEmail && candidateEmail === sessionEmail) return true;
+
+    const candidateName = normalizeSearchText(item?.nombre || item?.nombreFlorista || item?.nombre_empleado);
+    return sessionName && candidateName && candidateName === sessionName;
+  });
+
+  return found?.idFlorista != null ? Number(found.idFlorista) : null;
+}
+
 function statusBadgeClass(status) {
   const key = normalizeStatus(status).replace(/_/g, "");
   return BADGE_CLASS_BY_STATUS[key] || "is-pendiente";
@@ -59,7 +108,7 @@ function isFloristaActivo(item) {
   return String(item?.estado || "").trim().toLowerCase() === "activo" && Boolean(item?.activo);
 }
 
-export function ProductionPage({ session, canViewPipeline, canViewPedidos, canViewProduccion, canViewDomicilios, canViewInventario, canViewClientesPanel, canViewUsuariosPanel, onLogout, onGoPipeline, onGoPedidos, onGoProduccion, onGoDomicilios, onGoInventario, onGoClientes, onGoUsuarios }) {
+export function ProductionPage({ session, canViewPipeline, canViewPedidos, canViewProduccion, canViewDomicilios, canViewInventario, canViewContabilidad, canViewClientesPanel, canViewUsuariosPanel, onLogout, onGoPipeline, onGoPedidos, onGoProduccion, onGoDomicilios, onGoInventario, onGoContabilidad, onGoClientes, onGoUsuarios }) {
   const api = useMemo(() => createApiClient(tenantConfig), []);
   const empresaId = Number(session?.empresaID || tenantConfig.empresaId);
   const sucursalId = Number(session?.sucursalID || tenantConfig.sucursalId);
@@ -98,6 +147,8 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
   const [metricasHasta, setMetricasHasta] = useState(todayIsoDate());
   const [historial, setHistorial] = useState([]);
   const [submenu, setSubmenu] = useState("pedidos");
+  const [busquedaGeneral, setBusquedaGeneral] = useState("");
+  const [soloMisAsignados, setSoloMisAsignados] = useState(!canManageProductionActions);
 
   const [sidebarPinned, setSidebarPinned] = useState(false);
   const [sidebarMobileOpen, setSidebarMobileOpen] = useState(false);
@@ -106,6 +157,39 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
     if (!floristaGestionID) return null;
     return floristasDisponibilidad.find(item => Number(item.idFlorista) === Number(floristaGestionID)) || null;
   }, [floristaGestionID, floristasDisponibilidad]);
+
+  const allFloristas = useMemo(() => {
+    const byId = new Map();
+    [...floristasDisponibilidad, ...floristas].forEach(item => {
+      const floristaId = item?.idFlorista;
+      if (floristaId == null || floristaId === "") return;
+      byId.set(Number(floristaId), item);
+    });
+    return Array.from(byId.values()).sort((left, right) =>
+      String(left?.nombre || "").localeCompare(String(right?.nombre || ""), "es", { sensitivity: "base" })
+    );
+  }, [floristas, floristasDisponibilidad]);
+
+  const currentFloristaId = useMemo(
+    () => inferCurrentFloristaId(session, allFloristas),
+    [session, allFloristas]
+  );
+
+  const visibleItems = useMemo(() => {
+    const search = normalizeSearchText(busquedaGeneral);
+    return items.filter(item => {
+      if (soloMisAsignados && currentFloristaId != null && Number(item?.floristaID) !== Number(currentFloristaId)) {
+        return false;
+      }
+      if (search) {
+        const matchesFlorista = normalizeSearchText(item?.floristaAsignado).includes(search);
+        const matchesCliente = normalizeSearchText(item?.cliente).includes(search);
+        const matchesPedido = normalizeSearchText(item?.numeroPedido).includes(search);
+        if (!matchesFlorista && !matchesCliente && !matchesPedido) return false;
+      }
+      return true;
+    });
+  }, [items, currentFloristaId, busquedaGeneral, soloMisAsignados]);
 
   const toggleEstadoFiltro = useCallback((estadoItem) => {
     setEstadosFiltro(current => {
@@ -219,6 +303,15 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
     setSubmenu("pedidos");
   }, [submenu, visibleSubmenuOptions]);
 
+  useEffect(() => {
+    if (canManageProductionActions) return;
+    if (!currentFloristaId) {
+      setSoloMisAsignados(false);
+      return;
+    }
+    setSoloMisAsignados(true);
+  }, [canManageProductionActions, currentFloristaId]);
+
   const toggleSidebar = () => {
     const isMobile = globalThis.matchMedia("(max-width: 980px)").matches;
     if (isMobile) {
@@ -234,15 +327,46 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
     await loadInsights();
   };
 
+  const onChangeSoloMisAsignados = checked => {
+    setSoloMisAsignados(checked);
+  };
+
+  const autoAsignarPedidosDeHoy = useCallback(async (sourceItems) => {
+    const today = todayIsoDate();
+    const candidates = sourceItems.filter(item =>
+      resolveProgrammedDate(item) === today && !hasAssignedFlorista(item)
+    );
+
+    if (candidates.length === 0) {
+      return { encontrados: 0, asignados: 0 };
+    }
+
+    const results = await Promise.allSettled(candidates.map(item => api.asignarProduccion({
+      produccionId: item.idProduccion,
+      floristaId: null,
+      fechaProgramadaProduccion: item.fechaProgramadaProduccion || item.fechaEntrega || null
+    })));
+
+    return {
+      encontrados: candidates.length,
+      asignados: results.filter(item => item.status === "fulfilled").length
+    };
+  }, [api]);
+
   const generarDesdePedidos = async () => {
     try {
       await api.generarProduccionDesdePedidos({
         empresaId,
         sucursalId,
         diasAnticipacion: 1,
-        autoAsignar: true
+        autoAsignar: false
       });
+      const nextItems = await loadData();
+      const autoAsignacion = await autoAsignarPedidosDeHoy(nextItems);
       await refreshAll();
+      if (autoAsignacion.encontrados > 0) {
+        globalThis.alert(`Producción sincronizada. Se autoasignaron ${autoAsignacion.asignados} de ${autoAsignacion.encontrados} arreglos programados para hoy. Los pedidos de otras fechas quedaron sin florista para asignación manual.`);
+      }
     } catch (nextError) {
       console.error("Error generando producción desde pedidos:", nextError);
       globalThis.alert("No fue posible generar producción desde pedidos aprobados/pagados.");
@@ -529,7 +653,20 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
               }}
             >
               <span className="sidebar-nav-icon">📦</span>
-              <span className="sidebar-nav-text">Inventario</span>
+                <span className="sidebar-nav-text">Inventario</span>
+              </button>
+            ) : null}
+          {canViewContabilidad ? (
+            <button
+              type="button"
+              className="sidebar-nav-btn"
+              onClick={() => {
+                setSidebarMobileOpen(false);
+                onGoContabilidad();
+              }}
+            >
+              <span className="sidebar-nav-icon">📊</span>
+              <span className="sidebar-nav-text">Contabilidad</span>
             </button>
           ) : null}
           {canViewClientesPanel ? (
@@ -579,7 +716,7 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
         <header className="orders-admin-header">
           <div>
             <button type="button" className="sidebar-trigger" onClick={toggleSidebar} title="Abrir o cerrar menú">☰ Menú</button>
-            <h1>Módulo de Producción</h1>
+            <h1>Producción</h1>
             <p className="orders-admin-subtitle">
               {canManageProductionActions
                 ? "Asignación inteligente, carga equitativa y control por fecha programada."
@@ -611,7 +748,17 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
 
         {submenu === "pedidos" && (
           <>
-            <section className="orders-filters orders-filters--two-col">
+            <section className="orders-filters orders-filters--four-col">
+              <label className="filter-field">
+                <span>Buscar</span>
+                <input
+                  type="search"
+                  value={busquedaGeneral}
+                  onChange={event => setBusquedaGeneral(event.target.value)}
+                  placeholder="Florista, cliente o pedido"
+                  title="Buscar por florista, cliente o número de pedido"
+                />
+              </label>
               <div className="filter-field">
                 <span>Fecha Inicio</span>
                 <input type="date" value={fecha} onChange={event => setFecha(event.target.value)} title="Filtrar por fecha programada" />
@@ -638,10 +785,24 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
                   </div>
                 </details>
               </label>
+              {currentFloristaId != null ? (
+                <label className="filter-field">
+                  <span>Asignación propia</span>
+                  <div className="filter-checkbox">
+                    <input
+                      type="checkbox"
+                      checked={soloMisAsignados}
+                      onChange={event => onChangeSoloMisAsignados(event.target.checked)}
+                    />
+                    <span>Solo mis pedidos asignados</span>
+                  </div>
+                </label>
+              ) : null}
             </section>
 
             {error && <p className="orders-message">{error}</p>}
             {loading && <p className="orders-message">Cargando producción...</p>}
+            {!loading && !error && visibleItems.length === 0 ? <p className="orders-message">No hay arreglos que coincidan con los filtros seleccionados.</p> : null}
 
             <section className="orders-table-wrap production-table-wrap">
               <table className="orders-table production-orders-table">
@@ -663,7 +824,7 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
                   </tr>
                 </thead>
                 <tbody>
-                  {items.map(item => (
+                  {visibleItems.map(item => (
                     <tr key={item.idProduccion}>
                       <td>
                         {canManageProductionActions ? (
@@ -722,7 +883,7 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
             </section>
 
             <section className="production-capsules" aria-label="Pedidos en cápsulas">
-              {items.map(item => (
+              {visibleItems.map(item => (
                 <article key={`cap-${item.idProduccion}`} className="production-capsule">
                   <header className="production-capsule-head">
                     <strong>{item.numeroPedido ?? "-"}</strong>

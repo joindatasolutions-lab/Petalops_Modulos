@@ -19,11 +19,13 @@ empresa
         ├── producto_sucursal   → catálogo web con precios por sucursal
         ├── barrio              → zonas de domicilio con costo
         ├── inventario          → stock de insumos por sucursal
-        └── empleado            → personal (floristas, domiciliarios, cajeros)
+        ├── empleado            → personal (floristas, domiciliarios, cajeros)
+        └── caja_apertura_cierre / caja_gasto → operación diaria de caja
 
 pedido (cliente hace pedido en sucursal)
   ├── pedido_detalle (productos del pedido)
   ├── pago (pasarela o manual)
+  ├── pago_metodo (desglose por método con monto)
   ├── produccion (un registro por detalle, asignado a florista)
   └── entrega (uno o más intentos de domicilio)
 ```
@@ -180,7 +182,7 @@ Usuarios con acceso al sistema (panel de administración / operación).
 | id_usuario | integer | NO | PK |
 | empresa_id | bigint | NO | FK → empresa |
 | nombre | varchar(150) | NO | |
-| email | varchar(180) | NO | UNIQUE por empresa |
+| email | varchar(180) | NO | Email de contacto del usuario. Puede repetirse |
 | login | varchar(80) | NO | UNIQUE global |
 | passwordhash | varchar(255) | NO | Bcrypt |
 | rolid | bigint | NO | FK → rol |
@@ -399,11 +401,14 @@ Pedido realizado por un cliente. Núcleo del sistema.
 | motivo_rechazo | varchar(300) | SÍ | Se llena cuando estado = Rechazado |
 | total_bruto | numeric(12,2) | NO | Suma de subtotales sin IVA |
 | total_iva | numeric(12,2) | NO | |
+| costo_domicilio | numeric(12,2) | SÍ | Snapshot del costo de domicilio aplicado al pedido |
 | total_neto | numeric(12,2) | NO | total_bruto + total_iva |
 | created_at | timestamp | NO | |
 | updated_at | timestamp | SÍ | |
 
 **Flujo:** Cliente crea pedido → estado Pendiente → empleado aprueba/rechaza → si aprobado, se crea `produccion` por cada `pedido_detalle` → producción completa → se crea `entrega`.
+
+**Nota contable:** `costo_domicilio` debe congelarse al momento de confirmar la venta para separar históricamente venta floral vs domicilio, sin depender del costo actual del barrio.
 
 **Numeración:** El número secuencial se gestiona con `sucursal_contador_pedido` usando SELECT FOR UPDATE para evitar duplicados en concurrencia.
 
@@ -534,6 +539,8 @@ CatÃ¡logo de canales de venta por empresa. Para Flora corresponde al campo ope
 
 ---
 
+**Extensión 2026-04-30:** `pago_metodo` incorpora la columna `monto numeric(12,2)` como valor asignado a ese método dentro del pago. Es obligatoria para nuevos pagos mixtos porque permite reconstruir cuánto ingresó por efectivo, transferencia, link, etc.
+
 ### pedido_canal_venta
 Canal de venta asociado a un pedido. Un pedido puede tener un Ãºnico canal vigente.
 
@@ -561,6 +568,100 @@ Factura generada para un pedido. Un pedido tiene máximo una factura.
 | total_factura | numeric(14,2) | NO | |
 | created_at | timestamp | NO | |
 | updated_at | timestamp | SÍ | |
+
+---
+
+### caja_apertura_cierre
+Apertura y cierre diario de caja por empresa y sucursal. Guarda la base con la que inicia el día,
+lo que se guarda fuera de caja y la nueva base final. El efectivo de ventas NO se persiste aquí
+porque se calcula desde `pago` + `pago_metodo`.
+
+| columna | tipo | null | descripción |
+|---|---|---|---|
+| id_caja_apertura_cierre | bigint | NO | PK |
+| empresa_id | bigint | NO | FK → empresa |
+| sucursal_id | bigint | NO | FK → sucursal |
+| fecha_operacion | date | NO | Fecha operativa de caja |
+| base_inicial | numeric(14,2) | NO | Efectivo con el que abre la caja |
+| monto_guardado | numeric(14,2) | NO | Dinero retirado de la caja para guardar |
+| nueva_base | numeric(14,2) | NO | Efectivo que queda físicamente en caja al cierre |
+| observacion | text | SÍ | Nota operativa libre |
+| abierto_por_usuario_id | bigint | SÍ | FK → usuario |
+| cerrado_por_usuario_id | bigint | SÍ | FK → usuario |
+| created_at | timestamp | NO | |
+| updated_at | timestamp | SÍ | |
+
+**Regla:** UNIQUE por `(empresa_id, sucursal_id, fecha_operacion)`.
+
+---
+
+### caja_gasto
+Salidas de efectivo de caja. Cada fila representa un gasto puntual asociado a una fecha operativa.
+
+| columna | tipo | null | descripción |
+|---|---|---|---|
+| id_caja_gasto | bigint | NO | PK |
+| empresa_id | bigint | NO | FK → empresa |
+| sucursal_id | bigint | NO | FK → sucursal |
+| fecha_operacion | date | NO | Debe existir en `caja_apertura_cierre` |
+| concepto | varchar(160) | NO | Motivo corto del gasto |
+| monto | numeric(14,2) | NO | Monto del gasto |
+| observacion | text | SÍ | Descripción libre |
+| usuario_id | bigint | SÍ | FK → usuario |
+| created_at | timestamp | NO | |
+| updated_at | timestamp | SÍ | |
+
+**Regla:** Todo gasto de caja pertenece a una fecha operativa existente de esa misma empresa y sucursal.
+
+---
+
+### vw_contabilidad_venta_pedido
+Vista base de contabilidad por pedido. Expone venta total, porción floral, porción de domicilio y
+efectivo asociado, reutilizando `pedido`, `pago` y `pago_metodo`.
+
+| columna | descripción |
+|---|---|
+| empresa_id / sucursal_id | Contexto tenant y sucursal |
+| id_pedido / numero_pedido | Identificación del pedido |
+| fecha_operacion | Fecha contable basada en `pedido.fecha_pedido` |
+| total_bruto / total_iva | Totales del pedido |
+| total_domicilios | Sale de `pedido.costo_domicilio` |
+| total_arreglos | `pedido.total_neto - costo_domicilio` |
+| total_venta | `pedido.total_neto` |
+| total_efectivo | Suma de montos en `pago_metodo` cuyo método es efectivo |
+| estado_pago_codigo / estado_pago_nombre | Estado del pago, si existe |
+
+---
+
+### vw_contabilidad_resumen_ventas_diario
+Agregado diario por empresa y sucursal construido a partir de `vw_contabilidad_venta_pedido`.
+
+| columna | descripción |
+|---|---|
+| empresa_id | Empresa dueña del dato |
+| sucursal_id | Sucursal del pedido |
+| fecha_operacion | Día del resumen |
+| cantidad_pedidos | Número de pedidos del día |
+| total_arreglos_florales | Suma diaria de arreglos |
+| total_domicilios | Suma diaria de domicilios |
+| total_venta | Venta total diaria |
+| total_efectivo_ventas | Efectivo diario calculado desde pagos |
+
+---
+
+### vw_caja_totales_diario
+Vista diaria de caja. Cruza `caja_apertura_cierre`, `caja_gasto` y `vw_contabilidad_resumen_ventas_diario`.
+
+**Fórmula:** `total_efectivo = base_inicial + efectivo_ventas - total_gastos`.
+
+| columna | descripción |
+|---|---|
+| base_inicial | Efectivo con el que abre caja |
+| efectivo_ventas | Efectivo recibido ese día según pagos |
+| total_gastos | Suma de gastos de caja |
+| total_efectivo | Resultado calculado de la fórmula |
+| monto_guardado | Dinero retirado para guardar |
+| nueva_base | Dinero que queda en caja |
 
 ---
 
@@ -693,6 +794,8 @@ Intento de entrega de un pedido. Un pedido puede tener múltiples intentos (una 
 | firmadocumento | varchar(50) | SÍ | Documento de quien firmó |
 | firmaimagenurl | text | SÍ | URL de la imagen de la firma |
 | evidenciafotourl | text | SÍ | URL de foto como evidencia de entrega |
+| latituddestino | numeric(10,7) | SÍ | Coordenada snapshot del destino usada para cálculo de distancia |
+| longituddestino | numeric(10,7) | SÍ | Coordenada snapshot del destino usada para cálculo de distancia |
 | latitudentrega | numeric(10,7) | SÍ | GPS donde se realizó la entrega |
 | longitudentrega | numeric(10,7) | SÍ | |
 | motivonoentregado | text | SÍ | Razón si no se pudo entregar |
@@ -702,7 +805,7 @@ Intento de entrega de un pedido. Un pedido puede tener múltiples intentos (una 
 | createdat | timestamp | NO | |
 | updatedat | timestamp | SÍ | |
 
-**Regla:** Para saber el estado actual de entrega de un pedido, tomar la fila con mayor `intentonumero`. El campo `barrionombre` es un snapshot intencional — preserva el barrio exacto al momento de la entrega aunque el nombre cambie luego.
+**Regla:** Para saber el estado actual de entrega de un pedido, tomar la fila con mayor `intentonumero`. Los campos `barrionombre`, `latituddestino` y `longituddestino` son snapshots intencionales — preservan el destino operativo de ese intento aunque la dirección original cambie luego.
 
 ---
 
