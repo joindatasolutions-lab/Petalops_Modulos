@@ -18,7 +18,7 @@ export function PedidoCard({ item, onOpen, onDragStart }) {
       style={{ borderLeftColor: item.color_estado }}
     >
       <header className="pipeline-card-head">
-        <strong>#{item.numero_pedido}</strong>
+        <strong>#{item.numero_pedido || 'Pendiente'}</strong>
         <span className={`pipeline-priority ${priorityClass}`}>{item.prioridad || "MEDIA"}</span>
       </header>
 
@@ -52,7 +52,7 @@ export function PedidoCard({ item, onOpen, onDragStart }) {
       </div>
 
       {item.imagen_url ? (
-        <img className="pipeline-card-img" src={item.imagen_url} alt={`Pedido ${item.numero_pedido}`} />
+        <img className="pipeline-card-img" src={item.imagen_url} alt={`Pedido ${item.numero_pedido || 'Pendiente'}`} />
       ) : null}
     </article>
   );

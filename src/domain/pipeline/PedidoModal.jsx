@@ -126,7 +126,7 @@ export function PedidoModal({ item, detail, onClose, api, empresaId, sucursalId,
     <div className="pipeline-modal-overlay" onClick={onClose}>
       <section className="pipeline-modal" onClick={event => event.stopPropagation()}>
         <header className="pipeline-modal-head">
-          <h3>Pedido #{item.numero_pedido}</h3>
+          <h3>Pedido #{item.numero_pedido || 'Pendiente'}</h3>
           <div className="pipeline-modal-actions">
             <button type="button" className="btn-outline" onClick={toggleEdit} disabled={saving}>
               {isEditing ? "Cancelar edición" : "Editar"}

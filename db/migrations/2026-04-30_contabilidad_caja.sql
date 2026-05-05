@@ -204,4 +204,14 @@ LEFT JOIN (
 COMMENT ON VIEW petalops.vw_caja_totales_diario IS
   'Totales diarios de caja. Formula: base_inicial + efectivo_ventas - total_gastos = total_efectivo; nueva_base es el efectivo que queda tras restar monto_guardado.';
 
+-- Corrección: pedidos en estado CREADO deben tener numero_pedido NULL
+-- ya que solo se asigna al aprobar
+UPDATE petalops.pedido
+SET numero_pedido = NULL
+WHERE estado_pedido_id = (
+  SELECT id_estado_pedido
+  FROM petalops.estado_pedido
+  WHERE LOWER(codigo) = 'creado'
+) AND numero_pedido IS NOT NULL;
+
 COMMIT;

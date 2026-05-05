@@ -467,6 +467,7 @@ export function createApiClient(config) {
     async actualizarDetallePedidoPipeline({
       pedidoId,
       productoID,
+      cantidad,
       productoObservaciones,
       productoPrecio,
       fechaEntrega,
@@ -494,6 +495,7 @@ export function createApiClient(config) {
         },
         body: JSON.stringify({
           productoID: productoID != null ? Number(productoID) : null,
+          cantidad: cantidad != null ? Number(cantidad) : null,
           productoObservaciones: productoObservaciones ?? null,
           productoPrecio: productoPrecio != null ? Number(productoPrecio) : null,
           fechaEntrega: fechaEntrega || null,

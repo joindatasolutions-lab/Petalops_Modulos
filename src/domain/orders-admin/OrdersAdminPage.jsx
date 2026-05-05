@@ -61,6 +61,7 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
   const [detailEditProductoID, setDetailEditProductoID] = useState("");
   const [detailEditNombreArreglo, setDetailEditNombreArreglo] = useState("");
   const [detailEditProductoCodigo, setDetailEditProductoCodigo] = useState("");
+  const [detailEditCantidad, setDetailEditCantidad] = useState(1);
   const [detailEditProductoObservaciones, setDetailEditProductoObservaciones] = useState("");
   const [detailEditPrecio, setDetailEditPrecio] = useState(null);
   const [detailEditFechaEntrega, setDetailEditFechaEntrega] = useState("");
@@ -84,6 +85,7 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
   const [detailEditSaving, setDetailEditSaving] = useState(false);
   const [detailEditError, setDetailEditError] = useState("");
   const [detailEditDropdownOpen, setDetailEditDropdownOpen] = useState(false);
+  const [approvingPedidoIds, setApprovingPedidoIds] = useState([]);
 
   const api = useMemo(() => createApiClient(tenantConfig), []);
   const debouncedQuery = useDebouncedValue(filters.q, 300);
@@ -214,6 +216,7 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
       setDetailEditProductoID("");
       setDetailEditNombreArreglo("");
       setDetailEditProductoCodigo("");
+      setDetailEditCantidad(1);
       setDetailEditProductoObservaciones("");
       setDetailEditPrecio(null);
       setDetailEditFechaEntrega("");
@@ -256,6 +259,7 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
 
     setDetailEditProductoID(productoId != null ? String(productoId) : "");
     setDetailEditProductoCodigo(productoCodigo);
+    setDetailEditCantidad(Number(firstProduct?.cantidad || 1));
     setDetailEditNombreArreglo(productoNombre);
     setDetailEditProductoObservaciones(productoObservaciones);
     setDetailEditPrecio(productoPrecio);
@@ -365,16 +369,23 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
       globalThis.alert(item.motivoBloqueoAprobacion || "Completa la información requerida antes de aprobar.");
       return;
     }
+    if (approvingPedidoIds.includes(Number(pedidoId))) {
+      globalThis.alert("Este pedido ya se está aprobando. Espera un momento.");
+      return;
+    }
 
     const ok = globalThis.confirm("¿Aprobar este pedido?");
     if (!ok) return;
 
+    setApprovingPedidoIds(current => [...current, Number(pedidoId)]);
     try {
       const response = await api.aprobarPedido(pedidoId);
       optimisticStatusPatch(pedidoId, response.estado || "APROBADO");
     } catch (nextError) {
       console.error("Error aprobando pedido:", nextError);
-      globalThis.alert("No fue posible aprobar el pedido.");
+      globalThis.alert(nextError?.detail || nextError?.message || "No fue posible aprobar el pedido.");
+    } finally {
+      setApprovingPedidoIds(current => current.filter(currentId => currentId !== Number(pedidoId)));
     }
   };
 
@@ -534,6 +545,17 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
     return value || null;
   };
 
+  const validateSalesChannel = () => {
+    if (!salesChannelFieldConfig) {
+      return null;
+    }
+    const value = String(detailEditCanalFlora || "").trim();
+    if (!value) {
+      throw new Error(`${salesChannelFieldConfig.titulo || "Celular Flora"} es obligatorio.`);
+    }
+    return value;
+  };
+
   const totalPedido = Number(detalle?.financiero?.total || 0);
 
   const validatePaymentMethods = () => {
@@ -550,12 +572,13 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
       throw new Error("Debes seleccionar al menos un método de pago.");
     }
 
-    const requiresBreakdown = methods.length > 1 || methods.some(method => isCashPaymentMethod(method));
+    const requiresBreakdown = methods.length > 1;
     if (!requiresBreakdown) {
+      const isCash = methods.length === 1 && isCashPaymentMethod(methods[0]);
       return {
         methods,
         paymentBreakdown: null,
-        cashAmount: null,
+        cashAmount: isCash ? totalPedido : null,
       };
     }
 
@@ -615,7 +638,7 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
       sucursalID: Number(detalle?.sucursalID || sucursalId),
       productos: productos.map((item, index) => ({
         productoID: index === 0 && detailEditProductoID ? Number(detailEditProductoID) : Number(item.productoID),
-        cantidad: Number(item.cantidad || 1),
+        cantidad: index === 0 ? Number(detailEditCantidad || item.cantidad || 1) : Number(item.cantidad || 1),
       })),
       cliente: {
         tipoIdent: detailEditClienteTipoIdent || null,
@@ -648,12 +671,13 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
     setDetailEditSaving(true);
     try {
       const paymentValidation = validatePaymentMethods();
+      const validatedCanalFlora = validateSalesChannel();
       if (isDuplicatingDetail) {
         const created = await api.crearPedidoCheckout(buildDuplicateCheckoutPayload());
-        const duplicateCanalFlora = salesChannelFieldConfig ? normalizeDuplicateCanalFlora() : null;
         await api.actualizarDetallePedidoPipeline({
           pedidoId: created.pedidoID,
           productoID: detailEditProductoID ? Number(detailEditProductoID) : null,
+          cantidad: Number(detailEditCantidad || 1),
           productoObservaciones: detailEditProductoObservaciones,
           productoPrecio: detailEditIsCustomArrangement && detailEditPrecio != null ? Number(detailEditPrecio) : null,
           fechaEntrega: detailEditFechaEntrega,
@@ -672,7 +696,7 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
           metodosPago: paymentValidation.methods,
           detallePago: paymentValidation.paymentBreakdown,
           montoEfectivo: paymentValidation.cashAmount,
-          canalFlora: duplicateCanalFlora,
+          canalFlora: validatedCanalFlora,
         });
         await loadOrders(true);
         await openDetail(created.pedidoID);
@@ -681,6 +705,7 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
         await api.actualizarDetallePedidoPipeline({
           pedidoId: selectedPedidoId,
           productoID: detailEditProductoID ? Number(detailEditProductoID) : null,
+          cantidad: Number(detailEditCantidad || 1),
           productoObservaciones: detailEditProductoObservaciones,
           productoPrecio: detailEditIsCustomArrangement && detailEditPrecio != null ? Number(detailEditPrecio) : null,
           fechaEntrega: detailEditFechaEntrega,
@@ -699,7 +724,7 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
           metodosPago: paymentValidation.methods,
           detallePago: paymentValidation.paymentBreakdown,
           montoEfectivo: paymentValidation.cashAmount,
-          canalFlora: salesChannelFieldConfig ? detailEditCanalFlora : null,
+          canalFlora: validatedCanalFlora,
         });
         await reloadDrawer();
       }
@@ -953,9 +978,12 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
                   const productText = (item.productos || []).slice(0, 2).join(", ");
                   const waPhone = String(item.telefonoCompleto || item.telefono || "").trim().replace(/\+/g, "");
                   const canAct = isPendingStatus(item.estado);
+                  const isApproving = approvingPedidoIds.includes(Number(pedidoId));
                   const approvalBlockedByTenant = canAct && item?.puedeAprobar === false;
-                  const approveDisabled = !canAct || approvalBlockedByTenant;
-                  const approveTitle = approvalBlockedByTenant
+                  const approveDisabled = !canAct || approvalBlockedByTenant || isApproving;
+                  const approveTitle = isApproving
+                    ? "Otro usuario o esta sesión está aprobando este pedido"
+                    : approvalBlockedByTenant
                     ? (item.motivoBloqueoAprobacion || "Completa la información requerida antes de aprobar")
                     : "Aprobar pedido";
                   const canDownloadInvoice = canInvoiceStatus(item.estado);
@@ -1084,15 +1112,16 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
                         className="order-detail-edit-readonly"
                       />
                     </label>
-                    <label className="order-detail-edit-label">
-                      Cantidad
-                      <input
-                        type="text"
-                        value={Number(detalle?.productos?.[0]?.cantidad || 0)}
-                        readOnly
-                        className="order-detail-edit-readonly"
-                      />
-                    </label>
+                      <label className="order-detail-edit-label">
+                        Cantidad
+                        <input
+                          type="number"
+                          min="1"
+                          step="1"
+                          value={detailEditCantidad}
+                          onChange={event => setDetailEditCantidad(Math.max(1, Number(event.target.value || 1)))}
+                        />
+                      </label>
                   </div>
 
                   {detailEditPrecio != null ? (
@@ -1158,13 +1187,14 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
                               <li
                                 key={item.id}
                                 className={`order-combobox-option${String(item.id) === detailEditProductoID ? " is-selected" : ""}`}
-                              onClick={() => {
-                                setDetailEditProductoID(String(item.id));
-                                setDetailEditProductoCodigo(String(item.codigo || ""));
-                                setDetailEditNombreArreglo(String(item.nombre || ""));
-                                setDetailEditProductoObservaciones("");
-                                setDetailEditPrecio(item.precio != null ? Number(item.precio) : null);
-                                setDetailEditDropdownOpen(false);
+                                onClick={() => {
+                                  setDetailEditProductoID(String(item.id));
+                                  setDetailEditProductoCodigo(String(item.codigo || ""));
+                                  setDetailEditNombreArreglo(String(item.nombre || ""));
+                                  setDetailEditCantidad(Number(detalle?.productos?.[0]?.cantidad || 1));
+                                  setDetailEditProductoObservaciones("");
+                                  setDetailEditPrecio(item.precio != null ? Number(item.precio) : null);
+                                  setDetailEditDropdownOpen(false);
                                 setDetailEditFilterText("");
                                 }}
                               >

@@ -74,6 +74,7 @@ export function PipelineOperativo({
   const [selectedDetail, setSelectedDetail] = useState(null);
   const [sidebarPinned, setSidebarPinned] = useState(false);
   const [sidebarMobileOpen, setSidebarMobileOpen] = useState(false);
+  const [processingPedidoIds, setProcessingPedidoIds] = useState([]);
 
   const empresaId = Number(session?.empresaID || tenantConfig.empresaId);
   const sucursalFromSession = session?.sucursalID != null ? Number(session.sucursalID) : null;
@@ -172,11 +173,20 @@ export function PipelineOperativo({
   const onDropCard = async (pedidoId, stage) => {
     const estadoId = STAGE_TO_ESTADO_ID[stage];
     if (!estadoId) return;
+    if (processingPedidoIds.includes(Number(pedidoId))) {
+      globalThis.alert("Este pedido ya se está actualizando. Espera un momento.");
+      return;
+    }
+    setProcessingPedidoIds(current => [...current, Number(pedidoId)]);
     try {
       await api.cambiarEstadoPedidoPipeline({ pedidoId, nuevoEstadoId: estadoId });
       await loadBoard();
     } catch (nextError) {
-      setError(nextError?.message || "No fue posible mover el pedido.");
+      const message = nextError?.detail || nextError?.message || "No fue posible mover el pedido.";
+      setError(message);
+      globalThis.alert(message);
+    } finally {
+      setProcessingPedidoIds(current => current.filter(currentId => currentId !== Number(pedidoId)));
     }
   };
 
