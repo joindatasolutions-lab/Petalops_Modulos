@@ -62,6 +62,19 @@ function roundCurrency(value) {
   return Math.round(Number(value || 0) * 100) / 100;
 }
 
+function normalizeWholePeso(value) {
+  if (value == null || value === "") return null;
+  const parsed = Number.parseFloat(String(value).replace(",", "."));
+  if (!Number.isFinite(parsed)) return null;
+  return Math.round(parsed);
+}
+
+function sanitizeWholePesoInput(value) {
+  const digits = String(value ?? "").replace(/[^\d]/g, "");
+  if (!digits) return null;
+  return normalizeWholePeso(digits);
+}
+
 function clampPercentage(value) {
   const parsed = Number.parseFloat(String(value ?? "").replace(",", "."));
   if (!Number.isFinite(parsed)) return 0;
@@ -220,7 +233,6 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
   const [detailAddProductoCodigo, setDetailAddProductoCodigo] = useState("");
   const [detailAddNombreArreglo, setDetailAddNombreArreglo] = useState("");
   const [detailAddCantidad, setDetailAddCantidad] = useState(1);
-  const [detailAddProductoObservaciones, setDetailAddProductoObservaciones] = useState("");
   const [detailAddPrecio, setDetailAddPrecio] = useState(null);
   const [detailAddSaving, setDetailAddSaving] = useState(false);
   const [approvingPedidoIds, setApprovingPedidoIds] = useState([]);
@@ -296,9 +308,9 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
     () => isCustomArrangement({
       codigo: detailAddProductoCodigo,
       nombre: detailAddNombreArreglo,
-      observaciones: detailAddProductoObservaciones,
+      observaciones: "",
     }),
-    [detailAddNombreArreglo, detailAddProductoCodigo, detailAddProductoObservaciones]
+    [detailAddNombreArreglo, detailAddProductoCodigo]
   );
   const detailAddSelectedProductLabel = useMemo(() => {
     const selected = detailEditCatalog.find(item => String(item.id) === String(detailAddProductoID));
@@ -313,6 +325,29 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
     }
     return "— Selecciona un arreglo —";
   }, [detailAddNombreArreglo, detailAddProductoCodigo, detailAddProductoID, detailEditCatalog]);
+
+  const applySelectedDetailProduct = useCallback((product, nextDetalleId = null) => {
+    if (!product) return;
+    const detalleId = nextDetalleId ?? (product?.detalleID != null ? Number(product.detalleID) : null);
+    const productoId = getProductoId(product);
+    const productoCodigo = String(product?.codigoProducto || product?.codigo || "").trim();
+    const productoNombre = String(product?.nombreProducto || product?.nombre || "").trim();
+    const productoObservaciones = String(product?.observaciones || "").trim();
+    const productoPrecio = normalizeWholePeso(product?.precioUnitario ?? product?.precio ?? product?.subtotal ?? 0);
+
+    setDetailEditDetalleID(detalleId != null ? String(detalleId) : "");
+    setDetailEditProductoID(productoId != null ? String(productoId) : "");
+    setDetailEditProductoCodigo(productoCodigo);
+    setDetailEditCantidad(Number(product?.cantidad || 1));
+    setDetailEditNombreArreglo(productoNombre);
+    setDetailEditProductoObservaciones(productoObservaciones);
+    setDetailEditPrecio(productoPrecio);
+    setDetailEditCustomPriceEnabled(isCustomArrangement({
+      codigo: productoCodigo,
+      nombre: productoNombre,
+      observaciones: productoObservaciones,
+    }));
+  }, []);
 
   const loadBarrioOptions = useCallback(async (query = "") => {
     const text = String(query || "").trim();
@@ -431,7 +466,6 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
       setDetailAddProductoCodigo("");
       setDetailAddNombreArreglo("");
       setDetailAddCantidad(1);
-      setDetailAddProductoObservaciones("");
       setDetailAddPrecio(null);
       setDetailAddSaving(false);
       setIsDuplicatingDetail(false);
@@ -441,33 +475,7 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
     const firstProduct = Array.isArray(detalle.productos) && detalle.productos.length > 0
       ? detalle.productos[0]
       : null;
-    const detalleId = firstProduct?.detalleID != null ? Number(firstProduct.detalleID) : null;
-    const productoId = getProductoId(firstProduct);
-    const productoCodigo = firstProduct
-      ? String(firstProduct.codigoProducto || firstProduct.codigo || "").trim()
-      : "";
-    const productoNombre = firstProduct
-      ? String(firstProduct.nombreProducto || firstProduct.nombre || "").trim()
-      : "";
-    const productoObservaciones = firstProduct
-      ? String(firstProduct.observaciones || "").trim()
-      : "";
-    const productoPrecio = firstProduct
-      ? Math.round(Number(firstProduct.precioUnitario || firstProduct.precio || firstProduct.subtotal || 0))
-      : null;
-
-    setDetailEditDetalleID(detalleId != null ? String(detalleId) : "");
-    setDetailEditProductoID(productoId != null ? String(productoId) : "");
-    setDetailEditProductoCodigo(productoCodigo);
-    setDetailEditCantidad(Number(firstProduct?.cantidad || 1));
-    setDetailEditNombreArreglo(productoNombre);
-    setDetailEditProductoObservaciones(productoObservaciones);
-    setDetailEditPrecio(productoPrecio);
-    setDetailEditCustomPriceEnabled(isCustomArrangement({
-      codigo: productoCodigo,
-      nombre: productoNombre,
-      observaciones: productoObservaciones,
-    }));
+    applySelectedDetailProduct(firstProduct);
     setDetailEditFechaEntrega(toDateInput(detalle.destinatario?.fechaEntrega));
     setDetailEditHoraEntrega(normalizeTime(detalle.destinatario?.horaEntrega));
     setDetailEditClienteNombre(String(detalle.cliente?.nombre || ""));
@@ -507,7 +515,6 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
     setDetailAddProductoCodigo("");
     setDetailAddNombreArreglo("");
     setDetailAddCantidad(1);
-    setDetailAddProductoObservaciones("");
     setDetailAddPrecio(null);
     setDetailAddSaving(false);
 
@@ -516,7 +523,7 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
       .filter(Boolean);
     setDetailEditCatalog(dedupeCatalogItems(initialCatalog));
     setDetailEditError("");
-  }, [detalle]);
+  }, [applySelectedDetailProduct, detalle]);
 
   useEffect(() => {
     if (!detalle || detalle.error) return;
@@ -525,37 +532,14 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
     const selectedProduct = productos.find(item => String(item?.detalleID ?? "") === String(detailEditDetalleID))
       || productos[0];
     const detalleId = selectedProduct?.detalleID != null ? Number(selectedProduct.detalleID) : null;
-    const productoId = getProductoId(selectedProduct);
-    const productoCodigo = selectedProduct
-      ? String(selectedProduct.codigoProducto || selectedProduct.codigo || "").trim()
-      : "";
-    const productoNombre = selectedProduct
-      ? String(selectedProduct.nombreProducto || selectedProduct.nombre || "").trim()
-      : "";
-    const productoObservaciones = selectedProduct
-      ? String(selectedProduct.observaciones || "").trim()
-      : "";
-    const productoPrecio = selectedProduct
-      ? Math.round(Number(selectedProduct.precioUnitario || selectedProduct.precio || selectedProduct.subtotal || 0))
-      : null;
 
     if (detalleId != null && String(detalleId) !== String(detailEditDetalleID || "")) {
       setDetailEditDetalleID(String(detalleId));
       return;
     }
 
-    setDetailEditProductoID(productoId != null ? String(productoId) : "");
-    setDetailEditProductoCodigo(productoCodigo);
-    setDetailEditCantidad(Number(selectedProduct?.cantidad || 1));
-    setDetailEditNombreArreglo(productoNombre);
-    setDetailEditProductoObservaciones(productoObservaciones);
-    setDetailEditPrecio(productoPrecio);
-    setDetailEditCustomPriceEnabled(isCustomArrangement({
-      codigo: productoCodigo,
-      nombre: productoNombre,
-      observaciones: productoObservaciones,
-    }));
-  }, [detalle, detailEditDetalleID]);
+    applySelectedDetailProduct(selectedProduct, detalleId);
+  }, [applySelectedDetailProduct, detalle, detailEditDetalleID]);
 
   useEffect(() => {
     if (!drawerOpen) {
@@ -944,7 +928,7 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
     setDetailEditSaving(true);
     try {
       if (detailEditIsCustomArrangement) {
-        const customPrice = Number(detailEditPrecio);
+        const customPrice = normalizeWholePeso(detailEditPrecio);
         if (!Number.isFinite(customPrice) || customPrice <= 0) {
           throw new Error("Debes indicar un precio válido para el arreglo personalizado.");
         }
@@ -959,7 +943,7 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
           productoID: detailEditProductoID ? Number(detailEditProductoID) : null,
           cantidad: Number(detailEditCantidad || 1),
           productoObservaciones: detailEditProductoObservaciones,
-          productoPrecio: detailEditIsCustomArrangement && detailEditPrecio != null ? Number(detailEditPrecio) : null,
+          productoPrecio: detailEditIsCustomArrangement ? normalizeWholePeso(detailEditPrecio) : null,
           fechaEntrega: detailEditFechaEntrega,
           horaEntrega: detailEditHoraEntrega,
           clienteNombre: detailEditClienteNombre,
@@ -993,7 +977,7 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
           productoID: detailEditProductoID ? Number(detailEditProductoID) : null,
           cantidad: Number(detailEditCantidad || 1),
           productoObservaciones: detailEditProductoObservaciones,
-          productoPrecio: detailEditIsCustomArrangement && detailEditPrecio != null ? Number(detailEditPrecio) : null,
+          productoPrecio: detailEditIsCustomArrangement ? normalizeWholePeso(detailEditPrecio) : null,
           fechaEntrega: detailEditFechaEntrega,
           horaEntrega: detailEditHoraEntrega,
           clienteNombre: detailEditClienteNombre,
@@ -1032,6 +1016,7 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
   const onAddDetailProduct = async () => {
     if (!selectedPedidoId || detailAddSaving) return;
     setDetailEditError("");
+    const currentDetalleId = String(detailEditDetalleID || "").trim();
 
     if (!detailAddProductoID) {
       setDetailEditError("Debes seleccionar el arreglo que quieres agregar.");
@@ -1039,7 +1024,7 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
     }
 
     if (detailAddIsCustomArrangement) {
-      const customPrice = Number(detailAddPrecio);
+      const customPrice = normalizeWholePeso(detailAddPrecio);
       if (!Number.isFinite(customPrice) || customPrice <= 0) {
         setDetailEditError("Debes indicar un precio válido para el arreglo personalizado.");
         return;
@@ -1052,11 +1037,12 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
         pedidoId: selectedPedidoId,
         productoID: Number(detailAddProductoID),
         cantidad: Number(detailAddCantidad || 1),
-        productoObservaciones: detailAddProductoObservaciones,
-        productoPrecio: detailAddIsCustomArrangement && detailAddPrecio != null ? Number(detailAddPrecio) : null,
+        productoPrecio: detailAddIsCustomArrangement ? normalizeWholePeso(detailAddPrecio) : null,
       });
       await reloadDrawer();
-      if (response?.detalleID != null) {
+      if (currentDetalleId) {
+        setDetailEditDetalleID(currentDetalleId);
+      } else if (response?.detalleID != null) {
         setDetailEditDetalleID(String(response.detalleID));
       }
       setDetailEditSubview("edit");
@@ -1066,7 +1052,6 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
       setDetailAddProductoCodigo("");
       setDetailAddNombreArreglo("");
       setDetailAddCantidad(1);
-      setDetailAddProductoObservaciones("");
       setDetailAddPrecio(null);
     } catch (nextError) {
       setDetailEditError(nextError?.detail || nextError?.message || "No fue posible agregar el arreglo al pedido.");
@@ -1081,13 +1066,38 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
     if (!confirmed) return;
     setDetailEditError("");
     setDetailEditDeletingDetailId(Number(detalleId));
+    let previousDetalle = null;
     try {
+      setDetalle(current => {
+        if (!current || current.error || !Array.isArray(current.productos)) return current;
+        previousDetalle = current;
+        const nextProducts = current.productos.filter(
+          item => String(item?.detalleID ?? "") !== String(detalleId)
+        );
+        if (nextProducts.length === 0) {
+          return current;
+        }
+        const currentSelected = String(detailEditDetalleID || "");
+        const fallbackProduct = nextProducts.find(
+          item => String(item?.detalleID ?? "") !== String(detalleId)
+        ) || nextProducts[0];
+        if (currentSelected === String(detalleId) && fallbackProduct) {
+          applySelectedDetailProduct(fallbackProduct);
+        }
+        return {
+          ...current,
+          productos: nextProducts,
+        };
+      });
       await api.eliminarDetallePedidoPipeline({
         pedidoId: selectedPedidoId,
         detalleID: Number(detalleId),
       });
-      await reloadDrawer();
+      await loadOrders(true);
     } catch (nextError) {
+      if (previousDetalle) {
+        setDetalle(previousDetalle);
+      }
       setDetailEditError(nextError?.detail || nextError?.message || "No fue posible eliminar el arreglo.");
     } finally {
       setDetailEditDeletingDetailId(null);
@@ -1459,9 +1469,8 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
                                     setDetailAddProductoID(String(item.id));
                                     setDetailAddProductoCodigo(String(item.codigo || ""));
                                     setDetailAddNombreArreglo(String(item.nombre || ""));
-                                    setDetailAddProductoObservaciones("");
                                     setDetailAddCantidad(1);
-                                    setDetailAddPrecio(item.precio != null ? Math.round(Number(item.precio)) : null);
+                                    setDetailAddPrecio(item.precio != null ? normalizeWholePeso(item.precio) : null);
                                     setDetailAddDropdownOpen(false);
                                     setDetailAddFilterText("");
                                   }}
@@ -1491,11 +1500,11 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
                         <label className="order-detail-edit-label">
                           Precio personalizado
                           <input
-                            type="number"
-                            min="0"
-                            step="1"
+                            type="text"
+                            inputMode="numeric"
+                            pattern="[0-9]*"
                             value={detailAddPrecio ?? ""}
-                            onChange={event => setDetailAddPrecio(event.target.value === "" ? null : Math.round(Number(event.target.value)))}
+                            onChange={event => setDetailAddPrecio(sanitizeWholePesoInput(event.target.value))}
                           />
                         </label>
                       ) : (
@@ -1510,16 +1519,6 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
                         </label>
                       )}
                     </div>
-
-                    <label className="order-detail-edit-label">
-                      Notas Producción
-                      <input
-                        type="text"
-                        value={detailAddProductoObservaciones}
-                        onChange={event => setDetailAddProductoObservaciones(event.target.value)}
-                        placeholder="Observaciones del arreglo agregado"
-                      />
-                    </label>
 
                     <div className="order-detail-add-actions">
                       <button
@@ -1572,11 +1571,11 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
                     <div className="order-detail-edit-label">
                       <span>Precio arreglo</span>
                       <input
-                        type="number"
-                        min="0"
-                        step="1"
+                        type="text"
+                        inputMode="numeric"
+                        pattern="[0-9]*"
                         value={detailEditPrecio ?? ""}
-                        onChange={event => setDetailEditPrecio(event.target.value === "" ? null : Math.round(Number(event.target.value)))}
+                        onChange={event => setDetailEditPrecio(sanitizeWholePesoInput(event.target.value))}
                         readOnly={!detailEditIsCustomArrangement}
                         className={detailEditIsCustomArrangement ? "" : "order-detail-edit-readonly"}
                       />
@@ -1634,7 +1633,7 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
                                   setDetailEditNombreArreglo(String(item.nombre || ""));
                                   setDetailEditCantidad(Number(detalle?.productos?.[0]?.cantidad || 1));
                                   setDetailEditProductoObservaciones("");
-                                  setDetailEditPrecio(item.precio != null ? Math.round(Number(item.precio)) : null);
+                                  setDetailEditPrecio(item.precio != null ? normalizeWholePeso(item.precio) : null);
                                   setDetailEditCustomPriceEnabled(isCustomArrangement({
                                     codigo: item.codigo,
                                     nombre: item.nombre,
@@ -2221,9 +2220,9 @@ function normalizeCatalogItem(raw) {
   const id = getProductoId(raw);
   if (id == null) return null;
   const precio = raw?.precio != null
-    ? Number(raw.precio)
+    ? normalizeWholePeso(raw.precio)
     : raw?.precioUnitario != null
-      ? Number(raw.precioUnitario)
+      ? normalizeWholePeso(raw.precioUnitario)
       : null;
   return {
     id,

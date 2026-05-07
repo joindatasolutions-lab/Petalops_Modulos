@@ -451,13 +451,9 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
 
   const reasignarAuditable = async item => {
     const floristaNuevoId = selectedFloristaById[item.idProduccion] || null;
-    const motivo = String(motivoAccion || "").trim() || "Reasignación desde panel florista";
+    const motivo = "Reasignación desde panel de producción";
     if (!floristaNuevoId) {
       globalThis.alert("Selecciona un florista para reasignar.");
-      return;
-    }
-    if (canManageProductionActions && !String(motivoAccion || "").trim()) {
-      globalThis.alert("Debes escribir un motivo para la reasignación auditada.");
       return;
     }
 
@@ -472,8 +468,8 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
       await refreshAndKeepSelection(item.idProduccion);
       setMotivoAccion("");
     } catch (nextError) {
-      console.error("Error en reasignación auditada:", nextError);
-      globalThis.alert("No fue posible realizar la reasignación auditada.");
+      console.error("Error reasignando florista:", nextError);
+      globalThis.alert("No fue posible reasignar el florista.");
     }
   };
 
@@ -1085,19 +1081,6 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
 
               {canManageProductionActions ? (
               <section className="order-block production-action-card">
-                <h4>Auditoría acción</h4>
-                <textarea
-                  value={motivoAccion}
-                  onChange={event => setMotivoAccion(event.target.value)}
-                  placeholder="Motivo de acción (recomendado/obligatorio para reasignar)"
-                  title="Motivo"
-                  rows={4}
-                />
-              </section>
-              ) : null}
-
-              {canManageProductionActions ? (
-              <section className="order-block production-action-card">
                 <h4>Asignación</h4>
                 <div className="order-actions production-drawer-actions">
                   <select
@@ -1117,7 +1100,7 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
                     ))}
                   </select>
                   <button type="button" className="btn-primary" title="Asignar florista" onClick={() => asignar(selectedItem)}>Asignar</button>
-                  <button type="button" className="btn-outline" title="Reasignación auditada" onClick={() => reasignarAuditable(selectedItem)}>Reasignar auditado</button>
+                  <button type="button" className="btn-outline" title="Reasignar florista" onClick={() => reasignarAuditable(selectedItem)}>Reasignar</button>
                 </div>
               </section>
               ) : null}
