@@ -2,13 +2,19 @@
 
 import { tenantConfig } from "../../config/tenantConfig.js";
 import { createApiClient } from "../../infrastructure/apiClient.js";
+import { AppSidebar } from "../../shared/AppSidebar.jsx";
+import { useSidebarState } from "../../shared/useSidebarState.js";
 
 const MODULE_HELP = {
+  pipeline: "Permite consultar y gestionar el flujo operativo general de pedidos.",
   pedidos: "Permite gestionar pedidos, aprobaciones y consulta operativa.",
   produccion: "Permite planificar y ejecutar la produccion de arreglos.",
   domicilios: "Permite asignar, enrutar y cerrar entregas con evidencia.",
   contabilidad: "Permite revisar resumen de ventas y cierre operativo de caja.",
+  trazabilidad: "Permite revisar aprobaciones y acciones operativas por usuario.",
   catalogo: "Permite consultar productos y referencias comerciales.",
+  clientes: "Permite consultar y administrar la base de clientes.",
+  inventario: "Permite administrar stock, insumos y movimientos de inventario.",
   usuarios: "Permite acceso al panel de gestion de usuarios.",
 };
 
@@ -18,15 +24,17 @@ const ROLE_TYPE_LABELS = [
   { pattern: /pedido|ventas|comercial/, label: "Pedidos" },
   { pattern: /domicili|repart/, label: "Domiciliario" },
   { pattern: /inventar|bodega|almacen/, label: "Inventarista" },
+  { pattern: /contab|caja|finan/, label: "Contabilidad" },
 ];
 
 const ROLE_MODULE_DEFAULTS = {
-  admin: ["pedidos", "produccion", "domicilios", "catalogo", "usuarios", "inventario", "contabilidad"],
+  admin: ["pipeline", "pedidos", "produccion", "domicilios", "catalogo", "usuarios", "inventario", "contabilidad", "trazabilidad", "clientes"],
   florista: ["produccion", "catalogo"],
-  pedidos: ["pedidos", "catalogo", "contabilidad"],
+  pedidos: ["pedidos", "domicilios"],
   domiciliario: ["domicilios"],
   inventarista: ["catalogo", "inventario"],
-  operativo: ["pedidos", "produccion", "inventario"],
+  contabilidad: ["contabilidad"],
+  operativo: ["pipeline", "pedidos", "produccion", "inventario"],
   otro: [],
 };
 
@@ -50,6 +58,7 @@ export function UsersManagementPage({
   canViewDomicilios,
   canViewInventario,
   canViewContabilidad,
+  canViewTrazabilidad,
   canViewClientesPanel,
   onGoPipeline,
   onGoPedidos,
@@ -57,14 +66,14 @@ export function UsersManagementPage({
   onGoDomicilios,
   onGoInventario,
   onGoContabilidad,
+  onGoTrazabilidad,
   onGoClientes,
   onGoUsuarios,
   onLogout,
 }) {
   const api = useMemo(() => createApiClient(tenantConfig), []);
 
-  const [sidebarPinned, setSidebarPinned] = useState(false);
-  const [sidebarMobileOpen, setSidebarMobileOpen] = useState(false);
+  const { sidebarPinned, sidebarMobileOpen, setSidebarMobileOpen, toggleSidebar } = useSidebarState();
 
   const initialEmpresaID = Number(session?.empresaID || 1);
   const [empresaID, setEmpresaID] = useState(initialEmpresaID);
@@ -136,6 +145,12 @@ export function UsersManagementPage({
       .filter(Boolean)
   ), [moduleItems]);
 
+  const modulosConfiguradosEmpresa = useMemo(() => (
+    moduleItems
+      .map(item => String(item.modulo || "").trim().toLowerCase())
+      .filter(Boolean)
+  ), [moduleItems]);
+
   const modulosCompatiblesRol = useMemo(() => {
     const currentRole = visibleRoles.find(item => String(item.rolID) === String(form.rolID));
     const allowedByRole = defaultModulesForRole(currentRole?.nombreRol);
@@ -184,29 +199,21 @@ export function UsersManagementPage({
   const userModulesSummary = useMemo(() => {
     if (modulesLoading) return "Cargando modulos...";
     if (modulosActivosEmpresa.length === 0) return "Sin modulos activos";
-    if (modulosCompatiblesRol.length === 0) return "Sin modulos compatibles";
+    if (modulosCompatiblesRol.length === 0 && form.rolID) return "Sin modulos compatibles";
     if (selectedUserModulesCount === 0) return "Selecciona modulos";
-    if (selectedUserModulesCount === modulosCompatiblesRol.length) return "Todos los modulos compatibles";
+    if (selectedUserModulesCount === modulosActivosEmpresa.length) return "Todos los modulos activos";
     return `${selectedUserModulesCount} modulos seleccionados`;
-  }, [modulesLoading, modulosActivosEmpresa.length, modulosCompatiblesRol.length, selectedUserModulesCount]);
+  }, [modulesLoading, modulosActivosEmpresa.length, modulosCompatiblesRol.length, selectedUserModulesCount, form.rolID]);
 
   const editUserModulesSummary = useMemo(() => {
     if (modulesLoading) return "Cargando modulos...";
     if (modulosActivosEmpresa.length === 0) return "Sin modulos activos";
-    if (editModulosCompatiblesRol.length === 0) return "Sin modulos compatibles";
+    if (editModulosCompatiblesRol.length === 0 && editForm.rolID) return "Sin modulos compatibles";
     if (selectedEditUserModulesCount === 0) return "Selecciona modulos";
-    if (selectedEditUserModulesCount === editModulosCompatiblesRol.length) return "Todos los modulos compatibles";
+    if (selectedEditUserModulesCount === modulosActivosEmpresa.length) return "Todos los modulos activos";
     return `${selectedEditUserModulesCount} modulos seleccionados`;
-  }, [modulesLoading, modulosActivosEmpresa.length, editModulosCompatiblesRol.length, selectedEditUserModulesCount]);
+  }, [modulesLoading, modulosActivosEmpresa.length, editModulosCompatiblesRol.length, selectedEditUserModulesCount, editForm.rolID]);
 
-  const toggleSidebar = () => {
-    const isMobile = globalThis.matchMedia("(max-width: 980px)").matches;
-    if (isMobile) {
-      setSidebarMobileOpen(current => !current);
-      return;
-    }
-    setSidebarPinned(current => !current);
-  };
 
   const loadEmpresas = useCallback(async () => {
     if (!canViewUsuariosGlobal) {
@@ -361,8 +368,10 @@ export function UsersManagementPage({
   useEffect(() => {
     setForm(current => {
       const currentModules = Array.isArray(current.modulosAcceso) ? current.modulosAcceso : [];
-      const filtered = currentModules.filter(module => modulosCompatiblesRol.includes(String(module).toLowerCase()));
-      const nextModules = filtered.length > 0 ? filtered : modulosCompatiblesRol;
+      const filtered = currentModules.filter(module => modulosActivosEmpresa.includes(String(module).toLowerCase()));
+      const nextModules = filtered.length > 0
+        ? filtered
+        : (modulosCompatiblesRol.length > 0 ? modulosCompatiblesRol : modulosActivosEmpresa);
       const sameLength = nextModules.length === currentModules.length;
       const sameValues = sameLength && nextModules.every((module, index) => module === currentModules[index]);
       if (sameValues) return current;
@@ -371,14 +380,16 @@ export function UsersManagementPage({
         modulosAcceso: nextModules,
       };
     });
-  }, [modulosCompatiblesRol]);
+  }, [modulosActivosEmpresa, modulosCompatiblesRol]);
 
   useEffect(() => {
     if (editingUserId == null) return;
     setEditForm(current => {
       const currentModules = Array.isArray(current.modulosAcceso) ? current.modulosAcceso : [];
-      const filtered = currentModules.filter(module => editModulosCompatiblesRol.includes(String(module).toLowerCase()));
-      const nextModules = filtered.length > 0 ? filtered : editModulosCompatiblesRol;
+      const filtered = currentModules.filter(module => modulosActivosEmpresa.includes(String(module).toLowerCase()));
+      const nextModules = filtered.length > 0
+        ? filtered
+        : (editModulosCompatiblesRol.length > 0 ? editModulosCompatiblesRol : modulosActivosEmpresa);
       const sameLength = nextModules.length === currentModules.length;
       const sameValues = sameLength && nextModules.every((module, index) => module === currentModules[index]);
       if (sameValues) return current;
@@ -387,20 +398,12 @@ export function UsersManagementPage({
         modulosAcceso: nextModules,
       };
     });
-  }, [editingUserId, editModulosCompatiblesRol]);
+  }, [editingUserId, modulosActivosEmpresa, editModulosCompatiblesRol]);
 
   useEffect(() => {
     loadEmpresasModuloResumen().catch(() => {});
   }, [loadEmpresasModuloResumen]);
 
-  useEffect(() => {
-    const mediaQuery = globalThis.matchMedia("(max-width: 980px)");
-    const handleChange = event => {
-      if (!event.matches) setSidebarMobileOpen(false);
-    };
-    mediaQuery.addEventListener("change", handleChange);
-    return () => mediaQuery.removeEventListener("change", handleChange);
-  }, []);
 
   const submitCreate = async event => {
     event.preventDefault();
@@ -667,33 +670,36 @@ export function UsersManagementPage({
 
   return (
     <div className={`app-shell ${sidebarPinned ? "is-sidebar-pinned" : ""} ${sidebarMobileOpen ? "is-sidebar-mobile-open" : ""}`}>
-      <aside className="app-sidebar">
-        <div className="sidebar-brand">
-          <img src="/petalops-compact.png" alt="PetalOps" className="sidebar-brand-logo-compact" />
-          <img src="/petalops-logo-full.png" alt="PetalOps" className="sidebar-brand-logo-full" />
-        </div>
-
-        <nav className="sidebar-nav" aria-label="Módulos">
-          {canViewPipeline ? <button type="button" className="sidebar-nav-btn" onClick={() => { setSidebarMobileOpen(false); onGoPipeline(); }}><span className="sidebar-nav-icon">▦</span><span className="sidebar-nav-text">Pipeline</span></button> : null}
-          {canViewPedidos ? <button type="button" className="sidebar-nav-btn" onClick={() => { setSidebarMobileOpen(false); onGoPedidos(); }}><span className="sidebar-nav-icon">🧾</span><span className="sidebar-nav-text">Pedidos</span></button> : null}
-          {canViewProduccion ? <button type="button" className="sidebar-nav-btn" onClick={() => { setSidebarMobileOpen(false); onGoProduccion(); }}><span className="sidebar-nav-icon">🏭</span><span className="sidebar-nav-text">Producción</span></button> : null}
-          {canViewDomicilios ? <button type="button" className="sidebar-nav-btn" onClick={() => { setSidebarMobileOpen(false); onGoDomicilios(); }}><span className="sidebar-nav-icon">🛵</span><span className="sidebar-nav-text">Domicilios</span></button> : null}
-          {canViewInventario ? <button type="button" className="sidebar-nav-btn" onClick={() => { setSidebarMobileOpen(false); onGoInventario(); }}><span className="sidebar-nav-icon">📦</span><span className="sidebar-nav-text">Inventario</span></button> : null}
-          {canViewClientesPanel ? <button type="button" className="sidebar-nav-btn" onClick={() => { setSidebarMobileOpen(false); onGoClientes(); }}><span className="sidebar-nav-icon">💐</span><span className="sidebar-nav-text">Clientes</span></button> : null}
-          <button type="button" className="sidebar-nav-btn is-active" onClick={() => { setSidebarMobileOpen(false); onGoUsuarios(); }}><span className="sidebar-nav-icon">👥</span><span className="sidebar-nav-text">Gestión Usuarios</span></button>
-          {canViewContabilidad ? <button type="button" className="sidebar-nav-btn" onClick={() => { setSidebarMobileOpen(false); onGoContabilidad(); }}><span className="sidebar-nav-icon">📊</span><span className="sidebar-nav-text">Contabilidad</span></button> : null}
-        </nav>
-
-        <button type="button" className="btn-outline sidebar-logout-btn" onClick={onLogout} title="Cerrar sesión">
-          <span className="sidebar-logout-icon" aria-hidden="true">⏻</span>
-          <span className="sidebar-logout-text">Cerrar sesión</span>
-        </button>
-
-        <button type="button" className="sidebar-pin-btn" onClick={toggleSidebar}>{sidebarPinned ? "←" : "→"}</button>
-        <p className="sidebar-caption">{canViewUsuariosGlobal ? "Consola global JOIN" : "Consola administración de empresa"}</p>
-      </aside>
-
-      <button type="button" className="sidebar-overlay" aria-label="Cerrar menu" onClick={() => setSidebarMobileOpen(false)} />
+      <AppSidebar
+        activeKey="usuarios"
+        sidebarPinned={sidebarPinned}
+        sidebarMobileOpen={sidebarMobileOpen}
+        toggleSidebar={toggleSidebar}
+        closeSidebarMobile={() => setSidebarMobileOpen(false)}
+        onLogout={onLogout}
+        permissions={{
+          pipeline: canViewPipeline,
+          pedidos: canViewPedidos,
+          produccion: canViewProduccion,
+          domicilios: canViewDomicilios,
+          inventario: canViewInventario,
+          contabilidad: canViewContabilidad,
+          trazabilidad: canViewTrazabilidad,
+          clientes: canViewClientesPanel,
+          usuarios: true,
+        }}
+        navigation={{
+          pipeline: onGoPipeline,
+          pedidos: onGoPedidos,
+          produccion: onGoProduccion,
+          domicilios: onGoDomicilios,
+          inventario: onGoInventario,
+          contabilidad: onGoContabilidad,
+          trazabilidad: onGoTrazabilidad,
+          clientes: onGoClientes,
+          usuarios: onGoUsuarios,
+        }}
+      />
 
       <main className="orders-admin-view">
         <header className="orders-admin-header">
@@ -792,30 +798,44 @@ export function UsersManagementPage({
               <div className="users-user-module-picker">
                 <p className="users-modulo-company-label">Modulos de acceso para este usuario</p>
                 {modulesLoading ? <p className="orders-admin-subtitle">Cargando modulos disponibles...</p> : null}
-              {!modulesLoading && modulosActivosEmpresa.length === 0 ? <p className="orders-admin-subtitle">No hay modulos activos para esta empresa.</p> : null}
-              {!modulesLoading && modulosActivosEmpresa.length > 0 && modulosCompatiblesRol.length === 0 ? <p className="orders-admin-subtitle">El rol seleccionado no tiene modulos operativos compatibles.</p> : null}
+                {!modulesLoading && modulosConfiguradosEmpresa.length === 0 ? <p className="orders-admin-subtitle">No hay modulos configurados para esta empresa.</p> : null}
+                {!modulesLoading && modulosActivosEmpresa.length > 0 && modulosCompatiblesRol.length === 0 ? <p className="orders-admin-subtitle">El rol seleccionado no tiene modulos operativos compatibles.</p> : null}
+                {!modulesLoading && modulosActivosEmpresa.length > 0 && modulosCompatiblesRol.length > 0 && modulosCompatiblesRol.length !== modulosActivosEmpresa.length ? (
+                  <p className="orders-admin-subtitle">Se muestran todos los modulos activos de la empresa. Los no compatibles con el rol quedan bloqueados.</p>
+                ) : null}
               <button
                 type="button"
                 className={`users-module-dropdown-trigger ${showUserModuleDropdown ? "is-open" : ""}`}
                 onClick={() => setShowUserModuleDropdown(current => !current)}
-                disabled={modulesLoading || modulosCompatiblesRol.length === 0}
+                disabled={modulesLoading || modulosConfiguradosEmpresa.length === 0}
               >
                 <span>{userModulesSummary}</span>
                 <span aria-hidden="true">▾</span>
               </button>
-                {showUserModuleDropdown && modulosCompatiblesRol.length > 0 ? (
+                {showUserModuleDropdown && modulosConfiguradosEmpresa.length > 0 ? (
                   <div className="users-module-dropdown-panel">
                     <div className="users-user-module-grid">
-                      {modulosCompatiblesRol.map(modulo => {
+                      {modulosConfiguradosEmpresa.map(modulo => {
                         const checked = (form.modulosAcceso || []).includes(modulo);
+                        const compatible = modulosCompatiblesRol.includes(modulo);
+                        const activeForEmpresa = modulosActivosEmpresa.includes(modulo);
+                        const enabled = compatible && activeForEmpresa;
                         return (
-                          <label key={modulo} className="users-user-module-item">
+                          <label
+                            key={modulo}
+                            className="users-user-module-item"
+                            style={{
+                              opacity: enabled ? 1 : 0.48,
+                              cursor: enabled ? "pointer" : "not-allowed",
+                            }}
+                          >
                             <input
                               type="checkbox"
                               checked={checked}
+                              disabled={!enabled}
                               onChange={() => toggleUserModuleAccess(modulo)}
                             />
-                            <span>{modulo}</span>
+                            <span>{modulo}{!activeForEmpresa ? " (inactivo en la empresa)" : compatible ? "" : " (no compatible con este rol)"}</span>
                           </label>
                         );
                       })}
@@ -1078,7 +1098,7 @@ export function UsersManagementPage({
               <div className="users-user-module-picker">
                 <p className="users-modulo-company-label">Modulos de acceso para este usuario</p>
                 {modulesLoading ? <p className="orders-admin-subtitle">Cargando modulos disponibles...</p> : null}
-                {!modulesLoading && modulosActivosEmpresa.length === 0 ? <p className="orders-admin-subtitle">No hay modulos activos para esta empresa.</p> : null}
+                {!modulesLoading && modulosConfiguradosEmpresa.length === 0 ? <p className="orders-admin-subtitle">No hay modulos configurados para esta empresa.</p> : null}
                 {!modulesLoading && modulosActivosEmpresa.length > 0 && editModulosCompatiblesRol.length === 0 ? <p className="orders-admin-subtitle">El rol seleccionado no tiene modulos operativos compatibles.</p> : null}
                 {!modulesLoading && modulosActivosEmpresa.length > 0 && editModulosCompatiblesRol.length > 0 && editModulosCompatiblesRol.length !== modulosActivosEmpresa.length ? (
                   <p className="orders-admin-subtitle">Se muestran todos los modulos activos de la empresa. Los no compatibles con el rol quedan bloqueados.</p>
@@ -1087,33 +1107,35 @@ export function UsersManagementPage({
                   type="button"
                   className={`users-module-dropdown-trigger ${showEditModuleDropdown ? "is-open" : ""}`}
                   onClick={() => setShowEditModuleDropdown(current => !current)}
-                  disabled={modulesLoading || modulosActivosEmpresa.length === 0}
+                  disabled={modulesLoading || modulosConfiguradosEmpresa.length === 0}
                 >
                   <span>{editUserModulesSummary}</span>
                   <span aria-hidden="true">▾</span>
                 </button>
-                {showEditModuleDropdown && modulosActivosEmpresa.length > 0 ? (
+                {showEditModuleDropdown && modulosConfiguradosEmpresa.length > 0 ? (
                   <div className="users-module-dropdown-panel">
                     <div className="users-user-module-grid">
-                      {modulosActivosEmpresa.map(modulo => {
+                      {modulosConfiguradosEmpresa.map(modulo => {
                         const checked = (editForm.modulosAcceso || []).includes(modulo);
                         const compatible = editModulosCompatiblesRol.includes(modulo);
+                        const activeForEmpresa = modulosActivosEmpresa.includes(modulo);
+                        const enabled = compatible && activeForEmpresa;
                         return (
                           <label
                             key={modulo}
                             className="users-user-module-item"
                             style={{
-                              opacity: compatible ? 1 : 0.48,
-                              cursor: compatible ? "pointer" : "not-allowed",
+                              opacity: enabled ? 1 : 0.48,
+                              cursor: enabled ? "pointer" : "not-allowed",
                             }}
                           >
                             <input
                               type="checkbox"
                               checked={checked}
-                              disabled={!compatible}
+                              disabled={!enabled}
                               onChange={() => toggleEditUserModuleAccess(modulo)}
                             />
-                            <span>{modulo}{compatible ? "" : " (no compatible con este rol)"}</span>
+                            <span>{modulo}{!activeForEmpresa ? " (inactivo en la empresa)" : compatible ? "" : " (no compatible con este rol)"}</span>
                           </label>
                         );
                       })}

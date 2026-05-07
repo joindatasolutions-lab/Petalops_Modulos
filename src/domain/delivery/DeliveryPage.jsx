@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { tenantConfig } from "../../config/tenantConfig.js";
 import { createApiClient } from "../../infrastructure/apiClient.js";
+import { AppSidebar } from "../../shared/AppSidebar.jsx";
+import { useSidebarState } from "../../shared/useSidebarState.js";
 import { formatDateOnly, formatTimeOnly, normalizeStatus } from "../../shared/utils.js";
 
 const FILTROS = [
@@ -17,6 +19,7 @@ const DELIVERY_VIEWS = [
   { value: "disponibles", label: "Pedidos disponibles" },
   { value: "mis-pedidos", label: "Mis pedidos" },
   { value: "barrios", label: "Barrios" },
+  { value: "crear-barrio", label: "Crear barrio" },
 ];
 
 const DEFAULT_DELIVERY_FORM = {
@@ -28,6 +31,11 @@ const DEFAULT_DELIVERY_FORM = {
   noEntregadoMotivo: "",
   reprogramarPara: "",
 };
+
+function isPedidosRole(session) {
+  const role = String(session?.rol || "").trim().toLowerCase();
+  return role.includes("pedido") || role.includes("ventas") || role.includes("comercial");
+}
 
 function todayIso() {
   return new Date().toISOString().slice(0, 10);
@@ -111,14 +119,14 @@ function buildActionErrorMessage(error, fallback) {
     return "Este pedido ya fue tomado por otro domiciliario.";
   }
   if (/location|ubicaci|gps/i.test(detail)) {
-    return "No fue posible validar la ubicación actual.";
+    return "No fue posible validar la ubicaciÃ³n actual.";
   }
   return detail;
 }
 
 async function requestCurrentCoords() {
   if (!globalThis.navigator?.geolocation) {
-    throw new Error("Este dispositivo no soporta geolocalización.");
+    throw new Error("Este dispositivo no soporta geolocalizaciÃ³n.");
   }
 
   return new Promise((resolve, reject) => {
@@ -131,14 +139,14 @@ async function requestCurrentCoords() {
       },
       error => {
         if (error?.code === 1) {
-          reject(new Error("Debes permitir la ubicación para continuar."));
+          reject(new Error("Debes permitir la ubicaciÃ³n para continuar."));
           return;
         }
         if (error?.code === 2) {
-          reject(new Error("No fue posible obtener tu ubicación actual."));
+          reject(new Error("No fue posible obtener tu ubicaciÃ³n actual."));
           return;
         }
-        reject(new Error("La ubicación tardó demasiado. Intenta de nuevo."));
+        reject(new Error("La ubicaciÃ³n tardÃ³ demasiado. Intenta de nuevo."));
       },
       { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
     );
@@ -176,6 +184,7 @@ export function DeliveryPage({
   canViewDomicilios,
   canViewInventario,
   canViewContabilidad,
+  canViewTrazabilidad,
   canViewClientesPanel,
   canViewUsuariosPanel,
   onLogout,
@@ -185,6 +194,7 @@ export function DeliveryPage({
   onGoDomicilios,
   onGoInventario,
   onGoContabilidad,
+  onGoTrazabilidad,
   onGoClientes,
   onGoUsuarios,
 }) {
@@ -192,9 +202,9 @@ export function DeliveryPage({
   const empresaId = Number(session?.empresaID || tenantConfig.empresaId);
   const sucursalId = Number(session?.sucursalID || tenantConfig.sucursalId);
   const usuarioCambio = String(session?.email || session?.nombre || "admin");
+  const pedidosRole = isPedidosRole(session);
 
-  const [sidebarPinned, setSidebarPinned] = useState(false);
-  const [sidebarMobileOpen, setSidebarMobileOpen] = useState(false);
+  const { sidebarPinned, sidebarMobileOpen, setSidebarMobileOpen, toggleSidebar } = useSidebarState();
 
   const [loading, setLoading] = useState(false);
   const [actionKey, setActionKey] = useState("");
@@ -208,7 +218,7 @@ export function DeliveryPage({
   const [filtro, setFiltro] = useState("hoy");
   const [fechaFiltro, setFechaFiltro] = useState(todayIso());
 
-  const [modo, setModo] = useState("admin");
+  const [modo, setModo] = useState(pedidosRole ? "barrios" : "admin");
   const [domiciliarioId, setDomiciliarioId] = useState("");
   const [soloMisAsignados, setSoloMisAsignados] = useState(true);
   const [availableItems, setAvailableItems] = useState([]);
@@ -220,6 +230,7 @@ export function DeliveryPage({
   const [deliveryForm, setDeliveryForm] = useState(DEFAULT_DELIVERY_FORM);
 
   const [barriosItems, setBarriosItems] = useState([]);
+  const [barriosSearch, setBarriosSearch] = useState("");
   const [barrioForm, setBarrioForm] = useState({
     zonaID: "",
     nombreBarrio: "",
@@ -244,6 +255,24 @@ export function DeliveryPage({
     if (!soloMisAsignados || currentDomiciliarioId == null) return adminItems;
     return adminItems.filter(item => Number(item?.domiciliarioID) === Number(currentDomiciliarioId));
   }, [adminItems, soloMisAsignados, currentDomiciliarioId]);
+  const visibleDeliveryViews = useMemo(
+    () => (
+      pedidosRole
+        ? DELIVERY_VIEWS.filter(item => item.value === "barrios" || item.value === "crear-barrio")
+        : DELIVERY_VIEWS
+    ),
+    [pedidosRole]
+  );
+  const filteredBarriosItems = useMemo(() => {
+    const term = normalizeSearchText(barriosSearch);
+    if (!term) return barriosItems;
+    return barriosItems.filter(item => {
+      const zona = String(item?.zonaID ?? "").trim();
+      const nombre = String(item?.nombreBarrio || "").trim();
+      const costo = String(item?.costoDomicilio ?? "").trim();
+      return [zona, nombre, costo].some(value => normalizeSearchText(value).includes(term));
+    });
+  }, [barriosItems, barriosSearch]);
 
   useEffect(() => {
     if (currentDomiciliarioId == null) {
@@ -258,6 +287,12 @@ export function DeliveryPage({
   }, [selectedDeliveryItem?.idEntrega]);
 
   useEffect(() => {
+    if (pedidosRole && modo !== "barrios" && modo !== "crear-barrio") {
+      setModo("barrios");
+    }
+  }, [pedidosRole, modo]);
+
+  useEffect(() => {
     const goOnline = () => setIsOffline(false);
     const goOffline = () => setIsOffline(true);
 
@@ -270,23 +305,7 @@ export function DeliveryPage({
     };
   }, []);
 
-  useEffect(() => {
-    const mediaQuery = globalThis.matchMedia("(max-width: 980px)");
-    const handleChange = event => {
-      if (!event.matches) setSidebarMobileOpen(false);
-    };
-    mediaQuery.addEventListener("change", handleChange);
-    return () => mediaQuery.removeEventListener("change", handleChange);
-  }, []);
 
-  const toggleSidebar = () => {
-    const isMobile = globalThis.matchMedia("(max-width: 980px)").matches;
-    if (isMobile) {
-      setSidebarMobileOpen(current => !current);
-      return;
-    }
-    setSidebarPinned(current => !current);
-  };
 
   const setBusy = key => {
     setActionKey(key);
@@ -349,7 +368,7 @@ export function DeliveryPage({
     try {
       await loader();
     } catch (nextError) {
-      console.error("Error en módulo de domicilios:", nextError);
+      console.error("Error en mÃ³dulo de domicilios:", nextError);
       setError(nextError?.detail || nextError?.message || "No fue posible cargar domicilios.");
     } finally {
       setLoading(false);
@@ -365,7 +384,7 @@ export function DeliveryPage({
       runLoad(loadAdmin).catch(() => {});
       return;
     }
-    if (modo === "barrios") {
+    if (modo === "barrios" || modo === "crear-barrio") {
       runLoad(loadBarrios).catch(() => {});
       return;
     }
@@ -378,12 +397,12 @@ export function DeliveryPage({
 
   const withCoords = async actionLabel => {
     if (isOffline) {
-      throw new Error("Sin conexión. Revisa internet antes de continuar.");
+      throw new Error("Sin conexiÃ³n. Revisa internet antes de continuar.");
     }
 
     const coords = await requestCurrentCoords();
     setAvailableCoords(coords);
-    setFeedback(`Ubicación confirmada para ${actionLabel}.`);
+    setFeedback(`UbicaciÃ³n confirmada para ${actionLabel}.`);
     return coords;
   };
 
@@ -404,7 +423,7 @@ export function DeliveryPage({
     } catch (nextError) {
       setModo(nextMode);
       setAvailableCoords(null);
-      setError(nextError?.message || "No fue posible obtener tu ubicación.");
+      setError(nextError?.message || "No fue posible obtener tu ubicaciÃ³n.");
     } finally {
       setLoading(false);
     }
@@ -429,7 +448,7 @@ export function DeliveryPage({
       await loadDomiciliarios();
       if (modo === "admin") {
         await loadAdmin();
-      } else if (modo === "barrios") {
+      } else if (modo === "barrios" || modo === "crear-barrio") {
         await loadBarrios();
       } else {
         await loadMyOrders();
@@ -460,7 +479,7 @@ export function DeliveryPage({
   const openWhatsApp = item => {
     const phone = String(item?.telefonoDestino || "").replace(/\+/g, "").trim();
     if (!phone) {
-      setError("Este pedido no tiene teléfono registrado.");
+      setError("Este pedido no tiene telÃ©fono registrado.");
       return;
     }
     const msg = encodeURIComponent(item?.mensaje || "Hola, vamos en camino con tu pedido.");
@@ -668,7 +687,7 @@ export function DeliveryPage({
 
   const onDeleteBarrio = async barrioId => {
     if (barrioSaving) return;
-    const confirmed = globalThis.confirm("¿Seguro que deseas borrar este barrio?");
+    const confirmed = globalThis.confirm("Â¿Seguro que deseas borrar este barrio?");
     if (!confirmed) return;
     setBarrioSaving(true);
     setError("");
@@ -696,78 +715,42 @@ export function DeliveryPage({
 
   return (
     <div className={`app-shell ${sidebarPinned ? "is-sidebar-pinned" : ""} ${sidebarMobileOpen ? "is-sidebar-mobile-open" : ""}`}>
-      <aside className="app-sidebar">
-        <div className="sidebar-brand">
-          <img src="/petalops-compact.png" alt="PetalOps" className="sidebar-brand-logo-compact" />
-          <img src="/petalops-logo-full.png" alt="PetalOps" className="sidebar-brand-logo-full" />
-        </div>
-
-        <nav className="sidebar-nav" aria-label="Módulos">
-          {canViewPipeline ? (
-            <button type="button" className="sidebar-nav-btn" onClick={() => { setSidebarMobileOpen(false); onGoPipeline(); }}>
-              <span className="sidebar-nav-icon">▦</span>
-              <span className="sidebar-nav-text">Pipeline</span>
-            </button>
-          ) : null}
-          {canViewPedidos ? (
-            <button type="button" className="sidebar-nav-btn" onClick={() => { setSidebarMobileOpen(false); onGoPedidos(); }}>
-              <span className="sidebar-nav-icon">🧾</span>
-              <span className="sidebar-nav-text">Pedidos</span>
-            </button>
-          ) : null}
-          {canViewProduccion ? (
-            <button type="button" className="sidebar-nav-btn" onClick={() => { setSidebarMobileOpen(false); onGoProduccion(); }}>
-              <span className="sidebar-nav-icon">🏭</span>
-              <span className="sidebar-nav-text">Producción</span>
-            </button>
-          ) : null}
-          {canViewDomicilios ? (
-            <button type="button" className="sidebar-nav-btn is-active" onClick={() => { setSidebarMobileOpen(false); onGoDomicilios(); }}>
-              <span className="sidebar-nav-icon">🛵</span>
-              <span className="sidebar-nav-text">Domicilios</span>
-            </button>
-          ) : null}
-          {canViewInventario ? (
-            <button type="button" className="sidebar-nav-btn" onClick={() => { setSidebarMobileOpen(false); onGoInventario(); }}>
-              <span className="sidebar-nav-icon">📦</span>
-              <span className="sidebar-nav-text">Inventario</span>
-            </button>
-          ) : null}
-          {canViewContabilidad ? (
-            <button type="button" className="sidebar-nav-btn" onClick={() => { setSidebarMobileOpen(false); onGoContabilidad(); }}>
-              <span className="sidebar-nav-icon">📊</span>
-              <span className="sidebar-nav-text">Contabilidad</span>
-            </button>
-          ) : null}
-          {canViewClientesPanel ? (
-            <button type="button" className="sidebar-nav-btn" onClick={() => { setSidebarMobileOpen(false); onGoClientes(); }}>
-              <span className="sidebar-nav-icon">💐</span>
-              <span className="sidebar-nav-text">Clientes</span>
-            </button>
-          ) : null}
-          {canViewUsuariosPanel ? (
-            <button type="button" className="sidebar-nav-btn" onClick={() => { setSidebarMobileOpen(false); onGoUsuarios(); }}>
-              <span className="sidebar-nav-icon">👥</span>
-              <span className="sidebar-nav-text">Gestión Usuarios</span>
-            </button>
-          ) : null}
-        </nav>
-
-        <button type="button" className="btn-outline sidebar-logout-btn" onClick={onLogout} title="Cerrar sesión">
-          <span className="sidebar-logout-icon" aria-hidden="true">⏻</span>
-          <span className="sidebar-logout-text">Cerrar sesión</span>
-        </button>
-
-        <button type="button" className="sidebar-pin-btn" onClick={toggleSidebar}>{sidebarPinned ? "←" : "→"}</button>
-        <p className="sidebar-caption">Última milla simple y trazable</p>
-      </aside>
-
-      <button type="button" className="sidebar-overlay" aria-label="Cerrar menú" onClick={() => setSidebarMobileOpen(false)} />
+      <AppSidebar
+        activeKey="domicilios"
+        sidebarPinned={sidebarPinned}
+        sidebarMobileOpen={sidebarMobileOpen}
+        toggleSidebar={toggleSidebar}
+        closeSidebarMobile={() => setSidebarMobileOpen(false)}
+        onLogout={onLogout}
+        permissions={{
+          pipeline: canViewPipeline,
+          pedidos: canViewPedidos,
+          produccion: canViewProduccion,
+          domicilios: canViewDomicilios,
+          inventario: canViewInventario,
+          contabilidad: canViewContabilidad,
+          trazabilidad: canViewTrazabilidad,
+          clientes: canViewClientesPanel,
+          usuarios: canViewUsuariosPanel,
+        }}
+        navigation={{
+          pipeline: onGoPipeline,
+          pedidos: onGoPedidos,
+          produccion: onGoProduccion,
+          domicilios: onGoDomicilios,
+          inventario: onGoInventario,
+          contabilidad: onGoContabilidad,
+          trazabilidad: onGoTrazabilidad,
+          clientes: onGoClientes,
+          usuarios: onGoUsuarios,
+        }}
+        badges={{ domicilios: visibleAdminItems.length }}
+      />
 
       <main className="orders-admin-view">
         <header className="orders-admin-header">
           <div>
-            <button type="button" className="sidebar-trigger" onClick={toggleSidebar}>☰ Menú</button>
+            <button type="button" className="sidebar-trigger" onClick={toggleSidebar}>{"\u2630 Men\u00fa"}</button>
             <h1>Domicilios</h1>
             <p className="orders-admin-subtitle">Pedidos listos para entrega, toma segura y cierre con evidencia reutilizando el flujo actual.</p>
           </div>
@@ -779,7 +762,7 @@ export function DeliveryPage({
         </header>
 
         <section className="inventory-header-tabs" aria-label="Submenu domicilios">
-          {DELIVERY_VIEWS.map(item => (
+          {visibleDeliveryViews.map(item => (
             <button
               key={item.value}
               type="button"
@@ -813,7 +796,7 @@ export function DeliveryPage({
             </div>
             {modo === "admin" && currentDomiciliarioId != null ? (
               <div className="filter-field">
-                <span>Asignación propia</span>
+                <span>AsignaciÃ³n propia</span>
                 <div className="filter-checkbox">
                   <input
                     type="checkbox"
@@ -880,7 +863,7 @@ export function DeliveryPage({
                           {actionKey === `enruta-${item.idEntrega}` ? "En proceso..." : "En camino"}
                         </button>
                         <button type="button" className="btn-outline" onClick={() => openDeliveryDetail(item)}>Ver detalle</button>
-                        <button type="button" className="btn-outline" onClick={() => openMaps(item)}>Ver ubicación</button>
+                        <button type="button" className="btn-outline" onClick={() => openMaps(item)}>Ver ubicaciÃ³n</button>
                       </div>
                     </td>
                   </tr>
@@ -893,11 +876,11 @@ export function DeliveryPage({
             <section className="delivery-summary-grid">
               <article className="order-block delivery-summary-card">
                 <strong>{availableSummary}</strong>
-                <span>{availableCoords ? "Distancias ordenadas por ubicación actual" : "Activa ubicación para calcular distancias"}</span>
+                <span>{availableCoords ? "Distancias ordenadas por ubicaciÃ³n actual" : "Activa ubicaciÃ³n para calcular distancias"}</span>
               </article>
               <article className="order-block delivery-summary-card">
-                <strong>{availableCoords ? "Ubicación lista" : "Ubicación pendiente"}</strong>
-                <span>{availableCoords ? `${availableCoords.lat.toFixed(4)}, ${availableCoords.lng.toFixed(4)}` : "Se solicitará al tomar o refrescar disponibles"}</span>
+                <strong>{availableCoords ? "UbicaciÃ³n lista" : "UbicaciÃ³n pendiente"}</strong>
+                <span>{availableCoords ? `${availableCoords.lat.toFixed(4)}, ${availableCoords.lng.toFixed(4)}` : "Se solicitarÃ¡ al tomar o refrescar disponibles"}</span>
               </article>
             </section>
 
@@ -911,12 +894,12 @@ export function DeliveryPage({
                     <span className={`order-badge ${priorityTone(item.prioridad)}`}>{item.prioridad || "MEDIA"}</span>
                   </div>
 
-                  <p className="delivery-address">{item.direccion || "Sin dirección"}</p>
+                  <p className="delivery-address">{item.direccion || "Sin direcciÃ³n"}</p>
                   <p className="delivery-meta">
                     {item.barrio || "Barrio sin definir"}
-                    {` · ${formatDistanceKm(getDistanceValue(item))}`}
+                    {` Â· ${formatDistanceKm(getDistanceValue(item))}`}
                     {item.horaEntrega || formatTimeOnly(item.fechaEntregaProgramada)
-                      ? ` · ${item.horaEntrega || formatTimeOnly(item.fechaEntregaProgramada)}`
+                      ? ` Â· ${item.horaEntrega || formatTimeOnly(item.fechaEntregaProgramada)}`
                       : ""}
                   </p>
 
@@ -952,11 +935,11 @@ export function DeliveryPage({
                       <strong>Pedido #{item.numeroPedido || "-"}</strong>
                       <span className={`order-badge ${stateBadgeClass(item.estado)}`}>{item.estado || "Asignado"}</span>
                     </div>
-                    <p className="delivery-address">{item.direccion || "Sin dirección"}</p>
+                    <p className="delivery-address">{item.direccion || "Sin direcciÃ³n"}</p>
                     <p className="delivery-meta">
                       {item.barrio || "Barrio sin definir"}
                       {item.horaEntrega || formatTimeOnly(item.fechaEntregaProgramada)
-                        ? ` · ${item.horaEntrega || formatTimeOnly(item.fechaEntregaProgramada)}`
+                        ? ` Â· ${item.horaEntrega || formatTimeOnly(item.fechaEntregaProgramada)}`
                         : ""}
                     </p>
                     <div className="delivery-courier-actions">
@@ -985,24 +968,23 @@ export function DeliveryPage({
                       <strong>Pedido #{item.numeroPedido || "-"}</strong>
                       <span className={`order-badge ${stateBadgeClass(item.estado)}`}>{item.estado || "EnRuta"}</span>
                     </div>
-                    <p className="delivery-address">{item.direccion || "Sin dirección"}</p>
+                    <p className="delivery-address">{item.direccion || "Sin direcciÃ³n"}</p>
                     <p className="delivery-meta">
                       {item.barrio || "Barrio sin definir"}
                       {item.horaEntrega || formatTimeOnly(item.fechaEntregaProgramada)
-                        ? ` · ${item.horaEntrega || formatTimeOnly(item.fechaEntregaProgramada)}`
+                        ? ` Â· ${item.horaEntrega || formatTimeOnly(item.fechaEntregaProgramada)}`
                         : ""}
                     </p>
                     <div className="delivery-courier-actions">
                       <button type="button" className="btn-outline" onClick={() => openDeliveryDetail(item)}>Ver detalle</button>
                       <button type="button" className="btn-outline" onClick={() => openWhatsApp(item)}>Mensaje</button>
-                      <button type="button" className="btn-primary" onClick={() => openDeliveryDetail(item)}>Cerrar entrega</button>
                     </div>
                   </article>
                 ))}
               </div>
             </article>
           </section>
-        ) : (
+        ) : modo === "crear-barrio" ? (
           <section className="delivery-barrios-layout">
             <article className="order-block users-top-panel delivery-barrios-form-panel">
               <h4>Crear barrio</h4>
@@ -1043,7 +1025,7 @@ export function DeliveryPage({
                     value={barrioForm.activo ? "1" : "0"}
                     onChange={event => onChangeBarrioForm("activo", event.target.value === "1")}
                   >
-                    <option value="1">Sí</option>
+                    <option value="1">S?</option>
                     <option value="0">No</option>
                   </select>
                 </label>
@@ -1052,7 +1034,20 @@ export function DeliveryPage({
                 </button>
               </div>
             </article>
-
+          </section>
+        ) : (
+          <section className="delivery-barrios-layout">
+            <article className="order-block delivery-barrios-search-panel">
+              <label className="order-detail-edit-label">
+                Buscar barrio
+                <input
+                  type="text"
+                  value={barriosSearch}
+                  onChange={event => setBarriosSearch(event.target.value)}
+                  placeholder="Busca por zona, barrio o costo"
+                />
+              </label>
+            </article>
             <article className="order-block users-table-panel delivery-barrios-table-panel">
               <h4>Barrios registrados</h4>
               <div className="orders-table-wrap">
@@ -1067,11 +1062,11 @@ export function DeliveryPage({
                     </tr>
                   </thead>
                   <tbody>
-                    {barriosItems.length === 0 ? (
+                    {filteredBarriosItems.length === 0 ? (
                       <tr>
-                        <td colSpan={5}>No hay barrios cargados para esta sucursal.</td>
+                        <td colSpan={5}>No hay barrios para el filtro seleccionado.</td>
                       </tr>
-                    ) : barriosItems.map(item => (
+                    ) : filteredBarriosItems.map(item => (
                       <tr key={item.idBarrio}>
                         <td>
                           {editingBarrioId === item.idBarrio ? (
@@ -1112,7 +1107,7 @@ export function DeliveryPage({
                             Number(item.costoDomicilio || 0)
                           )}
                         </td>
-                        <td>{item.activo ? "Sí" : "No"}</td>
+                        <td>{item.activo ? "S?" : "No"}</td>
                         <td>
                           <div className="order-actions">
                             {editingBarrioId === item.idBarrio ? (
@@ -1153,7 +1148,7 @@ export function DeliveryPage({
         <div className="orders-drawer-head">
           <strong>Detalle Domicilio</strong>
           <div className="orders-drawer-head-actions">
-            <button type="button" className="icon-btn" onClick={closeDeliveryDetail} title="Cerrar barra lateral">✕</button>
+            <button type="button" className="icon-btn" onClick={closeDeliveryDetail} title="Cerrar barra lateral">âœ•</button>
           </div>
         </div>
 
@@ -1165,7 +1160,7 @@ export function DeliveryPage({
               <section className="order-block">
                 <h4>Detalle del pedido</h4>
                 <div className="delivery-detail-list">
-                  <p><span>Número del pedido</span><strong>{selectedDeliveryItem.numeroPedido || "-"}</strong></p>
+                  <p><span>NÃºmero del pedido</span><strong>{selectedDeliveryItem.numeroPedido || "-"}</strong></p>
                   <p><span>Cliente</span><strong>{selectedDeliveryItem.cliente || selectedDeliveryItem.destinatario || "-"}</strong></p>
                   <p><span>Destinatario</span><strong>{selectedDeliveryItem.destinatario || "-"}</strong></p>
                   <p><span>Dirección</span><strong>{selectedDeliveryItem.direccion || "-"}</strong></p>
@@ -1174,9 +1169,9 @@ export function DeliveryPage({
                   <p><span>Hora entrega</span><strong>{selectedDeliveryItem.horaEntrega || formatTimeOnly(selectedDeliveryItem.fechaEntregaProgramada) || "-"}</strong></p>
                   <p><span>Estado</span><strong>{selectedDeliveryItem.estado || "-"}</strong></p>
                   <p><span>Domiciliario</span><strong>{selectedDeliveryItem.domiciliario || "-"}</strong></p>
-                  <p><span>Teléfono</span><strong>{selectedDeliveryItem.telefonoDestino || "-"}</strong></p>
+                  <p><span>TelÃ©fono</span><strong>{selectedDeliveryItem.telefonoDestino || "-"}</strong></p>
                   <p><span>Mensaje</span><strong>{selectedDeliveryItem.mensaje || "-"}</strong></p>
-                  <p><span>Observación</span><strong>{selectedDeliveryItem.observacion || "-"}</strong></p>
+                  <p><span>Observaciones personalizados</span><strong>{selectedDeliveryItem.observacion || "-"}</strong></p>
                 </div>
 
                 <div className="delivery-courier-actions">
@@ -1277,7 +1272,7 @@ export function DeliveryPage({
                           rows="3"
                           value={deliveryForm.noEntregadoMotivo}
                           onChange={event => setDeliveryForm(current => ({ ...current, noEntregadoMotivo: event.target.value }))}
-                          placeholder="Describe por qué no se pudo entregar"
+                          placeholder="Describe por quÃ© no se pudo entregar"
                         />
                       </label>
                       <label className="order-detail-edit-label">

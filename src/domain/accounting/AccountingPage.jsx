@@ -2,12 +2,16 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { tenantConfig } from "../../config/tenantConfig.js";
 import { createApiClient } from "../../infrastructure/apiClient.js";
+import { AppSidebar } from "../../shared/AppSidebar.jsx";
+import { useSidebarState } from "../../shared/useSidebarState.js";
 import { formatearCOP, normalizeStatus, splitDateTimeParts, toIsoDateEnd, toIsoDateStart } from "../../shared/utils.js";
 
 const CASH_CLOSING_STORAGE_KEY = "petalops_accounting_cash_closing";
 
 const ACCOUNTING_VIEWS = [
   { key: "ventas", label: "Ventas" },
+  { key: "arreglos", label: "Métricas por arreglo" },
+  { key: "cuentas", label: "Cuentas de pago" },
   { key: "caja", label: "Caja" },
 ];
 
@@ -31,6 +35,7 @@ export function AccountingPage({
   canViewDomicilios,
   canViewInventario,
   canViewContabilidad,
+  canViewTrazabilidad,
   canViewClientesPanel,
   canViewUsuariosPanel,
   onGoPipeline,
@@ -39,6 +44,7 @@ export function AccountingPage({
   onGoDomicilios,
   onGoInventario,
   onGoContabilidad,
+  onGoTrazabilidad,
   onGoClientes,
   onGoUsuarios,
   onLogout,
@@ -47,10 +53,8 @@ export function AccountingPage({
   const empresaId = Number(session?.empresaID || tenantConfig.empresaId);
   const sucursalId = Number(session?.sucursalID || tenantConfig.sucursalId);
 
-  const [sidebarPinned, setSidebarPinned] = useState(false);
-  const [sidebarMobileOpen, setSidebarMobileOpen] = useState(false);
+  const { sidebarPinned, sidebarMobileOpen, setSidebarMobileOpen, toggleSidebar } = useSidebarState();
   const [activeView, setActiveView] = useState("ventas");
-
   const [filters, setFilters] = useState(() => {
     const today = new Date().toISOString().slice(0, 10);
     return {
@@ -59,17 +63,17 @@ export function AccountingPage({
       fechaHasta: today,
     };
   });
-
   const [cashForm, setCashForm] = useState(() => ({
     ...initialCashForm,
     fecha: new Date().toISOString().slice(0, 10),
   }));
-
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [info, setInfo] = useState("");
   const [saving, setSaving] = useState(false);
+  const [accountingOrders, setAccountingOrders] = useState([]);
   const [orderRows, setOrderRows] = useState([]);
+  const [selectedArrangementKeys, setSelectedArrangementKeys] = useState([]);
   const [cashHistoryVersion, setCashHistoryVersion] = useState(0);
 
   const loadAccountingData = useCallback(async () => {
@@ -96,28 +100,21 @@ export function AccountingPage({
         })
       );
 
+      setAccountingOrders(details);
       setOrderRows(buildAccountingRows(details));
     } catch (nextError) {
       console.error("Error cargando contabilidad:", nextError);
+      setAccountingOrders([]);
       setOrderRows([]);
       setError(nextError?.message || "No fue posible cargar el módulo de contabilidad.");
     } finally {
       setLoading(false);
     }
-  }, [api, empresaId, filters.fechaDesde, filters.fechaHasta, sucursalId]);
+  }, [api, empresaId, sucursalId, filters.fechaDesde, filters.fechaHasta]);
 
   useEffect(() => {
     loadAccountingData();
   }, [loadAccountingData]);
-
-  useEffect(() => {
-    const mediaQuery = globalThis.matchMedia("(max-width: 980px)");
-    const handleChange = event => {
-      if (!event.matches) setSidebarMobileOpen(false);
-    };
-    mediaQuery.addEventListener("change", handleChange);
-    return () => mediaQuery.removeEventListener("change", handleChange);
-  }, []);
 
   useEffect(() => {
     const saved = readCashClosing(empresaId, sucursalId, cashForm.fecha);
@@ -130,6 +127,13 @@ export function AccountingPage({
     setInfo("");
   }, [cashForm.fecha, empresaId, sucursalId, cashHistoryVersion]);
 
+  const arrangementRows = useMemo(() => buildArrangementRows(accountingOrders), [accountingOrders]);
+  const paymentAccountRows = useMemo(() => buildPaymentAccountRows(accountingOrders), [accountingOrders]);
+
+  useEffect(() => {
+    setSelectedArrangementKeys(arrangementRows.map(item => item.key));
+  }, [arrangementRows]);
+
   const summaryTotals = useMemo(() => {
     return orderRows.reduce((acc, row) => ({
       cantidadPedidos: acc.cantidadPedidos + Number(row.cantidadPedidos || 0),
@@ -137,14 +141,59 @@ export function AccountingPage({
       totalDomicilios: acc.totalDomicilios + Number(row.totalDomicilios || 0),
       totalVenta: acc.totalVenta + Number(row.totalVenta || 0),
       totalEfectivo: acc.totalEfectivo + Number(row.totalEfectivo || 0),
+      totalRecargos: acc.totalRecargos + Number(row.totalRecargos || 0),
+      totalDescuentos: acc.totalDescuentos + Number(row.totalDescuentos || 0),
     }), {
       cantidadPedidos: 0,
       totalArreglos: 0,
       totalDomicilios: 0,
       totalVenta: 0,
       totalEfectivo: 0,
+      totalRecargos: 0,
+      totalDescuentos: 0,
     });
   }, [orderRows]);
+
+  const selectedArrangementRows = useMemo(() => {
+    const selected = new Set(selectedArrangementKeys);
+    return arrangementRows.filter(item => selected.has(item.key));
+  }, [arrangementRows, selectedArrangementKeys]);
+
+  const arrangementSummary = useMemo(() => {
+    const pedidos = new Set();
+    const totals = selectedArrangementRows.reduce((acc, item) => {
+      (Array.isArray(item.pedidoIDs) ? item.pedidoIDs : []).forEach(id => pedidos.add(id));
+      return {
+        arreglosSeleccionados: acc.arreglosSeleccionados + 1,
+        unidadesVendidas: acc.unidadesVendidas + Number(item.unidades || 0),
+        totalVendido: acc.totalVendido + Number(item.totalVendido || 0),
+      };
+    }, {
+      arreglosSeleccionados: 0,
+      unidadesVendidas: 0,
+      totalVendido: 0,
+    });
+    return {
+      ...totals,
+      pedidosImpactados: pedidos.size,
+    };
+  }, [selectedArrangementRows]);
+
+  const topArrangementByUnits = selectedArrangementRows[0] || null;
+  const topArrangementBySales = useMemo(
+    () => [...selectedArrangementRows].sort((a, b) => b.totalVendido - a.totalVendido)[0] || null,
+    [selectedArrangementRows]
+  );
+  const arrangementChartRows = useMemo(() => selectedArrangementRows.slice(0, 8), [selectedArrangementRows]);
+
+  const paymentSummary = useMemo(() => {
+    return paymentAccountRows.reduce((acc, item) => ({
+      cuentas: acc.cuentas + 1,
+      pedidos: acc.pedidos + Number(item.pedidos || 0),
+      recaudo: acc.recaudo + Number(item.totalRecaudado || 0),
+    }), { cuentas: 0, pedidos: 0, recaudo: 0 });
+  }, [paymentAccountRows]);
+  const topPaymentAccount = paymentAccountRows[0] || null;
 
   const baseValue = parseMoneyInput(cashForm.base);
   const gastoValue = parseMoneyInput(cashForm.gasto);
@@ -158,20 +207,24 @@ export function AccountingPage({
     [empresaId, sucursalId, cashHistoryVersion]
   );
 
-  const toggleSidebar = () => {
-    const isMobile = globalThis.matchMedia("(max-width: 980px)").matches;
-    if (isMobile) {
-      setSidebarMobileOpen(current => !current);
-      return;
-    }
-    setSidebarPinned(current => !current);
+  const applyFilter = (field, value) => {
+    setFilters(current => ({ ...current, [field]: value }));
   };
 
-  const applyFilter = (field, value) => {
-    setFilters(current => ({
-      ...current,
-      [field]: value,
-    }));
+  const toggleArrangementSelection = arrangementKey => {
+    setSelectedArrangementKeys(current => (
+      current.includes(arrangementKey)
+        ? current.filter(item => item !== arrangementKey)
+        : [...current, arrangementKey]
+    ));
+  };
+
+  const selectAllArrangements = () => {
+    setSelectedArrangementKeys(arrangementRows.map(item => item.key));
+  };
+
+  const clearAllArrangements = () => {
+    setSelectedArrangementKeys([]);
   };
 
   const saveCashClosing = () => {
@@ -199,41 +252,47 @@ export function AccountingPage({
 
   return (
     <div className={`app-shell ${sidebarPinned ? "is-sidebar-pinned" : ""} ${sidebarMobileOpen ? "is-sidebar-mobile-open" : ""}`}>
-      <aside className="app-sidebar">
-        <div className="sidebar-brand">
-          <img src="/petalops-compact.png" alt="PetalOps" className="sidebar-brand-logo-compact" />
-          <img src="/petalops-logo-full.png" alt="PetalOps" className="sidebar-brand-logo-full" />
-        </div>
-
-        <nav className="sidebar-nav" aria-label="Modulos">
-          {canViewPipeline ? <button type="button" className="sidebar-nav-btn" onClick={() => { setSidebarMobileOpen(false); onGoPipeline(); }}><span className="sidebar-nav-icon">▦</span><span className="sidebar-nav-text">Pipeline</span></button> : null}
-          {canViewPedidos ? <button type="button" className="sidebar-nav-btn" onClick={() => { setSidebarMobileOpen(false); onGoPedidos(); }}><span className="sidebar-nav-icon">🧾</span><span className="sidebar-nav-text">Pedidos</span></button> : null}
-          {canViewProduccion ? <button type="button" className="sidebar-nav-btn" onClick={() => { setSidebarMobileOpen(false); onGoProduccion(); }}><span className="sidebar-nav-icon">🏭</span><span className="sidebar-nav-text">Producción</span></button> : null}
-          {canViewDomicilios ? <button type="button" className="sidebar-nav-btn" onClick={() => { setSidebarMobileOpen(false); onGoDomicilios(); }}><span className="sidebar-nav-icon">🛵</span><span className="sidebar-nav-text">Domicilios</span></button> : null}
-          {canViewInventario ? <button type="button" className="sidebar-nav-btn" onClick={() => { setSidebarMobileOpen(false); onGoInventario(); }}><span className="sidebar-nav-icon">📦</span><span className="sidebar-nav-text">Inventario</span></button> : null}
-          {canViewContabilidad ? <button type="button" className="sidebar-nav-btn is-active" onClick={() => { setSidebarMobileOpen(false); onGoContabilidad(); }}><span className="sidebar-nav-icon">📊</span><span className="sidebar-nav-text">Contabilidad</span></button> : null}
-          {canViewClientesPanel ? <button type="button" className="sidebar-nav-btn" onClick={() => { setSidebarMobileOpen(false); onGoClientes(); }}><span className="sidebar-nav-icon">💐</span><span className="sidebar-nav-text">Clientes</span></button> : null}
-          {canViewUsuariosPanel ? <button type="button" className="sidebar-nav-btn" onClick={() => { setSidebarMobileOpen(false); onGoUsuarios(); }}><span className="sidebar-nav-icon">👥</span><span className="sidebar-nav-text">Gestión Usuarios</span></button> : null}
-        </nav>
-
-        <button type="button" className="btn-outline sidebar-logout-btn" onClick={onLogout} title="Cerrar sesión">
-          <span className="sidebar-logout-icon" aria-hidden="true">⏻</span>
-          <span className="sidebar-logout-text">Cerrar sesión</span>
-        </button>
-
-        <button type="button" className="sidebar-pin-btn" onClick={toggleSidebar} title={sidebarPinned ? "Contraer menú" : "Expandir menú"}>
-          {sidebarPinned ? "←" : "→"}
-        </button>
-      </aside>
-
-      <button type="button" className="sidebar-overlay" aria-label="Cerrar menú" onClick={() => setSidebarMobileOpen(false)} />
+      <AppSidebar
+        activeKey="contabilidad"
+        sidebarPinned={sidebarPinned}
+        sidebarMobileOpen={sidebarMobileOpen}
+        toggleSidebar={toggleSidebar}
+        closeSidebarMobile={() => setSidebarMobileOpen(false)}
+        onLogout={onLogout}
+        permissions={{
+          pipeline: canViewPipeline,
+          pedidos: canViewPedidos,
+          produccion: canViewProduccion,
+          domicilios: canViewDomicilios,
+          inventario: canViewInventario,
+          contabilidad: canViewContabilidad,
+          trazabilidad: canViewTrazabilidad,
+          clientes: canViewClientesPanel,
+          usuarios: canViewUsuariosPanel,
+        }}
+        navigation={{
+          pipeline: onGoPipeline,
+          pedidos: onGoPedidos,
+          produccion: onGoProduccion,
+          domicilios: onGoDomicilios,
+          inventario: onGoInventario,
+          contabilidad: onGoContabilidad,
+          trazabilidad: onGoTrazabilidad,
+          clientes: onGoClientes,
+          usuarios: onGoUsuarios,
+        }}
+      />
 
       <main className="orders-admin-view accounting-view">
         <header className="orders-admin-header">
           <div>
-            <button type="button" className="sidebar-trigger" onClick={toggleSidebar} title="Abrir o cerrar menú">☰ Menú</button>
             <h1>Contabilidad</h1>
-            <p className="orders-admin-subtitle">Resumen de ventas y cierre operativo por fecha.</p>
+            <p className="orders-admin-subtitle">Resumen de ventas, análisis por arreglo, cuentas de pago y cierre operativo por fecha.</p>
+          </div>
+          <div className="orders-admin-header-actions">
+            <button type="button" className="btn-primary" onClick={loadAccountingData} disabled={loading}>
+              {loading ? "Actualizando..." : "Actualizar"}
+            </button>
           </div>
         </header>
 
@@ -250,27 +309,27 @@ export function AccountingPage({
           ))}
         </section>
 
+        <section className="orders-filters accounting-filters">
+          <label className="filter-field">
+            <span>Fecha Inicio</span>
+            <input type="date" value={filters.fechaDesde} onChange={event => applyFilter("fechaDesde", event.target.value)} />
+          </label>
+          <label className="filter-field">
+            <span>Fecha Fin</span>
+            <input type="date" value={filters.fechaHasta} onChange={event => applyFilter("fechaHasta", event.target.value)} />
+          </label>
+          <div className="accounting-filter-actions">
+            <button type="button" className="btn-primary" onClick={loadAccountingData} disabled={loading}>
+              {loading ? "Cargando..." : "Actualizar resumen"}
+            </button>
+          </div>
+        </section>
+
         {error ? <p className="orders-message">{error}</p> : null}
         {info ? <p className="orders-message">{info}</p> : null}
 
         {activeView === "ventas" ? (
           <>
-            <section className="orders-filters accounting-filters">
-              <label className="filter-field">
-                <span>Fecha Inicio</span>
-                <input type="date" value={filters.fechaDesde} onChange={event => applyFilter("fechaDesde", event.target.value)} />
-              </label>
-              <label className="filter-field">
-                <span>Fecha Fin</span>
-                <input type="date" value={filters.fechaHasta} onChange={event => applyFilter("fechaHasta", event.target.value)} />
-              </label>
-              <div className="accounting-filter-actions">
-                <button type="button" className="btn-primary" onClick={loadAccountingData} disabled={loading}>
-                  {loading ? "Cargando..." : "Actualizar resumen"}
-                </button>
-              </div>
-            </section>
-
             <section className="accounting-summary-cards">
               <article className="order-block accounting-stat-card">
                 <span>Pedidos</span>
@@ -288,6 +347,14 @@ export function AccountingPage({
                 <span>Total venta</span>
                 <strong>${formatearCOP(summaryTotals.totalVenta)}</strong>
               </article>
+              <article className="order-block accounting-stat-card">
+                <span>Recargos link</span>
+                <strong>${formatearCOP(summaryTotals.totalRecargos)}</strong>
+              </article>
+              <article className="order-block accounting-stat-card">
+                <span>Descuentos</span>
+                <strong>${formatearCOP(summaryTotals.totalDescuentos)}</strong>
+              </article>
             </section>
 
             <section className="orders-table-wrap">
@@ -298,13 +365,15 @@ export function AccountingPage({
                     <th>Cantidad de pedidos</th>
                     <th>Total $ en arreglos florales</th>
                     <th>Total $ en domicilios</th>
+                    <th>Recargos link</th>
+                    <th>Descuentos</th>
                     <th>Total de la venta</th>
                   </tr>
                 </thead>
                 <tbody>
                   {orderRows.length === 0 ? (
                     <tr>
-                      <td colSpan={5}>{loading ? "Cargando resumen..." : "No hay ventas para los filtros seleccionados."}</td>
+                      <td colSpan={7}>{loading ? "Cargando resumen..." : "No hay ventas para los filtros seleccionados."}</td>
                     </tr>
                   ) : orderRows.map(row => (
                     <tr key={row.fecha}>
@@ -312,6 +381,8 @@ export function AccountingPage({
                       <td>{row.cantidadPedidos}</td>
                       <td>${formatearCOP(row.totalArreglos)}</td>
                       <td>${formatearCOP(row.totalDomicilios)}</td>
+                      <td>${formatearCOP(row.totalRecargos)}</td>
+                      <td>${formatearCOP(row.totalDescuentos)}</td>
                       <td>${formatearCOP(row.totalVenta)}</td>
                     </tr>
                   ))}
@@ -323,11 +394,232 @@ export function AccountingPage({
                       <th>{summaryTotals.cantidadPedidos}</th>
                       <th>${formatearCOP(summaryTotals.totalArreglos)}</th>
                       <th>${formatearCOP(summaryTotals.totalDomicilios)}</th>
+                      <th>${formatearCOP(summaryTotals.totalRecargos)}</th>
+                      <th>${formatearCOP(summaryTotals.totalDescuentos)}</th>
                       <th>${formatearCOP(summaryTotals.totalVenta)}</th>
                     </tr>
                   </tfoot>
                 ) : null}
               </table>
+            </section>
+          </>
+        ) : null}
+
+        {activeView === "arreglos" ? (
+          <section className="order-block accounting-arrangements-panel">
+            <div className="looker-header accounting-arrangements-head">
+              <div>
+                <h4>Métricas por arreglos</h4>
+                <p className="orders-admin-subtitle">Cuántas unidades se han vendido por arreglo, con filtro masivo y detalle visual.</p>
+              </div>
+              <div className="accounting-arrangements-actions">
+                <button type="button" className="btn-outline" onClick={selectAllArrangements} disabled={arrangementRows.length === 0}>
+                  Seleccionar todo
+                </button>
+                <button type="button" className="btn-outline" onClick={clearAllArrangements} disabled={arrangementRows.length === 0}>
+                  Borrar todo
+                </button>
+              </div>
+            </div>
+
+            <section className="accounting-summary-cards accounting-summary-cards--arrangements">
+              <article className="order-block accounting-stat-card">
+                <span>Arreglos seleccionados</span>
+                <strong>{arrangementSummary.arreglosSeleccionados}</strong>
+              </article>
+              <article className="order-block accounting-stat-card">
+                <span>Unidades vendidas</span>
+                <strong>{arrangementSummary.unidadesVendidas}</strong>
+              </article>
+              <article className="order-block accounting-stat-card">
+                <span>Total vendido</span>
+                <strong>${formatearCOP(arrangementSummary.totalVendido)}</strong>
+              </article>
+              <article className="order-block accounting-stat-card">
+                <span>Pedidos impactados</span>
+                <strong>{arrangementSummary.pedidosImpactados}</strong>
+              </article>
+            </section>
+
+            <div className="accounting-arrangements-grid">
+              <section className="order-block accounting-arrangements-selector">
+                <div className="accounting-arrangements-selector-head">
+                  <strong>Arreglos incluidos</strong>
+                  <span>{selectedArrangementKeys.length} / {arrangementRows.length}</span>
+                </div>
+                <div className="accounting-arrangements-checklist">
+                  {arrangementRows.length === 0 ? (
+                    <p className="accounting-empty-state">No hay arreglos vendidos para este rango.</p>
+                  ) : arrangementRows.map(item => (
+                    <label key={item.key} className="accounting-arrangement-check">
+                      <input
+                        type="checkbox"
+                        checked={selectedArrangementKeys.includes(item.key)}
+                        onChange={() => toggleArrangementSelection(item.key)}
+                      />
+                      <span>
+                        <strong>{item.nombre}</strong>
+                        <small>{item.codigo || "Sin código"} · {item.unidades} und.</small>
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              </section>
+
+              <section className="order-block accounting-arrangements-insights">
+                <div className="accounting-insight-cards">
+                  <article className="accounting-insight-card">
+                    <span>Top por unidades</span>
+                    <strong>{topArrangementByUnits?.nombre || "-"}</strong>
+                    <small>{topArrangementByUnits ? `${topArrangementByUnits.unidades} unidades` : "Sin datos"}</small>
+                  </article>
+                  <article className="accounting-insight-card">
+                    <span>Top por venta</span>
+                    <strong>{topArrangementBySales?.nombre || "-"}</strong>
+                    <small>{topArrangementBySales ? `$${formatearCOP(topArrangementBySales.totalVendido)}` : "Sin datos"}</small>
+                  </article>
+                </div>
+
+                <div className="accounting-chart-grid">
+                  <article className="accounting-chart-card">
+                    <h5>Gráfica por unidades</h5>
+                    {arrangementChartRows.length === 0 ? (
+                      <p className="accounting-empty-state">Selecciona al menos un arreglo para ver la gráfica.</p>
+                    ) : (
+                      <div className="accounting-bar-list">
+                        {renderBarChartRows(arrangementChartRows, "unidades")}
+                      </div>
+                    )}
+                  </article>
+                  <article className="accounting-chart-card">
+                    <h5>Gráfica por total vendido</h5>
+                    {arrangementChartRows.length === 0 ? (
+                      <p className="accounting-empty-state">Selecciona al menos un arreglo para ver la gráfica.</p>
+                    ) : (
+                      <div className="accounting-bar-list">
+                        {renderBarChartRows(arrangementChartRows, "totalVendido", true)}
+                      </div>
+                    )}
+                  </article>
+                </div>
+              </section>
+            </div>
+
+            <section className="orders-table-wrap">
+              <table className="orders-table accounting-table">
+                <thead>
+                  <tr>
+                    <th>Código</th>
+                    <th>Arreglo</th>
+                    <th>Unidades vendidas</th>
+                    <th>Pedidos</th>
+                    <th>Total vendido</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {selectedArrangementRows.length === 0 ? (
+                    <tr>
+                      <td colSpan={5}>No hay arreglos seleccionados para mostrar.</td>
+                    </tr>
+                  ) : selectedArrangementRows.map(item => (
+                    <tr key={item.key}>
+                      <td>{item.codigo || "-"}</td>
+                      <td>{item.nombre}</td>
+                      <td>{item.unidades}</td>
+                      <td>{item.pedidos}</td>
+                      <td>${formatearCOP(item.totalVendido)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </section>
+          </section>
+        ) : null}
+
+        {activeView === "cuentas" ? (
+          <>
+            <section className="accounting-summary-cards">
+              <article className="order-block accounting-stat-card">
+                <span>Cuentas activas</span>
+                <strong>{paymentSummary.cuentas}</strong>
+              </article>
+              <article className="order-block accounting-stat-card">
+                <span>Pedidos impactados</span>
+                <strong>{paymentSummary.pedidos}</strong>
+              </article>
+              <article className="order-block accounting-stat-card">
+                <span>Recaudo total</span>
+                <strong>${formatearCOP(paymentSummary.recaudo)}</strong>
+              </article>
+              <article className="order-block accounting-stat-card">
+                <span>Cuenta líder</span>
+                <strong>{topPaymentAccount?.cuenta || "-"}</strong>
+              </article>
+            </section>
+
+            <section className="order-block accounting-arrangements-panel">
+              <div className="looker-header accounting-arrangements-head">
+                <div>
+                  <h4>Ventas por cuenta o medio de pago</h4>
+                  <p className="orders-admin-subtitle">Mide número de pedidos, recaudo, participación y comportamiento por cada cuenta o medio de pago usado.</p>
+                </div>
+              </div>
+
+              <div className="accounting-chart-grid">
+                <article className="accounting-chart-card">
+                  <h5>Participación por recaudo</h5>
+                  {paymentAccountRows.length === 0 ? (
+                    <p className="accounting-empty-state">No hay movimientos de pago para este rango.</p>
+                  ) : (
+                    <div className="accounting-bar-list">
+                      {renderBarChartRows(paymentAccountRows.slice(0, 8), "totalRecaudado", true, "cuenta")}
+                    </div>
+                  )}
+                </article>
+                <article className="accounting-chart-card">
+                  <h5>Pedidos por cuenta</h5>
+                  {paymentAccountRows.length === 0 ? (
+                    <p className="accounting-empty-state">No hay movimientos de pago para este rango.</p>
+                  ) : (
+                    <div className="accounting-bar-list">
+                      {renderBarChartRows(paymentAccountRows.slice(0, 8), "pedidos", false, "cuenta")}
+                    </div>
+                  )}
+                </article>
+              </div>
+
+              <section className="orders-table-wrap">
+                <table className="orders-table accounting-table">
+                  <thead>
+                    <tr>
+                      <th>Cuenta / Medio</th>
+                      <th>Pedidos</th>
+                      <th>Métodos usados</th>
+                      <th>Total recaudado</th>
+                      <th>Promedio por pedido</th>
+                      <th>Participación</th>
+                      <th>Último movimiento</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {paymentAccountRows.length === 0 ? (
+                      <tr>
+                        <td colSpan={7}>No hay cuentas de pago para mostrar.</td>
+                      </tr>
+                    ) : paymentAccountRows.map(item => (
+                      <tr key={item.key}>
+                        <td>{item.cuenta}</td>
+                        <td>{item.pedidos}</td>
+                        <td>{item.metodos.join(", ") || "-"}</td>
+                        <td>${formatearCOP(item.totalRecaudado)}</td>
+                        <td>${formatearCOP(item.promedioPedido)}</td>
+                        <td>{item.participacionPct}%</td>
+                        <td>{item.ultimoMovimiento || "-"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </section>
             </section>
           </>
         ) : null}
@@ -344,22 +636,11 @@ export function AccountingPage({
             <div className="accounting-cash-grid">
               <label className="order-detail-edit-label">
                 Fecha
-                <input
-                  type="date"
-                  value={cashForm.fecha}
-                  onChange={event => setCashForm(current => ({ ...current, fecha: event.target.value }))}
-                />
+                <input type="date" value={cashForm.fecha} onChange={event => setCashForm(current => ({ ...current, fecha: event.target.value }))} />
               </label>
               <label className="order-detail-edit-label">
                 Base
-                <input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={cashForm.base}
-                  onChange={event => setCashForm(current => ({ ...current, base: event.target.value }))}
-                  placeholder="0.00"
-                />
+                <input type="number" min="0" step="0.01" value={cashForm.base} onChange={event => setCashForm(current => ({ ...current, base: event.target.value }))} placeholder="0.00" />
               </label>
               <label className="order-detail-edit-label">
                 Efectivo
@@ -367,14 +648,7 @@ export function AccountingPage({
               </label>
               <label className="order-detail-edit-label">
                 Gasto
-                <input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={cashForm.gasto}
-                  onChange={event => setCashForm(current => ({ ...current, gasto: event.target.value }))}
-                  placeholder="0.00"
-                />
+                <input type="number" min="0" step="0.01" value={cashForm.gasto} onChange={event => setCashForm(current => ({ ...current, gasto: event.target.value }))} placeholder="0.00" />
               </label>
               <label className="order-detail-edit-label">
                 T. Efectivo
@@ -382,14 +656,7 @@ export function AccountingPage({
               </label>
               <label className="order-detail-edit-label">
                 Guardado
-                <input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={cashForm.guardado}
-                  onChange={event => setCashForm(current => ({ ...current, guardado: event.target.value }))}
-                  placeholder="0.00"
-                />
+                <input type="number" min="0" step="0.01" value={cashForm.guardado} onChange={event => setCashForm(current => ({ ...current, guardado: event.target.value }))} placeholder="0.00" />
               </label>
               <label className="order-detail-edit-label">
                 Nueva Base
@@ -476,6 +743,8 @@ function buildAccountingRows(items) {
       cantidadPedidos: 0,
       totalArreglos: 0,
       totalDomicilios: 0,
+      totalRecargos: 0,
+      totalDescuentos: 0,
       totalVenta: 0,
       totalEfectivo: 0,
     };
@@ -484,10 +753,14 @@ function buildAccountingRows(items) {
     const domicilio = roundMoney(financiero?.domicilio);
     const total = roundMoney(financiero?.total ?? item?.order?.total);
     const arreglos = roundMoney((financiero?.subtotal ?? 0) + (financiero?.iva ?? 0));
+    const recargos = roundMoney(financiero?.recargoLinkMonto ?? 0);
+    const descuentos = roundMoney(financiero?.descuentoMonto ?? 0);
 
     current.cantidadPedidos += 1;
     current.totalArreglos += arreglos;
     current.totalDomicilios += domicilio;
+    current.totalRecargos += recargos;
+    current.totalDescuentos += descuentos;
     current.totalVenta += total;
     current.totalEfectivo += extractCashAmount(financiero, total);
 
@@ -497,7 +770,103 @@ function buildAccountingRows(items) {
   return Array.from(grouped.values()).sort((a, b) => a.fecha.localeCompare(b.fecha));
 }
 
-function extractCashAmount(financiero, fallbackTotal = 0) {
+function buildArrangementRows(items) {
+  const grouped = new Map();
+
+  for (const item of items) {
+    const pedidoId = Number(item?.order?.pedidoID || item?.detail?.pedidoID || 0);
+    const productos = Array.isArray(item?.detail?.productos) ? item.detail.productos : [];
+    for (const producto of productos) {
+      const codigo = String(producto?.codigoProducto || "").trim();
+      const nombre = String(producto?.nombreProducto || "Arreglo").trim() || "Arreglo";
+      const productoId = Number(producto?.productoID || 0);
+      const key = `${productoId || "na"}::${codigo || "sin-codigo"}::${nombre}`;
+      const current = grouped.get(key) || {
+        key,
+        productoId: productoId || null,
+        codigo: codigo || null,
+        nombre,
+        unidades: 0,
+        pedidosIds: new Set(),
+        totalVendido: 0,
+      };
+
+      current.unidades += Number(producto?.cantidad || 0);
+      if (pedidoId) current.pedidosIds.add(pedidoId);
+      current.totalVendido += Number(producto?.subtotal || 0);
+      grouped.set(key, current);
+    }
+  }
+
+  return Array.from(grouped.values())
+    .map(item => ({
+      key: item.key,
+      productoId: item.productoId,
+      codigo: item.codigo,
+      nombre: item.nombre,
+      unidades: roundMoney(item.unidades),
+      pedidos: item.pedidosIds.size,
+      pedidoIDs: Array.from(item.pedidosIds),
+      totalVendido: roundMoney(item.totalVendido),
+    }))
+    .sort((a, b) => {
+      if (b.unidades !== a.unidades) return b.unidades - a.unidades;
+      if (b.totalVendido !== a.totalVendido) return b.totalVendido - a.totalVendido;
+      return a.nombre.localeCompare(b.nombre);
+    });
+}
+
+function buildPaymentAccountRows(items) {
+  const grouped = new Map();
+  let totalGlobal = 0;
+
+  for (const item of items) {
+    const pedidoId = Number(item?.order?.pedidoID || item?.detail?.pedidoID || 0);
+    const fecha = splitDateTimeParts(item?.order?.fechaPedido || item?.order?.fecha).date || "";
+    const financiero = item?.detail?.financiero || {};
+    const entries = extractPaymentEntries(financiero);
+    for (const entry of entries) {
+      const cuenta = entry.cuenta;
+      const key = cuenta.toLowerCase();
+      const current = grouped.get(key) || {
+        key,
+        cuenta,
+        pedidosSet: new Set(),
+        metodosSet: new Set(),
+        totalRecaudado: 0,
+        ultimoMovimiento: "",
+      };
+      if (pedidoId) current.pedidosSet.add(pedidoId);
+      if (entry.metodo) current.metodosSet.add(entry.metodo);
+      current.totalRecaudado += Number(entry.monto || 0);
+      if (fecha && (!current.ultimoMovimiento || fecha > current.ultimoMovimiento)) current.ultimoMovimiento = fecha;
+      grouped.set(key, current);
+      totalGlobal += Number(entry.monto || 0);
+    }
+  }
+
+  return Array.from(grouped.values())
+    .map(item => {
+      const pedidos = item.pedidosSet.size;
+      return {
+        key: item.key,
+        cuenta: item.cuenta,
+        pedidos,
+        metodos: Array.from(item.metodosSet),
+        totalRecaudado: roundMoney(item.totalRecaudado),
+        promedioPedido: pedidos > 0 ? roundMoney(item.totalRecaudado / pedidos) : 0,
+        participacionPct: totalGlobal > 0 ? roundMoney((item.totalRecaudado / totalGlobal) * 100) : 0,
+        ultimoMovimiento: item.ultimoMovimiento || "-",
+      };
+    })
+    .sort((a, b) => {
+      if (b.totalRecaudado !== a.totalRecaudado) return b.totalRecaudado - a.totalRecaudado;
+      if (b.pedidos !== a.pedidos) return b.pedidos - a.pedidos;
+      return a.cuenta.localeCompare(b.cuenta);
+    });
+}
+
+function extractPaymentEntries(financiero) {
   const breakdownCandidates = [
     financiero?.detallePago,
     financiero?.desglosePago,
@@ -506,31 +875,75 @@ function extractCashAmount(financiero, fallbackTotal = 0) {
   ];
   const breakdown = breakdownCandidates.find(Array.isArray) || [];
   if (breakdown.length > 0) {
-    return roundMoney(breakdown.reduce((sum, item) => {
-      const metodo = String(item?.metodo || item?.metodoPago || item?.nombre || "").trim().toLowerCase();
-      if (!metodo.includes("efectivo")) return sum;
-      return sum + Number(item?.monto ?? item?.valor ?? item?.amount ?? 0);
-    }, 0));
+    return breakdown.map(item => ({
+      cuenta: String(item?.metodo || item?.metodoPago || item?.nombre || "Sin especificar").trim() || "Sin especificar",
+      metodo: String(item?.metodo || item?.metodoPago || item?.nombre || "Sin especificar").trim() || "Sin especificar",
+      monto: Number(item?.monto ?? item?.valor ?? item?.amount ?? 0),
+    }));
   }
 
   const methods = Array.isArray(financiero?.metodosPago)
-    ? financiero.metodosPago.map(item => String(item || "").trim().toLowerCase()).filter(Boolean)
+    ? financiero.metodosPago.map(item => String(item || "").trim()).filter(Boolean)
     : [];
-  if (methods.length === 1 && methods[0].includes("efectivo")) {
-    return roundMoney(financiero?.montoEfectivo ?? financiero?.efectivoMonto ?? fallbackTotal);
+  const total = Number(financiero?.total || 0);
+  if (methods.length === 1) {
+    return [{
+      cuenta: methods[0],
+      metodo: methods[0],
+      monto: methods[0].toLowerCase().includes("efectivo")
+        ? Number(financiero?.montoEfectivo ?? financiero?.efectivoMonto ?? total)
+        : total,
+    }];
   }
 
-  const metodoPago = String(financiero?.metodoPago || "").trim().toLowerCase();
-  if (metodoPago.includes("efectivo")) {
-    return roundMoney(financiero?.montoEfectivo ?? financiero?.efectivoMonto ?? fallbackTotal);
+  const metodoPago = String(financiero?.metodoPago || "").trim();
+  if (metodoPago) {
+    return [{
+      cuenta: metodoPago,
+      metodo: metodoPago,
+      monto: metodoPago.toLowerCase().includes("efectivo")
+        ? Number(financiero?.montoEfectivo ?? financiero?.efectivoMonto ?? total)
+        : total,
+    }];
   }
 
+  return [];
+}
+
+function renderBarChartRows(rows, field, isMoney = false, labelField = "nombre") {
+  const maxValue = Math.max(...rows.map(item => Number(item?.[field] || 0)), 0);
+
+  return rows.map(item => {
+    const value = Number(item?.[field] || 0);
+    const width = maxValue > 0 ? Math.max((value / maxValue) * 100, 4) : 0;
+    return (
+      <div key={`${field}-${item.key}`} className="accounting-bar-row">
+        <div className="accounting-bar-row-head">
+          <strong>{item[labelField]}</strong>
+          <span>{isMoney ? `$${formatearCOP(value)}` : value}</span>
+        </div>
+        <div className="accounting-bar-track">
+          <div className="accounting-bar-fill" style={{ width: `${width}%` }} />
+        </div>
+      </div>
+    );
+  });
+}
+
+function extractCashAmount(financiero, fallbackTotal = 0) {
+  const entries = extractPaymentEntries(financiero);
+  if (entries.length > 0) {
+    return roundMoney(entries.reduce((sum, item) => {
+      if (!String(item?.metodo || "").trim().toLowerCase().includes("efectivo")) return sum;
+      return sum + Number(item?.monto || 0);
+    }, 0));
+  }
   return 0;
 }
 
 function isSaleStatus(status) {
   const normalized = normalizeStatus(status);
-  return normalized !== "RECHAZADO" && normalized !== "CANCELADO";
+  return normalized === "APROBADO";
 }
 
 function parseMoneyInput(value) {

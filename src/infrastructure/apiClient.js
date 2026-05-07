@@ -375,8 +375,8 @@ export function createApiClient(config) {
       params.set("empresaID", String(empresaId));
       if (sucursalId != null) params.set("sucursalID", String(sucursalId));
       if (fecha) params.set("fecha", String(fecha));
-      if (domiciliarioId != null) params.set("domiciliarioID", String(domiciliarioId));
-      if (floristaId != null) params.set("floristaID", String(floristaId));
+      if (domiciliarioId != null && String(domiciliarioId).trim()) params.set("domiciliarioID", String(domiciliarioId).trim());
+      if (floristaId != null && String(floristaId).trim()) params.set("floristaID", String(floristaId).trim());
       if (numeroPedido) params.set("numeroPedido", String(numeroPedido));
       params.set("soloHoy", soloHoy ? "true" : "false");
       params.set("soloAtrasados", soloAtrasados ? "true" : "false");
@@ -466,6 +466,7 @@ export function createApiClient(config) {
 
     async actualizarDetallePedidoPipeline({
       pedidoId,
+      detalleID,
       productoID,
       cantidad,
       productoObservaciones,
@@ -486,6 +487,8 @@ export function createApiClient(config) {
       metodosPago,
       detallePago,
       montoEfectivo,
+      omitirRecargoLink,
+      descuentoPct,
       canalFlora,
     }) {
       return requestJson(`/pedido/${pedidoId}/detalle`, {
@@ -494,6 +497,7 @@ export function createApiClient(config) {
           "Content-Type": "application/json"
         },
         body: JSON.stringify({
+          detalleID: detalleID != null ? Number(detalleID) : null,
           productoID: productoID != null ? Number(productoID) : null,
           cantidad: cantidad != null ? Number(cantidad) : null,
           productoObservaciones: productoObservaciones ?? null,
@@ -514,8 +518,37 @@ export function createApiClient(config) {
           metodosPago: Array.isArray(metodosPago) ? metodosPago : null,
           detallePago: Array.isArray(detallePago) ? detallePago : null,
           montoEfectivo: montoEfectivo != null ? Number(montoEfectivo) : null,
+          omitirRecargoLink: omitirRecargoLink != null ? Boolean(omitirRecargoLink) : null,
+          descuentoPct: descuentoPct != null ? Number(descuentoPct) : null,
           canalFlora: canalFlora ?? null,
         })
+      });
+    },
+
+    async agregarDetallePedidoPipeline({
+      pedidoId,
+      productoID,
+      cantidad,
+      productoObservaciones,
+      productoPrecio,
+    }) {
+      return requestJson(`/pedido/${pedidoId}/detalle`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          productoID: productoID != null ? Number(productoID) : null,
+          cantidad: cantidad != null ? Number(cantidad) : 1,
+          productoObservaciones: productoObservaciones ?? null,
+          productoPrecio: productoPrecio != null ? Number(productoPrecio) : null,
+        })
+      });
+    },
+
+    async eliminarDetallePedidoPipeline({ pedidoId, detalleID }) {
+      return requestJson(`/pedido/${pedidoId}/detalle/${detalleID}`, {
+        method: "DELETE",
       });
     },
 
@@ -685,6 +718,24 @@ export function createApiClient(config) {
       params.set("fechaHasta", String(fechaHasta));
 
       return requestJson(`/produccion/metricas/operacion?${params.toString()}`);
+    },
+
+    async obtenerTrazabilidadAprobacionesPedidos({ empresaId, sucursalId, fechaDesde, fechaHasta }) {
+      const params = new URLSearchParams();
+      params.set("empresaID", String(empresaId));
+      if (sucursalId != null) params.set("sucursalID", String(sucursalId));
+      params.set("fechaDesde", String(fechaDesde));
+      params.set("fechaHasta", String(fechaHasta));
+      return requestJson(`/pedidos/trazabilidad/aprobaciones?${params.toString()}`);
+    },
+
+    async obtenerTrazabilidadProduccionUsuarios({ empresaId, sucursalId, fechaDesde, fechaHasta }) {
+      const params = new URLSearchParams();
+      params.set("empresaID", String(empresaId));
+      if (sucursalId != null) params.set("sucursalID", String(sucursalId));
+      params.set("fechaDesde", String(fechaDesde));
+      params.set("fechaHasta", String(fechaHasta));
+      return requestJson(`/produccion/trazabilidad/usuarios?${params.toString()}`);
     },
 
     async listarDomiciliarios({ empresaId, sucursalId, soloActivos = true }) {

@@ -1,7 +1,16 @@
 ﻿import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { tenantConfig } from "../../config/tenantConfig.js";
 import { createApiClient } from "../../infrastructure/apiClient.js";
+import { AppSidebar } from "../../shared/AppSidebar.jsx";
+import { useSidebarState } from "../../shared/useSidebarState.js";
 import { formatDateOnly, formatDateTimeCompact, normalizeStatus } from "../../shared/utils.js";
+import {
+  IconAdjustments,
+  IconCalendarPlus,
+  IconRefresh,
+  IconReload,
+  IconX,
+} from "@tabler/icons-react";
 
 const ESTADOS_UI = ["Pendiente", "EnProduccion", "ParaEntrega", "Cancelado"];
 const ESTADOS_FILTRO_DEFAULT = ["Pendiente", "EnProduccion"];
@@ -108,7 +117,48 @@ function isFloristaActivo(item) {
   return String(item?.estado || "").trim().toLowerCase() === "activo" && Boolean(item?.activo);
 }
 
-export function ProductionPage({ session, canViewPipeline, canViewPedidos, canViewProduccion, canViewDomicilios, canViewInventario, canViewContabilidad, canViewClientesPanel, canViewUsuariosPanel, onLogout, onGoPipeline, onGoPedidos, onGoProduccion, onGoDomicilios, onGoInventario, onGoContabilidad, onGoClientes, onGoUsuarios }) {
+function sanitizeHistoryText(value) {
+  return String(value || "")
+    .replaceAll("Â·", "-")
+    .replaceAll("Ã¡", "á")
+    .replaceAll("Ã©", "é")
+    .replaceAll("Ã­", "í")
+    .replaceAll("Ã³", "ó")
+    .replaceAll("Ãº", "ú")
+    .replaceAll("Ã", "Á")
+    .replaceAll("Ã‰", "É")
+    .replaceAll("Ã", "Í")
+    .replaceAll("Ã“", "Ó")
+    .replaceAll("Ãš", "Ú")
+    .trim();
+}
+
+function formatHistoryActor(value) {
+  const raw = sanitizeHistoryText(value);
+  if (!raw) return "-";
+  return raw.replace(/\./g, " · ");
+}
+
+function formatHistoryReason(value) {
+  return sanitizeHistoryText(value) || "-";
+}
+
+function resolveHistoryTypeLabel(motivo, actor) {
+  const reason = sanitizeHistoryText(motivo).toLowerCase();
+  const who = sanitizeHistoryText(actor).toLowerCase();
+  if (reason.includes("auto") || reason.includes("autom")) return "Auto";
+  if (who.includes("admin") || reason.includes("admin")) return "Admin";
+  return "Reasignación";
+}
+
+function resolveHistoryTypeClass(motivo, actor) {
+  const label = resolveHistoryTypeLabel(motivo, actor);
+  if (label === "Auto") return "is-auto";
+  if (label === "Admin") return "is-admin";
+  return "is-reassignment";
+}
+
+export function ProductionPage({ session, canViewPipeline, canViewPedidos, canViewProduccion, canViewDomicilios, canViewInventario, canViewContabilidad, canViewTrazabilidad, canViewClientesPanel, canViewUsuariosPanel, onLogout, onGoPipeline, onGoPedidos, onGoProduccion, onGoDomicilios, onGoInventario, onGoContabilidad, onGoTrazabilidad, onGoClientes, onGoUsuarios }) {
   const api = useMemo(() => createApiClient(tenantConfig), []);
   const empresaId = Number(session?.empresaID || tenantConfig.empresaId);
   const sucursalId = Number(session?.sucursalID || tenantConfig.sucursalId);
@@ -150,8 +200,7 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
   const [busquedaGeneral, setBusquedaGeneral] = useState("");
   const [soloMisAsignados, setSoloMisAsignados] = useState(!canManageProductionActions);
 
-  const [sidebarPinned, setSidebarPinned] = useState(false);
-  const [sidebarMobileOpen, setSidebarMobileOpen] = useState(false);
+  const { sidebarPinned, sidebarMobileOpen, setSidebarMobileOpen, toggleSidebar } = useSidebarState();
 
   const currentFloristaDisponibilidad = useMemo(() => {
     if (!floristaGestionID) return null;
@@ -279,17 +328,6 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
     loadInsights();
   }, [loadInsights]);
 
-  useEffect(() => {
-    const mediaQuery = globalThis.matchMedia("(max-width: 980px)");
-    const handleChange = event => {
-      if (!event.matches) {
-        setSidebarMobileOpen(false);
-      }
-    };
-
-    mediaQuery.addEventListener("change", handleChange);
-    return () => mediaQuery.removeEventListener("change", handleChange);
-  }, []);
 
   useEffect(() => {
     if (submenu !== "pedidos") {
@@ -312,15 +350,6 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
     setSoloMisAsignados(true);
   }, [canManageProductionActions, currentFloristaId]);
 
-  const toggleSidebar = () => {
-    const isMobile = globalThis.matchMedia("(max-width: 980px)").matches;
-    if (isMobile) {
-      setSidebarMobileOpen(current => !current);
-      return;
-    }
-
-    setSidebarPinned(current => !current);
-  };
 
   const refreshAll = async () => {
     await loadData();
@@ -578,166 +607,71 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
 
   return (
     <div className={`app-shell ${sidebarPinned ? "is-sidebar-pinned" : ""} ${sidebarMobileOpen ? "is-sidebar-mobile-open" : ""}`}>
-      <aside className="app-sidebar">
-        <div className="sidebar-brand">
-          <img src="/petalops-compact.png" alt="PetalOps" className="sidebar-brand-logo-compact" />
-          <img src="/petalops-logo-full.png" alt="PetalOps" className="sidebar-brand-logo-full" />
-        </div>
+      <AppSidebar
+        activeKey="produccion"
+        sidebarPinned={sidebarPinned}
+        sidebarMobileOpen={sidebarMobileOpen}
+        toggleSidebar={toggleSidebar}
+        closeSidebarMobile={() => setSidebarMobileOpen(false)}
+        onLogout={onLogout}
+        permissions={{
+          pipeline: canViewPipeline,
+          pedidos: canViewPedidos,
+          produccion: canViewProduccion,
+          domicilios: canViewDomicilios,
+          inventario: canViewInventario,
+          contabilidad: canViewContabilidad,
+          trazabilidad: canViewTrazabilidad,
+          clientes: canViewClientesPanel,
+          usuarios: canViewUsuariosPanel,
+        }}
+        navigation={{
+          pipeline: onGoPipeline,
+          pedidos: onGoPedidos,
+          produccion: () => {
+            onGoProduccion();
+            setSubmenu("pedidos");
+          },
+          domicilios: onGoDomicilios,
+          inventario: onGoInventario,
+          contabilidad: onGoContabilidad,
+          trazabilidad: onGoTrazabilidad,
+          clientes: onGoClientes,
+          usuarios: onGoUsuarios,
+        }}
+      />
 
-        <nav className="sidebar-nav" aria-label="Módulos">
-          {canViewPipeline ? (
-            <button
-              type="button"
-              className="sidebar-nav-btn"
-              title="Pipeline"
-              onClick={() => {
-                setSidebarMobileOpen(false);
-                onGoPipeline();
-              }}
-            >
-              <span className="sidebar-nav-icon">▦</span>
-              <span className="sidebar-nav-text">Pipeline</span>
-            </button>
-          ) : null}
-          {canViewPedidos ? (
-            <button
-              type="button"
-              className="sidebar-nav-btn"
-              title="Pedidos"
-              onClick={() => {
-                setSidebarMobileOpen(false);
-                onGoPedidos();
-              }}
-            >
-              <span className="sidebar-nav-icon">🧾</span>
-              <span className="sidebar-nav-text">Pedidos</span>
-            </button>
-          ) : null}
-          {canViewProduccion ? (
-            <button
-              type="button"
-              className="sidebar-nav-btn is-active"
-              title="Producción"
-              onClick={() => {
-                onGoProduccion();
-                setSubmenu("pedidos");
-                setSidebarMobileOpen(false);
-              }}
-            >
-              <span className="sidebar-nav-icon">🏭</span>
-              <span className="sidebar-nav-text">Producción</span>
-            </button>
-          ) : null}
-          {canViewDomicilios ? (
-            <button
-              type="button"
-              className="sidebar-nav-btn"
-              title="Domicilios"
-              onClick={() => {
-                setSidebarMobileOpen(false);
-                onGoDomicilios();
-              }}
-            >
-              <span className="sidebar-nav-icon">🛵</span>
-              <span className="sidebar-nav-text">Domicilios</span>
-            </button>
-          ) : null}
-          {canViewInventario ? (
-            <button
-              type="button"
-              className="sidebar-nav-btn"
-              title="Inventario"
-              onClick={() => {
-                setSidebarMobileOpen(false);
-                onGoInventario();
-              }}
-            >
-              <span className="sidebar-nav-icon">📦</span>
-                <span className="sidebar-nav-text">Inventario</span>
-              </button>
-            ) : null}
-          {canViewContabilidad ? (
-            <button
-              type="button"
-              className="sidebar-nav-btn"
-              onClick={() => {
-                setSidebarMobileOpen(false);
-                onGoContabilidad();
-              }}
-            >
-              <span className="sidebar-nav-icon">📊</span>
-              <span className="sidebar-nav-text">Contabilidad</span>
-            </button>
-          ) : null}
-          {canViewClientesPanel ? (
-            <button
-              type="button"
-              className="sidebar-nav-btn"
-              onClick={() => {
-                setSidebarMobileOpen(false);
-                onGoClientes();
-              }}
-            >
-              <span className="sidebar-nav-icon">💐</span>
-              <span className="sidebar-nav-text">Clientes</span>
-            </button>
-          ) : null}
-          {canViewUsuariosPanel ? (
-            <button
-              type="button"
-              className="sidebar-nav-btn"
-              title="Gestin Usuarios"
-              onClick={() => {
-                setSidebarMobileOpen(false);
-                onGoUsuarios();
-              }}
-            >
-              <span className="sidebar-nav-icon">👥</span>
-              <span className="sidebar-nav-text">Gestión Usuarios</span>
-            </button>
-          ) : null}
-        </nav>
-
-        <button type="button" className="btn-outline sidebar-logout-btn" onClick={onLogout} title="Cerrar sesión">
-          <span className="sidebar-logout-icon" aria-hidden="true">⏻</span>
-          <span className="sidebar-logout-text">Cerrar sesión</span>
-        </button>
-
-        <button type="button" className="sidebar-pin-btn" onClick={toggleSidebar} title={sidebarPinned ? "Contraer menú" : "Expandir menú"}>
-          {sidebarPinned ? "←" : "→"}
-        </button>
-
-        <p className="sidebar-caption">Escalable para nuevos módulos</p>
-      </aside>
-
-      <button type="button" className="sidebar-overlay" aria-label="Cerrar menú" onClick={() => setSidebarMobileOpen(false)} />
-
-      <main className="orders-admin-view">
-        <header className="orders-admin-header">
-          <div>
-            <button type="button" className="sidebar-trigger" onClick={toggleSidebar} title="Abrir o cerrar menú">☰ Menú</button>
-            <h1>Producción</h1>
-            <p className="orders-admin-subtitle">
+      <main className="orders-admin-view production-page-view">
+        <div className="production-topbar">
+          <div className="production-topbar-left">
+            <span className="production-topbar-title">Producción</span>
+            <p className="production-topbar-description">
               {canManageProductionActions
                 ? "Asignación inteligente, carga equitativa y control por fecha programada."
                 : "Consulta operativa de tus pedidos asignados y su estado actual."}
             </p>
           </div>
-          <div className="header-actions">
+          <div className="production-topbar-actions">
             {canManageProductionActions ? (
-              <button type="button" className="btn-outline" title="Crear tareas desde pedidos aprobados/pagados" onClick={generarDesdePedidos}>Sincronizar pedidos</button>
+              <button type="button" className="btn-outline production-topbar-btn" title="Crear tareas desde pedidos aprobados/pagados" onClick={generarDesdePedidos}>
+                <IconReload size={15} stroke={2} />
+                <span>Sincronizar pedidos</span>
+              </button>
             ) : null}
-            <button type="button" className="btn-primary" title="Recargar vista" onClick={refreshAll}>Actualizar</button>
+            <button type="button" className="btn-primary production-topbar-btn production-topbar-btn-primary" title="Recargar vista" onClick={refreshAll}>
+              <IconRefresh size={15} stroke={2} />
+              <span>Actualizar</span>
+            </button>
           </div>
-        </header>
+        </div>
 
         {canManageProductionActions ? (
-          <section className="inventory-header-tabs production-header-tabs" aria-label="Submenu producción">
+          <section className="production-subtabs" aria-label="Submenu producción">
             {visibleSubmenuOptions.map(item => (
               <button
                 key={item.key}
                 type="button"
-                className={`btn-outline inventory-tab-btn ${submenu === item.key ? "is-active" : ""}`}
+                className={`production-subtab ${submenu === item.key ? "is-active" : ""}`}
                 onClick={() => setSubmenu(item.key)}
               >
                 {item.label}
@@ -748,7 +682,7 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
 
         {submenu === "pedidos" && (
           <>
-            <section className="orders-filters orders-filters--four-col">
+            <section className="orders-filters orders-filters--four-col production-filters-bar">
               <label className="filter-field">
                 <span>Buscar</span>
                 <input
@@ -804,15 +738,13 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
             {loading && <p className="orders-message">Cargando producción...</p>}
             {!loading && !error && visibleItems.length === 0 ? <p className="orders-message">No hay arreglos que coincidan con los filtros seleccionados.</p> : null}
 
-            <section className="orders-table-wrap production-table-wrap">
+            <section className="orders-table-wrap production-table-wrap production-table-shell">
               <table className="orders-table production-orders-table">
                 <thead>
                   <tr>
                     <th>N° Pedido</th>
-                    <th>Producto</th>
-                    <th>Cliente</th>
-                    <th>Fecha Entrega</th>
-                    <th>Hora Entrega</th>
+                    <th>Producto · Cliente</th>
+                    <th>Fecha + Hora entrega</th>
                     <th>Florista Asignado</th>
                     <th>Estado</th>
                     <th>Fecha Asignación</th>
@@ -827,27 +759,37 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
                   {visibleItems.map(item => (
                     <tr key={item.idProduccion}>
                       <td>
-                        {canManageProductionActions ? (
-                          <button type="button" className="btn-outline" title="Abrir acciones del pedido" onClick={() => openActionsDrawer(item)}>
-                            {item.numeroPedido ?? "-"}
-                          </button>
+                        <span className="production-order-badge">{item.numeroPedido ?? "-"}</span>
+                      </td>
+                      <td>
+                        <div className="production-product-customer">
+                          <strong>{item.producto || "-"}</strong>
+                          <span>{item.cliente || "-"}</span>
+                        </div>
+                      </td>
+                      <td>
+                        <div className="production-delivery-stack">
+                          <strong>{formatDateOnly(item.fechaEntrega) || "-"}</strong>
+                          <span>{item.horaEntrega || "-"}</span>
+                        </div>
+                      </td>
+                      <td>
+                        {item.floristaAsignado ? (
+                          <span className="production-florista-name">{item.floristaAsignado}</span>
                         ) : (
-                          <span>{item.numeroPedido ?? "-"}</span>
+                          <span className="production-florista-empty">Sin asignar</span>
                         )}
                       </td>
-                      <td>{item.producto || "-"}</td>
-                      <td>{item.cliente || "-"}</td>
-                      <td>{formatDateOnly(item.fechaEntrega) || "-"}</td>
-                      <td>{item.horaEntrega || "-"}</td>
-                      <td>{item.floristaAsignado || "Sin asignar"}</td>
                       <td><span className={`order-badge ${statusBadgeClass(item.estado)}`}>{item.estado || "-"}</span></td>
                       <td>{formatDateTimeCompact(item.fechaAsignacion) || "-"}</td>
-                      <td>{typeof item.tiempoRestanteHoras === "number" ? `${item.tiempoRestanteHoras} h` : "-"}</td>
+                      <td className={typeof item.tiempoRestanteHoras === "number" && item.tiempoRestanteHoras < 0 ? "is-overdue" : ""}>
+                        {typeof item.tiempoRestanteHoras === "number" ? `${item.tiempoRestanteHoras} h` : "-"}
+                      </td>
                       <td>{`${item.tiempoEstimadoMin ?? "-"} / ${item.tiempoRealMin ?? "-"}`}</td>
                       <td>{item.prioridad || "MEDIA"}</td>
                       {canManageProductionActions ? (
                         <td>
-                          <button type="button" className="btn-outline" title="Abrir barra lateral de acciones" onClick={() => openActionsDrawer(item)}>
+                          <button type="button" className="btn-outline production-actions-btn" title="Abrir barra lateral de acciones" onClick={() => openActionsDrawer(item)}>
                             Ver acciones
                           </button>
                         </td>
@@ -903,8 +845,8 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
                   </div>
 
                   <div className="production-capsule-actions">
-                    {canManageProductionActions ? (
-                      <button type="button" className="btn-outline" title="Abrir barra lateral de acciones" onClick={() => openActionsDrawer(item)}>
+                      {canManageProductionActions ? (
+                      <button type="button" className="btn-outline production-actions-btn" title="Abrir barra lateral de acciones" onClick={() => openActionsDrawer(item)}>
                         Ver acciones
                       </button>
                     ) : null}
@@ -939,18 +881,27 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
 
 
         {canManageProductionActions && submenu === "historial" && (
-          <section className="order-block" style={{ marginTop: 12 }}>
-            <h4> Historial de reasignaciones</h4>
-            <div className="order-actions" style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 8 }}>
-              <input type="date" value={metricasDesde} onChange={event => setMetricasDesde(event.target.value)} title="Desde" />
-              <input type="date" value={metricasHasta} onChange={event => setMetricasHasta(event.target.value)} title="Hasta" />
-              <button type="button" className="btn-outline" onClick={loadInsights} title="Consultar">Consultar</button>
+          <section className="order-block production-section-card production-history-panel">
+            <div className="production-section-head">
+              <h4>Historial de reasignaciones</h4>
+              <div className="production-history-filters">
+                <input type="date" value={metricasDesde} onChange={event => setMetricasDesde(event.target.value)} title="Desde" />
+                <input type="date" value={metricasHasta} onChange={event => setMetricasHasta(event.target.value)} title="Hasta" />
+                <button type="button" className="btn-primary" onClick={loadInsights} title="Consultar">Consultar</button>
+              </div>
             </div>
-            <ul className="order-products-list">
-              {historial.length === 0 ? <li>Sin datos</li> : historial.map((item, idx) => (
+            <ul className="order-products-list production-history-list">
+              {historial.length === 0 ? <li className="production-history-empty">Sin datos</li> : historial.map((item, idx) => (
                 <li key={`${item.produccionID}-${item.fechaCambio}-${idx}`}>
-                  <span>P{item.produccionID} Â· {item.usuarioCambio} Â· {item.motivo}</span>
-                  <strong>{formatDateTimeCompact(item.fechaCambio) || "-"}</strong>
+                  <span className="production-history-copy">
+                    <span className="production-history-line">
+                      <strong>P{item.produccionID}</strong>
+                      <span className={`production-history-tag ${resolveHistoryTypeClass(item.motivo, item.usuarioCambio)}`}>{resolveHistoryTypeLabel(item.motivo, item.usuarioCambio)}</span>
+                    </span>
+                    <small>{formatHistoryActor(item.usuarioCambio)}</small>
+                    <em>{formatHistoryReason(item.motivo)}</em>
+                  </span>
+                  <strong className="production-history-date">{formatDateTimeCompact(item.fechaCambio) || "-"}</strong>
                 </li>
               ))}
             </ul>
@@ -958,18 +909,23 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
         )}
 
         {canManageProductionActions && submenu === "disponibilidad" && (
-          <section className="order-block" style={{ marginTop: 12 }}>
-            <div className="inventory-section-title">
-              <h4>Disponibilidad florista</h4>
-              <p>Floristas internos numerados por la sucursal actual. Los demás aparecen como externos.</p>
+          <section className="order-block production-section-card production-availability-panel">
+            <div className="production-section-head production-section-head--stack">
+              <div>
+                <h4>Disponibilidad florista</h4>
+                <p className="production-section-copy">Floristas internos numerados por la sucursal actual. Los demás aparecen como externos.</p>
+              </div>
             </div>
 
-            <div className="production-availability-grid">
+            <div className="production-availability-grid production-availability-grid--compact floristas-grid">
               {floristasDisponibilidad.length === 0 ? (
                 <p className="orders-message" style={{ marginBottom: 0 }}>No hay floristas disponibles para mostrar.</p>
               ) : floristasDisponibilidad.map(item => {
                 const estaActivo = isFloristaActivo(item);
-                const identificador = item.esExterno ? "Externo" : String(item.numeroFlorista ?? "-");
+                const identificador = item.esExterno ? "Externo" : `#${item.numeroFlorista ?? "-"}`;
+                const capacidad = Number(item.capacidadDiaria || 0);
+                const carga = Number(item.arreglosHoy || 0);
+                const capacidadPct = capacidad > 0 ? Math.min(100, Math.round((carga / capacidad) * 100)) : 0;
                 return (
                   <article key={item.idFlorista} className={`production-availability-card ${item.esExterno ? "is-external" : ""}`}>
                     <div className="production-availability-head">
@@ -977,7 +933,7 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
                         <p className="production-availability-id">{identificador}</p>
                         <strong>{item.nombre}</strong>
                       </div>
-                      <span className={`order-badge ${estaActivo ? "is-entregado" : "is-cancelado"}`}>
+                      <span className={`production-availability-status ${estaActivo ? "is-active" : "is-inactive"}`}>
                         {estaActivo ? "Activo" : "Inactivo"}
                       </span>
                     </div>
@@ -988,10 +944,17 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
                       <p><span>Tipo</span><strong>{item.esExterno ? "Externo" : "Interno"}</strong></p>
                     </div>
 
+                    <div className="production-capacity-block">
+                      <div className="production-capacity-bar">
+                        <div className="production-capacity-fill" style={{ width: `${capacidadPct}%` }} />
+                      </div>
+                      <span>{carga} / {capacidad || 0}</span>
+                    </div>
+
                     <div className="production-inline-actions">
                       <button
                         type="button"
-                        className={`btn-outline ${estaActivo ? "" : "is-selected"}`}
+                        className={`btn-outline production-availability-toggle ${estaActivo ? "is-inactivate" : "is-activate"}`}
                         onClick={() => toggleDisponibilidadFlorista(item)}
                       >
                         {estaActivo ? "Inactivar" : "Activar"}
@@ -1005,9 +968,19 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
         )}
 
         {canManageProductionActions && submenu === "incapacidad" && (
-          <section className="order-block" style={{ marginTop: 12 }}>
-            <h4>🩺 Gestión de incapacidad</h4>
-            <div className="order-actions" style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <section className="order-block production-section-card production-incapacity-panel">
+            <div className="production-section-head">
+              <div>
+                <h4>Gestión incapacidad</h4>
+                <p className="production-section-copy">Registra rangos de incapacidad y controla el estado operativo del florista.</p>
+              </div>
+              <button type="button" className="btn-primary production-register-btn" onClick={actualizarEstadoFlorista} title="Registrar incapacidad o aplicar cambio">
+                <IconCalendarPlus size={15} stroke={2} />
+                <span>Registrar incapacidad</span>
+              </button>
+            </div>
+
+            <div className="production-incapacity-form">
               <select value={floristaGestionID} onChange={event => setFloristaGestionID(event.target.value)} title="Seleccionar florista">
                 <option value="">Florista...</option>
                 {floristas.map(f => <option key={f.idFlorista} value={f.idFlorista}>{f.nombre}</option>)}
@@ -1018,7 +991,28 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
               <input type="date" value={fechaInicioIncapacidad} onChange={event => setFechaInicioIncapacidad(event.target.value)} title="Inicio incapacidad" />
               <input type="date" value={fechaFinIncapacidad} onChange={event => setFechaFinIncapacidad(event.target.value)} title="Fin incapacidad" />
               <input type="text" value={motivoAccion} onChange={event => setMotivoAccion(event.target.value)} placeholder="Motivo" title="Motivo de cambio" />
-              <button type="button" className="btn-outline" onClick={actualizarEstadoFlorista} title="Aplicar estado florista">Aplicar estado</button>
+              <div className="production-incapacity-actions">
+                <button type="button" className="btn-primary" onClick={actualizarEstadoFlorista} title="Guardar incapacidad o cambio de estado">Guardar</button>
+                <button type="button" className="btn-outline" onClick={() => setMotivoAccion("")} title="Limpiar motivo">Cancelar</button>
+              </div>
+            </div>
+
+            <div className="production-incapacity-list">
+              {floristasDisponibilidad.map(item => {
+                const inicio = formatDateOnly(item.fechaInicioIncapacidad || item.fecha_ini_incap) || "-";
+                const fin = formatDateOnly(item.fechaFinIncapacidad || item.fecha_fin_incap) || "-";
+                const estado = String(item.estado || "").toLowerCase() === "incapacidad" ? "Activa" : "Vencida";
+                return (
+                  <article key={`inc-${item.idFlorista}`} className="production-incapacity-item">
+                    <div>
+                      <strong>{item.nombre}</strong>
+                      <p>{inicio} - {fin}</p>
+                      <small>{item.motivoIncapacidad || item.motivo || "Sin motivo registrado"}</small>
+                    </div>
+                    <span className={`production-incapacity-badge ${estado === "Activa" ? "is-active" : "is-expired"}`}>{estado}</span>
+                  </article>
+                );
+              })}
             </div>
           </section>
         )}
@@ -1057,11 +1051,16 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
         )}
       </main>
 
-      <aside className={`orders-drawer ${drawerOpen && submenu === "pedidos" ? "open" : ""}`}>
+      <aside className={`orders-drawer production-actions-drawer ${drawerOpen && submenu === "pedidos" ? "open" : ""}`}>
         <div className="orders-drawer-head">
-          <strong>{canManageProductionActions ? "Acciones Producción" : "Detalle Producción"}</strong>
+          <strong className="orders-drawer-title">
+            <IconAdjustments size={17} stroke={2} />
+            <span>{canManageProductionActions ? "Acciones Producción" : "Detalle Producción"}</span>
+          </strong>
           <div className="orders-drawer-head-actions">
-            <button type="button" className="icon-btn" onClick={closeActionsDrawer} title="Cerrar barra lateral">✕</button>
+            <button type="button" className="icon-btn" onClick={closeActionsDrawer} title="Cerrar barra lateral">
+              <IconX size={18} stroke={2} />
+            </button>
           </div>
         </div>
 
@@ -1070,8 +1069,8 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
             <p className="order-drawer-empty">Selecciona un pedido para ver acciones.</p>
           ) : (
             <>
-              <section className="order-block">
-                <h4>📦 Ver detalle</h4>
+              <section className="order-block production-action-card">
+                <h4>Ver detalle</h4>
                 <p><strong>Número del pedido:</strong> {selectedItem.numeroPedido ?? "-"}</p>
                 <p><strong>Cliente:</strong> {selectedItem.cliente || "-"}</p>
                 <p><strong>Código o número del arreglo:</strong> {arregloCodeLabel(selectedItem)}</p>
@@ -1079,27 +1078,28 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
                 <p><strong>Fecha Entrega:</strong> {formatDateOnly(selectedItem.fechaEntrega) || "-"}</p>
                 <p><strong>Hora Entrega:</strong> {selectedItem.horaEntrega || "-"}</p>
                 <p><strong>Estado del arreglo:</strong> {selectedItem.estado || "-"}</p>
-                <p><strong>Observaciones del arreglo:</strong> {selectedItem.observacion || "-"}</p>
+                <p><strong>Notas Producción:</strong> {selectedItem.notasProduccion || selectedItem.observacion || "-"}</p>
+                <p><strong>Observaciones personalizados:</strong> {selectedItem.observacionesPersonalizados || "-"}</p>
                 <p><strong>Florista asignado:</strong> {selectedItem.floristaAsignado || "Sin asignar"}</p>
               </section>
 
               {canManageProductionActions ? (
-              <section className="order-block">
+              <section className="order-block production-action-card">
                 <h4>Auditoría acción</h4>
-                <input
-                  type="text"
+                <textarea
                   value={motivoAccion}
                   onChange={event => setMotivoAccion(event.target.value)}
                   placeholder="Motivo de acción (recomendado/obligatorio para reasignar)"
                   title="Motivo"
+                  rows={4}
                 />
               </section>
               ) : null}
 
               {canManageProductionActions ? (
-              <section className="order-block">
-                <h4>👩‍🎨 Asignación</h4>
-                <div className="order-actions" style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <section className="order-block production-action-card">
+                <h4>Asignación</h4>
+                <div className="order-actions production-drawer-actions">
                   <select
                     value={selectedFloristaById[selectedItem.idProduccion] || ""}
                     onChange={event => setSelectedFloristaById(current => ({ ...current, [selectedItem.idProduccion]: event.target.value }))}
@@ -1116,7 +1116,7 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
                       </option>
                     ))}
                   </select>
-                  <button type="button" className="btn-outline" title="Asignar florista" onClick={() => asignar(selectedItem)}>Asignar</button>
+                  <button type="button" className="btn-primary" title="Asignar florista" onClick={() => asignar(selectedItem)}>Asignar</button>
                   <button type="button" className="btn-outline" title="Reasignación auditada" onClick={() => reasignarAuditable(selectedItem)}>Reasignar auditado</button>
                 </div>
               </section>

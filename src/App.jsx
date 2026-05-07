@@ -1,17 +1,20 @@
-import { OrdersAdminPage } from "./domain/orders-admin/OrdersAdminPage.jsx";
-import { ProductionPage } from "./domain/production/ProductionPage.jsx";
-import { DeliveryPage } from "./domain/delivery/DeliveryPage.jsx";
-import { InventoryPage } from "./domain/inventory/InventoryPage.jsx";
+import { useEffect, useMemo, useState } from "react";
+
+import { LoginPage } from "./domain/auth/LoginPage.jsx";
 import { AccountingPage } from "./domain/accounting/AccountingPage.jsx";
 import { ClientsPage } from "./domain/clients/ClientsPage.jsx";
-import { UsersManagementPage } from "./domain/users/UsersManagementPage.jsx";
+import { DeliveryPage } from "./domain/delivery/DeliveryPage.jsx";
+import { InventoryPage } from "./domain/inventory/InventoryPage.jsx";
+import { OrdersAdminPage } from "./domain/orders-admin/OrdersAdminPage.jsx";
 import { PipelineOperativo } from "./domain/pipeline/PipelineOperativo.jsx";
-import { LoginPage } from "./domain/auth/LoginPage.jsx";
-import { useEffect, useMemo, useState } from "react";
-import { createApiClient } from "./infrastructure/apiClient.js";
+import { ProductionPage } from "./domain/production/ProductionPage.jsx";
+import { TraceabilityPage } from "./domain/traceability/TraceabilityPage.jsx";
+import { UsersManagementPage } from "./domain/users/UsersManagementPage.jsx";
 import { tenantConfig } from "./config/tenantConfig.js";
+import { createApiClient } from "./infrastructure/apiClient.js";
 
 const TOKEN_KEY = "petalops_access_token";
+const VIEW_KEY = "petalops_active_view";
 
 function hasModuleAccess(session, modulo) {
   const name = String(modulo || "").toLowerCase();
@@ -41,9 +44,18 @@ function resolveDefaultView(session) {
   if (hasModuleAccess(session, "domicilios")) return "domicilios";
   if (hasModuleAccess(session, "inventario")) return "inventario";
   if (hasModuleAccess(session, "contabilidad")) return "contabilidad";
-  if (hasModuleAccess(session, "pedidos")) return "clientes";
+  if (hasModuleAccess(session, "trazabilidad")) return "trazabilidad";
+  if (hasModuleAccess(session, "clientes")) return "clientes";
   if (session?.esGlobalJoin || isEmpresaAdminRole(session)) return "usuarios";
   return "pedidos";
+}
+
+function readStoredView() {
+  try {
+    return String(globalThis.localStorage?.getItem(VIEW_KEY) || "").trim() || "pipeline";
+  } catch {
+    return "pipeline";
+  }
 }
 
 export default function App() {
@@ -51,7 +63,7 @@ export default function App() {
   const [session, setSession] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [authError, setAuthError] = useState("");
-  const [view, setView] = useState("pipeline");
+  const [view, setView] = useState(() => readStoredView());
 
   useEffect(() => {
     const bootstrap = async () => {
@@ -74,96 +86,55 @@ export default function App() {
     bootstrap();
   }, [api]);
 
+  useEffect(() => {
+    if (!session) return;
+    try {
+      globalThis.localStorage?.setItem(VIEW_KEY, view);
+    } catch {
+      // Ignorar storage no disponible.
+    }
+  }, [session, view]);
+
   const canPedidos = hasModuleAccess(session, "pedidos");
   const canProduccion = hasModuleAccess(session, "produccion");
   const canDomicilios = hasModuleAccess(session, "domicilios");
   const canInventario = hasModuleAccess(session, "inventario");
-  const canClientes = hasModuleAccess(session, "pedidos");
   const canContabilidad = hasModuleAccess(session, "contabilidad");
+  const canTrazabilidad = hasModuleAccess(session, "trazabilidad");
+  const canClientes = hasModuleAccess(session, "clientes");
   const canPipeline = canAccessPipeline(session);
   const canUsuariosGlobal = Boolean(session?.esGlobalJoin);
   const canUsuariosPanel = Boolean(canUsuariosGlobal || isEmpresaAdminRole(session));
 
   useEffect(() => {
     if (!session) return;
-    if (view === "pipeline" && !canPipeline) {
-      setView(resolveDefaultView(session));
-      return;
-    }
-    if (view === "pedidos" && !canPedidos) {
-      if (canProduccion) {
-        setView("produccion");
-      } else if (canDomicilios) {
-        setView("domicilios");
-      }
-      return;
-    }
-    if (view === "produccion" && !canProduccion) {
-      if (canPedidos) {
-        setView("pedidos");
-      } else if (canDomicilios) {
-        setView("domicilios");
-      }
-      return;
-    }
-    if (view === "domicilios" && !canDomicilios) {
-      if (canPedidos) {
-        setView("pedidos");
-      } else if (canProduccion) {
-        setView("produccion");
-      } else if (canInventario) {
-        setView("inventario");
-      } else if (canUsuariosPanel) {
-        setView("usuarios");
-      }
-    }
-    if (view === "inventario" && !canInventario) {
-      if (canPedidos) {
-        setView("pedidos");
-      } else if (canProduccion) {
-        setView("produccion");
-      } else if (canDomicilios) {
-        setView("domicilios");
-      } else if (canUsuariosPanel) {
-        setView("usuarios");
-      }
-    }
-    if (view === "contabilidad" && !canContabilidad) {
-      if (canPedidos) {
-        setView("pedidos");
-      } else if (canProduccion) {
-        setView("produccion");
-      } else if (canDomicilios) {
-        setView("domicilios");
-      } else if (canInventario) {
-        setView("inventario");
-      } else if (canUsuariosPanel) {
-        setView("usuarios");
-      }
-    }
-    if (view === "clientes" && !canClientes) {
-      if (canPedidos) {
-        setView("pedidos");
-      } else if (canProduccion) {
-        setView("produccion");
-      } else if (canDomicilios) {
-        setView("domicilios");
-      } else if (canInventario) {
-        setView("inventario");
-      } else if (canUsuariosPanel) {
-        setView("usuarios");
-      }
-    }
-    if (view === "usuarios" && !canUsuariosPanel) {
-      if (canPedidos) {
-        setView("pedidos");
-      } else if (canProduccion) {
-        setView("produccion");
-      } else if (canDomicilios) {
-        setView("domicilios");
-      }
-    }
-  }, [session, view, canPipeline, canPedidos, canProduccion, canDomicilios, canInventario, canContabilidad, canClientes, canUsuariosPanel]);
+    const fallbackView = resolveDefaultView(session);
+    const redirectTo = nextView => {
+      setView(nextView || fallbackView);
+    };
+
+    if (view === "pipeline" && !canPipeline) return redirectTo(fallbackView);
+    if (view === "pedidos" && !canPedidos) return redirectTo(fallbackView);
+    if (view === "produccion" && !canProduccion) return redirectTo(fallbackView);
+    if (view === "domicilios" && !canDomicilios) return redirectTo(fallbackView);
+    if (view === "inventario" && !canInventario) return redirectTo(fallbackView);
+    if (view === "contabilidad" && !canContabilidad) return redirectTo(fallbackView);
+    if (view === "trazabilidad" && !canTrazabilidad) return redirectTo(fallbackView);
+    if (view === "clientes" && !canClientes) return redirectTo(fallbackView);
+    if (view === "usuarios" && !canUsuariosPanel) return redirectTo(fallbackView);
+  }, [
+    session,
+    view,
+    canPipeline,
+    canPedidos,
+    canProduccion,
+    canDomicilios,
+    canInventario,
+    canContabilidad,
+    canTrazabilidad,
+    canClientes,
+    canUsuariosPanel,
+  ]);
 
   const handleLogin = async ({ login, password }) => {
     setAuthError("");
@@ -172,13 +143,14 @@ export default function App() {
       const response = await api.login({ login, password });
       globalThis.localStorage?.setItem(TOKEN_KEY, response.accessToken);
       setSession(response.user);
-      setView(resolveDefaultView(response.user));
+      const storedView = readStoredView();
+      setView(storedView || resolveDefaultView(response.user));
     } catch (error) {
       const message = error?.message;
       setAuthError(
         typeof message === "string" && message.trim()
           ? message
-            : "No fue posible iniciar sesion. Verifica usuario y contrasena."
+          : "No fue posible iniciar sesión. Verifica usuario y contraseña."
       );
     } finally {
       setAuthLoading(false);
@@ -187,6 +159,7 @@ export default function App() {
 
   const handleLogout = () => {
     globalThis.localStorage?.removeItem(TOKEN_KEY);
+    globalThis.localStorage?.removeItem(VIEW_KEY);
     setSession(null);
     setView("pipeline");
   };
@@ -199,7 +172,7 @@ export default function App() {
     return <LoginPage onSubmit={handleLogin} loading={authLoading} error={authError} />;
   }
 
-  if (!canPedidos && !canProduccion && !canDomicilios && !canInventario && !canContabilidad && !canClientes && !canUsuariosPanel) {
+  if (!canPedidos && !canProduccion && !canDomicilios && !canInventario && !canContabilidad && !canTrazabilidad && !canClientes && !canUsuariosPanel) {
     return (
       <main className="auth-view">
         <section className="auth-card">
@@ -211,187 +184,42 @@ export default function App() {
     );
   }
 
-  return view === "pipeline"
-    ? (
-      <PipelineOperativo
-        session={session}
-        canViewPipeline={canPipeline}
-        canViewPedidos={canPedidos}
-        canViewProduccion={canProduccion}
-        canViewDomicilios={canDomicilios}
-        canViewInventario={canInventario}
-        canViewContabilidad={canContabilidad}
-        canViewClientesPanel={canClientes}
-        canViewUsuariosPanel={canUsuariosPanel}
-        onLogout={handleLogout}
-        onGoPipeline={() => canPipeline && setView("pipeline")}
-        onGoPedidos={() => canPedidos && setView("pedidos")}
-        onGoProduccion={() => canProduccion && setView("produccion")}
-        onGoDomicilios={() => canDomicilios && setView("domicilios")}
-        onGoInventario={() => canInventario && setView("inventario")}
-        onGoContabilidad={() => canContabilidad && setView("contabilidad")}
-        onGoClientes={() => canClientes && setView("clientes")}
-        onGoUsuarios={() => canUsuariosPanel && setView("usuarios")}
-      />
-    )
-    : view === "pedidos"
-    ? (
-      <OrdersAdminPage
-        session={session}
-        canViewPipeline={canPipeline}
-        canViewPedidos={canPedidos}
-        canViewProduccion={canProduccion}
-        canViewDomicilios={canDomicilios}
-        canViewInventario={canInventario}
-        canViewContabilidad={canContabilidad}
-        canViewClientesPanel={canClientes}
-        canViewUsuariosPanel={canUsuariosPanel}
-        onLogout={handleLogout}
-        onGoPipeline={() => canPipeline && setView("pipeline")}
-        onGoPedidos={() => canPedidos && setView("pedidos")}
-        onGoProduccion={() => canProduccion && setView("produccion")}
-        onGoDomicilios={() => canDomicilios && setView("domicilios")}
-        onGoInventario={() => canInventario && setView("inventario")}
-        onGoContabilidad={() => canContabilidad && setView("contabilidad")}
-        onGoClientes={() => canClientes && setView("clientes")}
-        onGoUsuarios={() => canUsuariosPanel && setView("usuarios")}
-      />
-    )
-    : view === "produccion"
-      ? (
-      <ProductionPage
-        session={session}
-        canViewPipeline={canPipeline}
-        canViewPedidos={canPedidos}
-        canViewProduccion={canProduccion}
-        canViewDomicilios={canDomicilios}
-        canViewInventario={canInventario}
-        canViewContabilidad={canContabilidad}
-        canViewClientesPanel={canClientes}
-        canViewUsuariosPanel={canUsuariosPanel}
-        onLogout={handleLogout}
-        onGoPipeline={() => canPipeline && setView("pipeline")}
-        onGoPedidos={() => canPedidos && setView("pedidos")}
-        onGoProduccion={() => canProduccion && setView("produccion")}
-        onGoDomicilios={() => canDomicilios && setView("domicilios")}
-        onGoInventario={() => canInventario && setView("inventario")}
-        onGoContabilidad={() => canContabilidad && setView("contabilidad")}
-        onGoClientes={() => canClientes && setView("clientes")}
-        onGoUsuarios={() => canUsuariosPanel && setView("usuarios")}
-      />
-      )
-      : view === "domicilios"
-        ? (
-        <DeliveryPage
-          session={session}
-          canViewPipeline={canPipeline}
-          canViewPedidos={canPedidos}
-          canViewProduccion={canProduccion}
-          canViewDomicilios={canDomicilios}
-          canViewInventario={canInventario}
-          canViewContabilidad={canContabilidad}
-          canViewClientesPanel={canClientes}
-          canViewUsuariosPanel={canUsuariosPanel}
-          onLogout={handleLogout}
-          onGoPipeline={() => canPipeline && setView("pipeline")}
-          onGoPedidos={() => canPedidos && setView("pedidos")}
-          onGoProduccion={() => canProduccion && setView("produccion")}
-          onGoDomicilios={() => canDomicilios && setView("domicilios")}
-          onGoInventario={() => canInventario && setView("inventario")}
-          onGoContabilidad={() => canContabilidad && setView("contabilidad")}
-          onGoClientes={() => canClientes && setView("clientes")}
-          onGoUsuarios={() => canUsuariosPanel && setView("usuarios")}
-        />
-        )
-        : view === "inventario"
-          ? (
-          <InventoryPage
-            session={session}
-            canViewPipeline={canPipeline}
-            canViewPedidos={canPedidos}
-            canViewProduccion={canProduccion}
-            canViewDomicilios={canDomicilios}
-            canViewInventario={canInventario}
-            canViewContabilidad={canContabilidad}
-            canViewClientesPanel={canClientes}
-            canViewUsuariosPanel={canUsuariosPanel}
-            onGoPipeline={() => canPipeline && setView("pipeline")}
-            onGoPedidos={() => canPedidos && setView("pedidos")}
-            onGoProduccion={() => canProduccion && setView("produccion")}
-            onGoDomicilios={() => canDomicilios && setView("domicilios")}
-            onGoInventario={() => canInventario && setView("inventario")}
-            onGoContabilidad={() => canContabilidad && setView("contabilidad")}
-            onGoClientes={() => canClientes && setView("clientes")}
-            onGoUsuarios={() => canUsuariosPanel && setView("usuarios")}
-            onLogout={handleLogout}
-          />
-          )
-        : view === "contabilidad"
-          ? (
-          <AccountingPage
-            session={session}
-            canViewPipeline={canPipeline}
-            canViewPedidos={canPedidos}
-            canViewProduccion={canProduccion}
-            canViewDomicilios={canDomicilios}
-            canViewInventario={canInventario}
-            canViewContabilidad={canContabilidad}
-            canViewClientesPanel={canClientes}
-            canViewUsuariosPanel={canUsuariosPanel}
-            onGoPipeline={() => canPipeline && setView("pipeline")}
-            onGoPedidos={() => canPedidos && setView("pedidos")}
-            onGoProduccion={() => canProduccion && setView("produccion")}
-            onGoDomicilios={() => canDomicilios && setView("domicilios")}
-            onGoInventario={() => canInventario && setView("inventario")}
-            onGoContabilidad={() => canContabilidad && setView("contabilidad")}
-            onGoClientes={() => canClientes && setView("clientes")}
-            onGoUsuarios={() => canUsuariosPanel && setView("usuarios")}
-            onLogout={handleLogout}
-          />
-          )
-        : view === "clientes"
-          ? (
-          <ClientsPage
-            session={session}
-            canViewPipeline={canPipeline}
-            canViewPedidos={canPedidos}
-            canViewProduccion={canProduccion}
-            canViewDomicilios={canDomicilios}
-            canViewInventario={canInventario}
-            canViewContabilidad={canContabilidad}
-            canViewClientesPanel={canClientes}
-            canViewUsuariosPanel={canUsuariosPanel}
-            onGoPipeline={() => canPipeline && setView("pipeline")}
-            onGoPedidos={() => canPedidos && setView("pedidos")}
-            onGoProduccion={() => canProduccion && setView("produccion")}
-            onGoDomicilios={() => canDomicilios && setView("domicilios")}
-            onGoInventario={() => canInventario && setView("inventario")}
-            onGoContabilidad={() => canContabilidad && setView("contabilidad")}
-            onGoClientes={() => canClientes && setView("clientes")}
-            onGoUsuarios={() => canUsuariosPanel && setView("usuarios")}
-            onLogout={handleLogout}
-          />
-          )
-        : (
-          <UsersManagementPage
-            session={session}
-            canViewPipeline={canPipeline}
-            canViewPedidos={canPedidos}
-            canViewProduccion={canProduccion}
-            canViewDomicilios={canDomicilios}
-            canViewInventario={canInventario}
-            canViewContabilidad={canContabilidad}
-            canViewClientesPanel={canClientes}
-            canViewUsuariosGlobal={canUsuariosGlobal}
-            onGoPipeline={() => canPipeline && setView("pipeline")}
-            onGoPedidos={() => canPedidos && setView("pedidos")}
-            onGoProduccion={() => canProduccion && setView("produccion")}
-            onGoDomicilios={() => canDomicilios && setView("domicilios")}
-            onGoInventario={() => canInventario && setView("inventario")}
-            onGoContabilidad={() => canContabilidad && setView("contabilidad")}
-            onGoClientes={() => canClientes && setView("clientes")}
-            onGoUsuarios={() => canUsuariosPanel && setView("usuarios")}
-            onLogout={handleLogout}
-          />
-        );
+  const pageProps = {
+    session,
+    canViewPipeline: canPipeline,
+    canViewPedidos: canPedidos,
+    canViewProduccion: canProduccion,
+    canViewDomicilios: canDomicilios,
+    canViewInventario: canInventario,
+    canViewContabilidad: canContabilidad,
+    canViewTrazabilidad: canTrazabilidad,
+    canViewClientesPanel: canClientes,
+    canViewUsuariosPanel: canUsuariosPanel,
+    onGoPipeline: () => canPipeline && setView("pipeline"),
+    onGoPedidos: () => canPedidos && setView("pedidos"),
+    onGoProduccion: () => canProduccion && setView("produccion"),
+    onGoDomicilios: () => canDomicilios && setView("domicilios"),
+    onGoInventario: () => canInventario && setView("inventario"),
+    onGoContabilidad: () => canContabilidad && setView("contabilidad"),
+    onGoTrazabilidad: () => canTrazabilidad && setView("trazabilidad"),
+    onGoClientes: () => canClientes && setView("clientes"),
+    onGoUsuarios: () => canUsuariosPanel && setView("usuarios"),
+    onLogout: handleLogout,
+  };
+
+  if (view === "pipeline") return <PipelineOperativo {...pageProps} />;
+  if (view === "pedidos") return <OrdersAdminPage {...pageProps} />;
+  if (view === "produccion") return <ProductionPage {...pageProps} />;
+  if (view === "domicilios") return <DeliveryPage {...pageProps} />;
+  if (view === "inventario") return <InventoryPage {...pageProps} />;
+  if (view === "contabilidad") return <AccountingPage {...pageProps} />;
+  if (view === "trazabilidad") return <TraceabilityPage {...pageProps} />;
+  if (view === "clientes") return <ClientsPage {...pageProps} />;
+
+  return (
+    <UsersManagementPage
+      {...pageProps}
+      canViewUsuariosGlobal={canUsuariosGlobal}
+    />
+  );
 }

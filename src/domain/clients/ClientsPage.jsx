@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { tenantConfig } from "../../config/tenantConfig.js";
 import { createApiClient } from "../../infrastructure/apiClient.js";
+import { AppSidebar } from "../../shared/AppSidebar.jsx";
+import { useSidebarState } from "../../shared/useSidebarState.js";
 
 const initialForm = {
   tipoIdent: "CC",
@@ -33,6 +35,7 @@ export function ClientsPage({
   canViewDomicilios,
   canViewInventario,
   canViewContabilidad,
+  canViewTrazabilidad,
   canViewClientesPanel,
   canViewUsuariosPanel,
   onGoPipeline,
@@ -41,6 +44,7 @@ export function ClientsPage({
   onGoDomicilios,
   onGoInventario,
   onGoContabilidad,
+  onGoTrazabilidad,
   onGoClientes,
   onGoUsuarios,
   onLogout,
@@ -48,8 +52,7 @@ export function ClientsPage({
   const api = useMemo(() => createApiClient(tenantConfig), []);
   const empresaId = Number(session?.empresaID || tenantConfig.empresaId);
 
-  const [sidebarPinned, setSidebarPinned] = useState(false);
-  const [sidebarMobileOpen, setSidebarMobileOpen] = useState(false);
+  const { sidebarPinned, sidebarMobileOpen, setSidebarMobileOpen, toggleSidebar } = useSidebarState();
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -61,14 +64,6 @@ export function ClientsPage({
   const [editingClienteId, setEditingClienteId] = useState(null);
   const [form, setForm] = useState(initialForm);
 
-  const toggleSidebar = () => {
-    const isMobile = globalThis.matchMedia("(max-width: 980px)").matches;
-    if (isMobile) {
-      setSidebarMobileOpen(current => !current);
-      return;
-    }
-    setSidebarPinned(current => !current);
-  };
 
   const loadClientes = useCallback(async () => {
     setLoading(true);
@@ -89,14 +84,6 @@ export function ClientsPage({
     loadClientes().catch(() => {});
   }, [loadClientes]);
 
-  useEffect(() => {
-    const mediaQuery = globalThis.matchMedia("(max-width: 980px)");
-    const handleChange = event => {
-      if (!event.matches) setSidebarMobileOpen(false);
-    };
-    mediaQuery.addEventListener("change", handleChange);
-    return () => mediaQuery.removeEventListener("change", handleChange);
-  }, []);
 
   const openCreate = () => {
     setEditingClienteId(null);
@@ -173,33 +160,36 @@ export function ClientsPage({
 
   return (
     <div className={`app-shell ${sidebarPinned ? "is-sidebar-pinned" : ""} ${sidebarMobileOpen ? "is-sidebar-mobile-open" : ""}`}>
-      <aside className="app-sidebar">
-        <div className="sidebar-brand">
-          <img src="/petalops-compact.png" alt="PetalOps" className="sidebar-brand-logo-compact" />
-          <img src="/petalops-logo-full.png" alt="PetalOps" className="sidebar-brand-logo-full" />
-        </div>
-
-        <nav className="sidebar-nav" aria-label="Módulos">
-          {canViewPipeline ? <button type="button" className="sidebar-nav-btn" onClick={() => { setSidebarMobileOpen(false); onGoPipeline(); }}><span className="sidebar-nav-icon">▦</span><span className="sidebar-nav-text">Pipeline</span></button> : null}
-          {canViewPedidos ? <button type="button" className="sidebar-nav-btn" onClick={() => { setSidebarMobileOpen(false); onGoPedidos(); }}><span className="sidebar-nav-icon">🧾</span><span className="sidebar-nav-text">Pedidos</span></button> : null}
-          {canViewProduccion ? <button type="button" className="sidebar-nav-btn" onClick={() => { setSidebarMobileOpen(false); onGoProduccion(); }}><span className="sidebar-nav-icon">🏭</span><span className="sidebar-nav-text">Producción</span></button> : null}
-          {canViewDomicilios ? <button type="button" className="sidebar-nav-btn" onClick={() => { setSidebarMobileOpen(false); onGoDomicilios(); }}><span className="sidebar-nav-icon">🛵</span><span className="sidebar-nav-text">Domicilios</span></button> : null}
-          {canViewInventario ? <button type="button" className="sidebar-nav-btn" onClick={() => { setSidebarMobileOpen(false); onGoInventario(); }}><span className="sidebar-nav-icon">📦</span><span className="sidebar-nav-text">Inventario</span></button> : null}
-          {canViewClientesPanel ? <button type="button" className="sidebar-nav-btn is-active" onClick={() => { setSidebarMobileOpen(false); onGoClientes(); }}><span className="sidebar-nav-icon">💐</span><span className="sidebar-nav-text">Clientes</span></button> : null}
-          {canViewUsuariosPanel ? <button type="button" className="sidebar-nav-btn" onClick={() => { setSidebarMobileOpen(false); onGoUsuarios(); }}><span className="sidebar-nav-icon">👥</span><span className="sidebar-nav-text">Gestión Usuarios</span></button> : null}
-          {canViewContabilidad ? <button type="button" className="sidebar-nav-btn" onClick={() => { setSidebarMobileOpen(false); onGoContabilidad(); }}><span className="sidebar-nav-icon">📊</span><span className="sidebar-nav-text">Contabilidad</span></button> : null}
-        </nav>
-
-        <button type="button" className="btn-outline sidebar-logout-btn" onClick={onLogout} title="Cerrar sesión">
-          <span className="sidebar-logout-icon" aria-hidden="true">⏻</span>
-          <span className="sidebar-logout-text">Cerrar sesión</span>
-        </button>
-
-        <button type="button" className="sidebar-pin-btn" onClick={toggleSidebar}>{sidebarPinned ? "←" : "→"}</button>
-        <p className="sidebar-caption">Base de clientes y fechas especiales</p>
-      </aside>
-
-      <button type="button" className="sidebar-overlay" aria-label="Cerrar menú" onClick={() => setSidebarMobileOpen(false)} />
+      <AppSidebar
+        activeKey="clientes"
+        sidebarPinned={sidebarPinned}
+        sidebarMobileOpen={sidebarMobileOpen}
+        toggleSidebar={toggleSidebar}
+        closeSidebarMobile={() => setSidebarMobileOpen(false)}
+        onLogout={onLogout}
+        permissions={{
+          pipeline: canViewPipeline,
+          pedidos: canViewPedidos,
+          produccion: canViewProduccion,
+          domicilios: canViewDomicilios,
+          inventario: canViewInventario,
+          contabilidad: canViewContabilidad,
+          trazabilidad: canViewTrazabilidad,
+          clientes: canViewClientesPanel,
+          usuarios: canViewUsuariosPanel,
+        }}
+        navigation={{
+          pipeline: onGoPipeline,
+          pedidos: onGoPedidos,
+          produccion: onGoProduccion,
+          domicilios: onGoDomicilios,
+          inventario: onGoInventario,
+          contabilidad: onGoContabilidad,
+          trazabilidad: onGoTrazabilidad,
+          clientes: onGoClientes,
+          usuarios: onGoUsuarios,
+        }}
+      />
 
       <main className="orders-admin-view">
         <header className="orders-admin-header">

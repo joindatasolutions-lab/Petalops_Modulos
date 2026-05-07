@@ -1,8 +1,8 @@
-﻿export function PipelineFilters({ filters, onChange, onRefresh }) {
+export function PipelineFilters({ filters, onChange }) {
   return (
     <section className="pipeline-filters">
       <label className="pipeline-filter-field">
-        <span>Búsqueda</span>
+        <span>Número pedido</span>
         <input
           className="pipeline-filter-search"
           type="text"
@@ -12,7 +12,7 @@
         />
       </label>
       <label className="pipeline-filter-field">
-        <span>Fecha Inicio</span>
+        <span>Fecha</span>
         <input
           className="pipeline-filter-date"
           type="date"
@@ -34,38 +34,30 @@
         <span>Domiciliario</span>
         <input
           className="pipeline-filter-domiciliario"
-          type="number"
-          placeholder="Domiciliario"
+          type="text"
+          placeholder="Nombre o ID domiciliario"
           value={filters.domiciliarioID ?? ""}
-          onChange={event => onChange("domiciliarioID", event.target.value ? Number(event.target.value) : null)}
+          onChange={event => onChange("domiciliarioID", event.target.value)}
         />
       </label>
       <label className="pipeline-filter-field">
         <span>Florista</span>
         <input
           className="pipeline-filter-florista"
-          type="number"
-          placeholder="Florista"
+          type="text"
+          placeholder="Nombre o ID florista"
           value={filters.floristaID ?? ""}
-          onChange={event => onChange("floristaID", event.target.value ? Number(event.target.value) : null)}
+          onChange={event => onChange("floristaID", event.target.value)}
         />
       </label>
       <div className="pipeline-filter-toggles">
         <label className="pipeline-filter-check">
           <input
             type="checkbox"
-            checked={filters.soloHoy}
-            onChange={event => onChange("soloHoy", event.target.checked)}
-          />
-          Solo hoy
-        </label>
-        <label className="pipeline-filter-check">
-          <input
-            type="checkbox"
             checked={filters.soloAtrasados}
             onChange={event => onChange("soloAtrasados", event.target.checked)}
           />
-          Atrasados
+          <span>Atrasados</span>
         </label>
         <label className="pipeline-filter-check">
           <input
@@ -73,12 +65,9 @@
             checked={filters.soloEnProduccion}
             onChange={event => onChange("soloEnProduccion", event.target.checked)}
           />
-          En produccion
+          <span>En producción</span>
         </label>
       </div>
-      <button type="button" className="btn-primary pipeline-filter-refresh" onClick={onRefresh}>Actualizar</button>
     </section>
   );
 }
-
-
