@@ -1989,6 +1989,29 @@ select:focus {
   margin-bottom: 14px;
 }
 
+.order-detail-subnav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.order-detail-subnav-tab {
+  border: 0.5px solid #e8d5de;
+  border-radius: 10px;
+  background: #fff;
+  color: #7a6670;
+  padding: 7px 12px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.order-detail-subnav-tab.is-active {
+  background: #8a3252;
+  border-color: #8a3252;
+  color: #fff;
+}
+
 .order-detail-product-switcher-title {
   font-size: 12px;
   color: #6b7280;

@@ -188,6 +188,9 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
   const [detailEditCustomPriceEnabled, setDetailEditCustomPriceEnabled] = useState(false);
   const [detailEditFechaEntrega, setDetailEditFechaEntrega] = useState("");
   const [detailEditHoraEntrega, setDetailEditHoraEntrega] = useState("");
+  const [detailEditClienteNombre, setDetailEditClienteNombre] = useState("");
+  const [detailEditClienteTelefono, setDetailEditClienteTelefono] = useState("");
+  const [detailEditClienteEmail, setDetailEditClienteEmail] = useState("");
   const [detailEditClienteTipoIdent, setDetailEditClienteTipoIdent] = useState("");
   const [detailEditClienteIdentificacion, setDetailEditClienteIdentificacion] = useState("");
   const [detailEditDestinatarioNombre, setDetailEditDestinatarioNombre] = useState("");
@@ -210,6 +213,7 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
   const [detailEditError, setDetailEditError] = useState("");
   const [detailEditDropdownOpen, setDetailEditDropdownOpen] = useState(false);
   const [detailEditDeletingDetailId, setDetailEditDeletingDetailId] = useState(null);
+  const [detailEditSubview, setDetailEditSubview] = useState("edit");
   const [detailAddDropdownOpen, setDetailAddDropdownOpen] = useState(false);
   const [detailAddFilterText, setDetailAddFilterText] = useState("");
   const [detailAddProductoID, setDetailAddProductoID] = useState("");
@@ -398,6 +402,9 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
       setDetailEditCustomPriceEnabled(false);
       setDetailEditFechaEntrega("");
       setDetailEditHoraEntrega("");
+      setDetailEditClienteNombre("");
+      setDetailEditClienteTelefono("");
+      setDetailEditClienteEmail("");
       setDetailEditClienteTipoIdent("");
       setDetailEditClienteIdentificacion("");
       setDetailEditDestinatarioNombre("");
@@ -417,6 +424,7 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
       setDetailEditCanalFlora("");
       setDetailEditError("");
       setDetailEditDropdownOpen(false);
+      setDetailEditSubview("edit");
       setDetailAddDropdownOpen(false);
       setDetailAddFilterText("");
       setDetailAddProductoID("");
@@ -462,6 +470,9 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
     }));
     setDetailEditFechaEntrega(toDateInput(detalle.destinatario?.fechaEntrega));
     setDetailEditHoraEntrega(normalizeTime(detalle.destinatario?.horaEntrega));
+    setDetailEditClienteNombre(String(detalle.cliente?.nombre || ""));
+    setDetailEditClienteTelefono(String(detalle.cliente?.telefonoCompleto || detalle.cliente?.telefono || ""));
+    setDetailEditClienteEmail(String(detalle.cliente?.email || ""));
     setDetailEditClienteTipoIdent(normalizeIdentType(detalle.cliente?.tipoIdent));
     setDetailEditClienteIdentificacion(String(detalle.cliente?.identificacion || ""));
     setDetailEditDestinatarioNombre(String(detalle.destinatario?.nombre || ""));
@@ -489,6 +500,7 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
         : ""
     );
     setDetailEditCanalFlora(String(detalle.financiero?.canalFlora || ""));
+    setDetailEditSubview("edit");
     setDetailAddDropdownOpen(false);
     setDetailAddFilterText("");
     setDetailAddProductoID("");
@@ -782,6 +794,7 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
     setIsEditingDetail(current => {
       const next = !current;
       if (!next) setIsDuplicatingDetail(false);
+      if (next) setDetailEditSubview("edit");
       return next;
     });
   };
@@ -791,6 +804,7 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
     setDetailEditError("");
     setIsDuplicatingDetail(true);
     setIsEditingDetail(true);
+    setDetailEditSubview("edit");
   };
 
   const normalizeDuplicateMetodosPago = () => (
@@ -948,6 +962,9 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
           productoPrecio: detailEditIsCustomArrangement && detailEditPrecio != null ? Number(detailEditPrecio) : null,
           fechaEntrega: detailEditFechaEntrega,
           horaEntrega: detailEditHoraEntrega,
+          clienteNombre: detailEditClienteNombre,
+          clienteTelefono: detailEditClienteTelefono,
+          clienteEmail: detailEditClienteEmail,
           clienteTipoIdent: detailEditClienteTipoIdent,
           clienteIdentificacion: detailEditClienteIdentificacion,
           destinatarioNombre: detailEditDestinatarioNombre,
@@ -979,6 +996,9 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
           productoPrecio: detailEditIsCustomArrangement && detailEditPrecio != null ? Number(detailEditPrecio) : null,
           fechaEntrega: detailEditFechaEntrega,
           horaEntrega: detailEditHoraEntrega,
+          clienteNombre: detailEditClienteNombre,
+          clienteTelefono: detailEditClienteTelefono,
+          clienteEmail: detailEditClienteEmail,
           clienteTipoIdent: detailEditClienteTipoIdent,
           clienteIdentificacion: detailEditClienteIdentificacion,
           destinatarioNombre: detailEditDestinatarioNombre,
@@ -1039,6 +1059,7 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
       if (response?.detalleID != null) {
         setDetailEditDetalleID(String(response.detalleID));
       }
+      setDetailEditSubview("edit");
       setDetailAddDropdownOpen(false);
       setDetailAddFilterText("");
       setDetailAddProductoID("");
@@ -1336,6 +1357,22 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
               {isEditingDetail ? (
                 <section className="order-block order-detail-edit-box">
                   <h4>{isDuplicatingDetail ? "Duplicar pedido" : "Editar pedido"}</h4>
+                  <div className="order-detail-subnav">
+                    <button
+                      type="button"
+                      className={`order-detail-subnav-tab${detailEditSubview === "edit" ? " is-active" : ""}`}
+                      onClick={() => setDetailEditSubview("edit")}
+                    >
+                      Editar arreglo
+                    </button>
+                    <button
+                      type="button"
+                      className={`order-detail-subnav-tab${detailEditSubview === "add" ? " is-active" : ""}`}
+                      onClick={() => setDetailEditSubview("add")}
+                    >
+                      Agregar arreglo
+                    </button>
+                  </div>
 
                   {detailProducts.length > 1 ? (
                     <div className="order-detail-product-switcher">
@@ -1372,10 +1409,11 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
                     </div>
                   ) : null}
 
+                  {detailEditSubview === "add" ? (
                   <div className="order-detail-add-box">
                     <div className="order-detail-add-box-head">
                       <span className="order-detail-product-switcher-title">Agregar arreglo</span>
-                      <span className="order-detail-edit-hint">Puedes sumar otro arreglo sin salir del detalle.</span>
+                      <span className="order-detail-edit-hint">Cuando lo agregues, se suma al pedido y se actualiza el total.</span>
                     </div>
                     <div className="order-detail-edit-label">
                       Buscar arreglo para agregar
@@ -1486,7 +1524,7 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
                     <div className="order-detail-add-actions">
                       <button
                         type="button"
-                        className="btn-outline"
+                        className="btn-primary"
                         onClick={onAddDetailProduct}
                         disabled={detailAddSaving}
                       >
@@ -1494,7 +1532,10 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
                       </button>
                     </div>
                   </div>
+                  ) : null}
 
+                  {detailEditSubview === "edit" ? (
+                  <>
                   <div className="order-detail-edit-label">
                     <span>Arreglo actual</span>
                     <input
@@ -1633,6 +1674,36 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
                   </div>
 
                   <div className="order-detail-edit-grid">
+                    <label className="order-detail-edit-label">
+                      Nombre cliente
+                      <input
+                        type="text"
+                        value={detailEditClienteNombre}
+                        onChange={event => setDetailEditClienteNombre(event.target.value)}
+                        placeholder="Nombre del cliente"
+                      />
+                    </label>
+                    <label className="order-detail-edit-label">
+                      Teléfono cliente
+                      <input
+                        type="text"
+                        value={detailEditClienteTelefono}
+                        onChange={event => setDetailEditClienteTelefono(event.target.value)}
+                        placeholder="Teléfono del cliente"
+                      />
+                    </label>
+                  </div>
+
+                  <div className="order-detail-edit-grid">
+                    <label className="order-detail-edit-label">
+                      Email cliente
+                      <input
+                        type="email"
+                        value={detailEditClienteEmail}
+                        onChange={event => setDetailEditClienteEmail(event.target.value)}
+                        placeholder="Correo del cliente"
+                      />
+                    </label>
                     <label className="order-detail-edit-label">
                       Tipo documento cliente
                       <select
@@ -1907,6 +1978,8 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
                       {detailEditSaving ? (isDuplicatingDetail ? "Creando..." : "Guardando...") : (isDuplicatingDetail ? "Crear duplicado" : "Guardar cambios")}
                     </button>
                   </div>
+                  </>
+                  ) : null}
                 </section>
               ) : null}
 
