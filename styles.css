@@ -1895,6 +1895,22 @@ select:focus {
   color: #7a6670;
 }
 
+.order-detail-edit-section {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  margin-bottom: 12px;
+  border: 0.5px solid #ead9de;
+  border-radius: 12px;
+  background: #fff;
+}
+
+.order-detail-edit-section-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: #8a3252;
+}
+
 .order-detail-edit-checklist {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

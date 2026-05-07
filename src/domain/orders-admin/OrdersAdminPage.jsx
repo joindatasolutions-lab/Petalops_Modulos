@@ -1673,9 +1673,11 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
                     </label>
                   </div>
 
-                  <div className="order-detail-edit-grid">
+                  <div className="order-detail-edit-section">
+                    <span className="order-detail-edit-section-title">Datos cliente</span>
+                    <div className="order-detail-edit-grid">
                     <label className="order-detail-edit-label">
-                      Nombre cliente
+                      Nombre
                       <input
                         type="text"
                         value={detailEditClienteNombre}
@@ -1684,7 +1686,7 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
                       />
                     </label>
                     <label className="order-detail-edit-label">
-                      Teléfono cliente
+                      Teléfono
                       <input
                         type="text"
                         value={detailEditClienteTelefono}
@@ -1692,11 +1694,8 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
                         placeholder="Teléfono del cliente"
                       />
                     </label>
-                  </div>
-
-                  <div className="order-detail-edit-grid">
                     <label className="order-detail-edit-label">
-                      Email cliente
+                      Email
                       <input
                         type="email"
                         value={detailEditClienteEmail}
@@ -1705,7 +1704,7 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
                       />
                     </label>
                     <label className="order-detail-edit-label">
-                      Tipo documento cliente
+                      Tipo documento
                       <select
                         value={detailEditClienteTipoIdent}
                         onChange={event => setDetailEditClienteTipoIdent(event.target.value)}
@@ -1716,7 +1715,7 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
                       </select>
                     </label>
                     <label className="order-detail-edit-label">
-                      Cédula / NIT cliente
+                      N documento
                       <input
                         type="text"
                         value={detailEditClienteIdentificacion}
@@ -1724,6 +1723,7 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
                         placeholder="Número de documento"
                       />
                     </label>
+                    </div>
                   </div>
 
                   <p className="order-detail-edit-hint">
