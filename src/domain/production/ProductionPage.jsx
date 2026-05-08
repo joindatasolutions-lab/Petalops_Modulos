@@ -407,7 +407,7 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
     setSelectedItem(item);
     setSelectedFloristaById(current => ({
       ...current,
-      [item.idProduccion]: current[item.idProduccion] || (item.floristaID != null ? String(item.floristaID) : ""),
+      [item.idProduccion]: current[item.idProduccion] || (item.floristaID != null ? String(item.floristaID) : (!canManageProductionActions && currentFloristaId != null ? String(currentFloristaId) : "")),
     }));
     if (item.floristaID != null) {
       setFloristaGestionID(String(item.floristaID));
@@ -450,7 +450,7 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
   };
 
   const reasignarAuditable = async item => {
-    const floristaNuevoId = selectedFloristaById[item.idProduccion] || null;
+    const floristaNuevoId = selectedFloristaById[item.idProduccion] || (!canManageProductionActions && currentFloristaId != null ? String(currentFloristaId) : null);
     const motivo = "Reasignación desde panel de producción";
     if (!floristaNuevoId) {
       globalThis.alert("Selecciona un florista para reasignar.");
