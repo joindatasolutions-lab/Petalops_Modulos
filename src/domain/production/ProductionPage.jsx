@@ -1107,7 +1107,7 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
 
               {!canManageProductionActions ? (
               <section className="order-block">
-                <h4>👩‍🎨 Reasignar florista</h4>
+                <h4>Asignar / reasignar florista</h4>
                 <div className="order-actions" style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                   <select
                     value={selectedFloristaById[selectedItem.idProduccion] || ""}
@@ -1125,8 +1125,8 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
                       </option>
                     ))}
                   </select>
-                  <button type="button" className="btn-outline" title="Reasignar florista" onClick={() => reasignarAuditable(selectedItem)}>
-                    Reasignar florista
+                  <button type="button" className="btn-outline" title="Asignar o reasignar florista" onClick={() => reasignarAuditable(selectedItem)}>
+                    Asignar / reasignar
                   </button>
                 </div>
               </section>
