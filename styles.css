@@ -2735,6 +2735,34 @@ select:focus {
   color: #9ca3af;
 }
 
+.pipeline-audit-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.pipeline-audit-summary-card {
+  border: 0.5px solid #f0e4ea;
+  border-radius: 14px;
+  background: #fff8fb;
+  padding: 14px 16px;
+  display: grid;
+  gap: 6px;
+}
+
+.pipeline-audit-summary-card span {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #8f6b7a;
+}
+
+.pipeline-audit-summary-card strong {
+  font-size: 22px;
+  color: #8a3252;
+}
+
 .floristas-grid {
   grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
 }
@@ -4890,6 +4918,12 @@ select:focus {
   margin-top: 0.4rem;
   display: flex;
   justify-content: flex-end;
+}
+
+@media (max-width: 900px) {
+  .pipeline-audit-summary {
+    grid-template-columns: 1fr;
+  }
 }
 
 .pipeline-modal-img {

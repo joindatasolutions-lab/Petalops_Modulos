@@ -4,13 +4,14 @@ import { tenantConfig } from "../../config/tenantConfig.js";
 import { createApiClient } from "../../infrastructure/apiClient.js";
 import { AppSidebar } from "../../shared/AppSidebar.jsx";
 import { useSidebarState } from "../../shared/useSidebarState.js";
+import { formatDateTimeCompact } from "../../shared/utils.js";
 import { PipelineColumn } from "./PipelineColumn.jsx";
 import { PipelineFilters } from "./PipelineFilters.jsx";
 import { PedidoModal } from "./PedidoModal.jsx";
 
 const PIPELINE_COLUMNS = [
   { key: "pedido_inicial", title: "Creado / Aprobado", stages: ["creado", "aprobado"], dropStage: "aprobado" },
-  { key: "produccion_base", title: "Pendiente / En producción", stages: ["pendiente_produccion", "en_produccion"], dropStage: "en_produccion" },
+  { key: "produccion_base", title: "Pendiente / En produccion", stages: ["pendiente_produccion", "en_produccion"], dropStage: "en_produccion" },
   { key: "listo", title: "Listo", stages: ["listo"], dropStage: "listo" },
   { key: "en_camino", title: "En camino", stages: ["en_camino"], dropStage: "en_camino" },
   { key: "entregado", title: "Entregado", stages: ["entregado"], dropStage: "entregado" },
@@ -30,7 +31,8 @@ const STAGE_TO_ESTADO_ID = {
 
 const PIPELINE_SUBMENU_OPTIONS = [
   { key: "pipeline", label: "Pipeline" },
-  { key: "historial", label: "Historial reasignaciones" }
+  { key: "historial", label: "Historial reasignaciones" },
+  { key: "pedidos", label: "Historial pedidos" }
 ];
 
 const INITIAL_FILTERS = {
@@ -47,45 +49,57 @@ function todayIsoDate() {
   return new Date().toISOString().slice(0, 10);
 }
 
-function sanitizeHistoryText(value) {
+function sanitizeUiText(value) {
   return String(value || "")
-    .replaceAll("Â·", "-")
-    .replaceAll("Ã¡", "á")
-    .replaceAll("Ã©", "é")
-    .replaceAll("Ã­", "í")
-    .replaceAll("Ã³", "ó")
-    .replaceAll("Ãº", "ú")
-    .replaceAll("Ã", "Á")
-    .replaceAll("Ã‰", "É")
-    .replaceAll("Ã", "Í")
-    .replaceAll("Ã“", "Ó")
-    .replaceAll("Ãš", "Ú")
+    .replaceAll("MÃ³dulo", "Modulo")
+    .replaceAll("Ã¡", "a")
+    .replaceAll("Ã©", "e")
+    .replaceAll("Ã­", "i")
+    .replaceAll("Ã³", "o")
+    .replaceAll("Ãº", "u")
+    .replaceAll("Ã±", "n")
+    .replaceAll("Ã‘", "N")
     .trim();
 }
 
 function formatHistoryActor(value) {
-  const raw = sanitizeHistoryText(value);
+  const raw = sanitizeUiText(value);
   if (!raw) return "-";
   return raw.replace(/\./g, " · ");
 }
 
 function formatHistoryReason(value) {
-  return sanitizeHistoryText(value) || "-";
+  return sanitizeUiText(value) || "-";
 }
 
 function resolveHistoryTypeLabel(tipoMovimiento) {
   const type = String(tipoMovimiento || "").trim().toUpperCase();
-  if (type === "ASIGNACION_MANUAL") return "Asignación";
-  if (type === "REASIGNACION_MANUAL") return "Reasignación";
-  if (type === "DESASIGNACION_MANUAL") return "Desasignación";
+  if (type === "ASIGNACION_MANUAL") return "Asignacion";
+  if (type === "REASIGNACION_MANUAL") return "Reasignacion";
+  if (type === "DESASIGNACION_MANUAL") return "Desasignacion";
   return "Movimiento";
 }
 
 function resolveHistoryTypeClass(tipoMovimiento) {
   const label = resolveHistoryTypeLabel(tipoMovimiento);
-  if (label === "Asignación") return "is-admin";
-  if (label === "Desasignación") return "is-auto";
+  if (label === "Asignacion") return "is-admin";
+  if (label === "Desasignacion") return "is-auto";
   return "is-reassignment";
+}
+
+function formatApprovalAuditError(error) {
+  const message = sanitizeUiText(error?.message || error?.detail || "");
+  if (message.toLowerCase().includes("modulo 'trazabilidad' no disponible en el plan")) {
+    return "El historial de pedidos no esta disponible en este ambiente porque el backend publicado aun responde con la regla anterior de Trazabilidad.";
+  }
+  return message || "No fue posible cargar el historial de pedidos.";
+}
+
+function formatApprovalAction(value) {
+  const action = String(value || "").trim().toUpperCase();
+  if (action === "APROBAR_PEDIDO" || action === "APROBAR_PEDIDO_PIPELINE") return "Aprobo pedido";
+  if (action === "GUARDAR_PEDIDO") return "Guardo edicion";
+  return action || "-";
 }
 
 export function PipelineOperativo({
@@ -132,11 +146,17 @@ export function PipelineOperativo({
   const [historial, setHistorial] = useState([]);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [historyError, setHistoryError] = useState("");
+  const [auditDesde, setAuditDesde] = useState(todayIsoDate());
+  const [auditHasta, setAuditHasta] = useState(todayIsoDate());
+  const [auditLoading, setAuditLoading] = useState(false);
+  const [auditError, setAuditError] = useState("");
+  const [auditData, setAuditData] = useState({ resumen: [], detalle: [], total: 0 });
   const { sidebarPinned, sidebarMobileOpen, setSidebarMobileOpen, toggleSidebar } = useSidebarState();
   const [processingPedidoIds, setProcessingPedidoIds] = useState([]);
 
   const empresaId = Number(session?.empresaID || tenantConfig.empresaId);
   const sucursalFromSession = session?.sucursalID != null ? Number(session.sucursalID) : null;
+  const activeSucursalId = filters.sucursalID ?? sucursalFromSession;
 
   const loadBoard = useCallback(async () => {
     setLoading(true);
@@ -144,7 +164,7 @@ export function PipelineOperativo({
     try {
       const data = await api.listarPipelinePedidos({
         empresaId,
-        sucursalId: filters.sucursalID ?? sucursalFromSession,
+        sucursalId: activeSucursalId,
         fecha: filters.fecha || null,
         domiciliarioId: filters.domiciliarioID,
         floristaId: filters.floristaID,
@@ -158,10 +178,10 @@ export function PipelineOperativo({
     } finally {
       setLoading(false);
     }
-  }, [api, empresaId, filters, sucursalFromSession]);
+  }, [activeSucursalId, api, empresaId, filters]);
 
   useEffect(() => {
-    loadBoard();
+    void loadBoard();
   }, [loadBoard]);
 
   const loadHistory = useCallback(async () => {
@@ -171,26 +191,52 @@ export function PipelineOperativo({
     try {
       const payload = await api.obtenerHistorialReasignaciones({
         empresaId,
-        sucursalId: filters.sucursalID ?? sucursalFromSession,
+        sucursalId: activeSucursalId,
         fechaDesde: metricasDesde,
         fechaHasta: metricasHasta
       });
       setHistorial(Array.isArray(payload?.items) ? payload.items : []);
     } catch (nextError) {
-      const message = nextError?.detail || nextError?.message || "No fue posible cargar el historial de reasignaciones.";
-      setHistoryError(message);
+      setHistoryError(nextError?.detail || nextError?.message || "No fue posible cargar el historial de reasignaciones.");
       setHistorial([]);
     } finally {
       setHistoryLoading(false);
     }
-  }, [api, empresaId, filters.sucursalID, metricasDesde, metricasHasta, sucursalFromSession]);
+  }, [activeSucursalId, api, empresaId, metricasDesde, metricasHasta]);
 
   useEffect(() => {
     if (submenu !== "historial") return;
     void loadHistory();
   }, [submenu, loadHistory]);
 
+  const loadApprovalAudit = useCallback(async () => {
+    if (!auditDesde || !auditHasta) return;
+    setAuditLoading(true);
+    setAuditError("");
+    try {
+      const payload = await api.obtenerTrazabilidadAprobacionesPedidos({
+        empresaId,
+        sucursalId: activeSucursalId,
+        fechaDesde: auditDesde,
+        fechaHasta: auditHasta,
+      });
+      setAuditData({
+        resumen: Array.isArray(payload?.resumen) ? payload.resumen : [],
+        detalle: Array.isArray(payload?.detalle) ? payload.detalle : [],
+        total: Number(payload?.total || 0),
+      });
+    } catch (nextError) {
+      setAuditError(formatApprovalAuditError(nextError));
+      setAuditData({ resumen: [], detalle: [], total: 0 });
+    } finally {
+      setAuditLoading(false);
+    }
+  }, [activeSucursalId, api, auditDesde, auditHasta, empresaId]);
 
+  useEffect(() => {
+    if (submenu !== "pedidos") return;
+    void loadApprovalAudit();
+  }, [submenu, loadApprovalAudit]);
 
   const onChangeFilter = (name, value) => {
     setFilters(current => ({ ...current, [name]: value }));
@@ -242,7 +288,7 @@ export function PipelineOperativo({
     const estadoId = STAGE_TO_ESTADO_ID[stage];
     if (!estadoId) return;
     if (processingPedidoIds.includes(Number(pedidoId))) {
-      globalThis.alert("Este pedido ya se está actualizando. Espera un momento.");
+      globalThis.alert("Este pedido ya se esta actualizando. Espera un momento.");
       return;
     }
     setProcessingPedidoIds(current => [...current, Number(pedidoId)]);
@@ -297,7 +343,7 @@ export function PipelineOperativo({
         <header className="orders-admin-header pipeline-page-header">
           <div>
             <h1>Pipeline</h1>
-            <p className="orders-admin-subtitle">Centro de control de pedidos, producción y entrega</p>
+            <p className="orders-admin-subtitle">Centro de control de pedidos, produccion y entrega</p>
           </div>
           <div className="header-actions">
             <button type="button" className="btn-primary pipeline-header-refresh" onClick={loadBoard}>
@@ -347,8 +393,8 @@ export function PipelineOperativo({
                       </span>
                       <small>{formatHistoryActor(item.usuarioCambio)}</small>
                       <em>
-                        {item.floristaAnteriorNombre || "Sin florista"} → {item.floristaNuevoNombre || "Sin florista"}
-                        {item.cliente ? ` · ${item.cliente}` : ""}
+                        {item.floristaAnteriorNombre || "Sin florista"} {"->"} {item.floristaNuevoNombre || "Sin florista"}
+                        {item.cliente ? ` - ${item.cliente}` : ""}
                       </em>
                       <small>{formatHistoryReason(item.motivo)}</small>
                     </span>
@@ -356,6 +402,93 @@ export function PipelineOperativo({
                   </li>
                 ))}
               </ul>
+            ) : null}
+          </section>
+        ) : submenu === "pedidos" ? (
+          <section className="order-block production-section-card production-history-panel">
+            <div className="production-section-head">
+              <h4>Historial de pedidos</h4>
+              <div className="production-history-filters">
+                <input type="date" value={auditDesde} onChange={event => setAuditDesde(event.target.value)} title="Desde" />
+                <input type="date" value={auditHasta} onChange={event => setAuditHasta(event.target.value)} title="Hasta" />
+                <button type="button" className="btn-primary" onClick={loadApprovalAudit} title="Consultar">Consultar</button>
+              </div>
+            </div>
+            {auditError ? <p className="orders-message">{auditError}</p> : null}
+            {auditLoading ? <p className="orders-message">Cargando historial...</p> : null}
+            {!auditLoading && !auditError ? (
+              <>
+                <div className="pipeline-audit-summary">
+                  <article className="pipeline-audit-summary-card">
+                    <span>Total acciones</span>
+                    <strong>{auditData.total || 0}</strong>
+                  </article>
+                  <article className="pipeline-audit-summary-card">
+                    <span>Usuarios</span>
+                    <strong>{auditData.resumen.length}</strong>
+                  </article>
+                  <article className="pipeline-audit-summary-card">
+                    <span>Pedidos impactados</span>
+                    <strong>{auditData.resumen.reduce((sum, item) => sum + Number(item?.pedidosAprobados || 0), 0)}</strong>
+                  </article>
+                </div>
+
+                <section className="orders-table-wrap orders-page-table-wrap" style={{ marginBottom: 16 }}>
+                  <table className="orders-table">
+                    <thead>
+                      <tr>
+                        <th>Usuario</th>
+                        <th>Acciones</th>
+                        <th>Pedidos</th>
+                        <th>Valor total</th>
+                        <th>Ultimo movimiento</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {auditData.resumen.length === 0 ? (
+                        <tr><td colSpan={5}>Sin movimientos para el rango seleccionado.</td></tr>
+                      ) : auditData.resumen.map(item => (
+                        <tr key={`audit-summary-${item.usuario}`}>
+                          <td>{item.usuario || "-"}</td>
+                          <td>{item.acciones || 0}</td>
+                          <td>{item.pedidosAprobados || 0}</td>
+                          <td>${Number(item.valorTotal || 0).toLocaleString("es-CO")}</td>
+                          <td>{item.ultimoMovimiento ? formatDateTimeCompact(item.ultimoMovimiento) : "-"}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </section>
+
+                <section className="orders-table-wrap orders-page-table-wrap">
+                  <table className="orders-table">
+                    <thead>
+                      <tr>
+                        <th>Fecha</th>
+                        <th>Usuario</th>
+                        <th>Accion</th>
+                        <th>Pedido</th>
+                        <th>Cliente</th>
+                        <th>Total</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {auditData.detalle.length === 0 ? (
+                        <tr><td colSpan={6}>Sin movimientos para el rango seleccionado.</td></tr>
+                      ) : auditData.detalle.map((item, index) => (
+                        <tr key={`audit-detail-${item.usuario}-${item.pedidoID}-${index}`}>
+                          <td>{item.fechaAccion ? formatDateTimeCompact(item.fechaAccion) : "-"}</td>
+                          <td>{item.usuario || "-"}</td>
+                          <td>{formatApprovalAction(item.accion)}</td>
+                          <td>{item.numeroPedido ?? item.pedidoID ?? "-"}</td>
+                          <td>{item.cliente || "-"}</td>
+                          <td>${Number(item.totalPedido || 0).toLocaleString("es-CO")}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </section>
+              </>
             ) : null}
           </section>
         ) : (
@@ -381,7 +514,7 @@ export function PipelineOperativo({
         onClose={onCloseModal}
         api={api}
         empresaId={empresaId}
-        sucursalId={filters.sucursalID ?? sucursalFromSession}
+        sucursalId={activeSucursalId}
         onSaveEdit={onSavePedidoEdit}
       />
     </div>

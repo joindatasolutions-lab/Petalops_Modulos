@@ -544,12 +544,6 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
   }, [applySelectedDetailProduct, detalle]);
 
   useEffect(() => {
-    const today = new Date().toISOString().slice(0, 10);
-    setAuditDesde(current => current || today);
-    setAuditHasta(current => current || today);
-  }, []);
-
-  useEffect(() => {
     if (!detalle || detalle.error) return;
     const productos = Array.isArray(detalle.productos) ? detalle.productos : [];
     if (productos.length === 0) return;
