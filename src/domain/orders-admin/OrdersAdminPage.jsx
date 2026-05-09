@@ -164,7 +164,6 @@ const MESSAGE_CARD_FONT_OPTIONS = [
   { value: "'Crimson Text', serif", label: "Crimson Text" },
   { value: "'Great Vibes', cursive", label: "Great Vibes" }
 ];
-
 export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canViewProduccion, canViewDomicilios, canViewInventario, canViewContabilidad, canViewTrazabilidad, canViewClientesPanel, canViewUsuariosPanel, onLogout, onGoPipeline, onGoPedidos, onGoProduccion, onGoDomicilios, onGoInventario, onGoContabilidad, onGoTrazabilidad, onGoClientes, onGoUsuarios }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -277,14 +276,33 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
     () => detailEditSelectedPaymentMethods.length > 1,
     [detailEditSelectedPaymentMethods]
   );
+  const detailEditSelectedBarrio = useMemo(() => {
+    const normalizedSelected = String(detailEditBarrioNombre || "").trim().toLowerCase();
+    if (!normalizedSelected) return null;
+    return detailEditBarrios.find(item => String(item?.nombre || "").trim().toLowerCase() === normalizedSelected) || null;
+  }, [detailEditBarrioNombre, detailEditBarrios]);
   const detailEditFinancialPreview = useMemo(
-    () => buildOrderFinancialPreview(
-      detalle?.financiero || {},
-      detailEditSelectedPaymentMethods,
-      detailEditOmitirRecargoLink,
-      detailEditDescuentoPct
-    ),
-    [detalle, detailEditSelectedPaymentMethods, detailEditOmitirRecargoLink, detailEditDescuentoPct]
+    () => {
+      const baseFinancial = {
+        ...(detalle?.financiero || {}),
+      };
+      const normalizedDeliveryType = normalizeDeliveryType(detailEditBarrioNombreOrFallback(
+        detailEditBarrioNombre,
+        detalle?.destinatario?.barrio
+      ));
+      if (normalizedDeliveryType === "recogida_en_tienda") {
+        baseFinancial.domicilio = 0;
+      } else if (detailEditSelectedBarrio?.costoDomicilio != null) {
+        baseFinancial.domicilio = Number(detailEditSelectedBarrio.costoDomicilio || 0);
+      }
+      return buildOrderFinancialPreview(
+        baseFinancial,
+        detailEditSelectedPaymentMethods,
+        detailEditOmitirRecargoLink,
+        detailEditDescuentoPct
+      );
+    },
+    [detalle, detailEditBarrioNombre, detailEditSelectedBarrio, detailEditSelectedPaymentMethods, detailEditOmitirRecargoLink, detailEditDescuentoPct]
   );
   const detailEditShowPriceField = detailEditCustomPriceEnabled || detailEditPrecio != null;
   const detailProducts = useMemo(
@@ -524,6 +542,12 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
     setDetailEditCatalog(dedupeCatalogItems(initialCatalog));
     setDetailEditError("");
   }, [applySelectedDetailProduct, detalle]);
+
+  useEffect(() => {
+    const today = new Date().toISOString().slice(0, 10);
+    setAuditDesde(current => current || today);
+    setAuditHasta(current => current || today);
+  }, []);
 
   useEffect(() => {
     if (!detalle || detalle.error) return;
@@ -2294,9 +2318,12 @@ function normalizeBarrioItem(raw) {
   if (!nombre) return null;
   const idValue = raw?.idBarrio ?? raw?.id ?? null;
   const id = idValue == null || idValue === "" ? null : Number(idValue);
+  const costoRaw = raw?.costoDomicilio ?? raw?.costo ?? null;
+  const costo = costoRaw == null || costoRaw === "" ? null : Number(costoRaw);
   return {
     id: Number.isNaN(id) ? null : id,
     nombre,
+    costoDomicilio: Number.isNaN(costo) ? null : costo,
   };
 }
 

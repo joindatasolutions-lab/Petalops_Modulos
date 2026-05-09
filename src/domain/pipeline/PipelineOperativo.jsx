@@ -28,6 +28,11 @@ const STAGE_TO_ESTADO_ID = {
   cancelado: 6
 };
 
+const PIPELINE_SUBMENU_OPTIONS = [
+  { key: "pipeline", label: "Pipeline" },
+  { key: "historial", label: "Historial reasignaciones" }
+];
+
 const INITIAL_FILTERS = {
   sucursalID: null,
   fecha: new Date().toISOString().slice(0, 10),
@@ -37,6 +42,51 @@ const INITIAL_FILTERS = {
   soloAtrasados: false,
   soloEnProduccion: false
 };
+
+function todayIsoDate() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function sanitizeHistoryText(value) {
+  return String(value || "")
+    .replaceAll("Â·", "-")
+    .replaceAll("Ã¡", "á")
+    .replaceAll("Ã©", "é")
+    .replaceAll("Ã­", "í")
+    .replaceAll("Ã³", "ó")
+    .replaceAll("Ãº", "ú")
+    .replaceAll("Ã", "Á")
+    .replaceAll("Ã‰", "É")
+    .replaceAll("Ã", "Í")
+    .replaceAll("Ã“", "Ó")
+    .replaceAll("Ãš", "Ú")
+    .trim();
+}
+
+function formatHistoryActor(value) {
+  const raw = sanitizeHistoryText(value);
+  if (!raw) return "-";
+  return raw.replace(/\./g, " · ");
+}
+
+function formatHistoryReason(value) {
+  return sanitizeHistoryText(value) || "-";
+}
+
+function resolveHistoryTypeLabel(tipoMovimiento) {
+  const type = String(tipoMovimiento || "").trim().toUpperCase();
+  if (type === "ASIGNACION_MANUAL") return "Asignación";
+  if (type === "REASIGNACION_MANUAL") return "Reasignación";
+  if (type === "DESASIGNACION_MANUAL") return "Desasignación";
+  return "Movimiento";
+}
+
+function resolveHistoryTypeClass(tipoMovimiento) {
+  const label = resolveHistoryTypeLabel(tipoMovimiento);
+  if (label === "Asignación") return "is-admin";
+  if (label === "Desasignación") return "is-auto";
+  return "is-reassignment";
+}
 
 export function PipelineOperativo({
   session,
@@ -76,6 +126,12 @@ export function PipelineOperativo({
   const [error, setError] = useState("");
   const [selected, setSelected] = useState(null);
   const [selectedDetail, setSelectedDetail] = useState(null);
+  const [submenu, setSubmenu] = useState("pipeline");
+  const [metricasDesde, setMetricasDesde] = useState(todayIsoDate());
+  const [metricasHasta, setMetricasHasta] = useState(todayIsoDate());
+  const [historial, setHistorial] = useState([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyError, setHistoryError] = useState("");
   const { sidebarPinned, sidebarMobileOpen, setSidebarMobileOpen, toggleSidebar } = useSidebarState();
   const [processingPedidoIds, setProcessingPedidoIds] = useState([]);
 
@@ -107,6 +163,32 @@ export function PipelineOperativo({
   useEffect(() => {
     loadBoard();
   }, [loadBoard]);
+
+  const loadHistory = useCallback(async () => {
+    if (!metricasDesde || !metricasHasta) return;
+    setHistoryLoading(true);
+    setHistoryError("");
+    try {
+      const payload = await api.obtenerHistorialReasignaciones({
+        empresaId,
+        sucursalId: filters.sucursalID ?? sucursalFromSession,
+        fechaDesde: metricasDesde,
+        fechaHasta: metricasHasta
+      });
+      setHistorial(Array.isArray(payload?.items) ? payload.items : []);
+    } catch (nextError) {
+      const message = nextError?.detail || nextError?.message || "No fue posible cargar el historial de reasignaciones.";
+      setHistoryError(message);
+      setHistorial([]);
+    } finally {
+      setHistoryLoading(false);
+    }
+  }, [api, empresaId, filters.sucursalID, metricasDesde, metricasHasta, sucursalFromSession]);
+
+  useEffect(() => {
+    if (submenu !== "historial") return;
+    void loadHistory();
+  }, [submenu, loadHistory]);
 
 
 
@@ -226,23 +308,71 @@ export function PipelineOperativo({
         </header>
 
         <PipelineFilters filters={filters} onChange={onChangeFilter} />
+        <section className="orders-submenu">
+          {PIPELINE_SUBMENU_OPTIONS.map(option => (
+            <button
+              key={option.key}
+              type="button"
+              className={`orders-submenu-chip${submenu === option.key ? " is-active" : ""}`}
+              onClick={() => setSubmenu(option.key)}
+            >
+              {option.label}
+            </button>
+          ))}
+        </section>
 
         {loading ? <p className="orders-message">Cargando pipeline...</p> : null}
         {error ? <p className="orders-message">{error}</p> : null}
 
-        <section className="pipeline-board">
-          {PIPELINE_COLUMNS.map(column => (
-            <PipelineColumn
-              key={column.key}
-              dropStageKey={column.dropStage}
-              title={column.title}
-              items={buildColumnItems(column.stages)}
-              onOpen={onOpen}
-              onDropCard={onDropCard}
-              onDragStart={onDragStart}
-            />
-          ))}
-        </section>
+        {submenu === "historial" ? (
+          <section className="order-block production-section-card production-history-panel">
+            <div className="production-section-head">
+              <h4>Historial de reasignaciones</h4>
+              <div className="production-history-filters">
+                <input type="date" value={metricasDesde} onChange={event => setMetricasDesde(event.target.value)} title="Desde" />
+                <input type="date" value={metricasHasta} onChange={event => setMetricasHasta(event.target.value)} title="Hasta" />
+                <button type="button" className="btn-primary" onClick={loadHistory} title="Consultar">Consultar</button>
+              </div>
+            </div>
+            {historyError ? <p className="orders-message">{historyError}</p> : null}
+            {historyLoading ? <p className="orders-message">Cargando historial...</p> : null}
+            {!historyLoading && !historyError ? (
+              <ul className="order-products-list production-history-list">
+                {historial.length === 0 ? <li className="production-history-empty">Sin datos</li> : historial.map((item, idx) => (
+                  <li key={`${item.produccionID}-${item.fechaCambio}-${idx}`}>
+                    <span className="production-history-copy">
+                      <span className="production-history-line">
+                        <strong>{item.numeroPedido ? `Pedido ${item.numeroPedido}` : `P${item.produccionID}`}</strong>
+                        <span className={`production-history-tag ${resolveHistoryTypeClass(item.tipoMovimiento)}`}>{resolveHistoryTypeLabel(item.tipoMovimiento)}</span>
+                      </span>
+                      <small>{formatHistoryActor(item.usuarioCambio)}</small>
+                      <em>
+                        {item.floristaAnteriorNombre || "Sin florista"} → {item.floristaNuevoNombre || "Sin florista"}
+                        {item.cliente ? ` · ${item.cliente}` : ""}
+                      </em>
+                      <small>{formatHistoryReason(item.motivo)}</small>
+                    </span>
+                    <strong className="production-history-date">{formatDateTimeCompact(item.fechaCambio) || "-"}</strong>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+          </section>
+        ) : (
+          <section className="pipeline-board">
+            {PIPELINE_COLUMNS.map(column => (
+              <PipelineColumn
+                key={column.key}
+                dropStageKey={column.dropStage}
+                title={column.title}
+                items={buildColumnItems(column.stages)}
+                onOpen={onOpen}
+                onDropCard={onDropCard}
+                onDragStart={onDragStart}
+              />
+            ))}
+          </section>
+        )}
       </main>
 
       <PedidoModal

@@ -20,7 +20,6 @@ const DEFAULT_USER = "admin.demo";
 const LOOKER_STUDIO_URL = "https://lookerstudio.google.com/embed/reporting/d08a04af-ed8e-4dde-a83c-90888bfde39d/page/p_mp7qxa6dzd";
 const SUBMENU_OPTIONS = [
   { key: "pedidos", label: "Pedidos" },
-  { key: "historial", label: "Historial reasignaciones" },
   { key: "disponibilidad", label: "Disponibilidad florista" },
   { key: "incapacidad", label: "Gestión incapacidad" },
   { key: "looker", label: "Looker" }
@@ -117,47 +116,6 @@ function isFloristaActivo(item) {
   return String(item?.estado || "").trim().toLowerCase() === "activo" && Boolean(item?.activo);
 }
 
-function sanitizeHistoryText(value) {
-  return String(value || "")
-    .replaceAll("Â·", "-")
-    .replaceAll("Ã¡", "á")
-    .replaceAll("Ã©", "é")
-    .replaceAll("Ã­", "í")
-    .replaceAll("Ã³", "ó")
-    .replaceAll("Ãº", "ú")
-    .replaceAll("Ã", "Á")
-    .replaceAll("Ã‰", "É")
-    .replaceAll("Ã", "Í")
-    .replaceAll("Ã“", "Ó")
-    .replaceAll("Ãš", "Ú")
-    .trim();
-}
-
-function formatHistoryActor(value) {
-  const raw = sanitizeHistoryText(value);
-  if (!raw) return "-";
-  return raw.replace(/\./g, " · ");
-}
-
-function formatHistoryReason(value) {
-  return sanitizeHistoryText(value) || "-";
-}
-
-function resolveHistoryTypeLabel(motivo, actor) {
-  const reason = sanitizeHistoryText(motivo).toLowerCase();
-  const who = sanitizeHistoryText(actor).toLowerCase();
-  if (reason.includes("auto") || reason.includes("autom")) return "Auto";
-  if (who.includes("admin") || reason.includes("admin")) return "Admin";
-  return "Reasignación";
-}
-
-function resolveHistoryTypeClass(motivo, actor) {
-  const label = resolveHistoryTypeLabel(motivo, actor);
-  if (label === "Auto") return "is-auto";
-  if (label === "Admin") return "is-admin";
-  return "is-reassignment";
-}
-
 export function ProductionPage({ session, canViewPipeline, canViewPedidos, canViewProduccion, canViewDomicilios, canViewInventario, canViewContabilidad, canViewTrazabilidad, canViewClientesPanel, canViewUsuariosPanel, onLogout, onGoPipeline, onGoPedidos, onGoProduccion, onGoDomicilios, onGoInventario, onGoContabilidad, onGoTrazabilidad, onGoClientes, onGoUsuarios }) {
   const api = useMemo(() => createApiClient(tenantConfig), []);
   const empresaId = Number(session?.empresaID || tenantConfig.empresaId);
@@ -193,9 +151,6 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
   const [fechaInicioIncapacidad, setFechaInicioIncapacidad] = useState(todayIsoDate());
   const [fechaFinIncapacidad, setFechaFinIncapacidad] = useState(todayIsoDate());
 
-  const [metricasDesde, setMetricasDesde] = useState(todayIsoDate());
-  const [metricasHasta, setMetricasHasta] = useState(todayIsoDate());
-  const [historial, setHistorial] = useState([]);
   const [submenu, setSubmenu] = useState("pedidos");
   const [busquedaGeneral, setBusquedaGeneral] = useState("");
   const [soloMisAsignados, setSoloMisAsignados] = useState(!canManageProductionActions);
@@ -223,6 +178,11 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
     () => inferCurrentFloristaId(session, allFloristas),
     [session, allFloristas]
   );
+
+  const ownFloristaDisponibilidad = useMemo(() => {
+    if (currentFloristaId == null) return null;
+    return floristasDisponibilidad.find(item => Number(item.idFlorista) === Number(currentFloristaId)) || null;
+  }, [currentFloristaId, floristasDisponibilidad]);
 
   const visibleItems = useMemo(() => {
     const search = normalizeSearchText(busquedaGeneral);
@@ -305,28 +265,9 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
     }
   }, [api, fecha, estadosFiltro, floristaGestionID, empresaId, sucursalId]);
 
-  const loadInsights = useCallback(async () => {
-    try {
-      const hist = await api.obtenerHistorialReasignaciones({
-        empresaId,
-        sucursalId,
-        fechaDesde: metricasDesde,
-        fechaHasta: metricasHasta
-      });
-
-      setHistorial(Array.isArray(hist.items) ? hist.items : []);
-    } catch (nextError) {
-      console.error("Error cargando insights de producción:", nextError);
-    }
-  }, [api, metricasDesde, metricasHasta, empresaId, sucursalId]);
-
   useEffect(() => {
     loadData();
   }, [loadData]);
-
-  useEffect(() => {
-    loadInsights();
-  }, [loadInsights]);
 
 
   useEffect(() => {
@@ -353,7 +294,6 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
 
   const refreshAll = async () => {
     await loadData();
-    await loadInsights();
   };
 
   const onChangeSoloMisAsignados = checked => {
@@ -423,7 +363,6 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
 
   const refreshAndKeepSelection = async produccionId => {
     const nextItems = await loadData();
-    await loadInsights();
     const nextSelected = nextItems.find(item => Number(item.idProduccion) === Number(produccionId));
     if (nextSelected) {
       setSelectedItem(nextSelected);
@@ -578,16 +517,16 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
   };
 
   const toggleEstadoFloristaPropio = async () => {
-    if (!floristaGestionID) {
+    if (currentFloristaId == null) {
       globalThis.alert("No fue posible identificar el florista.");
       return;
     }
 
-    const estadoObjetivo = isFloristaActivo(currentFloristaDisponibilidad) ? "Inactivo" : "Activo";
+    const estadoObjetivo = isFloristaActivo(ownFloristaDisponibilidad) ? "Inactivo" : "Activo";
 
     try {
       await api.actualizarEstadoFlorista({
-        floristaId: Number(floristaGestionID),
+        floristaId: Number(currentFloristaId),
         estado: estadoObjetivo,
         fechaInicioIncapacidad: null,
         fechaFinIncapacidad: null,
@@ -875,35 +814,6 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
           </>
         )}
 
-
-        {canManageProductionActions && submenu === "historial" && (
-          <section className="order-block production-section-card production-history-panel">
-            <div className="production-section-head">
-              <h4>Historial de reasignaciones</h4>
-              <div className="production-history-filters">
-                <input type="date" value={metricasDesde} onChange={event => setMetricasDesde(event.target.value)} title="Desde" />
-                <input type="date" value={metricasHasta} onChange={event => setMetricasHasta(event.target.value)} title="Hasta" />
-                <button type="button" className="btn-primary" onClick={loadInsights} title="Consultar">Consultar</button>
-              </div>
-            </div>
-            <ul className="order-products-list production-history-list">
-              {historial.length === 0 ? <li className="production-history-empty">Sin datos</li> : historial.map((item, idx) => (
-                <li key={`${item.produccionID}-${item.fechaCambio}-${idx}`}>
-                  <span className="production-history-copy">
-                    <span className="production-history-line">
-                      <strong>P{item.produccionID}</strong>
-                      <span className={`production-history-tag ${resolveHistoryTypeClass(item.motivo, item.usuarioCambio)}`}>{resolveHistoryTypeLabel(item.motivo, item.usuarioCambio)}</span>
-                    </span>
-                    <small>{formatHistoryActor(item.usuarioCambio)}</small>
-                    <em>{formatHistoryReason(item.motivo)}</em>
-                  </span>
-                  <strong className="production-history-date">{formatDateTimeCompact(item.fechaCambio) || "-"}</strong>
-                </li>
-              ))}
-            </ul>
-          </section>
-        )}
-
         {canManageProductionActions && submenu === "disponibilidad" && (
           <section className="order-block production-section-card production-availability-panel">
             <div className="production-section-head production-section-head--stack">
@@ -1136,11 +1046,11 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
               <section className="order-block">
                 <h4>Estado de florista</h4>
                 <div className="order-actions" style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                  <span className={`order-badge ${isFloristaActivo(currentFloristaDisponibilidad) ? "is-entregado" : "is-cancelado"}`}>
-                    {isFloristaActivo(currentFloristaDisponibilidad) ? "Activo" : "Inactivo"}
+                  <span className={`order-badge ${isFloristaActivo(ownFloristaDisponibilidad) ? "is-entregado" : "is-cancelado"}`}>
+                    {isFloristaActivo(ownFloristaDisponibilidad) ? "Activo" : "Inactivo"}
                   </span>
                   <button type="button" className="btn-outline" onClick={toggleEstadoFloristaPropio} title="Cambiar disponibilidad del florista">
-                    {isFloristaActivo(currentFloristaDisponibilidad) ? "Inactivar" : "Activar"}
+                    {isFloristaActivo(ownFloristaDisponibilidad) ? "Inactivar" : "Activar"}
                   </button>
                 </div>
               </section>
