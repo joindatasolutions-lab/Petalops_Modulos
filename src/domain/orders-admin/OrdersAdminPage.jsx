@@ -24,6 +24,7 @@ const BADGE_CLASS_BY_STATUS = {
   CANCELADO: "is-rechazado",
 };
 const LINK_PAYMENT_METHODS = new Set(["link bold", "link payu", "link wompi"]);
+const AUTO_REFRESH_INTERVAL_MS = 15000;
 
 function extractIndicativo(phone) {
   const raw = String(phone || "").trim();
@@ -81,7 +82,25 @@ function clampPercentage(value) {
   return Math.max(0, Math.min(100, roundCurrency(parsed)));
 }
 
-function buildOrderFinancialPreview(financiero, methods = [], omitirRecargoLink = false, descuentoPct = 0) {
+function isEmpresaAdminRole(session) {
+  const role = String(session?.rol || "").trim().toLowerCase().replace(/\s+/g, "_");
+  return Boolean(session?.esGlobalJoin) || role === "admin" || role === "empresa_admin";
+}
+
+function ensureRappiOption(options) {
+  const normalized = Array.isArray(options)
+    ? options.map(item => String(item || "").trim()).filter(Boolean)
+    : [];
+  return normalized.includes("RAPPI") ? normalized : [...normalized, "RAPPI"];
+}
+
+function buildOrderFinancialPreview(
+  financiero,
+  methods = [],
+  omitirRecargoLink = false,
+  descuentoMontoInput = 0,
+  saldoFavorMontoInput = 0
+) {
   const subtotal = roundCurrency(financiero?.subtotal ?? 0);
   const iva = roundCurrency(financiero?.iva ?? 0);
   const domicilio = roundCurrency(financiero?.domicilio ?? 0);
@@ -89,10 +108,11 @@ function buildOrderFinancialPreview(financiero, methods = [], omitirRecargoLink 
   const hasLinkPayment = normalizePaymentMethods(methods).some(isLinkPaymentMethod);
   const recargoPct = hasLinkPayment && !omitirRecargoLink ? 5 : 0;
   const recargoMonto = roundCurrency((baseTotal * recargoPct) / 100);
-  const descuentoNormalizado = clampPercentage(descuentoPct);
   const totalAntesDescuento = roundCurrency(baseTotal + recargoMonto);
-  const descuentoMonto = roundCurrency((totalAntesDescuento * descuentoNormalizado) / 100);
-  const total = roundCurrency(totalAntesDescuento - descuentoMonto);
+  const descuentoMonto = Math.max(0, Math.min(totalAntesDescuento, normalizeWholePeso(descuentoMontoInput) ?? 0));
+  const totalDespuesDescuento = roundCurrency(totalAntesDescuento - descuentoMonto);
+  const saldoFavorMonto = Math.max(0, Math.min(totalDespuesDescuento, normalizeWholePeso(saldoFavorMontoInput) ?? 0));
+  const total = roundCurrency(totalDespuesDescuento - saldoFavorMonto);
   return {
     subtotal,
     iva,
@@ -101,8 +121,8 @@ function buildOrderFinancialPreview(financiero, methods = [], omitirRecargoLink 
     hasLinkPayment,
     recargoPct,
     recargoMonto,
-    descuentoPct: descuentoNormalizado,
     descuentoMonto,
+    saldoFavorMonto,
     total,
   };
 }
@@ -148,6 +168,7 @@ function extractPaymentAmounts(financiero, paymentMethods = []) {
 const initialFilters = {
   q: "",
   estado: "",
+  sinImprimir: false,
   fechaDesde: new Date().toISOString().slice(0, 10),
   fechaHasta: new Date().toISOString().slice(0, 10),
   page: 1,
@@ -169,6 +190,7 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
   const [error, setError] = useState("");
   const [items, setItems] = useState([]);
   const [total, setTotal] = useState(0);
+  const [facturasPendientesImpresion, setFacturasPendientesImpresion] = useState(0);
   const [filters, setFilters] = useState(initialFilters);
   const [selectedPedidoId, setSelectedPedidoId] = useState(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -219,7 +241,10 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
   const [detailEditMetodosPago, setDetailEditMetodosPago] = useState([]);
   const [detailEditPaymentAmounts, setDetailEditPaymentAmounts] = useState({});
   const [detailEditOmitirRecargoLink, setDetailEditOmitirRecargoLink] = useState(false);
-  const [detailEditDescuentoPct, setDetailEditDescuentoPct] = useState("");
+  const [detailEditDescuentoMonto, setDetailEditDescuentoMonto] = useState("");
+  const [detailEditDescuentoNota, setDetailEditDescuentoNota] = useState("");
+  const [detailEditSaldoFavorMonto, setDetailEditSaldoFavorMonto] = useState("");
+  const [detailEditSaldoFavorNota, setDetailEditSaldoFavorNota] = useState("");
   const [detailEditCanalFlora, setDetailEditCanalFlora] = useState("");
   const [detailEditSaving, setDetailEditSaving] = useState(false);
   const [detailEditError, setDetailEditError] = useState("");
@@ -248,10 +273,15 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
     () => pedidoMenuFields.find(field => field?.codigo === "pedido_metodos_pago" && field?.activo),
     [pedidoMenuFields]
   );
+  const paymentFieldOptions = useMemo(
+    () => ensureRappiOption(paymentFieldConfig?.opciones),
+    [paymentFieldConfig]
+  );
   const salesChannelFieldConfig = useMemo(
     () => pedidoMenuFields.find(field => field?.codigo === "pedido_canal_venta" && field?.activo),
     [pedidoMenuFields]
   );
+  const canEditClientIdentity = useMemo(() => isEmpresaAdminRole(session), [session]);
   const detailEditSelectedPaymentMethods = useMemo(
     () => normalizePaymentMethods(detailEditMetodosPago),
     [detailEditMetodosPago]
@@ -299,10 +329,11 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
         baseFinancial,
         detailEditSelectedPaymentMethods,
         detailEditOmitirRecargoLink,
-        detailEditDescuentoPct
+        detailEditDescuentoMonto,
+        detailEditSaldoFavorMonto
       );
     },
-    [detalle, detailEditBarrioNombre, detailEditSelectedBarrio, detailEditSelectedPaymentMethods, detailEditOmitirRecargoLink, detailEditDescuentoPct]
+    [detalle, detailEditBarrioNombre, detailEditSelectedBarrio, detailEditSelectedPaymentMethods, detailEditOmitirRecargoLink, detailEditDescuentoMonto, detailEditSaldoFavorMonto]
   );
   const detailEditShowPriceField = detailEditCustomPriceEnabled || detailEditPrecio != null;
   const detailProducts = useMemo(
@@ -403,6 +434,7 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
         sucursalId,
         q: debouncedQuery,
         estado: filters.estado,
+        sinImprimir: filters.sinImprimir,
         fechaDesde: toIsoDateStart(filters.fechaDesde),
         fechaHasta: toIsoDateEnd(filters.fechaHasta),
         page: filters.page,
@@ -411,19 +443,29 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
 
       setItems(Array.isArray(data.items) ? data.items : []);
       setTotal(Number(data.total || 0));
+      setFacturasPendientesImpresion(Number(data.facturasPendientesImpresion || 0));
       setError("");
     } catch (nextError) {
       console.error("Error cargando pedidos:", nextError);
       setItems([]);
       setTotal(0);
+      setFacturasPendientesImpresion(0);
       setError("No fue posible cargar pedidos.");
     } finally {
       if (!silent) setLoading(false);
     }
-  }, [api, debouncedQuery, filters.estado, filters.fechaDesde, filters.fechaHasta, filters.page, filters.pageSize, empresaId, sucursalId]);
+  }, [api, debouncedQuery, filters.estado, filters.sinImprimir, filters.fechaDesde, filters.fechaHasta, filters.page, filters.pageSize, empresaId, sucursalId]);
 
   useEffect(() => {
     loadOrders(false);
+  }, [loadOrders]);
+
+  useEffect(() => {
+    const intervalId = globalThis.setInterval(() => {
+      if (document?.hidden) return;
+      loadOrders(true);
+    }, AUTO_REFRESH_INTERVAL_MS);
+    return () => globalThis.clearInterval(intervalId);
   }, [loadOrders]);
 
 
@@ -473,7 +515,10 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
       setDetailEditObservacionGeneral("");
       setDetailEditMetodosPago([]);
       setDetailEditOmitirRecargoLink(false);
-      setDetailEditDescuentoPct("");
+      setDetailEditDescuentoMonto("");
+      setDetailEditDescuentoNota("");
+      setDetailEditSaldoFavorMonto("");
+      setDetailEditSaldoFavorNota("");
       setDetailEditCanalFlora("");
       setDetailEditError("");
       setDetailEditDropdownOpen(false);
@@ -520,11 +565,18 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
     setDetailEditMetodosPago(initialPaymentMethods);
     setDetailEditPaymentAmounts(extractPaymentAmounts(detalle.financiero, initialPaymentMethods));
     setDetailEditOmitirRecargoLink(Boolean(detalle.financiero?.omitirRecargoLink));
-    setDetailEditDescuentoPct(
-      Number(detalle.financiero?.descuentoPct || 0) > 0
-        ? String(detalle.financiero?.descuentoPct)
+    setDetailEditDescuentoMonto(
+      Number(detalle.financiero?.descuentoMonto || 0) > 0
+        ? String(Math.round(Number(detalle.financiero?.descuentoMonto || 0)))
         : ""
     );
+    setDetailEditDescuentoNota(String(detalle.financiero?.descuentoNota || ""));
+    setDetailEditSaldoFavorMonto(
+      Number(detalle.financiero?.saldoFavorMonto || 0) > 0
+        ? String(Math.round(Number(detalle.financiero?.saldoFavorMonto || 0)))
+        : ""
+    );
+    setDetailEditSaldoFavorNota(String(detalle.financiero?.saldoFavorNota || ""));
     setDetailEditCanalFlora(String(detalle.financiero?.canalFlora || ""));
     setDetailEditSubview("edit");
     setDetailAddDropdownOpen(false);
@@ -643,6 +695,7 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
     try {
       const response = await api.aprobarPedido(pedidoId);
       optimisticStatusPatch(pedidoId, response.estado || "APROBADO");
+      await loadOrders(true);
     } catch (nextError) {
       console.error("Error aprobando pedido:", nextError);
       globalThis.alert(nextError?.detail || nextError?.message || "No fue posible aprobar el pedido.");
@@ -678,6 +731,10 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
       link.click();
       link.remove();
       URL.revokeObjectURL(url);
+      await loadOrders(true);
+      if (Number(selectedPedidoId) === Number(pedidoId)) {
+        await reloadDrawer();
+      }
     } catch (nextError) {
       console.error("Error descargando factura:", nextError);
       globalThis.alert("No fue posible descargar la factura del pedido.");
@@ -964,8 +1021,8 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
           productoPrecio: detailEditIsCustomArrangement ? normalizeWholePeso(detailEditPrecio) : null,
           fechaEntrega: detailEditFechaEntrega,
           horaEntrega: detailEditHoraEntrega,
-          clienteNombre: detailEditClienteNombre,
-          clienteTelefono: detailEditClienteTelefono,
+          clienteNombre: canEditClientIdentity ? detailEditClienteNombre : null,
+          clienteTelefono: canEditClientIdentity ? detailEditClienteTelefono : null,
           clienteEmail: detailEditClienteEmail,
           clienteTipoIdent: detailEditClienteTipoIdent,
           clienteIdentificacion: detailEditClienteIdentificacion,
@@ -982,7 +1039,10 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
           detallePago: paymentValidation.paymentBreakdown,
           montoEfectivo: paymentValidation.cashAmount,
           omitirRecargoLink: detailEditOmitirRecargoLink,
-          descuentoPct: clampPercentage(detailEditDescuentoPct),
+          descuentoMonto: normalizeWholePeso(detailEditDescuentoMonto) ?? 0,
+          descuentoNota: detailEditDescuentoNota || null,
+          saldoFavorMonto: normalizeWholePeso(detailEditSaldoFavorMonto) ?? 0,
+          saldoFavorNota: detailEditSaldoFavorNota || null,
           canalFlora: validatedCanalFlora,
         });
         await loadOrders(true);
@@ -998,8 +1058,8 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
           productoPrecio: detailEditIsCustomArrangement ? normalizeWholePeso(detailEditPrecio) : null,
           fechaEntrega: detailEditFechaEntrega,
           horaEntrega: detailEditHoraEntrega,
-          clienteNombre: detailEditClienteNombre,
-          clienteTelefono: detailEditClienteTelefono,
+          clienteNombre: canEditClientIdentity ? detailEditClienteNombre : null,
+          clienteTelefono: canEditClientIdentity ? detailEditClienteTelefono : null,
           clienteEmail: detailEditClienteEmail,
           clienteTipoIdent: detailEditClienteTipoIdent,
           clienteIdentificacion: detailEditClienteIdentificacion,
@@ -1016,7 +1076,10 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
           detallePago: paymentValidation.paymentBreakdown,
           montoEfectivo: paymentValidation.cashAmount,
           omitirRecargoLink: detailEditOmitirRecargoLink,
-          descuentoPct: clampPercentage(detailEditDescuentoPct),
+          descuentoMonto: normalizeWholePeso(detailEditDescuentoMonto) ?? 0,
+          descuentoNota: detailEditDescuentoNota || null,
+          saldoFavorMonto: normalizeWholePeso(detailEditSaldoFavorMonto) ?? 0,
+          saldoFavorNota: detailEditSaldoFavorNota || null,
           canalFlora: validatedCanalFlora,
         });
         await reloadDrawer();
@@ -1217,7 +1280,36 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
                 onChange={event => applyFilterValue("fechaHasta", event.target.value)}
               />
             </div>
+            <label className="filter-field filter-field-check orders-filter-check">
+              <span>Factura</span>
+              <div className="orders-filter-check-row">
+                <input
+                  type="checkbox"
+                  checked={Boolean(filters.sinImprimir)}
+                  onChange={event => applyFilterValue("sinImprimir", event.target.checked)}
+                />
+                <span>Sin imprimir</span>
+              </div>
+            </label>
           </section>
+
+          {!loading && facturasPendientesImpresion > 0 ? (
+            <section className="orders-alert-card" aria-live="polite">
+              <div className="orders-alert-card-copy">
+                <strong>Alerta de facturas pendientes</strong>
+                <span>
+                  Hay {facturasPendientesImpresion} pedido{facturasPendientesImpresion === 1 ? "" : "s"} aprobado{facturasPendientesImpresion === 1 ? "" : "s"} con factura sin imprimir en este rango.
+                </span>
+              </div>
+              <button
+                type="button"
+                className="btn-outline"
+                onClick={() => applyFilterValue("sinImprimir", !filters.sinImprimir)}
+              >
+                {filters.sinImprimir ? "Ver todos" : "Ver solo sin imprimir"}
+              </button>
+            </section>
+          ) : null}
 
           {error && <p className="orders-message">{error}</p>}
           {loading && <p className="orders-message">Cargando pedidos...</p>}
@@ -1293,7 +1385,14 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
                         <span className="orders-total-value">${formatearCOP(Number(item.total || 0))}</span>
                       </td>
                       <td data-label="Método pago">{item.metodoPago || "-"}</td>
-                      <td data-label="Estado"><span className={`order-badge ${statusClass}`}>{item.estado || "-"}</span></td>
+                      <td data-label="Estado">
+                        <div className="orders-cell-stack">
+                          <span className={`order-badge ${statusClass}`}>{item.estado || "-"}</span>
+                          {canDownloadInvoice && !item.facturaImpresa ? (
+                            <span className="orders-inline-alert">Factura pendiente</span>
+                          ) : null}
+                        </div>
+                      </td>
                       <td data-label="Acciones">
                         <div className="order-actions">
                           <a href={`https://wa.me/${waPhone}`} target="_blank" rel="noreferrer" className="order-icon" title="WhatsApp">💬</a>
@@ -1700,6 +1799,7 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
                         value={detailEditClienteNombre}
                         onChange={event => setDetailEditClienteNombre(event.target.value)}
                         placeholder="Nombre del cliente"
+                        disabled={!canEditClientIdentity}
                       />
                     </label>
                     <label className="order-detail-edit-label">
@@ -1709,6 +1809,7 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
                         value={detailEditClienteTelefono}
                         onChange={event => setDetailEditClienteTelefono(event.target.value)}
                         placeholder="Teléfono del cliente"
+                        disabled={!canEditClientIdentity}
                       />
                     </label>
                     <label className="order-detail-edit-label">
@@ -1746,6 +1847,11 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
                   <p className="order-detail-edit-hint">
                     Si corriges el documento a NIT, el pedido recalcula IVA con la configuración fiscal disponible.
                   </p>
+                  {!canEditClientIdentity ? (
+                    <p className="order-detail-edit-hint">
+                      Solo un usuario administrador puede cambiar nombre o teléfono del cliente.
+                    </p>
+                  ) : null}
 
                   <div className="order-detail-edit-grid">
                     <label className="order-detail-edit-label">
@@ -1886,7 +1992,7 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
                         <div className="order-detail-edit-label">
                           <span>{paymentFieldConfig.titulo || "Métodos de pago"}</span>
                           <div className="order-detail-edit-checklist">
-                            {(Array.isArray(paymentFieldConfig.opciones) ? paymentFieldConfig.opciones : []).map(option => (
+                            {paymentFieldOptions.map(option => (
                             <label key={option} className="order-detail-edit-checkitem">
                               <input
                                 type="checkbox"
@@ -1949,15 +2055,45 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
                           ) : null}
                           <div className="order-detail-edit-payment-grid compact">
                             <label className="order-detail-edit-label">
-                              Descuento %
+                              Descuento
                               <input
-                                type="number"
+                                type="text"
+                                inputMode="numeric"
+                                pattern="[0-9]*"
                                 min="0"
-                                max="100"
-                                step="0.01"
-                                value={detailEditDescuentoPct}
-                                onChange={event => setDetailEditDescuentoPct(event.target.value)}
+                                value={detailEditDescuentoMonto}
+                                onChange={event => setDetailEditDescuentoMonto(sanitizeWholePesoInput(event.target.value) ?? "")}
                                 placeholder="0"
+                              />
+                            </label>
+                            <label className="order-detail-edit-label">
+                              Nota descuento
+                              <textarea
+                                rows={2}
+                                value={detailEditDescuentoNota}
+                                onChange={event => setDetailEditDescuentoNota(event.target.value)}
+                                placeholder="Razón del descuento"
+                              />
+                            </label>
+                            <label className="order-detail-edit-label">
+                              Saldo a favor
+                              <input
+                                type="text"
+                                inputMode="numeric"
+                                pattern="[0-9]*"
+                                min="0"
+                                value={detailEditSaldoFavorMonto}
+                                onChange={event => setDetailEditSaldoFavorMonto(sanitizeWholePesoInput(event.target.value) ?? "")}
+                                placeholder="0"
+                              />
+                            </label>
+                            <label className="order-detail-edit-label">
+                              Nota saldo a favor
+                              <textarea
+                                rows={2}
+                                value={detailEditSaldoFavorNota}
+                                onChange={event => setDetailEditSaldoFavorNota(event.target.value)}
+                                placeholder="Razón del saldo a favor"
                               />
                             </label>
                             <div className="order-detail-edit-adjustment-summary">
@@ -1966,7 +2102,10 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
                                 <span>Recargo link ({detailEditFinancialPreview.recargoPct}%): +${formatearCOP(detailEditFinancialPreview.recargoMonto)}</span>
                               ) : null}
                               {detailEditFinancialPreview.descuentoMonto > 0 ? (
-                                <span>Descuento ({detailEditFinancialPreview.descuentoPct}%): -${formatearCOP(detailEditFinancialPreview.descuentoMonto)}</span>
+                                <span>Descuento: -${formatearCOP(detailEditFinancialPreview.descuentoMonto)}</span>
+                              ) : null}
+                              {detailEditFinancialPreview.saldoFavorMonto > 0 ? (
+                                <span>Saldo a favor: -${formatearCOP(detailEditFinancialPreview.saldoFavorMonto)}</span>
                               ) : null}
                               <strong>Total ajustado: ${formatearCOP(detailEditFinancialPreview.total)}</strong>
                             </div>
@@ -2169,6 +2308,7 @@ function OrderDetail({ detalle, paymentTitle = "Método de pago", salesChannelTi
         {detailRow("Fecha pedido", fechaPedido || "-")}
         {detailRow("Hora pedido", detalle.horaPedido || horaPedido || "-")}
         {detailRow("Estado", detalle.estado || "-")}
+        {detailRow("Factura", detalle.financiero?.facturaImpresa ? "Impresa" : "Pendiente por imprimir")}
         {detalle.motivoRechazo ? detailRow("Motivo rechazo", detalle.motivoRechazo) : null}
       </section>
 
@@ -2201,13 +2341,15 @@ function OrderDetail({ detalle, paymentTitle = "Método de pago", salesChannelTi
         {detailRow("Domicilio", `$${formatearCOP(Number(detalle.financiero?.domicilio || 0))}`)}
         {Number(detalle.financiero?.recargoLinkMonto || 0) > 0 ? detailRow("Recargo link", `+$${formatearCOP(Number(detalle.financiero?.recargoLinkMonto || 0))}`) : null}
         {Number(detalle.financiero?.descuentoMonto || 0) > 0 ? detailRow("Descuento", `-$${formatearCOP(Number(detalle.financiero?.descuentoMonto || 0))}`) : null}
+        {detalle.financiero?.descuentoNota ? detailRow("Nota descuento", detalle.financiero.descuentoNota) : null}
+        {Number(detalle.financiero?.saldoFavorMonto || 0) > 0 ? detailRow("Saldo a favor", `-$${formatearCOP(Number(detalle.financiero?.saldoFavorMonto || 0))}`) : null}
+        {detalle.financiero?.saldoFavorNota ? detailRow("Nota saldo a favor", detalle.financiero.saldoFavorNota) : null}
         {detailRow("Total", `$${formatearCOP(Number(detalle.financiero?.total || 0))}`, "is-accent-value")}
         {detailRow("Estado pago", detalle.financiero?.estadoPago || "-")}
         {detailRow(paymentTitle, formatMetodoPago(detalle.financiero))}
         {paymentBreakdown.length > 0 ? detailRow("Desglose pagos", paymentBreakdown.map(item => `${item.metodo}: $${formatearCOP(item.monto)}`).join(" · ")) : null}
         {detailRow("Cuenta bancaria", detalle.financiero?.cuentaBancaria || "-")}
         {detailRow(salesChannelTitle, detalle.financiero?.canalFlora || "-")}
-        {Number(detalle.financiero?.descuentoPct || 0) > 0 ? detailRow("Descuento aplicado %", `${detalle.financiero?.descuentoPct}%`) : null}
       </section>
 
       <section className="order-block order-detail-section">

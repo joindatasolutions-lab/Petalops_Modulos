@@ -346,7 +346,7 @@ export function createApiClient(config) {
       });
     },
 
-    async listarPedidos({ empresaId, sucursalId, q, estado, fechaDesde, fechaHasta, page, pageSize }) {
+    async listarPedidos({ empresaId, sucursalId, q, estado, fechaDesde, fechaHasta, sinImprimir, page, pageSize }) {
       const params = new URLSearchParams();
       params.set("empresaID", String(empresaId));
       if (sucursalId != null) params.set("sucursalID", String(sucursalId));
@@ -354,6 +354,7 @@ export function createApiClient(config) {
       if (estado) params.set("estado", String(estado));
       if (fechaDesde) params.set("fechaDesde", String(fechaDesde));
       if (fechaHasta) params.set("fechaHasta", String(fechaHasta));
+      params.set("sinImprimir", sinImprimir ? "true" : "false");
       params.set("page", String(page || 1));
       params.set("pageSize", String(pageSize || 20));
 
@@ -491,7 +492,10 @@ export function createApiClient(config) {
       detallePago,
       montoEfectivo,
       omitirRecargoLink,
-      descuentoPct,
+      descuentoMonto,
+      descuentoNota,
+      saldoFavorMonto,
+      saldoFavorNota,
       canalFlora,
     }) {
       return requestJson(`/pedido/${pedidoId}/detalle`, {
@@ -525,7 +529,10 @@ export function createApiClient(config) {
           detallePago: Array.isArray(detallePago) ? detallePago : null,
           montoEfectivo: montoEfectivo != null ? Number(montoEfectivo) : null,
           omitirRecargoLink: omitirRecargoLink != null ? Boolean(omitirRecargoLink) : null,
-          descuentoPct: descuentoPct != null ? Number(descuentoPct) : null,
+          descuentoMonto: descuentoMonto != null ? Number(descuentoMonto) : null,
+          descuentoNota: descuentoNota ?? null,
+          saldoFavorMonto: saldoFavorMonto != null ? Number(saldoFavorMonto) : null,
+          saldoFavorNota: saldoFavorNota ?? null,
           canalFlora: canalFlora ?? null,
         })
       });

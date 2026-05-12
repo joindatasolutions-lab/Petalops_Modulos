@@ -830,6 +830,7 @@ select:focus {
 }
 
 .order-badge.is-pendiente { background: #ffe5a3; color: #7a5400; }
+.order-badge.is-pendiente-other-date { background: #ffd4bf; color: #8f2d16; }
 .order-badge.is-aprobado { background: #8ff0b3; color: #0f5a2f; }
 .order-badge.is-rechazado { background: #ffb3bf; color: #7a1023; }
 .order-badge.is-produccion { background: #a9d2ff; color: #154a8b; }
@@ -885,6 +886,66 @@ select:focus {
   border-radius: 9px;
   box-shadow: none;
   gap: 8px;
+}
+
+.orders-alert-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin: 0 0 14px;
+  padding: 14px 16px;
+  border: 1px solid #f1d39b;
+  border-radius: 18px;
+  background: linear-gradient(135deg, #fff8e8 0%, #fff2d4 100%);
+  box-shadow: 0 14px 28px rgba(94, 66, 17, 0.08);
+}
+
+.orders-alert-card-copy {
+  display: grid;
+  gap: 4px;
+}
+
+.orders-alert-card-copy strong {
+  color: #7a5400;
+  font-size: 0.95rem;
+}
+
+.orders-alert-card-copy span {
+  color: #6a5737;
+  font-size: 0.9rem;
+}
+
+.orders-filter-check {
+  justify-content: flex-end;
+}
+
+.orders-filter-check-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 42px;
+  padding: 12px 14px;
+  border: 1px solid rgba(148, 163, 184, 0.24);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.88);
+}
+
+.orders-filter-check-row input {
+  width: 16px;
+  height: 16px;
+}
+
+.orders-inline-alert {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: #fff1b8;
+  color: #8a5a00;
+  font-size: 0.72rem;
+  font-weight: 700;
 }
 
 .orders-page-header .header-actions,
@@ -2473,6 +2534,18 @@ select:focus {
   line-height: 1.2;
   font-weight: 600;
   color: #8a3252;
+}
+
+.production-topbar-user {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: #fdf0f5;
+  color: #8a3252;
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
 }
 
 .production-topbar-description {

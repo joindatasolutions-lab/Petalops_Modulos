@@ -62,6 +62,75 @@ function hasAssignedFlorista(item) {
   return String(item?.floristaAsignado || "").trim().length > 0;
 }
 
+function productionSelectionKey(item) {
+  const pedidoId = Number(item?.pedidoID || 0);
+  if (pedidoId > 0) return `pedido-${pedidoId}`;
+  return `produccion-${Number(item?.idProduccion || 0)}`;
+}
+
+function buildVisibleProductionItems(sourceItems, currentFloristaId, busquedaGeneral, soloMisAsignados) {
+  const search = normalizeSearchText(busquedaGeneral);
+  const filtered = sourceItems.filter(item => {
+    if (soloMisAsignados && currentFloristaId != null && Number(item?.floristaID) !== Number(currentFloristaId)) {
+      return false;
+    }
+    if (search) {
+      const matchesFlorista = normalizeSearchText(item?.floristaAsignado).includes(search);
+      const matchesCliente = normalizeSearchText(item?.cliente).includes(search);
+      const matchesPedido = normalizeSearchText(item?.numeroPedido).includes(search);
+      if (!matchesFlorista && !matchesCliente && !matchesPedido) return false;
+    }
+    return true;
+  });
+
+  const grouped = new Map();
+  for (const item of filtered) {
+    const key = String(item?.pedidoID || item?.idProduccion || "");
+    if (!key) continue;
+    const current = grouped.get(key);
+    if (!current) {
+      grouped.set(key, {
+        ...item,
+        produccionIds: [item.idProduccion],
+        pedidoDetalleIds: item.pedidoDetalleID != null ? [item.pedidoDetalleID] : [],
+        productosAgrupados: [item.nombreArreglo || item.producto].filter(Boolean),
+        codigosAgrupados: [item.codigoArreglo].filter(Boolean),
+        cantidadProducciones: 1,
+      });
+      continue;
+    }
+
+    current.produccionIds.push(item.idProduccion);
+    if (item.pedidoDetalleID != null) current.pedidoDetalleIds.push(item.pedidoDetalleID);
+    if (item.nombreArreglo || item.producto) current.productosAgrupados.push(item.nombreArreglo || item.producto);
+    if (item.codigoArreglo) current.codigosAgrupados.push(item.codigoArreglo);
+    current.cantidadProducciones += 1;
+    if (!current.floristaID && item.floristaID) current.floristaID = item.floristaID;
+    if (!current.floristaAsignado && item.floristaAsignado) current.floristaAsignado = item.floristaAsignado;
+    if (!current.observacion && item.observacion) current.observacion = item.observacion;
+    if (!current.notasProduccion && item.notasProduccion) current.notasProduccion = item.notasProduccion;
+    if (!current.observacionesPersonalizados && item.observacionesPersonalizados) current.observacionesPersonalizados = item.observacionesPersonalizados;
+  }
+
+  return Array.from(grouped.values()).map(item => {
+    const productosUnicos = Array.from(new Set((item.productosAgrupados || []).filter(Boolean)));
+    const codigosUnicos = Array.from(new Set((item.codigosAgrupados || []).filter(Boolean)));
+    return {
+      ...item,
+      idProduccion: Number(item.produccionIds?.[0] || item.idProduccion),
+      pedidoDetalleID: item.pedidoDetalleIds?.[0] ?? item.pedidoDetalleID ?? null,
+      nombreArreglo: productosUnicos.join(" + "),
+      producto: productosUnicos.join(" + "),
+      codigoArreglo: codigosUnicos.join(" + "),
+    };
+  }).sort((left, right) => {
+    const numeroLeft = Number(left?.numeroPedido || 0);
+    const numeroRight = Number(right?.numeroPedido || 0);
+    if (numeroLeft !== numeroRight) return numeroLeft - numeroRight;
+    return Number(left?.pedidoID || 0) - Number(right?.pedidoID || 0);
+  });
+}
+
 function inferCurrentFloristaId(session, floristaItems) {
   const sessionUserId = Number(session?.userID || session?.usuarioID || session?.idUsuario || 0);
   const sessionLogin = normalizeSearchText(session?.login);
@@ -88,6 +157,18 @@ function inferCurrentFloristaId(session, floristaItems) {
 function statusBadgeClass(status) {
   const key = normalizeStatus(status).replace(/_/g, "");
   return BADGE_CLASS_BY_STATUS[key] || "is-pendiente";
+}
+
+function isPendingOutsideToday(item) {
+  const normalizedStatus = normalizeStatus(item?.estado).replace(/_/g, "");
+  if (normalizedStatus !== "PENDIENTE") return false;
+  const programmedDate = resolveProgrammedDate(item);
+  return Boolean(programmedDate) && programmedDate !== todayIsoDate();
+}
+
+function productionStatusBadgeClass(item) {
+  const baseClass = statusBadgeClass(item?.estado);
+  return isPendingOutsideToday(item) ? `${baseClass} is-pendiente-other-date` : baseClass;
 }
 
 function nextFloristaStatus(status) {
@@ -125,6 +206,10 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
   const canManageProductionActions = Boolean(session?.esGlobalJoin) || ["admin", "empresa_admin"].includes(normalizedRole);
   const canManageStateAndRecalculate = isSuperAdmin;
   const canFloristaQuickState = !canManageProductionActions;
+  const displayUserName = useMemo(
+    () => String(session?.nombre || session?.login || "Usuario").trim() || "Usuario",
+    [session]
+  );
   const visibleSubmenuOptions = useMemo(
     () => (canManageProductionActions ? SUBMENU_OPTIONS : [{ key: "pedidos", label: "Pedidos" }]),
     [canManageProductionActions]
@@ -184,21 +269,10 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
     return floristasDisponibilidad.find(item => Number(item.idFlorista) === Number(currentFloristaId)) || null;
   }, [currentFloristaId, floristasDisponibilidad]);
 
-  const visibleItems = useMemo(() => {
-    const search = normalizeSearchText(busquedaGeneral);
-    return items.filter(item => {
-      if (soloMisAsignados && currentFloristaId != null && Number(item?.floristaID) !== Number(currentFloristaId)) {
-        return false;
-      }
-      if (search) {
-        const matchesFlorista = normalizeSearchText(item?.floristaAsignado).includes(search);
-        const matchesCliente = normalizeSearchText(item?.cliente).includes(search);
-        const matchesPedido = normalizeSearchText(item?.numeroPedido).includes(search);
-        if (!matchesFlorista && !matchesCliente && !matchesPedido) return false;
-      }
-      return true;
-    });
-  }, [items, currentFloristaId, busquedaGeneral, soloMisAsignados]);
+  const visibleItems = useMemo(
+    () => buildVisibleProductionItems(items, currentFloristaId, busquedaGeneral, soloMisAsignados),
+    [items, currentFloristaId, busquedaGeneral, soloMisAsignados]
+  );
 
   const toggleEstadoFiltro = useCallback((estadoItem) => {
     setEstadosFiltro(current => {
@@ -354,10 +428,11 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
 
   const openActionsDrawer = item => {
     if (!item) return;
+    const itemKey = productionSelectionKey(item);
     setSelectedItem(item);
     setSelectedFloristaById(current => ({
       ...current,
-      [item.idProduccion]: current[item.idProduccion] || (item.floristaID != null ? String(item.floristaID) : (!canManageProductionActions && currentFloristaId != null ? String(currentFloristaId) : "")),
+      [itemKey]: current[itemKey] || (item.floristaID != null ? String(item.floristaID) : (!canManageProductionActions && currentFloristaId != null ? String(currentFloristaId) : "")),
     }));
     if (item.floristaID != null) {
       setFloristaGestionID(String(item.floristaID));
@@ -371,9 +446,10 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
     setSelectedItem(null);
   };
 
-  const refreshAndKeepSelection = async produccionId => {
+  const refreshAndKeepSelection = async item => {
     const nextItems = await loadItems();
-    const nextSelected = nextItems.find(item => Number(item.idProduccion) === Number(produccionId));
+    const nextVisible = buildVisibleProductionItems(nextItems, currentFloristaId, busquedaGeneral, soloMisAsignados);
+    const nextSelected = nextVisible.find(candidate => Number(candidate.pedidoID) === Number(item?.pedidoID));
     if (nextSelected) {
       setSelectedItem(nextSelected);
       setDrawerOpen(true);
@@ -383,15 +459,19 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
   };
 
   const asignar = async item => {
-    const floristaId = selectedFloristaById[item.idProduccion];
+    const itemKey = productionSelectionKey(item);
+    const floristaId = selectedFloristaById[itemKey];
+    const produccionIds = Array.isArray(item?.produccionIds) && item.produccionIds.length > 0
+      ? item.produccionIds
+      : [item.idProduccion];
 
     try {
-      await api.asignarProduccion({
-        produccionId: item.idProduccion,
+      await Promise.all(produccionIds.map(produccionId => api.asignarProduccion({
+        produccionId,
         floristaId: floristaId ? Number(floristaId) : null,
         fechaProgramadaProduccion: item.fechaProgramadaProduccion
-      });
-      await refreshAndKeepSelection(item.idProduccion);
+      })));
+      await refreshAndKeepSelection(item);
     } catch (nextError) {
       console.error("Error asignando producción:", nextError);
       globalThis.alert("No fue posible asignar el florista.");
@@ -399,22 +479,26 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
   };
 
   const reasignarAuditable = async item => {
-    const floristaNuevoId = selectedFloristaById[item.idProduccion] || (!canManageProductionActions && currentFloristaId != null ? String(currentFloristaId) : null);
+    const itemKey = productionSelectionKey(item);
+    const floristaNuevoId = selectedFloristaById[itemKey] || (!canManageProductionActions && currentFloristaId != null ? String(currentFloristaId) : null);
     const motivo = "Reasignación desde panel de producción";
+    const produccionIds = Array.isArray(item?.produccionIds) && item.produccionIds.length > 0
+      ? item.produccionIds
+      : [item.idProduccion];
     if (!floristaNuevoId) {
       globalThis.alert("Selecciona un florista para reasignar.");
       return;
     }
 
     try {
-      await api.reasignarProduccion({
-        produccionId: item.idProduccion,
+      await Promise.all(produccionIds.map(produccionId => api.reasignarProduccion({
+        produccionId,
         floristaNuevoId: floristaNuevoId ? Number(floristaNuevoId) : null,
         fechaProgramadaProduccion: item.fechaProgramadaProduccion,
         motivo,
         usuarioCambio
-      });
-      await refreshAndKeepSelection(item.idProduccion);
+      })));
+      await refreshAndKeepSelection(item);
       setMotivoAccion("");
     } catch (nextError) {
       console.error("Error reasignando florista:", nextError);
@@ -423,19 +507,23 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
   };
 
   const cambiarEstado = async item => {
-    const nuevoEstado = selectedEstadoById[item.idProduccion];
+    const itemKey = productionSelectionKey(item);
+    const nuevoEstado = selectedEstadoById[itemKey];
+    const produccionIds = Array.isArray(item?.produccionIds) && item.produccionIds.length > 0
+      ? item.produccionIds
+      : [item.idProduccion];
     if (!nuevoEstado) {
       globalThis.alert("Selecciona un estado.");
       return;
     }
 
     try {
-      await api.cambiarEstadoProduccion({
-        produccionId: item.idProduccion,
+      await Promise.all(produccionIds.map(produccionId => api.cambiarEstadoProduccion({
+        produccionId,
         nuevoEstado,
         observacionesInternas: motivoAccion || null
-      });
-      await refreshAndKeepSelection(item.idProduccion);
+      })));
+      await refreshAndKeepSelection(item);
       setMotivoAccion("");
     } catch (nextError) {
       console.error("Error cambiando estado:", nextError);
@@ -445,6 +533,9 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
 
   const cambiarEstadoFloristaRapido = async item => {
     const nuevoEstado = nextFloristaStatus(item?.estado);
+    const produccionIds = Array.isArray(item?.produccionIds) && item.produccionIds.length > 0
+      ? item.produccionIds
+      : [item.idProduccion];
     if (!nuevoEstado) return;
     if (!item?.floristaAsignado) {
       globalThis.alert("No puedes cambiar estado sin florista asignado.");
@@ -452,11 +543,11 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
     }
 
     try {
-      await api.cambiarEstadoProduccion({
-        produccionId: item.idProduccion,
+      await Promise.all(produccionIds.map(produccionId => api.cambiarEstadoProduccion({
+        produccionId,
         nuevoEstado,
         observacionesInternas: "Cambio de estado desde panel florista"
-      });
+      })));
       await loadItems();
     } catch (nextError) {
       console.error("Error cambiando estado rápido de florista:", nextError);
@@ -473,7 +564,7 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
         productoEstructuralCambiado: false,
         forceCancelarYCrearNueva: false
       });
-      await refreshAndKeepSelection(item.idProduccion);
+      await refreshAndKeepSelection(item);
     } catch (nextError) {
       console.error("Error recalculando producción por pedido:", nextError);
       globalThis.alert("No fue posible recalcular la producción del pedido.");
@@ -590,6 +681,7 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
         <div className="production-topbar">
           <div className="production-topbar-left">
             <span className="production-topbar-title">Producción</span>
+            <span className="production-topbar-user">Usuario: {displayUserName}</span>
             <p className="production-topbar-description">
               {canManageProductionActions
                 ? "Asignación inteligente, carga equitativa y control por fecha programada."
@@ -725,7 +817,7 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
                           <span className="production-florista-empty">Sin asignar</span>
                         )}
                       </td>
-                      <td><span className={`order-badge ${statusBadgeClass(item.estado)}`}>{item.estado || "-"}</span></td>
+                      <td><span className={`order-badge ${productionStatusBadgeClass(item)}`}>{item.estado || "-"}</span></td>
                       <td>{formatDateTimeCompact(item.fechaAsignacion) || "-"}</td>
                       <td className={typeof item.tiempoRestanteHoras === "number" && item.tiempoRestanteHoras < 0 ? "is-overdue" : ""}>
                         {typeof item.tiempoRestanteHoras === "number" ? `${item.tiempoRestanteHoras} h` : "-"}
@@ -774,7 +866,7 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
                 <article key={`cap-${item.idProduccion}`} className="production-capsule">
                   <header className="production-capsule-head">
                     <strong>{item.numeroPedido ?? "-"}</strong>
-                    <span className={`order-badge ${statusBadgeClass(item.estado)}`}>{item.estado || "-"}</span>
+                    <span className={`order-badge ${productionStatusBadgeClass(item)}`}>{item.estado || "-"}</span>
                   </header>
 
                   <div className="production-capsule-grid">
@@ -1004,8 +1096,8 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
                 <h4>Asignación</h4>
                 <div className="order-actions production-drawer-actions">
                   <select
-                    value={selectedFloristaById[selectedItem.idProduccion] || ""}
-                    onChange={event => setSelectedFloristaById(current => ({ ...current, [selectedItem.idProduccion]: event.target.value }))}
+                    value={selectedFloristaById[productionSelectionKey(selectedItem)] || ""}
+                    onChange={event => setSelectedFloristaById(current => ({ ...current, [productionSelectionKey(selectedItem)]: event.target.value }))}
                     title="Seleccionar florista"
                   >
                     <option value="">Auto</option>
@@ -1030,8 +1122,8 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
                 <h4>Asignar / reasignar florista</h4>
                 <div className="order-actions" style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                   <select
-                    value={selectedFloristaById[selectedItem.idProduccion] || ""}
-                    onChange={event => setSelectedFloristaById(current => ({ ...current, [selectedItem.idProduccion]: event.target.value }))}
+                    value={selectedFloristaById[productionSelectionKey(selectedItem)] || ""}
+                    onChange={event => setSelectedFloristaById(current => ({ ...current, [productionSelectionKey(selectedItem)]: event.target.value }))}
                     title="Seleccionar florista"
                   >
                     <option value="">Selecciona florista</option>
@@ -1072,8 +1164,8 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
                     <h4> Estado</h4>
                     <div className="order-actions" style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                       <select
-                        value={selectedEstadoById[selectedItem.idProduccion] || ""}
-                        onChange={event => setSelectedEstadoById(current => ({ ...current, [selectedItem.idProduccion]: event.target.value }))}
+                        value={selectedEstadoById[productionSelectionKey(selectedItem)] || ""}
+                        onChange={event => setSelectedEstadoById(current => ({ ...current, [productionSelectionKey(selectedItem)]: event.target.value }))}
                         title="Seleccionar nuevo estado"
                       >
                         <option value="">Estado...</option>
