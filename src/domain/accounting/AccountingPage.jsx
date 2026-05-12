@@ -71,8 +71,9 @@ export function AccountingPage({
   const [error, setError] = useState("");
   const [info, setInfo] = useState("");
   const [saving, setSaving] = useState(false);
-  const [accountingOrders, setAccountingOrders] = useState([]);
   const [orderRows, setOrderRows] = useState([]);
+  const [arrangementRows, setArrangementRows] = useState([]);
+  const [paymentAccountRows, setPaymentAccountRows] = useState([]);
   const [selectedArrangementKeys, setSelectedArrangementKeys] = useState([]);
   const [cashHistoryVersion, setCashHistoryVersion] = useState(0);
 
@@ -80,33 +81,21 @@ export function AccountingPage({
     setLoading(true);
     setError("");
     try {
-      const orders = await fetchOrdersForAccounting({
-        api,
+      const payload = await api.obtenerResumenContabilidad({
         empresaId,
         sucursalId,
         fechaDesde: filters.fechaDesde,
         fechaHasta: filters.fechaHasta,
       });
-
-      const saleOrders = orders.filter(item => isSaleStatus(item.estado));
-      const details = await Promise.all(
-        saleOrders.map(async item => {
-          try {
-            const detail = await api.obtenerDetallePedido(Number(item.pedidoID));
-            return { order: item, detail };
-          } catch {
-            return { order: item, detail: null };
-          }
-        })
-      );
-
-      setAccountingOrders(details);
-      setOrderRows(buildAccountingRows(details));
+      setOrderRows(Array.isArray(payload?.orderRows) ? payload.orderRows : []);
+      setArrangementRows(Array.isArray(payload?.arrangementRows) ? payload.arrangementRows : []);
+      setPaymentAccountRows(Array.isArray(payload?.paymentAccountRows) ? payload.paymentAccountRows : []);
     } catch (nextError) {
       console.error("Error cargando contabilidad:", nextError);
-      setAccountingOrders([]);
       setOrderRows([]);
-      setError(nextError?.message || "No fue posible cargar el módulo de contabilidad.");
+      setArrangementRows([]);
+      setPaymentAccountRows([]);
+      setError(nextError?.message || "No fue posible cargar el modulo de contabilidad.");
     } finally {
       setLoading(false);
     }
@@ -126,9 +115,6 @@ export function AccountingPage({
     }));
     setInfo("");
   }, [cashForm.fecha, empresaId, sucursalId, cashHistoryVersion]);
-
-  const arrangementRows = useMemo(() => buildArrangementRows(accountingOrders), [accountingOrders]);
-  const paymentAccountRows = useMemo(() => buildPaymentAccountRows(accountingOrders), [accountingOrders]);
 
   useEffect(() => {
     setSelectedArrangementKeys(arrangementRows.map(item => item.key));
@@ -250,6 +236,79 @@ export function AccountingPage({
     }
   };
 
+  const exportRowsToExcel = useCallback(async (rows, filename, sheetName) => {
+    if (!Array.isArray(rows) || rows.length === 0) {
+      setInfo("No hay datos para exportar.");
+      return;
+    }
+    const XLSX = await import("xlsx");
+    const worksheet = XLSX.utils.json_to_sheet(rows);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
+    XLSX.writeFile(workbook, filename);
+  }, []);
+
+  const exportVentas = () => {
+    exportRowsToExcel(
+      orderRows.map(row => ({
+        Fecha: row.fecha,
+        "Cantidad de pedidos": row.cantidadPedidos,
+        "Total arreglos": row.totalArreglos,
+        "Total domicilios": row.totalDomicilios,
+        "Recargos link": row.totalRecargos,
+        Descuentos: row.totalDescuentos,
+        "Total venta": row.totalVenta,
+      })),
+      `contabilidad-ventas-${filters.fechaDesde}-${filters.fechaHasta}.xlsx`,
+      "Ventas"
+    );
+  };
+
+  const exportArreglos = () => {
+    exportRowsToExcel(
+      selectedArrangementRows.map(item => ({
+        Codigo: item.codigo || "",
+        Arreglo: item.nombre,
+        "Unidades vendidas": item.unidades,
+        Pedidos: item.pedidos,
+        "Total vendido": item.totalVendido,
+      })),
+      `contabilidad-arreglos-${filters.fechaDesde}-${filters.fechaHasta}.xlsx`,
+      "Arreglos"
+    );
+  };
+
+  const exportCuentas = () => {
+    exportRowsToExcel(
+      paymentAccountRows.map(item => ({
+        "Cuenta o medio": item.cuenta,
+        Pedidos: item.pedidos,
+        "Metodos usados": Array.isArray(item.metodos) ? item.metodos.join(", ") : "",
+        "Total recaudado": item.totalRecaudado,
+        "Promedio por pedido": item.promedioPedido,
+        "Participacion %": item.participacionPct,
+        "Ultimo movimiento": item.ultimoMovimiento,
+      })),
+      `contabilidad-cuentas-${filters.fechaDesde}-${filters.fechaHasta}.xlsx`,
+      "Cuentas"
+    );
+  };
+
+  const exportCaja = () => {
+    exportRowsToExcel(
+      cashHistoryRows.map(row => ({
+        Fecha: row.fecha,
+        Base: row.base,
+        Efectivo: row.efectivo,
+        Gasto: row.gasto,
+        TotalEfectivo: row.totalEfectivo,
+        NuevaBase: row.nuevaBase,
+      })),
+      `contabilidad-caja-${cashForm.fecha || filters.fechaHasta}.xlsx`,
+      "Caja"
+    );
+  };
+
   return (
     <div className={`app-shell ${sidebarPinned ? "is-sidebar-pinned" : ""} ${sidebarMobileOpen ? "is-sidebar-mobile-open" : ""}`}>
       <AppSidebar
@@ -357,6 +416,11 @@ export function AccountingPage({
               </article>
             </section>
 
+            <div className="accounting-table-actions">
+              <button type="button" className="btn-outline" onClick={exportVentas} disabled={orderRows.length === 0}>
+                Descargar Excel
+              </button>
+            </div>
             <section className="orders-table-wrap">
               <table className="orders-table accounting-table">
                 <thead>
@@ -418,6 +482,9 @@ export function AccountingPage({
                 </button>
                 <button type="button" className="btn-outline" onClick={clearAllArrangements} disabled={arrangementRows.length === 0}>
                   Borrar todo
+                </button>
+                <button type="button" className="btn-outline" onClick={exportArreglos} disabled={selectedArrangementRows.length === 0}>
+                  Descargar Excel
                 </button>
               </div>
             </div>
@@ -563,6 +630,11 @@ export function AccountingPage({
                   <h4>Ventas por cuenta o medio de pago</h4>
                   <p className="orders-admin-subtitle">Mide número de pedidos, recaudo, participación y comportamiento por cada cuenta o medio de pago usado.</p>
                 </div>
+                <div className="accounting-arrangements-actions">
+                  <button type="button" className="btn-outline" onClick={exportCuentas} disabled={paymentAccountRows.length === 0}>
+                    Descargar Excel
+                  </button>
+                </div>
               </div>
 
               <div className="accounting-chart-grid">
@@ -667,6 +739,9 @@ export function AccountingPage({
             <div className="order-detail-edit-actions">
               <button type="button" className="btn-primary" onClick={saveCashClosing} disabled={saving}>
                 {saving ? "Guardando..." : "Guardar cierre"}
+              </button>
+              <button type="button" className="btn-outline" onClick={exportCaja} disabled={cashHistoryRows.length === 0}>
+                Descargar Excel
               </button>
             </div>
 
