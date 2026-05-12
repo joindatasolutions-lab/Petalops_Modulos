@@ -130,7 +130,7 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
     [canManageProductionActions]
   );
 
-  const [fecha, setFecha] = useState("");
+  const [fecha, setFecha] = useState(todayIsoDate());
   const [estadosFiltro, setEstadosFiltro] = useState(ESTADOS_FILTRO_DEFAULT);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -212,19 +212,43 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
     });
   }, []);
 
-  const loadData = useCallback(async () => {
+  const loadItems = useCallback(async () => {
     setLoading(true);
     setError("");
 
     try {
-      const [produccion, floristasData, disponibilidadData] = await Promise.all([
-        api.listarProduccion({
-          empresaId,
-          sucursalId,
-          fecha,
-          estado: undefined,
-          incluirCancelado: false
-        }),
+      const produccion = await api.listarProduccion({
+        empresaId,
+        sucursalId,
+        fecha,
+        estado: undefined,
+        incluirCancelado: false
+      });
+      const nextItemsRaw = Array.isArray(produccion.items) ? produccion.items : [];
+      const nextItems = nextItemsRaw.filter(item =>
+        estadosFiltro.some(estadoItem => normalizeStatus(estadoItem) === normalizeStatus(item.estado))
+      );
+
+      setItems(nextItems);
+      setError("");
+      return nextItems;
+    } catch (nextError) {
+      console.error("Error cargando producción:", nextError);
+      setItems([]);
+      setError("No fue posible cargar el módulo de producción.");
+      return [];
+    } finally {
+      setLoading(false);
+    }
+  }, [api, fecha, estadosFiltro, empresaId, sucursalId]);
+
+  useEffect(() => {
+    void loadItems();
+  }, [loadItems]);
+
+  const loadFloristaData = useCallback(async () => {
+    try {
+      const [floristasData, disponibilidadData] = await Promise.all([
         api.listarFloristas({
           empresaId,
           sucursalId,
@@ -237,37 +261,23 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
           incluirExternos: true,
         })
       ]);
-
-      const nextItemsRaw = Array.isArray(produccion.items) ? produccion.items : [];
-      const nextItems = nextItemsRaw.filter(item =>
-        estadosFiltro.some(estadoItem => normalizeStatus(estadoItem) === normalizeStatus(item.estado))
-      );
       const nextFloristas = Array.isArray(floristasData.items) ? floristasData.items : [];
       const nextFloristasDisponibilidad = Array.isArray(disponibilidadData.items) ? disponibilidadData.items : [];
-
-      setItems(nextItems);
       setFloristas(nextFloristas);
       setFloristasDisponibilidad(nextFloristasDisponibilidad);
       if (!floristaGestionID && nextFloristas.length > 0) {
         setFloristaGestionID(String(nextFloristas[0].idFlorista));
       }
-      setError("");
-      return nextItems;
     } catch (nextError) {
-      console.error("Error cargando producción:", nextError);
-      setItems([]);
+      console.error("Error cargando floristas:", nextError);
       setFloristas([]);
       setFloristasDisponibilidad([]);
-      setError("No fue posible cargar el módulo de producción.");
-      return [];
-    } finally {
-      setLoading(false);
     }
-  }, [api, fecha, estadosFiltro, floristaGestionID, empresaId, sucursalId]);
+  }, [api, empresaId, sucursalId, floristaGestionID]);
 
   useEffect(() => {
-    loadData();
-  }, [loadData]);
+    void loadFloristaData();
+  }, [loadFloristaData]);
 
 
   useEffect(() => {
@@ -293,7 +303,7 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
 
 
   const refreshAll = async () => {
-    await loadData();
+    await Promise.all([loadItems(), loadFloristaData()]);
   };
 
   const onChangeSoloMisAsignados = checked => {
@@ -330,7 +340,7 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
         diasAnticipacion: 1,
         autoAsignar: false
       });
-      const nextItems = await loadData();
+      const nextItems = await loadItems();
       const autoAsignacion = await autoAsignarPedidosDeHoy(nextItems);
       await refreshAll();
       if (autoAsignacion.encontrados > 0) {
@@ -362,7 +372,7 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
   };
 
   const refreshAndKeepSelection = async produccionId => {
-    const nextItems = await loadData();
+    const nextItems = await loadItems();
     const nextSelected = nextItems.find(item => Number(item.idProduccion) === Number(produccionId));
     if (nextSelected) {
       setSelectedItem(nextSelected);
@@ -447,7 +457,7 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
         nuevoEstado,
         observacionesInternas: "Cambio de estado desde panel florista"
       });
-      await loadData();
+      await loadItems();
     } catch (nextError) {
       console.error("Error cambiando estado rápido de florista:", nextError);
       globalThis.alert("No fue posible cambiar el estado.");

@@ -148,8 +148,8 @@ function extractPaymentAmounts(financiero, paymentMethods = []) {
 const initialFilters = {
   q: "",
   estado: "",
-  fechaDesde: "",
-  fechaHasta: "",
+  fechaDesde: new Date().toISOString().slice(0, 10),
+  fechaHasta: new Date().toISOString().slice(0, 10),
   page: 1,
   pageSize: 20
 };
