@@ -1,0 +1,1195 @@
+REDISEÑO COMPLETO DEL MÓDULO PEDIDOS
+
+OBJETIVO
+
+Alinear visualmente el módulo Pedidos con Producción.
+
+Actualmente Producción tiene apariencia SaaS moderna mientras Pedidos parece una tabla administrativa tradicional.
+
+Debe sentirse como una extensión natural de Producción.
+
+================================================
+
+HEADER
+
+Reducir altura vertical.
+
+Usar:
+
+Título:
+Pedidos
+
+Subtítulo:
+Gestión centralizada de órdenes, pagos y entregas.
+
+Botones:
+
+Entregas en tienda
+Actualizar
+Nuevo pedido
+
+Mismos estilos visuales del módulo Producción.
+
+================================================
+
+FILTROS
+
+Eliminar labels encima de cada campo.
+
+Convertir filtros en barra moderna.
+
+Buscar pedido
+Estado
+Fecha inicio
+Fecha fin
+Filtros avanzados
+
+Altura:
+52px
+
+Border radius:
+16px
+
+Responsive.
+
+================================================
+
+KPIS
+
+Agregar KPIs superiores:
+
+Pedidos hoy
+Aprobados
+Pendientes
+Cancelados
+
+
+Usar exactamente el mismo lenguaje visual de Producción.
+
+================================================
+
+TABLA
+
+Transformar filas en cards horizontales.
+
+Cada pedido debe mostrar:
+
+ID
+Producto
+Cliente
+Fecha entrega
+Florista
+Método pago
+Estado
+Valor
+
+Usar avatares.
+
+Eliminar ruido visual.
+
+================================================
+
+ACCIONES
+
+Eliminar múltiples botones.
+
+Mostrar:
+
+👁 Ver
+
+⋮ Más acciones
+
+Todo lo demás dentro del menú contextual.
+
+================================================
+
+RESPONSIVE
+
+Desktop:
+Tabla premium
+
+Tablet:
+Cards compactas
+
+Mobile:
+Cards verticales
+
+Sin scroll horizontal.
+
+================================================
+
+OBJETIVO FINAL
+
+Que Producción y Pedidos parezcan diseñados por el mismo equipo de producto, utilizando el mismo sistema visual, misma jerarquía tipográfica, mismos colores, mismas sombras y mismos componentes.
+
+
+
+
+
+
+CORRECCIÓN DE CONSISTENCIA VISUAL DEL MÓDULO PEDIDOS
+
+NO agregar nuevos componentes.
+
+NO agregar más cards.
+
+NO agregar más contenedores.
+
+El problema actual es de alineación y consistencia visual.
+
+================================================
+
+HEADER
+
+El contenedor del título debe comenzar exactamente donde termina el sidebar.
+
+Eliminar el efecto de tarjeta flotante.
+
+Eliminar separación visual entre sidebar y header.
+
+El header debe sentirse integrado al layout principal.
+
+Reducir altura total del header un 35%.
+
+Mantener:
+
+Título
+Subtítulo
+Botones
+
+pero ocupando mucho menos espacio vertical.
+
+================================================
+
+SIDEBAR
+
+Usar exactamente el mismo fondo que Producción.
+
+No usar tonos rosados diferentes.
+
+No usar sombras adicionales.
+
+El sidebar y el área principal deben parecer parte del mismo sistema.
+
+================================================
+
+KPIs
+
+Reducir altura.
+
+Hacerlos más anchos y menos altos.
+
+Agregar icono superior izquierdo.
+
+Agregar indicador secundario pequeño.
+
+Ejemplo:
+
+Pedidos hoy
+16
++4 vs ayer
+
+Mantener colores suaves.
+
+================================================
+
+ESPACIADO
+
+Reducir separación vertical entre:
+
+Header → KPIs
+
+KPIs → Tabs
+
+Tabs → Filtros
+
+Filtros → Tabla
+
+en aproximadamente 40%.
+
+La tabla debe aparecer mucho más arriba.
+
+================================================
+
+FILTROS
+
+Mantener diseño actual.
+
+Mejorar únicamente:
+
+- iconografía
+- estados hover
+- focus
+- active
+
+No aumentar tamaño.
+
+================================================
+
+TABLA
+
+Mantener estructura actual.
+
+No convertir en cards.
+
+No agregar contenedores externos.
+
+La tabla debe sentirse parte natural del módulo Producción.
+
+================================================
+
+OBJETIVO
+
+Que Pedidos y Producción parezcan construidos por el mismo equipo de producto utilizando exactamente el mismo sistema visual.
+
+
+
+
+
+
+REDISEÑO PREMIUM DEL MÓDULO PEDIDOS
+
+OBJETIVO
+
+Llevar el módulo Pedidos a nivel SaaS comercial premium.
+
+NO cambiar la arquitectura actual.
+
+NO convertir la tabla en cards.
+
+NO agregar imágenes de producto.
+
+Mantener la tabla actual pero elevar significativamente la percepción visual, legibilidad y consistencia con Producción.
+
+================================================================
+
+IDENTIDAD VISUAL
+
+El módulo debe compartir exactamente el mismo sistema visual que Producción.
+
+Misma tipografía.
+
+Mismos colores.
+
+Mismos radios.
+
+Mismas sombras.
+
+Mismos estados.
+
+Misma sensación de producto.
+
+No debe parecer un módulo diferente.
+
+================================================================
+
+JERARQUÍA DE INFORMACIÓN
+
+La prioridad visual debe ser:
+
+1. Producto
+2. Cliente
+3. Estado
+4. Fecha de entrega
+5. Florista
+6. Valor
+7. Acciones
+
+Actualmente demasiados elementos compiten por atención.
+
+================================================================
+
+PRODUCTO
+
+Aumentar peso visual.
+
+font-weight: 700
+
+font-size: 18px
+
+color principal del sistema.
+
+Agregar máximo dos líneas.
+
+Truncar textos muy largos.
+
+================================================================
+
+CLIENTE
+
+Mostrar cliente principal más destacado.
+
+Destinatario como texto secundario.
+
+Ejemplo:
+
+Rosalia Llanos
+Destinatario: Tiana Camelo
+
+No usar flechas ni símbolos antiguos.
+
+================================================================
+
+ID PEDIDO
+
+Convertir el ID en badge premium.
+
+Ejemplo:
+
+#1385
+
+Badge con:
+
+border-radius: 999px
+
+padding horizontal generoso
+
+fondo suave según estado.
+
+Eliminar texto duplicado:
+
+ID 1385
+
+porque genera ruido visual.
+
+================================================================
+
+FLORISTA
+
+No mostrar iniciales solamente.
+
+Mostrar avatar circular moderno.
+
+Cuando no existe florista:
+
+icono usuario gris
+texto:
+Sin asignar
+
+Cuando existe:
+
+Avatar
+Nombre
+Rol opcional
+
+================================================================
+
+ESTADOS
+
+Agregar iconografía moderna.
+
+Ejemplos:
+
+Creado
+🟣
+
+Producción
+🟠
+
+Aprobado
+🟢
+
+Entregado
+🔵
+
+Cancelado
+🔴
+
+Mantener badge.
+
+Reducir borde.
+
+Aumentar contraste.
+
+================================================================
+
+VALOR
+
+Convertir valor en dato financiero destacado.
+
+font-weight: 700
+
+font-size: 24px
+
+alineación consistente.
+
+No usar rojo para todos.
+
+Solo rojo si existe alerta.
+
+Usar color principal del sistema.
+
+================================================================
+
+FECHA ENTREGA
+
+Agrupar:
+
+Horario
+Fecha
+
+Como bloque visual.
+
+Ejemplo:
+
+Tarde (2pm - 6pm)
+28 Mayo 2026
+
+No separarlos visualmente.
+
+================================================================
+
+FILAS
+
+Aplicar hover premium.
+
+Al pasar mouse:
+
+elevación suave
+
+sombra ligera
+
+transición 180ms
+
+No mover contenido.
+
+================================================================
+
+ACCIONES
+
+Eliminar botón ojo independiente.
+
+Usar:
+
+botón principal circular
+
+icono Eye de Lucide
+
+y menú contextual:
+
+MoreHorizontal
+
+Agrupar visualmente ambos botones.
+
+No dejarlos separados.
+
+================================================================
+
+TABLA
+
+Reducir sensación de ERP.
+
+Encabezado:
+
+fondo ligeramente diferenciado.
+
+sticky header.
+
+Mayor contraste.
+
+Separadores más suaves.
+
+================================================================
+
+FILTROS
+
+Mantener diseño actual.
+
+Mejorar:
+
+hover
+
+focus
+
+active
+
+placeholder
+
+Agregar transición.
+
+Agregar estado visual cuando un filtro está aplicado.
+
+================================================================
+
+BOTONES SUPERIORES
+
+Entregas en tienda
+Actualizar
+Nuevo pedido
+
+Aplicar mismo estilo premium utilizado en Producción.
+
+Altura uniforme.
+
+Iconografía Lucide.
+
+Sombras suaves.
+
+Hover consistente.
+
+================================================================
+
+RESPONSIVE
+
+Desktop:
+Tabla completa.
+
+Tablet:
+Ocultar columnas secundarias.
+
+Mobile:
+Convertir filas en tarjetas compactas.
+
+Sin scroll horizontal.
+
+================================================================
+
+MICROINTERACCIONES
+
+Agregar transiciones suaves.
+
+Hover en filas.
+
+Hover en badges.
+
+Hover en botones.
+
+Hover en filtros.
+
+Duración entre 150ms y 220ms.
+
+================================================================
+
+RESULTADO ESPERADO
+
+El módulo debe verse como un producto SaaS premium especializado para floristerías, comparable visualmente con Shopify, HubSpot o Monday, manteniendo la eficiencia operativa de una tabla administrativa moderna.
+
+
+
+
+REDISEÑAR COMPLETAMENTE EL DRAWER "DETALLE PEDIDO"
+
+OBJETIVO
+
+Llevar el panel lateral de detalle a nivel SaaS premium.
+
+Debe sentirse consistente con Producción.
+
+Debe parecer una extensión natural de Producción.
+
+NO parecer un formulario administrativo.
+
+NO parecer una página CRUD.
+
+================================================================
+
+HEADER
+
+Reemplazar:
+
+Detalle pedido
+
+Por:
+
+Pedido #1385
+
+debajo:
+
+Cliente • Estado • Fecha entrega
+
+Ejemplo:
+
+Pedido #1385
+
+Rosalia Llanos
+Cancelado • 28 Mayo 2026
+
+Agregar badge de estado.
+
+================================================================
+
+RESUMEN SUPERIOR
+
+Antes de cualquier sección mostrar:
+
+4 mini KPIs horizontales
+
+Cliente
+Destinatario
+Valor
+Entrega
+
+Ejemplo:
+
+Cliente
+Rosalia Llanos
+
+Destinatario
+Tiana Camelo
+
+Valor
+$94.000
+
+Entrega
+28 Mayo
+
+Diseño igual a las tarjetas pequeñas usadas en Producción.
+
+================================================================
+
+BOTONES
+
+Eliminar diseño actual.
+
+Reemplazar por:
+
+Editar
+Duplicar
+Recargar
+
+Como botones modernos.
+
+Altura 44px.
+
+Iconos Lucide.
+
+Distribución horizontal.
+
+Botón principal:
+
+Editar
+
+color principal.
+
+Duplicar:
+
+secundario.
+
+Recargar:
+
+ghost.
+
+================================================================
+
+SECCIONES
+
+Convertir:
+
+Info general
+Cliente
+Destinatario
+Productos
+Resumen financiero
+
+en acordeones premium.
+
+Solo una sección abierta por defecto.
+
+Reducir scroll visual.
+
+================================================================
+
+INFO GENERAL
+
+Reemplazar layout tabla.
+
+Usar grid de 2 columnas.
+
+Ejemplo:
+
+Pedido
+1385
+
+Estado
+Cancelado
+
+Fecha
+28 Mayo 2026
+
+Hora
+7:12 PM
+
+Factura
+Pendiente
+
+Motivo
+Canceló cliente
+
+Sin líneas horizontales.
+
+================================================================
+
+CLIENTE
+
+Mostrar:
+
+Avatar generado con iniciales.
+
+Nombre destacado.
+
+Teléfono clickeable.
+
+Email clickeable.
+
+Documento secundario.
+
+================================================================
+
+DESTINATARIO
+
+Diseño tipo ficha.
+
+Mostrar:
+
+Nombre
+
+Dirección
+
+Barrio
+
+Mensaje
+
+Firma
+
+Observaciones
+
+Agregar iconos.
+
+================================================================
+
+PRODUCTOS
+
+Es la sección más importante.
+
+Rediseñarla completamente.
+
+Cada producto debe mostrarse como tarjeta.
+
+Ejemplo:
+
+──────────────────
+
+Mini Box Orquídea
+
+Código 0002
+
+Cantidad 1
+
+Subtotal $580.000
+
+──────────────────
+
+No mostrar filas tipo formulario.
+
+Usar cards.
+
+Borde suave.
+
+Sombra ligera.
+
+Hover elegante.
+
+================================================================
+
+FINANCIERO
+
+Mostrar:
+
+Subtotal
+
+IVA
+
+Domicilio
+
+Descuentos
+
+Total
+
+Con jerarquía visual.
+
+TOTAL debe ser el dato dominante.
+
+Ejemplo:
+
+TOTAL
+
+$670.000
+
+font-size: 32px
+
+font-weight: 700
+
+================================================================
+
+ESTADOS
+
+Agregar colores consistentes:
+
+Creado
+morado
+
+Producción
+naranja
+
+Aprobado
+verde
+
+Entregado
+azul
+
+Cancelado
+rojo
+
+================================================================
+
+SCROLL
+
+El drawer debe sentirse ligero.
+
+Reducir altura visual.
+
+Reducir espacios muertos.
+
+Evitar más de 1 scroll interno.
+
+================================================================
+
+MICROINTERACCIONES
+
+Hover en productos.
+
+Hover en botones.
+
+Animación suave al abrir acordeones.
+
+Duración 180ms.
+
+================================================================
+
+RESULTADO
+
+El detalle debe parecer el panel lateral de Shopify, HubSpot o Monday.
+
+No un formulario.
+
+Debe permitir entender un pedido completo en menos de 5 segundos.
+
+
+
+
+CORRECCIÓN DEL DRAWER
+
+NO utilizar diseño tipo dashboard.
+
+NO utilizar KPIs superiores.
+
+NO utilizar cards para Cliente, Destinatario, Valor y Entrega.
+
+NO utilizar títulos gigantes.
+
+El drawer debe sentirse compacto y operativo.
+
+Inspiración:
+
+Shopify Admin
+Linear
+Stripe Dashboard
+
+================================================================
+
+Reducir altura del header 40%.
+
+Pedido #141 debe ocupar una sola línea.
+
+Debajo mostrar:
+
+Estado • Fecha • Valor
+
+Ejemplo:
+
+Cancelado • 06 May 2026 • $670.000
+
+================================================================
+
+Reemplazar los 4 KPIs superiores por una barra resumen compacta.
+
+Cliente | Destinatario | Valor | Entrega
+
+En una sola fila.
+
+Sin cajas independientes.
+
+================================================================
+
+Reducir tamaño de botones 30%.
+
+Altura máxima 40px.
+
+En desktop:
+
+✏️ Editar
+📄 Duplicar
+🔄 Recargar
+
+En móvil mostrar sólo iconos.
+
+================================================================
+
+Reducir padding vertical global.
+
+Reducir espacios muertos entre secciones.
+
+================================================================
+
+Las secciones deben parecer parte del sistema actual.
+
+No usar cards gigantes.
+
+No usar bloques de dashboard.
+
+================================================================
+
+Los productos son la única sección que puede usar cards.
+
+Cliente
+Destinatario
+General
+Financiero
+
+deben mostrarse en formato compacto.
+
+================================================================
+
+Objetivo:
+
+Que el drawer se vea como una extensión natural de la tabla de pedidos.
+
+No como una pantalla diferente.
+
+
+EVOLUCIÓN VISUAL DEL TABLERO DE PEDIDOS
+
+PROBLEMA ACTUAL
+
+Producción utiliza filas tipo card premium.
+
+Pedidos todavía utiliza una tabla tradicional.
+
+Ambos módulos parecen productos distintos.
+
+OBJETIVO
+
+Convertir Pedidos en una tabla-card híbrida.
+
+Mantener la densidad de información.
+
+Mantener capacidad operativa.
+
+Pero adoptar el lenguaje visual de Producción.
+
+================================================================
+
+ESTRUCTURA DE FILA
+
+Eliminar sensación de tabla rígida.
+
+Cada fila debe comportarse visualmente como una tarjeta horizontal.
+
+Aplicar:
+
+border-radius: 20px
+
+background: white
+
+box-shadow suave
+
+separación vertical entre filas
+
+margin-bottom: 12px
+
+================================================================
+
+BORDE LATERAL
+
+Agregar indicador vertical de color.
+
+Ejemplo:
+
+Aprobado
+verde
+
+Pendiente
+naranja
+
+Producción
+azul
+
+Cancelado
+rojo
+
+El borde debe ocupar toda la altura de la fila.
+
+Como Producción.
+
+================================================================
+
+ID PEDIDO
+
+Convertir ID en badge visual.
+
+Ejemplo:
+
+#1385
+
+pill badge
+
+No mostrar como texto plano.
+
+================================================================
+
+PRODUCTO
+
+Convertir en bloque principal.
+
+Jerarquía:
+
+Nombre producto
+
+Cliente
+
+Destinatario
+
+No usar múltiples columnas pequeñas.
+
+Agrupar información relacionada.
+
+================================================================
+
+CLIENTE Y DESTINATARIO
+
+Mostrar iniciales.
+
+NO fotografías.
+
+Ejemplo:
+
+RL
+
+Rosalia Llanos
+
+Destinatario:
+Tiana Camelo
+
+================================================================
+
+ENTREGA
+
+Mostrar:
+
+📅 Fecha
+
+🕒 Franja
+
+como bloque visual.
+
+Igual que Producción.
+
+================================================================
+
+ESTADO
+
+Rediseñar badges.
+
+Más compactos.
+
+Con icono.
+
+Ejemplos:
+
+🟢 Aprobado
+
+🟠 Pendiente
+
+🔵 Producción
+
+🔴 Cancelado
+
+================================================================
+
+VALOR
+
+Debe ser el segundo dato más visible.
+
+Mayor tamaño.
+
+Mayor peso visual.
+
+Ejemplo:
+
+$94.000
+
+font-size: 30px
+
+font-weight: 700
+
+================================================================
+
+ACCIONES
+
+Eliminar columna vacía gigante.
+
+Eliminar botones cuadrados.
+
+Usar:
+
+👁 Ver detalle
+
+⋮ Más acciones
+
+Dos iconos compactos.
+
+Alineados verticalmente.
+
+================================================================
+
+RESPONSIVE
+
+Desktop:
+
+tabla-card híbrida.
+
+Tablet:
+
+2 líneas por fila.
+
+Mobile:
+
+card completa.
+
+No scroll horizontal.
+
+================================================================
+
+RESULTADO
+
+Pedidos debe sentirse como el hermano del módulo Producción.
+
+Misma identidad visual.
+
+Mismo lenguaje.
+
+Misma jerarquía.
+
+Misma experiencia premium.
+
+Inspiración:
+
+Linear
+
+Monday
+
+HubSpot
+
+Stripe Dashboard
+
+NO usar estilo ERP clásico.

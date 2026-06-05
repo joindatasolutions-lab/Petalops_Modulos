@@ -1,0 +1,41 @@
+En modulo pedidos:
+
+
+PEDIDOS CANCELADOs:  visualizar la nota porque fueron cancelados, y si fueron elimanos despues de aprobado dejar el numero del pedido y ver la nota. dar permiso al usuario admni eliminar un pedido aprobado, la nota debe abrise cuando se cancela y la persona debe  escribir y guardar,  ademas tener en cuenta en las metricas de contaduria los cancelados
+
+
+que laas notas canceladas sean un campo  visible en bd, 
+
+pofavor COLOCAR LA advertencia de cantidad de FACTURA por descargar en 0 hasta el dia de hoy
+
+
+Modulo de usuarios:
+
+que tenga la posibilidad de crearse usuarios por modulos y poder seleccionar a que modulos se debe tener acceso ese usuario que se va a crear,  en el menu de usuarios debe aparecer ademas de los que estan  contabilidad, recepcion, el usaurio de recepcion es el mismo de pedidos solo que aun no se puede proporcionar acceso a los demas modulos, ademas asegurarse de que si ce crea un usuario dstinta a usuario florista, el sistema no le vaya a asignar pedidos solo por tener acceso a producción, lo mismo para domicilios, solo los usaurios floristas se les asigna pedidos de producción.
+
+ademas asegurarse de que si se puedan crear usuarios y ademas si se pueda seleccionar y que el user tenga acceso a los modulos, 
+ 
+ estoy tratando DE MANERA URGENTE de crearlo pero no ha sido posible 
+
+ELIMINAR USUARIOS: asegurarte de que estas funciones si sirvan, es decir si se pueda eliminar
+o editar un usaurio o guardarlo.
+
+PRUEBA                                    CONTA1
+LINDA                                        CONTABILIDAD
+DOMICILIARIA UNO 
+PRUEBA                                   DOMICILIO 
+LINDA                                       CONTABILIDAD
+KATERIN DE LA ASUNCION 
+FLORA INVENTARIO
+RECEPCION
+ELI                     FLORA300
+
+
+MODULO CLIENTES:
+
+Editar CLIENTE(nombre, telefono)  solo usurario admin
+
+
+MODULO producción: 
+
+

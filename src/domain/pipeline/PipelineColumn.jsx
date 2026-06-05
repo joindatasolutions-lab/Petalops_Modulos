@@ -1,39 +1,37 @@
 import {
-  IconCircleCheck,
-  IconClockExclamation,
-  IconPackageExport,
-  IconPackageImport,
-  IconRosetteDiscountCheck,
-  IconTruckDelivery,
-  IconX,
-} from "@tabler/icons-react";
+  BadgeCheck,
+  CheckCircle,
+  PackagePlus,
+  Timer,
+  Truck,
+  XCircle,
+} from "lucide-react";
 import { PedidoCard } from "./PedidoCard.jsx";
 
-const COLUMN_TONE = {
-  pedido_inicial: "is-created",
-  produccion_base: "is-production",
-  listo: "is-ready",
-  en_camino: "is-route",
-  entregado: "is-delivered",
-  cancelado: "is-cancelled",
+const COLUMN_CONFIG = {
+  pedido_inicial:  { tone: "is-created",    accentColor: "#8a3252" },
+  produccion_base: { tone: "is-production",  accentColor: "#2563eb" },
+  listo:           { tone: "is-ready",       accentColor: "#15803d" },
+  en_camino:       { tone: "is-route",       accentColor: "#d97706" },
+  entregado:       { tone: "is-delivered",   accentColor: "#15803d" },
+  cancelado:       { tone: "is-cancelled",   accentColor: "#dc2626" },
 };
 
-const EMPTY_ICON_BY_COLUMN = {
-  pedido_inicial: IconPackageImport,
-  produccion_base: IconClockExclamation,
-  listo: IconRosetteDiscountCheck,
-  en_camino: IconTruckDelivery,
-  entregado: IconCircleCheck,
-  cancelado: IconX,
+const EMPTY_CONTENT = {
+  pedido_inicial:  { Icon: PackagePlus, title: "Sin pedidos nuevos",     subtitle: "Los pedidos creados o aprobados aparecerán aquí" },
+  produccion_base: { Icon: Timer,       title: "Sin pedidos en producción", subtitle: "Los pedidos asignados a floristas aparecerán aquí" },
+  listo:           { Icon: BadgeCheck,  title: "Nada listo aún",         subtitle: "Los arreglos terminados aparecerán aquí" },
+  en_camino:       { Icon: Truck,       title: "Sin pedidos en camino",  subtitle: "Los pedidos despachados aparecerán aquí" },
+  entregado:       { Icon: CheckCircle, title: "Sin entregas hoy",       subtitle: "Las entregas completadas aparecerán aquí" },
+  cancelado:       { Icon: XCircle,     title: "Sin pedidos cancelados", subtitle: "Los pedidos cancelados aparecerán aquí" },
 };
 
 export function PipelineColumn({ dropStageKey, title, items, onOpen, onDropCard, onDragStart }) {
-  const EmptyIcon = EMPTY_ICON_BY_COLUMN[dropStageKey] || IconPackageExport;
-  const toneClass = COLUMN_TONE[dropStageKey] || "is-created";
+  const config = COLUMN_CONFIG[dropStageKey] || COLUMN_CONFIG.pedido_inicial;
+  const emptyContent = EMPTY_CONTENT[dropStageKey] || EMPTY_CONTENT.pedido_inicial;
+  const EmptyIcon = emptyContent.Icon;
 
-  const onDragOver = event => {
-    event.preventDefault();
-  };
+  const onDragOver = event => event.preventDefault();
 
   const onDrop = event => {
     event.preventDefault();
@@ -44,16 +42,20 @@ export function PipelineColumn({ dropStageKey, title, items, onOpen, onDropCard,
 
   return (
     <section className="pipeline-column" onDragOver={onDragOver} onDrop={onDrop}>
-      <header className="pipeline-column-head">
-        <h3>{title}</h3>
-        <span className={`pipeline-column-count ${toneClass}`}>{items.length}</span>
+      <header className={`pipeline-column-head ${config.tone}`}>
+        <h3 className="pipeline-column-title">{title}</h3>
+        <span className={`pipeline-column-count ${config.tone}`}>{items.length}</span>
       </header>
 
-      <div className={`pipeline-column-body${items.length === 0 ? " is-empty" : ""}`}>
+      <div className={`pipeline-column-body${items.length === 0 ? " is-empty" : ""}`}
+        style={{ "--column-accent": config.accentColor }}>
         {items.length === 0 ? (
           <div className="pipeline-empty-state">
-            <EmptyIcon size={22} stroke={1.8} />
-            <span>Sin pedidos</span>
+            <span className="pipeline-empty-icon" style={{ color: config.accentColor }}>
+              <EmptyIcon size={28} strokeWidth={1.5} />
+            </span>
+            <strong className="pipeline-empty-title">{emptyContent.title}</strong>
+            <span className="pipeline-empty-subtitle">{emptyContent.subtitle}</span>
           </div>
         ) : items.map(item => (
           <PedidoCard

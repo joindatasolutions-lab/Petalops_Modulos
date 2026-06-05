@@ -1,8 +1,10 @@
 import { useState } from "react";
+import { IconEye, IconEyeOff } from "@tabler/icons-react";
 
 export function LoginPage({ onSubmit, error, loading }) {
   const [usuario, setUsuario] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
 
   const handleSubmit = async event => {
     event.preventDefault();
@@ -34,13 +36,24 @@ export function LoginPage({ onSubmit, error, loading }) {
           />
 
           <label htmlFor="password">Password</label>
-          <input
-            id="password"
-            type="password"
-            value={password}
-            onChange={event => setPassword(event.target.value)}
-            required
-          />
+          <div className="auth-password-field">
+            <input
+              id="password"
+              type={showPassword ? "text" : "password"}
+              value={password}
+              onChange={event => setPassword(event.target.value)}
+              required
+            />
+            <button
+              type="button"
+              className="auth-password-toggle"
+              onClick={() => setShowPassword(current => !current)}
+              aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
+              title={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
+            >
+              {showPassword ? <IconEyeOff size={18} stroke={1.8} /> : <IconEye size={18} stroke={1.8} />}
+            </button>
+          </div>
 
           {error ? <p className="auth-error">{error}</p> : null}
 

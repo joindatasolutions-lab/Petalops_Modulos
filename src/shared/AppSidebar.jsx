@@ -1,41 +1,43 @@
 import {
-  ClientesMenuIcon,
-  ContabilidadMenuIcon,
-  DomiciliosMenuIcon,
-  InventarioMenuIcon,
-  PedidosMenuIcon,
-  PipelineMenuIcon,
-  ProduccionMenuIcon,
-  TrazabilidadMenuIcon,
-  UsuariosMenuIcon,
-} from "./MenuIcons.jsx";
+  ClipboardList,
+  Flower2,
+  LogOut,
+  Package2,
+  PanelLeftClose,
+  PanelLeftOpen,
+  Receipt,
+  ShieldUser,
+  Truck,
+  UsersRound,
+  Workflow,
+} from "lucide-react";
 
 const SIDEBAR_SECTIONS = [
   {
     key: "ventas",
     label: "VENTAS",
     items: [
-      { key: "pipeline", label: "Pipeline", Icon: PipelineMenuIcon, canViewKey: "pipeline", goKey: "pipeline" },
-      { key: "pedidos", label: "Pedidos", Icon: PedidosMenuIcon, canViewKey: "pedidos", goKey: "pedidos" },
+      { key: "pipeline", label: "Pipeline", Icon: Workflow, canViewKey: "pipeline", goKey: "pipeline" },
+      { key: "pedidos", label: "Pedidos", Icon: ClipboardList, canViewKey: "pedidos", goKey: "pedidos" },
     ],
   },
   {
     key: "operaciones",
     label: "OPERACIONES",
     items: [
-      { key: "produccion", label: "Producción", Icon: ProduccionMenuIcon, canViewKey: "produccion", goKey: "produccion" },
-      { key: "domicilios", label: "Domicilios", Icon: DomiciliosMenuIcon, canViewKey: "domicilios", goKey: "domicilios" },
-      { key: "inventario", label: "Inventario", Icon: InventarioMenuIcon, canViewKey: "inventario", goKey: "inventario" },
+      { key: "produccion", label: "Producción", Icon: Flower2, canViewKey: "produccion", goKey: "produccion" },
+      { key: "domicilios", label: "Domicilios", Icon: Truck, canViewKey: "domicilios", goKey: "domicilios" },
+      { key: "inventario", label: "Inventario", Icon: Package2, canViewKey: "inventario", goKey: "inventario" },
     ],
   },
   {
     key: "administracion",
     label: "ADMINISTRACIÓN",
     items: [
-      { key: "contabilidad", label: "Contabilidad", Icon: ContabilidadMenuIcon, canViewKey: "contabilidad", goKey: "contabilidad" },
-      { key: "trazabilidad", label: "Trazabilidad", Icon: TrazabilidadMenuIcon, canViewKey: "trazabilidad", goKey: "trazabilidad" },
-      { key: "clientes", label: "Clientes", Icon: ClientesMenuIcon, canViewKey: "clientes", goKey: "clientes" },
-      { key: "usuarios", label: "Gestión usuarios", Icon: UsuariosMenuIcon, canViewKey: "usuarios", goKey: "usuarios" },
+      { key: "contabilidad", label: "Contabilidad", Icon: Receipt, canViewKey: "contabilidad", goKey: "contabilidad" },
+      { key: "trazabilidad", label: "Trazabilidad", Icon: Workflow, canViewKey: "trazabilidad", goKey: "trazabilidad" },
+      { key: "clientes", label: "Clientes", Icon: UsersRound, canViewKey: "clientes", goKey: "clientes" },
+      { key: "usuarios", label: "Gestión usuarios", Icon: ShieldUser, canViewKey: "usuarios", goKey: "usuarios" },
     ],
   },
 ];
@@ -56,19 +58,21 @@ export function AppSidebar({
     const isActive = activeKey === item.key;
     const count = Number(badges?.[item.key]);
     const hasBadge = Number.isFinite(count) && count > 0;
+    const Icon = item.Icon;
 
     return (
       <button
         key={item.key}
         type="button"
         className={`sidebar-nav-btn${isActive ? " is-active" : ""}`}
+        data-label={item.label}
         onClick={() => {
           closeSidebarMobile?.();
           navigation?.[item.goKey]?.();
         }}
         title={item.label}
       >
-        <span className="sidebar-nav-icon"><item.Icon /></span>
+        <span className="sidebar-nav-icon"><Icon size={20} strokeWidth={2} /></span>
         <span className="sidebar-nav-text">{item.label}</span>
         {hasBadge ? <span className="sidebar-nav-badge">{count}</span> : null}
       </button>
@@ -80,8 +84,11 @@ export function AppSidebar({
       <aside className="app-sidebar">
         <div className="sidebar-brand">
           <img src="/petalops-compact.png" alt="PetalOps" className="sidebar-brand-logo-compact" />
-          <img src="/petalops-logo-full.png" alt="PetalOps" className="sidebar-brand-logo-full" />
-          <p className="sidebar-brand-subtitle">Gestión floral</p>
+          <img src="/petalops-compact.png" alt="" className="sidebar-brand-logo-full" />
+          <div className="sidebar-brand-wordmark">
+            <strong>PetalOps</strong>
+            <span>Gestión Floral</span>
+          </div>
         </div>
 
         <nav className="sidebar-nav" aria-label="Módulos">
@@ -101,8 +108,8 @@ export function AppSidebar({
 
         <div className="sidebar-footer">
           <hr className="sidebar-divider" />
-          <button type="button" className="sidebar-logout-btn" onClick={onLogout} title="Cerrar sesión">
-            <span className="sidebar-logout-icon" aria-hidden="true">⏻</span>
+          <button type="button" className="sidebar-logout-btn" onClick={onLogout} title="Cerrar sesión" data-label="Cerrar sesión">
+            <span className="sidebar-logout-icon" aria-hidden="true"><LogOut size={20} strokeWidth={2} /></span>
             <span className="sidebar-logout-text">Cerrar sesión</span>
           </button>
           <button
@@ -110,8 +117,9 @@ export function AppSidebar({
             className="sidebar-pin-btn"
             onClick={toggleSidebar}
             title={sidebarPinned ? "Contraer menú" : "Expandir menú"}
+            data-label={sidebarPinned ? "Contraer menú" : "Expandir menú"}
           >
-            {sidebarPinned ? "←" : "→"}
+            {sidebarPinned ? <PanelLeftClose size={20} strokeWidth={2} /> : <PanelLeftOpen size={20} strokeWidth={2} />}
           </button>
         </div>
       </aside>
@@ -122,7 +130,7 @@ export function AppSidebar({
         aria-label={sidebarMobileOpen ? "Cerrar menú" : "Abrir menú"}
         onClick={toggleSidebar}
       >
-        ☰
+        {sidebarMobileOpen ? <PanelLeftClose size={21} strokeWidth={2} /> : <PanelLeftOpen size={21} strokeWidth={2} />}
       </button>
 
       <button

@@ -1,0 +1,153 @@
+==================================================
+REDISEÑO COMPLETO DEL SIDEBAR
+==================================================
+
+El sidebar debe convertirse en uno de los elementos visuales más fuertes del sistema.
+
+Inspiración:
+
+Linear
+Raycast
+Attio
+Vercel
+ClickUp
+
+==================================================
+ICONOGRAFÍA
+==================================================
+
+Eliminar iconos actuales.
+
+Usar exclusivamente Lucide React.
+
+Mapeo:
+
+Pipeline:
+Workflow
+
+Pedidos:
+ClipboardList
+
+Producción:
+Flower2
+
+Domicilios:
+Truck
+
+Inventario:
+Package2
+
+Contabilidad:
+Receipt
+
+Clientes:
+UsersRound
+
+Gestión usuarios:
+ShieldUser
+
+Cerrar sesión:
+LogOut
+
+Expandir/contraer:
+PanelLeftClose
+PanelLeftOpen
+
+==================================================
+ESTADO ACTIVO
+==================================================
+
+El módulo activo debe destacar claramente.
+
+Diseño:
+
+background:
+linear-gradient(
+135deg,
+#8A3252,
+#A63E68
+);
+
+texto blanco
+
+icono blanco
+
+box-shadow:
+0 10px 25px rgba(138,50,82,.25);
+
+border-radius:
+18px
+
+==================================================
+MODO COLAPSADO
+==================================================
+
+Cuando el menú esté colapsado:
+
+- centrar iconos
+- aumentar tamaño visual
+- mostrar tooltip al hover
+- mantener indicador de módulo activo
+
+El elemento activo debe seguir viéndose premium.
+
+==================================================
+MICROINTERACCIONES
+==================================================
+
+Hover:
+
+transform:
+translateX(4px);
+
+duración:
+200ms
+
+ease-out
+
+==================================================
+CATEGORÍAS
+==================================================
+
+Rediseñar:
+
+VENTAS
+OPERACIONES
+ADMINISTRACIÓN
+
+Usar:
+
+font-size: 11px
+
+letter-spacing: 0.12em
+
+font-weight: 700
+
+color:
+#64748B
+
+Agregar separadores visuales elegantes.
+
+==================================================
+LOGO
+==================================================
+
+Expandido:
+
+Logo
+PetalOps
+Gestión Floral
+
+Colapsado:
+
+Solo logo
+
+centrado
+
+sin desperdiciar espacio vertical.
+
+==================================================
+OBJETIVO
+==================================================
+
+El sidebar debe sentirse como un componente premium de SaaS moderno y no como un menú administrativo tradicional.

@@ -1,0 +1,1341 @@
+Actúa como un Senior Product Designer con más de 10 años diseñando software SaaS para floristerías, logística floral y gestión de pedidos.
+
+Necesito rediseñar completamente la capa visual del módulo de Producción de PetalOps.
+
+IMPORTANTE:
+NO modificar la funcionalidad.
+NO modificar los flujos.
+NO modificar las reglas de negocio.
+
+El objetivo es únicamente transformar la interfaz para que se perciba como un SaaS premium moderno en 2026.
+
+Referencias visuales:
+
+- Linear
+- Stripe Dashboard
+- Notion
+- ClickUp
+- Raycast
+- Vercel Dashboard
+
+Principios de diseño:
+
+1. Mucho espacio en blanco.
+2. Apariencia limpia y elegante.
+3. Sensación premium.
+4. Diseño minimalista.
+5. Jerarquía visual clara.
+6. Microinteracciones modernas.
+7. Aspecto más cercano a producto tecnológico que a ERP tradicional.
+
+==================================================
+PALETA VISUAL
+==================================================
+
+Primary:
+#8A3252
+
+Primary Hover:
+#742844
+
+Primary Light:
+#F7EEF2
+
+Success:
+#16A34A
+
+Warning:
+#F59E0B
+
+Danger:
+#DC2626
+
+Background:
+#FAFAFB
+
+Cards:
+#FFFFFF
+
+Border:
+#EAEAEA
+
+Text Primary:
+#111827
+
+Text Secondary:
+#6B7280
+
+==================================================
+TIPOGRAFÍA
+==================================================
+
+Usar:
+
+font-family: 'Inter', sans-serif;
+
+Pesos:
+
+500
+600
+700
+
+Eliminar apariencia corporativa antigua.
+
+==================================================
+KPIs
+==================================================
+
+Rediseñar completamente los KPIs.
+
+Eliminar bordes gruesos.
+
+Agregar:
+
+- icono superior
+- número grande
+- descripción corta
+
+Diseño tipo:
+
+[icono]
+
+16
+
+Pedidos Hoy
+
++3 respecto ayer
+
+Utilizar sombra suave.
+
+border-radius: 20px
+
+hover:
+elevación ligera
+
+==================================================
+TABS
+==================================================
+
+Convertir:
+
+Pedidos
+Disponibilidad florista
+Gestión incapacidad
+Looker
+
+en tabs modernas tipo Linear.
+
+Indicador activo:
+
+- fondo primary
+- texto blanco
+- transición suave
+
+==================================================
+FILTROS
+==================================================
+
+Diseño estilo Stripe.
+
+Inputs más altos.
+
+48px mínimo.
+
+Placeholder elegante.
+
+Iconos internos.
+
+Bordes suaves.
+
+==================================================
+TABLA
+==================================================
+
+Mantener tabla.
+
+NO convertir a cards.
+
+Pero modernizar completamente.
+
+Cambios:
+
+- filas más altas
+- hover suave
+- zebra rows muy sutil
+- encabezados más limpios
+- más padding horizontal
+
+Eliminar sensación de Excel.
+
+==================================================
+BADGES
+==================================================
+
+Estados:
+
+Pendiente
+EnProducción
+ParaEntrega
+Cancelado
+
+Diseño tipo chips modernos.
+
+Pill shape.
+
+Sin bordes gruesos.
+
+==================================================
+BOTONES
+==================================================
+
+Actualizar
+Sincronizar pedidos
+Ver acciones
+
+Diseño premium.
+
+border-radius: 14px
+
+sombras suaves
+
+iconos Lucide
+
+==================================================
+SIDEBAR
+==================================================
+
+Rediseñar sidebar.
+
+Más compacta.
+
+Iconos Lucide.
+
+Hover elegante.
+
+Elemento activo:
+
+fondo primary
+texto blanco
+
+==================================================
+ICONOS PROFESIONALES
+==================================================
+
+Usar exclusivamente Lucide React.
+
+Instalar:
+
+npm install lucide-react
+
+Mapeo:
+
+Producción:
+Factory
+
+Pedidos:
+ClipboardList
+
+Disponibilidad:
+CalendarClock
+
+Gestión incapacidad:
+ShieldAlert
+
+Indicadores:
+BarChart3
+
+Clientes:
+Users
+
+Logística:
+Truck
+
+Configuración:
+Settings
+
+Sincronizar:
+RefreshCw
+
+Actualizar:
+RotateCw
+
+Ver acciones:
+ArrowRight
+
+Pendientes:
+Clock3
+
+Retrasados:
+AlertTriangle
+
+Entregados:
+BadgeCheck
+
+==================================================
+MICROINTERACCIONES
+==================================================
+
+Agregar:
+
+hover cards
+hover botones
+hover filas
+
+duración:
+
+200ms
+
+easing:
+
+ease-out
+
+==================================================
+RESULTADO ESPERADO
+==================================================
+
+El usuario debe sentir que está usando:
+
+- un SaaS premium
+- moderno
+- tecnológico
+- elegante
+
+y no un software administrativo tradicional.
+
+Genera todos los cambios necesarios en componentes, estilos y layout para alcanzar este resultado.
+
+
+
+
+
+
+
+==================================================
+REDISEÑO DE KPIs Y ALERTAS OPERATIVAS
+==================================================
+
+IMPORTANTE:
+
+El módulo de Producción tiene comportamiento interactivo.
+
+Cada KPI es clickeable.
+
+Al hacer click se despliega un panel de alertas operativas debajo.
+
+Por esta razón eliminar el texto descriptivo largo dentro de cada KPI.
+
+Actualmente existe redundancia entre:
+
+- descripción del KPI
+- panel de alertas
+
+Mantener únicamente:
+
+- icono
+- número
+- título
+
+Ejemplo:
+
+[icono]
+
+16
+
+Pedidos visibles
+
+NO mostrar textos largos explicativos.
+
+==================================================
+IDENTIDAD VISUAL DE CADA KPI
+==================================================
+
+Cada KPI debe tener su propia personalidad visual.
+
+No usar el mismo color para todas las tarjetas.
+
+Pedidos visibles:
+
+background:
+#EEF2FF
+
+icon:
+indigo
+
+Pendientes hoy:
+
+background:
+#ECFDF5
+
+icon:
+green
+
+Pendientes sin asignar:
+
+background:
+#FFF7ED
+
+icon:
+orange
+
+Pendientes atrasados:
+
+background:
+#FEF2F2
+
+icon:
+red
+
+Pendientes futuros:
+
+background:
+#F5F3FF
+
+icon:
+purple
+
+Los colores deben ser suaves y elegantes.
+
+No utilizar colores saturados.
+
+Inspiración:
+
+Stripe
+Linear
+Attio
+Raycast
+
+==================================================
+ESTADO ACTIVO DEL KPI
+==================================================
+
+Cuando el usuario haga click sobre un KPI:
+
+- elevar la card
+- aumentar sombra
+- resaltar borde
+- mostrar indicador visual de selección
+
+Ejemplo:
+
+border-width: 2px
+
+transform: translateY(-4px)
+
+box-shadow:
+0 12px 30px rgba(0,0,0,.08)
+
+Solo una card puede estar activa.
+
+==================================================
+PANEL DE ALERTAS
+==================================================
+
+Convertir el panel de alertas en una sección premium.
+
+Diseño tipo centro de operaciones.
+
+Layout:
+
+[Resumen alerta]
+[Pedidos afectados]
+
+No mostrar bloques genéricos.
+
+Cada pedido debe verse como una mini-card.
+
+Mostrar:
+
+Pedido #
+Cliente
+Fecha
+Estado
+
+Agregar iconografía.
+
+==================================================
+ANIMACIONES
+==================================================
+
+Al seleccionar un KPI:
+
+animación suave de entrada.
+
+Duración:
+
+200ms
+
+ease-out
+
+El panel de alertas debe aparecer con:
+
+fade + slide-up
+
+==================================================
+OBJETIVO
+==================================================
+
+Los KPIs deben parecer métricas ejecutivas.
+
+Las alertas deben parecer acciones operativas.
+
+Ambos componentes deben verse claramente diferentes.
+
+
+==================================================
+OPTIMIZACIÓN DEL ESPACIO VERTICAL DE KPIs
+==================================================
+
+Los KPIs actuales consumen demasiado espacio vertical para la cantidad de información que muestran.
+
+Objetivo:
+
+- Reducir altura de las tarjetas entre 25% y 35%.
+- Incrementar ligeramente el ancho para mejorar legibilidad.
+- Mostrar más información operativa visible sin necesidad de hacer scroll.
+
+Nuevo layout KPI:
+
+[icono]    [título]
+
+[número grande]
+
+La tarjeta debe priorizar:
+
+1. Número
+2. Título
+3. Estado visual
+
+Eliminar espacios vacíos innecesarios.
+
+Reducir padding vertical.
+
+Mantener buen aire visual sin desperdiciar espacio.
+
+==================================================
+DISTRIBUCIÓN RESPONSIVE
+==================================================
+
+Desktop:
+
+5 KPIs en una sola fila.
+
+Altura aproximada:
+140px - 180px máximo.
+
+Evitar tarjetas cuadradas.
+
+Preferir formato horizontal o rectangular.
+
+Inspiración:
+
+- Linear Analytics
+- Stripe Dashboard
+- Datadog
+- HubSpot
+- Vercel Analytics
+
+==================================================
+OBJETIVO OPERATIVO
+==================================================
+
+El usuario principal es personal operativo de floristería.
+
+Debe poder visualizar:
+
+- KPIs
+- Alertas
+- Pedidos
+
+en la misma pantalla sin necesidad de scroll inicial.
+
+La prioridad es maximizar la información visible y la velocidad de lectura, no ocupar espacio con elementos decorativos.
+
+Cada KPI debe sentirse como una métrica ejecutiva compacta y accionable, no como una tarjeta informativa de marketing.
+
+
+
+==================================================
+UNIFICACIÓN VISUAL ENTRE KPIs Y TABLA
+==================================================
+
+Actualmente los KPIs utilizan un lenguaje visual moderno:
+
+- fondos coloreados
+- iconografía
+- métricas destacadas
+- apariencia dashboard
+
+La tabla de pedidos debe adoptar el mismo lenguaje visual.
+
+Objetivo:
+
+Que KPIs y tabla parezcan parte del mismo producto.
+
+No deben sentirse como dos interfaces distintas.
+
+==================================================
+FILAS TIPO CARD
+==================================================
+
+Transformar visualmente cada fila en una card-row.
+
+Mantener estructura tabular.
+
+Pero agregar:
+
+- fondo independiente
+- border radius
+- separación vertical entre filas
+- sombra extremadamente sutil
+
+Inspiración:
+
+Linear
+Attio
+Hubspot
+ClickUp
+
+==================================================
+COLORES CONTEXTUALES
+==================================================
+
+Aplicar colores suaves según el estado.
+
+Retrasado:
+
+background:
+#FEF2F2
+
+A tiempo:
+
+background:
+#ECFDF5
+
+Sin asignar:
+
+background:
+#FFF7ED
+
+Futuro:
+
+background:
+#F5F3FF
+
+Los colores deben ser casi imperceptibles.
+
+Nunca saturados.
+
+==================================================
+IDENTIDAD VISUAL DEL PEDIDO
+==================================================
+
+El número de pedido debe convertirse en un elemento visual importante.
+
+Usar:
+
+- badge
+- pill
+- fondo suave
+
+Debe ser fácilmente identificable al escanear la tabla.
+
+==================================================
+CONSISTENCIA DE COMPONENTES
+==================================================
+
+Todos los badges de la tabla deben utilizar exactamente el mismo sistema visual que los KPIs:
+
+- mismos radios
+- misma tipografía
+- misma paleta
+- mismas sombras
+
+==================================================
+OBJETIVO
+==================================================
+
+El usuario debe sentir que:
+
+KPIs
+Alertas
+Tabla
+
+forman parte del mismo sistema de diseño y del mismo producto.
+
+
+
+
+==================================================
+REFINAMIENTO VISUAL FINAL
+==================================================
+
+Tomar como referencia visual principal el mockup aprobado.
+
+Mantener:
+
+- KPIs coloridos
+- iconografía
+- filtros modernos
+- tabla enriquecida
+
+==================================================
+ACCIONES DE FILA
+==================================================
+
+Eliminar definitivamente el botón:
+
+"Ver acciones"
+
+Reemplazar por acciones rápidas con iconos.
+
+Usar Lucide React.
+
+Instalar:
+
+npm install lucide-react
+
+Acciones:
+
+Eye
+Pencil
+MoreVertical
+
+Diseño:
+
+botones circulares
+
+40x40
+
+hover suave
+
+tooltip descriptivo
+
+==================================================
+FILTROS PREMIUM
+==================================================
+
+Los filtros deben parecer herramientas profesionales.
+
+Agregar:
+
+Search
+Calendar
+Filter
+
+Usar iconos dentro de los inputs.
+
+Agregar botón:
+
+Filtros avanzados
+
+con contador activo.
+
+Ejemplo:
+
+Filtros (2)
+
+==================================================
+AVATARES DE FLORISTAS
+==================================================
+
+Agregar avatar o iniciales.
+
+Ejemplo:
+
+JD
+ES
+CR
+
+Diseño:
+
+círculo pastel
+
+32px
+
+==================================================
+JERARQUÍA TIPOGRÁFICA
+==================================================
+
+Cliente:
+
+font-weight: 600
+
+Producto:
+
+font-weight: 700
+
+Información secundaria:
+
+font-weight: 400
+
+color:
+#6B7280
+
+==================================================
+ENCABEZADOS DE TABLA
+==================================================
+
+Diseño tipo Linear.
+
+font-size: 12px
+
+font-weight: 600
+
+letter-spacing: 0.08em
+
+text-transform: uppercase
+
+color:
+#64748B
+
+==================================================
+ESTADOS VISUALES
+==================================================
+
+Agregar color lateral de fila según estado.
+
+Retrasado:
+rojo
+
+A tiempo:
+verde
+
+Pendiente:
+naranja
+
+Futuro:
+morado
+
+Aplicar como barra lateral de 4px.
+
+No colorear toda la fila.
+
+==================================================
+OBJETIVO FINAL
+==================================================
+
+La experiencia debe sentirse como una mezcla entre:
+
+Linear
+ClickUp
+Monday
+HubSpot
+
+adaptada específicamente para una floristería moderna.
+
+Debe transmitir:
+
+orden,
+velocidad operativa,
+elegancia,
+tecnología,
+y gestión profesional de producción floral  
+
+
+
+
+
+
+
+==================================================
+UNIFICACIÓN VISUAL GLOBAL
+==================================================
+
+Actualmente los KPIs tienen una apariencia moderna y premium.
+
+Sin embargo:
+
+- Header
+- Tabs
+- Filtros
+- Tabla
+
+aún no comparten completamente el mismo lenguaje visual.
+
+El objetivo es que toda la pantalla parezca diseñada al mismo tiempo por el mismo equipo.
+
+==================================================
+HEADER PREMIUM
+==================================================
+
+Rediseñar el bloque superior.
+
+Convertir el encabezado de Producción en una zona visual más fuerte.
+
+Mantener:
+
+Título
+Usuario
+Descripción
+
+Pero agregar:
+
+- mejor jerarquía
+- mejor espaciado
+- elementos visuales suaves
+- apariencia de centro operativo
+
+Inspiración:
+
+Linear
+Attio
+Stripe
+
+==================================================
+SUBMENÚ (TABS)
+==================================================
+
+Rediseñar completamente:
+
+Pedidos
+Disponibilidad florista
+Gestión incapacidad
+Looker
+
+Agregar iconografía Lucide.
+
+Pedidos:
+ClipboardList
+
+Disponibilidad:
+Users
+
+Incapacidad:
+ShieldCheck
+
+Looker:
+BarChart3
+
+Los tabs deben verse como componentes premium.
+
+Agregar:
+
+hover
+animaciones
+estado activo moderno
+
+No usar apariencia Bootstrap.
+
+==================================================
+TOOLBAR DE FILTROS
+==================================================
+
+Transformar la sección de filtros en una toolbar moderna.
+
+Agregar iconos internos.
+
+Buscar:
+Search
+
+Fecha:
+CalendarDays
+
+Estado:
+Filter
+
+Filtros avanzados:
+SlidersHorizontal
+
+Eliminar apariencia de formulario tradicional.
+
+Los filtros deben parecer herramientas operativas.
+
+==================================================
+CONSISTENCIA DE COLOR
+==================================================
+
+Tomar los colores de los KPIs y reutilizarlos en:
+
+- tabs activos
+- badges
+- indicadores
+- acciones rápidas
+
+Crear sensación de sistema visual único.
+
+No usar colores aislados.
+
+==================================================
+TIPOGRAFÍA
+==================================================
+
+Mejorar contraste visual.
+
+Jerarquía recomendada:
+
+Título Producción:
+40px
+700
+
+Títulos KPI:
+20px
+600
+
+Subtítulos:
+14px
+500
+
+Texto secundario:
+13px
+400
+
+Tabla:
+14px
+
+Evitar que todo tenga el mismo peso visual.
+
+==================================================
+BOTONES PRINCIPALES
+==================================================
+
+Sincronizar pedidos
+Actualizar
+
+Deben verse como acciones premium.
+
+Agregar:
+
+- iconos más grandes
+- sombra más elegante
+- transición hover
+- feedback visual
+
+Inspiración:
+
+Vercel
+Linear
+Stripe
+
+==================================================
+OBJETIVO FINAL
+==================================================
+
+La pantalla completa debe transmitir:
+
+Centro operativo moderno para floristerías.
+
+No debe sentirse como:
+
+Header ERP
++
+KPIs SaaS
++
+Tabla CRM
+
+Debe sentirse como un único producto premium y coherente.
+
+
+
+
+==================================================
+OPTIMIZACIÓN DEL HEADER
+==================================================
+
+El módulo Producción es una herramienta operativa.
+
+Reducir significativamente la altura del encabezado.
+
+Eliminar elementos decorativos que no aporten información accionable.
+
+Eliminar:
+
+"Centro operativo floral"
+
+Eliminar o reducir al mínimo:
+
+"Asignación inteligente, carga equitativa y control por fecha programada"
+
+==================================================
+NUEVA ESTRUCTURA
+==================================================
+
+Mantener únicamente:
+
+Título:
+Producción
+
+Usuario:
+Flora Empresa Admin
+
+Botones:
+Sincronizar pedidos
+Actualizar
+
+==================================================
+ESPACIO VERTICAL
+==================================================
+
+Reducir la altura total del header entre 35% y 50%.
+
+Objetivo:
+
+Mostrar más contenido operativo por encima del primer scroll.
+
+Priorizar:
+
+1. KPIs
+2. Filtros
+3. Pedidos
+
+por encima de textos descriptivos.
+
+==================================================
+PRINCIPIO DE DISEÑO
+==================================================
+
+Este módulo debe sentirse como un centro operativo.
+
+No como una página de presentación.
+
+Cada píxel vertical debe justificar su existencia.
+
+
+
+
+
+
+
+
+
+==================================================
+REDISEÑO DEL PANEL LATERAL DE DETALLE
+==================================================
+
+El panel lateral de Producción debe abandonar la apariencia de formulario administrativo.
+
+Actualmente se percibe como una lista de etiquetas y valores.
+
+Objetivo:
+
+Convertirlo en una ficha operativa moderna.
+
+Inspiración:
+
+Linear
+Attio
+ClickUp
+HubSpot
+
+==================================================
+HEADER DEL PEDIDO
+==================================================
+
+Eliminar:
+
+"Ver detalle"
+
+Reemplazar por:
+
+Pedido #94843
+
+Badge de estado
+
+Nombre del arreglo
+
+Ejemplo:
+
+Pedido #94843
+
+🔴 Retrasado
+
+Base de Barro Gerbera N°4
+
+Este bloque debe dominar visualmente el panel.
+
+==================================================
+ESTRUCTURA DEL PANEL
+==================================================
+
+Organizar en secciones visuales.
+
+1. Cliente
+
+Icono:
+User
+
+Mostrar:
+
+Nombre cliente
+
+2. Entrega
+
+Icono:
+CalendarDays
+
+Mostrar:
+
+Fecha
+Hora
+
+3. Producción
+
+Icono:
+Flower2
+
+Mostrar:
+
+Estado
+Florista asignado
+
+4. Observaciones
+
+Icono:
+FileText
+
+Mostrar observaciones dentro de una card.
+
+==================================================
+ELIMINAR PARED DE TEXTO
+==================================================
+
+Evitar estructuras repetitivas:
+
+Etiqueta:
+Valor
+
+Etiqueta:
+Valor
+
+Etiqueta:
+Valor
+
+Utilizar layouts de cards.
+
+==================================================
+ASIGNACIÓN DE FLORISTA
+==================================================
+
+Convertir la sección de asignación en una card premium.
+
+Mostrar:
+
+Avatar
+Nombre
+Estado
+
+Agregar botón principal:
+
+Asignar
+
+Botón secundario:
+
+Reasignar
+
+==================================================
+ACCIONES RÁPIDAS
+==================================================
+
+Agregar barra de acciones.
+
+Lucide:
+
+Eye
+Pencil
+Phone
+Printer
+
+Diseño:
+
+icon buttons
+
+40px
+
+border-radius: 12px
+
+==================================================
+ESTILO VISUAL
+==================================================
+
+Usar exactamente:
+
+- misma tipografía
+- mismos colores
+- mismos badges
+- mismos radios
+- mismas sombras
+
+que el dashboard principal.
+
+El panel debe sentirse parte del mismo sistema de diseño.
+
+==================================================
+OBJETIVO
+==================================================
+
+Al abrir un pedido el usuario debe sentir que está viendo una ficha operativa moderna de producción floral y no un formulario administrativo tradicional.
+
+
+
+
+CORRECCIÓN DE LAYOUT GLOBAL DEL MÓDULO PRODUCCIÓN
+
+El problema actual NO es visual de componentes.
+
+Es un problema de alineación estructural.
+
+================================================
+
+HEADER
+
+Eliminar apariencia de card.
+
+Eliminar fondo.
+
+Eliminar borde.
+
+Eliminar sombra.
+
+Eliminar sensación de bloque flotante.
+
+El header debe integrarse naturalmente al contenido.
+
+================================================
+
+ALINEACIÓN
+
+El inicio horizontal del header debe coincidir exactamente con el inicio del contenido principal.
+
+Eliminar cualquier desplazamiento extra entre sidebar y header.
+
+No debe existir espacio muerto visual entre el menú lateral y el encabezado.
+
+================================================
+
+ALTURA
+
+Reducir altura total del encabezado aproximadamente 35%.
+
+Mantener:
+
+Título
+Usuario
+Descripción
+
+pero con menor espacio vertical.
+
+================================================
+
+BOTONES
+
+Sincronizar pedidos
+Actualizar
+
+Alinearlos verticalmente con el título.
+
+No deben parecer flotando en una zona independiente.
+
+================================================
+
+ESPACIADO
+
+Reducir espacio entre:
+
+Header → KPIs
+
+aproximadamente 30%.
+
+================================================
+
+OBJETIVO
+
+Que el encabezado parezca parte del layout principal y no una tarjeta separada del sidebar.

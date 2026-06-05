@@ -5,12 +5,29 @@ import { AppSidebar } from "../../shared/AppSidebar.jsx";
 import { useSidebarState } from "../../shared/useSidebarState.js";
 import { formatDateOnly, formatDateTimeCompact, normalizeStatus } from "../../shared/utils.js";
 import {
-  IconAdjustments,
   IconCalendarPlus,
-  IconRefresh,
-  IconReload,
   IconX,
 } from "@tabler/icons-react";
+import {
+  BarChart3,
+  CalendarCheck2,
+  CalendarClock,
+  CalendarDays,
+  ChevronDown,
+  ClipboardList,
+  Eye,
+  Filter,
+  FileText,
+  Flower2,
+  ListChecks,
+  RotateCw,
+  Search,
+  ShieldCheck,
+  TriangleAlert,
+  Users,
+  User,
+  UserX,
+} from "lucide-react";
 
 const ESTADOS_UI = ["Pendiente", "EnProduccion", "ParaEntrega", "Cancelado"];
 const ESTADOS_FILTRO_DEFAULT = ["Pendiente", "EnProduccion"];
@@ -24,6 +41,13 @@ const SUBMENU_OPTIONS = [
   { key: "incapacidad", label: "Gestión incapacidad" },
   { key: "looker", label: "Looker" }
 ];
+
+const PRODUCTION_SUBMENU_ICONS = {
+  pedidos: ClipboardList,
+  disponibilidad: Users,
+  incapacidad: ShieldCheck,
+  looker: BarChart3,
+};
 
 const BADGE_CLASS_BY_STATUS = {
   PENDIENTE: "is-pendiente",
@@ -44,6 +68,15 @@ function normalizeSearchText(value) {
     .toLowerCase();
 }
 
+function initialsFromName(value) {
+  const parts = String(value || "")
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+  if (parts.length === 0) return "SA";
+  return parts.slice(0, 2).map(part => part[0]).join("").toUpperCase();
+}
+
 function toIsoDate(value) {
   const raw = String(value || "").trim();
   if (!raw) return "";
@@ -57,9 +90,59 @@ function resolveProgrammedDate(item) {
   return toIsoDate(item?.fechaProgramadaProduccion || item?.fechaEntrega);
 }
 
+function minutesUntilDelivery(item) {
+  const raw = item?.fechaEntrega;
+  if (!raw) return null;
+  const parsed = new Date(raw);
+  if (Number.isNaN(parsed.getTime())) return null;
+  return Math.round((parsed.getTime() - Date.now()) / 60000);
+}
+
+function formatDurationFromMinutes(totalMinutes) {
+  if (typeof totalMinutes !== "number" || !Number.isFinite(totalMinutes)) return "-";
+  const absMinutes = Math.abs(Math.round(totalMinutes));
+  if (absMinutes < 60) return `${absMinutes} min`;
+  const hours = Math.floor(absMinutes / 60);
+  const minutes = absMinutes % 60;
+  if (minutes === 0) return `${hours} h`;
+  return `${hours} h ${minutes} min`;
+}
+
+function deliveryTimingStatus(item) {
+  const remaining = minutesUntilDelivery(item);
+  if (remaining == null) {
+    return { label: "Sin hora", className: "is-neutral", remainingLabel: "-" };
+  }
+  if (remaining < 0) {
+    return {
+      label: `🔴 Retrasado ${formatDurationFromMinutes(remaining)}`,
+      className: "is-late",
+      remainingLabel: `Vencido hace ${formatDurationFromMinutes(remaining)}`,
+    };
+  }
+  if (remaining <= 120) {
+    return {
+      label: "🟡 Próximo a vencer",
+      className: "is-soon",
+      remainingLabel: `Faltan ${formatDurationFromMinutes(remaining)}`,
+    };
+  }
+  return {
+    label: "🟢 A tiempo",
+    className: "is-on-time",
+    remainingLabel: `Faltan ${formatDurationFromMinutes(remaining)}`,
+  };
+}
+
 function hasAssignedFlorista(item) {
   if (item?.floristaID != null && item?.floristaID !== "") return true;
   return String(item?.floristaAsignado || "").trim().length > 0;
+}
+
+function flattenPipelineCards(payload) {
+  if (!payload || typeof payload !== "object") return [];
+  const stages = ["creado", "aprobado", "pendiente_produccion", "en_produccion", "listo", "en_camino", "entregado", "cancelado"];
+  return stages.flatMap(stage => (Array.isArray(payload?.[stage]) ? payload[stage] : []));
 }
 
 function productionSelectionKey(item) {
@@ -68,10 +151,10 @@ function productionSelectionKey(item) {
   return `produccion-${Number(item?.idProduccion || 0)}`;
 }
 
-function buildVisibleProductionItems(sourceItems, currentFloristaId, busquedaGeneral, soloMisAsignados) {
+function buildVisibleProductionItems(sourceItems, currentFloristaId, busquedaGeneral, soloMisAsignados, groupByPedido = true) {
   const search = normalizeSearchText(busquedaGeneral);
   const filtered = sourceItems.filter(item => {
-    if (soloMisAsignados && currentFloristaId != null && Number(item?.floristaID) !== Number(currentFloristaId)) {
+    if (!search && soloMisAsignados && currentFloristaId != null && Number(item?.floristaID) !== Number(currentFloristaId)) {
       return false;
     }
     if (search) {
@@ -82,6 +165,15 @@ function buildVisibleProductionItems(sourceItems, currentFloristaId, busquedaGen
     }
     return true;
   });
+
+  if (!groupByPedido) {
+    return [...filtered].sort((left, right) => {
+      const numeroLeft = Number(left?.numeroPedido || 0);
+      const numeroRight = Number(right?.numeroPedido || 0);
+      if (numeroLeft !== numeroRight) return numeroLeft - numeroRight;
+      return Number(left?.idProduccion || 0) - Number(right?.idProduccion || 0);
+    });
+  }
 
   const grouped = new Map();
   for (const item of filtered) {
@@ -166,6 +258,26 @@ function isPendingOutsideToday(item) {
   return Boolean(programmedDate) && programmedDate !== todayIsoDate();
 }
 
+function isPendingOverdue(item) {
+  const normalizedStatus = normalizeStatus(item?.estado).replace(/_/g, "");
+  if (normalizedStatus !== "PENDIENTE") return false;
+  const programmedDate = resolveProgrammedDate(item);
+  if (!programmedDate) return false;
+  return programmedDate < todayIsoDate();
+}
+
+function matchesProductionMetric(item, metricKey) {
+  const normalizedStatus = normalizeStatus(item?.estado).replace(/_/g, "");
+  if (metricKey === "pendientesHoy") return normalizedStatus === "PENDIENTE" && resolveProgrammedDate(item) === todayIsoDate();
+  if (metricKey === "sinAsignar") return normalizedStatus === "PENDIENTE" && !hasAssignedFlorista(item);
+  if (metricKey === "atrasados") return isPendingOverdue(item);
+  if (metricKey === "pendientesFuturos") {
+    const programmedDate = resolveProgrammedDate(item);
+    return normalizedStatus === "PENDIENTE" && Boolean(programmedDate) && programmedDate > todayIsoDate();
+  }
+  return true;
+}
+
 function productionStatusBadgeClass(item) {
   const baseClass = statusBadgeClass(item?.estado);
   return isPendingOutsideToday(item) ? `${baseClass} is-pendiente-other-date` : baseClass;
@@ -220,6 +332,13 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [items, setItems] = useState([]);
+  const [productionMetricas, setProductionMetricas] = useState({
+    pendientesHoy: null,
+    sinAsignar: null,
+    atrasados: null,
+    pendientesFuturos: 0,
+  });
+  const productionMetricasRef = useRef(productionMetricas);
   const [floristas, setFloristas] = useState([]);
   const [floristasDisponibilidad, setFloristasDisponibilidad] = useState([]);
 
@@ -237,10 +356,28 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
   const [fechaFinIncapacidad, setFechaFinIncapacidad] = useState(todayIsoDate());
 
   const [submenu, setSubmenu] = useState("pedidos");
+  const [productionMenuOpen, setProductionMenuOpen] = useState(false);
   const [busquedaGeneral, setBusquedaGeneral] = useState("");
   const [soloMisAsignados, setSoloMisAsignados] = useState(!canManageProductionActions);
+  const [activeMetricFilter, setActiveMetricFilter] = useState(null);
+  const productionListRef = useRef(null);
+  const productionMenuRef = useRef(null);
 
   const { sidebarPinned, sidebarMobileOpen, setSidebarMobileOpen, toggleSidebar } = useSidebarState();
+
+  useEffect(() => {
+    productionMetricasRef.current = productionMetricas;
+  }, [productionMetricas]);
+
+  useEffect(() => {
+    if (!productionMenuOpen) return undefined;
+    const handlePointerDown = event => {
+      if (productionMenuRef.current?.contains(event.target)) return;
+      setProductionMenuOpen(false);
+    };
+    document.addEventListener("pointerdown", handlePointerDown);
+    return () => document.removeEventListener("pointerdown", handlePointerDown);
+  }, [productionMenuOpen]);
 
   const currentFloristaDisponibilidad = useMemo(() => {
     if (!floristaGestionID) return null;
@@ -269,12 +406,100 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
     return floristasDisponibilidad.find(item => Number(item.idFlorista) === Number(currentFloristaId)) || null;
   }, [currentFloristaId, floristasDisponibilidad]);
 
+  const canChangeOwnProductionState = useCallback((item) => {
+    if (!canFloristaQuickState || currentFloristaId == null) return false;
+    return Number(item?.floristaID) === Number(currentFloristaId);
+  }, [canFloristaQuickState, currentFloristaId]);
+
   const visibleItems = useMemo(
-    () => buildVisibleProductionItems(items, currentFloristaId, busquedaGeneral, soloMisAsignados),
-    [items, currentFloristaId, busquedaGeneral, soloMisAsignados]
+    () => buildVisibleProductionItems(items, currentFloristaId, busquedaGeneral, activeMetricFilter ? false : soloMisAsignados, !activeMetricFilter),
+    [items, currentFloristaId, busquedaGeneral, soloMisAsignados, activeMetricFilter]
   );
+  const searchOverridesFilters = useMemo(
+    () => normalizeSearchText(busquedaGeneral).length > 0,
+    [busquedaGeneral]
+  );
+  const metrics = useMemo(() => {
+    const total = visibleItems.length;
+    const pendientes = visibleItems.filter(item => normalizeStatus(item?.estado).replace(/_/g, "") === "PENDIENTE");
+    const enProduccion = visibleItems.filter(item => normalizeStatus(item?.estado).replace(/_/g, "") === "ENPRODUCCION");
+    const sinAsignar = pendientes.filter(item => !hasAssignedFlorista(item));
+    const pendientesHoy = pendientes.filter(item => resolveProgrammedDate(item) === todayIsoDate());
+    const atrasados = pendientes.filter(item => isPendingOverdue(item));
+    const criticos = pendientes
+      .filter(item => isPendingOverdue(item) || !hasAssignedFlorista(item))
+      .sort((left, right) => {
+        const leftDate = resolveProgrammedDate(left) || "9999-12-31";
+        const rightDate = resolveProgrammedDate(right) || "9999-12-31";
+        if (leftDate !== rightDate) return leftDate.localeCompare(rightDate);
+        return Number(left?.numeroPedido || 0) - Number(right?.numeroPedido || 0);
+      })
+      .slice(0, 5);
+
+    return {
+      total,
+      pendientes: pendientes.length,
+      pendientesHoy: productionMetricas?.pendientesHoy != null ? Number(productionMetricas.pendientesHoy) : pendientesHoy.length,
+      enProduccion: enProduccion.length,
+      sinAsignar: productionMetricas?.sinAsignar != null ? Number(productionMetricas.sinAsignar) : sinAsignar.length,
+      atrasados: productionMetricas?.atrasados != null ? Number(productionMetricas.atrasados) : atrasados.length,
+      criticos,
+      pendientesFuturos: Number(productionMetricas?.pendientesFuturos || 0),
+    };
+  }, [visibleItems, productionMetricas]);
+
+  const activeMetricMeta = useMemo(() => {
+    const metaByKey = {
+      pendientesHoy: {
+        label: "Pendientes hoy",
+        description: "Pedidos que deben resolverse en la jornada.",
+      },
+      sinAsignar: {
+        label: "Pendientes sin asignar",
+        description: "Pedidos pendientes que todavía no tienen florista.",
+      },
+      atrasados: {
+        label: "Pendientes atrasados",
+        description: "Pedidos pendientes con fecha programada vencida.",
+      },
+      pendientesFuturos: {
+        label: "Pendientes futuros",
+        description: "Pedidos pendientes programados para días posteriores.",
+      },
+    };
+    return activeMetricFilter ? metaByKey[activeMetricFilter] || null : null;
+  }, [activeMetricFilter]);
+
+  const focusedVisibleItems = useMemo(() => {
+    if (!activeMetricFilter) return visibleItems;
+    return visibleItems.filter(item => matchesProductionMetric(item, activeMetricFilter));
+  }, [activeMetricFilter, visibleItems]);
+
+  const focusMetric = useCallback(metricKey => {
+    setSubmenu("pedidos");
+    setBusquedaGeneral("");
+    setActiveMetricFilter(current => {
+      const nextMetric = current === metricKey ? null : metricKey;
+      if (!nextMetric) {
+        setFecha(todayIsoDate());
+        setEstadosFiltro(ESTADOS_FILTRO_DEFAULT);
+        return null;
+      }
+      if (nextMetric === "pendientesHoy") {
+        setFecha(todayIsoDate());
+      } else {
+        setFecha("");
+      }
+      setEstadosFiltro(["Pendiente"]);
+      return nextMetric;
+    });
+    window.requestAnimationFrame(() => {
+      productionListRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  }, []);
 
   const toggleEstadoFiltro = useCallback((estadoItem) => {
+    setActiveMetricFilter(null);
     setEstadosFiltro(current => {
       const exists = current.includes(estadoItem);
       if (exists) {
@@ -291,30 +516,103 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
     setError("");
 
     try {
+      const expectedMetricCount = activeMetricFilter
+        ? Number(productionMetricasRef.current?.[activeMetricFilter] || 0)
+        : 0;
       const produccion = await api.listarProduccion({
         empresaId,
         sucursalId,
-        fecha,
+        fecha: searchOverridesFilters || activeMetricFilter ? undefined : fecha,
         estado: undefined,
-        incluirCancelado: false
+        q: searchOverridesFilters ? busquedaGeneral : undefined,
+        metricFilter: searchOverridesFilters ? undefined : activeMetricFilter,
+        todasFechas: !searchOverridesFilters && !activeMetricFilter && !fecha,
+        incluirCancelado: false,
+        autoAsignarPendientesHoy: !activeMetricFilter && !searchOverridesFilters,
       });
-      const nextItemsRaw = Array.isArray(produccion.items) ? produccion.items : [];
-      const nextItems = nextItemsRaw.filter(item =>
-        estadosFiltro.some(estadoItem => normalizeStatus(estadoItem) === normalizeStatus(item.estado))
-      );
+      let nextItemsRaw = Array.isArray(produccion.items) ? produccion.items : [];
+      const responseMetricas = produccion?.metricas || {};
+      const activeMetricCount = activeMetricFilter ? Number(responseMetricas?.[activeMetricFilter] || 0) : 0;
+      if (activeMetricFilter && nextItemsRaw.length === 0 && Math.max(activeMetricCount, expectedMetricCount) > 0) {
+        const fallbackResponse = await api.listarProduccion({
+          empresaId,
+          sucursalId,
+          fecha: undefined,
+          estado: undefined,
+          metricFilter: undefined,
+          todasFechas: true,
+          incluirCancelado: false,
+          autoAsignarPendientesHoy: false,
+        });
+        nextItemsRaw = (Array.isArray(fallbackResponse.items) ? fallbackResponse.items : [])
+          .filter(item => matchesProductionMetric(item, activeMetricFilter));
+      }
+      if (searchOverridesFilters && nextItemsRaw.length === 0) {
+        const pipelinePayload = await api.listarPipelinePedidos({
+          empresaId,
+          sucursalId,
+          numeroPedido: String(busquedaGeneral || "").trim(),
+          soloHoy: false,
+          soloAtrasados: false,
+          soloEnProduccion: false,
+        });
+        const pipelineMatches = flattenPipelineCards(pipelinePayload);
+        const candidateDates = Array.from(
+          new Set(
+            pipelineMatches
+              .map(item => toIsoDate(item?.fecha_entrega))
+              .filter(Boolean)
+          )
+        );
+        if (candidateDates.length > 0) {
+          const fallbackResponses = await Promise.all(
+            candidateDates.map(candidateDate =>
+              api.listarProduccion({
+                empresaId,
+                sucursalId,
+                fecha: candidateDate,
+                estado: undefined,
+                incluirCancelado: false,
+              })
+            )
+          );
+          nextItemsRaw = fallbackResponses.flatMap(response => (Array.isArray(response?.items) ? response.items : []));
+        }
+      }
+      const nextItems = activeMetricFilter
+        ? nextItemsRaw
+        : searchOverridesFilters
+        ? nextItemsRaw.filter(item => {
+          const search = normalizeSearchText(busquedaGeneral);
+          const matchesFlorista = normalizeSearchText(item?.floristaAsignado).includes(search);
+          const matchesCliente = normalizeSearchText(item?.cliente).includes(search);
+          const matchesPedido = normalizeSearchText(item?.numeroPedido).includes(search);
+          return matchesFlorista || matchesCliente || matchesPedido;
+        })
+        : nextItemsRaw.filter(item =>
+          estadosFiltro.some(estadoItem => normalizeStatus(estadoItem) === normalizeStatus(item.estado))
+        );
 
       setItems(nextItems);
+      const metricas = responseMetricas;
+      setProductionMetricas({
+        pendientesHoy: Object.prototype.hasOwnProperty.call(metricas, "pendientesHoy") ? Number(metricas.pendientesHoy || 0) : null,
+        sinAsignar: Object.prototype.hasOwnProperty.call(metricas, "sinAsignar") ? Number(metricas.sinAsignar || 0) : null,
+        atrasados: Object.prototype.hasOwnProperty.call(metricas, "atrasados") ? Number(metricas.atrasados || 0) : null,
+        pendientesFuturos: Number(metricas.pendientesFuturos || 0),
+      });
       setError("");
       return nextItems;
     } catch (nextError) {
       console.error("Error cargando producción:", nextError);
       setItems([]);
+      setProductionMetricas({ pendientesHoy: null, sinAsignar: null, atrasados: null, pendientesFuturos: 0 });
       setError("No fue posible cargar el módulo de producción.");
       return [];
     } finally {
       setLoading(false);
     }
-  }, [api, fecha, estadosFiltro, empresaId, sucursalId]);
+  }, [api, fecha, estadosFiltro, activeMetricFilter, empresaId, sucursalId, searchOverridesFilters, busquedaGeneral]);
 
   useEffect(() => {
     void loadItems();
@@ -541,6 +839,10 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
       globalThis.alert("No puedes cambiar estado sin florista asignado.");
       return;
     }
+    if (!canChangeOwnProductionState(item)) {
+      globalThis.alert("Solo puedes cambiar el estado de tus propios pedidos asignados.");
+      return;
+    }
 
     try {
       await Promise.all(produccionIds.map(produccionId => api.cambiarEstadoProduccion({
@@ -682,62 +984,180 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
           <div className="production-topbar-left">
             <span className="production-topbar-title">Producción</span>
             <span className="production-topbar-user">Usuario: {displayUserName}</span>
-            <p className="production-topbar-description">
-              {canManageProductionActions
-                ? "Asignación inteligente, carga equitativa y control por fecha programada."
-                : "Consulta operativa de tus pedidos asignados y su estado actual."}
-            </p>
           </div>
           <div className="production-topbar-actions">
-            {canManageProductionActions ? (
-              <button type="button" className="btn-outline production-topbar-btn" title="Crear tareas desde pedidos aprobados/pagados" onClick={generarDesdePedidos}>
-                <IconReload size={15} stroke={2} />
-                <span>Sincronizar pedidos</span>
+            <div className="production-menu-dropdown" ref={productionMenuRef}>
+              <button
+                type="button"
+                className={`btn-outline production-topbar-btn production-menu-trigger${productionMenuOpen ? " is-open" : ""}`}
+                onClick={() => setProductionMenuOpen(open => !open)}
+                aria-expanded={productionMenuOpen}
+                aria-haspopup="menu"
+                title="Cambiar vista de producción"
+              >
+                {(() => {
+                  const activeOption = visibleSubmenuOptions.find(item => item.key === submenu) || visibleSubmenuOptions[0] || SUBMENU_OPTIONS[0];
+                  const ActiveIcon = PRODUCTION_SUBMENU_ICONS[activeOption.key] || ClipboardList;
+                  return (
+                    <>
+                      <ActiveIcon size={18} strokeWidth={2} />
+                      <span>{activeOption.label}</span>
+                      <ChevronDown size={16} strokeWidth={2} className="production-menu-chevron" />
+                    </>
+                  );
+                })()}
               </button>
-            ) : null}
+
+              {productionMenuOpen ? (
+                <div className="production-menu-panel" role="menu" onClick={() => setProductionMenuOpen(false)}>
+                  {visibleSubmenuOptions.map(item => {
+                    const ItemIcon = PRODUCTION_SUBMENU_ICONS[item.key] || ClipboardList;
+                    return (
+                      <button
+                        key={item.key}
+                        type="button"
+                        className={`production-menu-option${submenu === item.key ? " is-active" : ""}`}
+                        onClick={() => {
+                          setSubmenu(item.key);
+                          setProductionMenuOpen(false);
+                        }}
+                        role="menuitem"
+                      >
+                        <span className="production-menu-option-icon"><ItemIcon size={17} strokeWidth={2} /></span>
+                        <span>{item.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : null}
+            </div>
             <button type="button" className="btn-primary production-topbar-btn production-topbar-btn-primary" title="Recargar vista" onClick={refreshAll}>
-              <IconRefresh size={15} stroke={2} />
+              <RotateCw size={18} strokeWidth={2} />
               <span>Actualizar</span>
             </button>
           </div>
         </div>
 
-        {canManageProductionActions ? (
-          <section className="production-subtabs" aria-label="Submenu producción">
-            {visibleSubmenuOptions.map(item => (
-              <button
-                key={item.key}
-                type="button"
-                className={`production-subtab ${submenu === item.key ? "is-active" : ""}`}
-                onClick={() => setSubmenu(item.key)}
-              >
-                {item.label}
-              </button>
-            ))}
+        <section className="production-metrics-grid" aria-label="Indicadores de producción">
+          <button type="button" className="production-metric-card" onClick={() => focusMetric(null)}>
+            <span className="production-metric-icon" aria-hidden="true"><ListChecks size={18} strokeWidth={2} /></span>
+            <span className="production-metric-label">Pedidos visibles</span>
+            <strong className="production-metric-value">{metrics.total}</strong>
+          </button>
+          <button type="button" className={`production-metric-card ${activeMetricFilter === "pendientesHoy" ? "is-active" : ""}`} onClick={() => focusMetric("pendientesHoy")}>
+            <span className="production-metric-icon" aria-hidden="true"><CalendarCheck2 size={18} strokeWidth={2} /></span>
+            <span className="production-metric-label">Pendientes hoy</span>
+            <strong className="production-metric-value">{metrics.pendientesHoy}</strong>
+          </button>
+          <button type="button" className={`production-metric-card ${metrics.sinAsignar > 0 ? "is-warning" : ""} ${activeMetricFilter === "sinAsignar" ? "is-active" : ""}`} onClick={() => focusMetric("sinAsignar")}>
+            <span className="production-metric-icon" aria-hidden="true"><UserX size={18} strokeWidth={2} /></span>
+            <span className="production-metric-label">Pendientes sin asignar</span>
+            <strong className="production-metric-value">{metrics.sinAsignar}</strong>
+          </button>
+          <button type="button" className={`production-metric-card ${metrics.atrasados > 0 ? "is-danger" : ""} ${activeMetricFilter === "atrasados" ? "is-active" : ""}`} onClick={() => focusMetric("atrasados")}>
+            <span className="production-metric-icon" aria-hidden="true"><TriangleAlert size={18} strokeWidth={2} /></span>
+            <span className="production-metric-label">Pendientes atrasados</span>
+            <strong className="production-metric-value">{metrics.atrasados}</strong>
+          </button>
+          <button type="button" className={`production-metric-card ${metrics.pendientesFuturos > 0 ? "is-warning" : ""} ${activeMetricFilter === "pendientesFuturos" ? "is-active" : ""}`} onClick={() => focusMetric("pendientesFuturos")}>
+            <span className="production-metric-icon" aria-hidden="true"><CalendarClock size={18} strokeWidth={2} /></span>
+            <span className="production-metric-label">Pendientes futuros</span>
+            <strong className="production-metric-value">{metrics.pendientesFuturos}</strong>
+          </button>
+        </section>
+
+        {activeMetricMeta ? (
+          <section className="production-alert-card production-ops-panel" ref={productionListRef} aria-label="Panel operativo de KPI seleccionado">
+            <div className="production-alert-card-copy">
+              <span className="production-alert-eyebrow">Centro operativo</span>
+              <strong>{activeMetricMeta.label}</strong>
+              <span>{focusedVisibleItems.length} pedido{focusedVisibleItems.length === 1 ? "" : "s"} afectado{focusedVisibleItems.length === 1 ? "" : "s"}</span>
+            </div>
+            <div className="production-alert-card-list">
+              {focusedVisibleItems.length === 0 ? (
+                <div className="production-alert-pill production-alert-pill-empty">
+                  <span className="production-alert-icon" aria-hidden="true" />
+                  <div className="production-alert-pill-copy">
+                    <strong>Sin pedidos visibles</strong>
+                    <span>No hay arreglos para este indicador.</span>
+                    <small>Revisa filtros o fecha seleccionada.</small>
+                  </div>
+                </div>
+              ) : focusedVisibleItems.slice(0, 8).map(item => (
+                <div key={`metric-focus-${item.idProduccion}`} className="production-alert-pill">
+                  <span className="production-alert-icon" aria-hidden="true" />
+                  <div className="production-alert-pill-copy">
+                    <strong>Pedido {item.numeroPedido}</strong>
+                    <span>{item.cliente || "Cliente"}</span>
+                    <small>{resolveProgrammedDate(item) || "-"}</small>
+                  </div>
+                  <span className={`order-badge production-alert-status ${productionStatusBadgeClass(item)}`}>{item.estado || "-"}</span>
+                </div>
+              ))}
+            </div>
           </section>
-        ) : null}
+        ) : metrics.criticos.length > 0 ? (
+          <section className="production-alert-card production-ops-panel" ref={productionListRef} aria-label="Alertas de pedidos críticos">
+            <div className="production-alert-card-copy">
+              <span className="production-alert-eyebrow">Centro operativo</span>
+              <strong>Alertas de producción</strong>
+              <span>{metrics.sinAsignar} sin asignar · {metrics.atrasados} atrasado{metrics.atrasados === 1 ? "" : "s"}</span>
+            </div>
+            <div className="production-alert-card-list">
+              {metrics.criticos.map(item => (
+                <div key={`metric-${item.idProduccion}`} className="production-alert-pill">
+                  <span className="production-alert-icon" aria-hidden="true" />
+                  <div className="production-alert-pill-copy">
+                    <strong>Pedido {item.numeroPedido}</strong>
+                    <span>{item.cliente || "Cliente"}</span>
+                    <small>{resolveProgrammedDate(item) || "-"}</small>
+                  </div>
+                  <span className={`order-badge production-alert-status ${productionStatusBadgeClass(item)}`}>{item.estado || "-"}</span>
+                </div>
+              ))}
+            </div>
+          </section>
+        ) : <span ref={productionListRef} />}
 
         {submenu === "pedidos" && (
           <>
             <section className="orders-filters orders-filters--four-col production-filters-bar">
-              <label className="filter-field">
+              <label className="filter-field production-filter-field production-filter-field-search">
                 <span>Buscar</span>
-                <input
-                  type="search"
-                  value={busquedaGeneral}
-                  onChange={event => setBusquedaGeneral(event.target.value)}
-                  placeholder="Florista, cliente o pedido"
-                  title="Buscar por florista, cliente o número de pedido"
-                />
+                <div className="production-filter-control">
+                  <Search size={17} strokeWidth={2} aria-hidden="true" />
+                  <input
+                    type="search"
+                    value={busquedaGeneral}
+                    onChange={event => {
+                      setActiveMetricFilter(null);
+                      setBusquedaGeneral(event.target.value);
+                    }}
+                    placeholder="Florista, cliente o pedido"
+                    title="Buscar por florista, cliente o número de pedido"
+                  />
+                </div>
               </label>
-              <div className="filter-field">
+              <div className="filter-field production-filter-field">
                 <span>Fecha Inicio</span>
-                <input type="date" value={fecha} onChange={event => setFecha(event.target.value)} title="Filtrar por fecha programada" />
+                <div className="production-filter-control">
+                  <CalendarDays size={17} strokeWidth={2} aria-hidden="true" />
+                  <input
+                    type="date"
+                    value={fecha}
+                    onChange={event => {
+                      setActiveMetricFilter(null);
+                      setFecha(event.target.value);
+                    }}
+                    title="Filtrar por fecha programada"
+                  />
+                </div>
               </div>
-              <label className="filter-field">
+              <label className="filter-field production-filter-field">
                 <span>Estado</span>
                 <details className="estado-filtro-dropdown">
                   <summary className="estado-filtro-summary">
+                    <Filter size={17} strokeWidth={2} aria-hidden="true" />
                     Estados
                   </summary>
                   <div className="estado-filtro-panel">
@@ -773,7 +1193,7 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
 
             {error && <p className="orders-message">{error}</p>}
             {loading && <p className="orders-message">Cargando producción...</p>}
-            {!loading && !error && visibleItems.length === 0 ? <p className="orders-message">No hay arreglos que coincidan con los filtros seleccionados.</p> : null}
+            {!loading && !error && focusedVisibleItems.length === 0 ? <p className="orders-message">No hay arreglos que coincidan con los filtros seleccionados.</p> : null}
 
             <section className="orders-table-wrap production-table-wrap production-table-shell">
               <table className="orders-table production-orders-table">
@@ -785,16 +1205,24 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
                     <th>Florista Asignado</th>
                     <th>Estado</th>
                     <th>Fecha Asignación</th>
-                    <th>Tiempo restante</th>
-                    <th>Estimado/Real (min)</th>
-                    <th>Prioridad</th>
+                    <th>Estado tiempo</th>
                     {canManageProductionActions ? <th>Acciones Domicilios</th> : null}
                     {canFloristaQuickState ? <th>Acción</th> : null}
                   </tr>
                 </thead>
                 <tbody>
-                  {visibleItems.map(item => (
-                    <tr key={item.idProduccion}>
+                  {focusedVisibleItems.map(item => {
+                    const timing = deliveryTimingStatus(item);
+                    const programmedDate = resolveProgrammedDate(item);
+                    const rowStateClasses = [
+                      "production-row-card",
+                      !hasAssignedFlorista(item) ? "production-row-unassigned" : "",
+                      timing.className === "is-late" ? "production-row-late" : "",
+                      timing.className === "is-on-time" ? "production-row-on-time" : "",
+                      programmedDate && programmedDate > todayIsoDate() ? "production-row-future" : "",
+                    ].filter(Boolean).join(" ");
+                    return (
+                    <tr key={item.idProduccion} className={rowStateClasses}>
                       <td>
                         <span className="production-order-badge">{item.numeroPedido ?? "-"}</span>
                       </td>
@@ -812,23 +1240,32 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
                       </td>
                       <td>
                         {item.floristaAsignado ? (
-                          <span className="production-florista-name">{item.floristaAsignado}</span>
+                          <span className="production-florista-name">
+                            <span className="production-florista-avatar" aria-hidden="true">{initialsFromName(item.floristaAsignado)}</span>
+                            <span>{item.floristaAsignado}</span>
+                          </span>
                         ) : (
-                          <span className="production-florista-empty">Sin asignar</span>
+                          <span className="production-florista-empty">
+                            <span className="production-florista-avatar" aria-hidden="true">SA</span>
+                            <span>Sin asignar</span>
+                          </span>
                         )}
                       </td>
                       <td><span className={`order-badge ${productionStatusBadgeClass(item)}`}>{item.estado || "-"}</span></td>
                       <td>{formatDateTimeCompact(item.fechaAsignacion) || "-"}</td>
-                      <td className={typeof item.tiempoRestanteHoras === "number" && item.tiempoRestanteHoras < 0 ? "is-overdue" : ""}>
-                        {typeof item.tiempoRestanteHoras === "number" ? `${item.tiempoRestanteHoras} h` : "-"}
+                      <td>
+                        <div className="production-time-stack">
+                          <span className={`production-timing-badge ${timing.className}`}>{timing.label}</span>
+                          <strong className={timing.className === "is-late" ? "is-overdue" : ""}>{timing.remainingLabel}</strong>
+                        </div>
                       </td>
-                      <td>{`${item.tiempoEstimadoMin ?? "-"} / ${item.tiempoRealMin ?? "-"}`}</td>
-                      <td>{item.prioridad || "MEDIA"}</td>
                       {canManageProductionActions ? (
                         <td>
-                          <button type="button" className="btn-outline production-actions-btn" title="Abrir barra lateral de acciones" onClick={() => openActionsDrawer(item)}>
-                            Ver acciones
-                          </button>
+                          <div className="production-row-actions" aria-label="Acciones rápidas">
+                            <button type="button" className="production-icon-action" title="Ver detalle" aria-label="Ver detalle" onClick={() => openActionsDrawer(item)}>
+                              <Eye size={18} strokeWidth={2} aria-hidden="true" />
+                            </button>
+                          </div>
                         </td>
                       ) : null}
                       {canFloristaQuickState ? (
@@ -842,7 +1279,7 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
                             >
                               Ver detalle
                             </button>
-                            {nextFloristaStatus(item.estado) ? (
+                            {canChangeOwnProductionState(item) && nextFloristaStatus(item.estado) ? (
                               <button
                                 type="button"
                                 className="btn-outline"
@@ -856,14 +1293,15 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
                         </td>
                       ) : null}
                     </tr>
-                  ))}
+                  );
+                  })}
                 </tbody>
               </table>
             </section>
 
             <section className="production-capsules" aria-label="Pedidos en cápsulas">
-              {visibleItems.map(item => (
-                <article key={`cap-${item.idProduccion}`} className="production-capsule">
+              {focusedVisibleItems.map(item => (
+                <article key={`cap-${item.idProduccion}`} className={`production-capsule ${!hasAssignedFlorista(item) ? "production-capsule-unassigned" : ""}`}>
                   <header className="production-capsule-head">
                     <strong>{item.numeroPedido ?? "-"}</strong>
                     <span className={`order-badge ${productionStatusBadgeClass(item)}`}>{item.estado || "-"}</span>
@@ -874,18 +1312,24 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
                     <p><span>Cliente</span><strong>{item.cliente || "-"}</strong></p>
                     <p><span>Fecha entrega</span><strong>{formatDateOnly(item.fechaEntrega) || "-"}</strong></p>
                     <p><span>Hora entrega</span><strong>{item.horaEntrega || "-"}</strong></p>
-                    <p><span>Florista</span><strong>{item.floristaAsignado || "Sin asignar"}</strong></p>
+                    <p>
+                      <span>Florista</span>
+                      <strong className="production-capsule-florista">
+                        <span className="production-florista-avatar" aria-hidden="true">{initialsFromName(item.floristaAsignado)}</span>
+                        <span>{item.floristaAsignado || "Sin asignar"}</span>
+                      </strong>
+                    </p>
                     <p><span>Asignación</span><strong>{formatDateTimeCompact(item.fechaAsignacion) || "-"}</strong></p>
-                    <p><span>Tiempo</span><strong>{typeof item.tiempoRestanteHoras === "number" ? `${item.tiempoRestanteHoras} h` : "-"}</strong></p>
-                    <p><span>Estimado/Real</span><strong>{`${item.tiempoEstimadoMin ?? "-"} / ${item.tiempoRealMin ?? "-"}`}</strong></p>
-                    <p><span>Prioridad</span><strong>{item.prioridad || "MEDIA"}</strong></p>
+                    <p><span>Estado tiempo</span><strong>{deliveryTimingStatus(item).label}</strong></p>
                   </div>
 
                   <div className="production-capsule-actions">
                       {canManageProductionActions ? (
-                      <button type="button" className="btn-outline production-actions-btn" title="Abrir barra lateral de acciones" onClick={() => openActionsDrawer(item)}>
-                        Ver acciones
-                      </button>
+                      <div className="production-row-actions" aria-label="Acciones rápidas">
+                        <button type="button" className="production-icon-action" title="Ver detalle" aria-label="Ver detalle" onClick={() => openActionsDrawer(item)}>
+                          <Eye size={18} strokeWidth={2} aria-hidden="true" />
+                        </button>
+                      </div>
                     ) : null}
                     {canFloristaQuickState ? (
                       <>
@@ -897,7 +1341,7 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
                         >
                           Ver detalle
                         </button>
-                        {nextFloristaStatus(item.estado) ? (
+                        {canChangeOwnProductionState(item) && nextFloristaStatus(item.estado) ? (
                           <button
                             type="button"
                             className="btn-outline"
@@ -1059,12 +1503,22 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
         )}
       </main>
 
+      <div className={`production-drawer-backdrop ${drawerOpen && submenu === "pedidos" ? "open" : ""}`} aria-hidden="true" />
+
       <aside className={`orders-drawer production-actions-drawer ${drawerOpen && submenu === "pedidos" ? "open" : ""}`}>
-        <div className="orders-drawer-head">
-          <strong className="orders-drawer-title">
-            <IconAdjustments size={17} stroke={2} />
-            <span>{canManageProductionActions ? "Acciones Producción" : "Detalle Producción"}</span>
-          </strong>
+        <div className="orders-drawer-head production-detail-head">
+          <div className="production-detail-head-copy">
+            <span className="production-detail-eyebrow">Ficha operativa</span>
+            <strong className="orders-drawer-title production-detail-title">
+              Pedido #{selectedItem?.numeroPedido ?? "-"}
+            </strong>
+            {selectedItem ? (
+              <span className={`order-badge production-detail-status ${productionStatusBadgeClass(selectedItem)}`}>{selectedItem.estado || "-"}</span>
+            ) : null}
+            {selectedItem ? (
+              <p className="production-detail-product">{selectedItem.nombreArreglo || selectedItem.producto || "-"}</p>
+            ) : null}
+          </div>
           <div className="orders-drawer-head-actions">
             <button type="button" className="icon-btn" onClick={closeActionsDrawer} title="Cerrar barra lateral">
               <IconX size={18} stroke={2} />
@@ -1077,23 +1531,64 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
             <p className="order-drawer-empty">Selecciona un pedido para ver acciones.</p>
           ) : (
             <>
-              <section className="order-block production-action-card">
-                <h4>Ver detalle</h4>
-                <p><strong>Número del pedido:</strong> {selectedItem.numeroPedido ?? "-"}</p>
-                <p><strong>Cliente:</strong> {selectedItem.cliente || "-"}</p>
-                <p><strong>Código o número del arreglo:</strong> {arregloCodeLabel(selectedItem)}</p>
-                <p><strong>Nombre del arreglo:</strong> {selectedItem.nombreArreglo || selectedItem.producto || "-"}</p>
-                <p><strong>Fecha Entrega:</strong> {formatDateOnly(selectedItem.fechaEntrega) || "-"}</p>
-                <p><strong>Hora Entrega:</strong> {selectedItem.horaEntrega || "-"}</p>
-                <p><strong>Estado del arreglo:</strong> {selectedItem.estado || "-"}</p>
-                <p><strong>Notas Producción:</strong> {selectedItem.notasProduccion || selectedItem.observacion || "-"}</p>
-                <p><strong>Observaciones personalizados:</strong> {selectedItem.observacionesPersonalizados || "-"}</p>
-                <p><strong>Florista asignado:</strong> {selectedItem.floristaAsignado || "Sin asignar"}</p>
+              <section className="production-detail-grid" aria-label="Detalle operativo del pedido">
+                <article className="production-detail-card">
+                  <span className="production-detail-card-icon"><User size={18} strokeWidth={2} aria-hidden="true" /></span>
+                  <div>
+                    <span className="production-detail-card-label">Cliente</span>
+                    <strong>{selectedItem.cliente || "-"}</strong>
+                  </div>
+                </article>
+
+                <article className="production-detail-card">
+                  <span className="production-detail-card-icon"><CalendarDays size={18} strokeWidth={2} aria-hidden="true" /></span>
+                  <div>
+                    <span className="production-detail-card-label">Entrega</span>
+                    <strong>{formatDateOnly(selectedItem.fechaEntrega) || "-"}</strong>
+                    <small>{selectedItem.horaEntrega || "-"}</small>
+                  </div>
+                </article>
+
+                <article className="production-detail-card">
+                  <span className="production-detail-card-icon"><Flower2 size={18} strokeWidth={2} aria-hidden="true" /></span>
+                  <div>
+                    <span className="production-detail-card-label">Producción</span>
+                    <strong>{selectedItem.estado || "-"}</strong>
+                    <small>{selectedItem.floristaAsignado || "Sin asignar"}</small>
+                  </div>
+                </article>
+
+                <article className="production-detail-card">
+                  <span className="production-detail-card-icon"><FileText size={18} strokeWidth={2} aria-hidden="true" /></span>
+                  <div>
+                    <span className="production-detail-card-label">Código arreglo</span>
+                    <strong>{arregloCodeLabel(selectedItem)}</strong>
+                  </div>
+                </article>
+              </section>
+
+              <section className="production-detail-notes-card">
+                <div className="production-detail-section-title">
+                  <FileText size={17} strokeWidth={2} aria-hidden="true" />
+                  <strong>Observaciones</strong>
+                </div>
+                <p>{selectedItem.notasProduccion || selectedItem.observacion || "Sin notas de producción."}</p>
+                <small>{selectedItem.observacionesPersonalizados || "Sin observaciones personalizadas."}</small>
               </section>
 
               {canManageProductionActions ? (
-              <section className="order-block production-action-card">
-                <h4>Asignación</h4>
+              <section className="order-block production-action-card production-assignment-card">
+                <div className="production-detail-section-title">
+                  <Flower2 size={17} strokeWidth={2} aria-hidden="true" />
+                  <strong>Asignación de florista</strong>
+                </div>
+                <div className="production-assignment-profile">
+                  <span className="production-florista-avatar" aria-hidden="true">{initialsFromName(selectedItem.floristaAsignado)}</span>
+                  <div>
+                    <strong>{selectedItem.floristaAsignado || "Sin asignar"}</strong>
+                    <span>{selectedItem.floristaAsignado ? "Asignado" : "Pendiente de asignación"}</span>
+                  </div>
+                </div>
                 <div className="order-actions production-drawer-actions">
                   <select
                     value={selectedFloristaById[productionSelectionKey(selectedItem)] || ""}
@@ -1118,9 +1613,19 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
               ) : null}
 
               {!canManageProductionActions ? (
-              <section className="order-block">
-                <h4>Asignar / reasignar florista</h4>
-                <div className="order-actions" style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <section className="order-block production-action-card production-assignment-card">
+                <div className="production-detail-section-title">
+                  <Flower2 size={17} strokeWidth={2} aria-hidden="true" />
+                  <strong>Asignar / reasignar florista</strong>
+                </div>
+                <div className="production-assignment-profile">
+                  <span className="production-florista-avatar" aria-hidden="true">{initialsFromName(selectedItem.floristaAsignado)}</span>
+                  <div>
+                    <strong>{selectedItem.floristaAsignado || "Sin asignar"}</strong>
+                    <span>{selectedItem.floristaAsignado ? "Asignado" : "Pendiente de asignación"}</span>
+                  </div>
+                </div>
+                <div className="order-actions production-drawer-actions">
                   <select
                     value={selectedFloristaById[productionSelectionKey(selectedItem)] || ""}
                     onChange={event => setSelectedFloristaById(current => ({ ...current, [productionSelectionKey(selectedItem)]: event.target.value }))}
@@ -1145,9 +1650,12 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
               ) : null}
 
               {!canManageProductionActions ? (
-              <section className="order-block">
-                <h4>Estado de florista</h4>
-                <div className="order-actions" style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <section className="order-block production-action-card">
+                <div className="production-detail-section-title">
+                  <User size={17} strokeWidth={2} aria-hidden="true" />
+                  <strong>Estado de florista</strong>
+                </div>
+                <div className="order-actions production-drawer-actions">
                   <span className={`order-badge ${isFloristaActivo(ownFloristaDisponibilidad) ? "is-entregado" : "is-cancelado"}`}>
                     {isFloristaActivo(ownFloristaDisponibilidad) ? "Activo" : "Inactivo"}
                   </span>

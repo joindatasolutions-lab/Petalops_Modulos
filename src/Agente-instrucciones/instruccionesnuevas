@@ -1,0 +1,17 @@
+en el modulo de contabilidad submenu de ventas, vas a gregar una card que muestre los descuentos y saldo a favor,
+
+adicional me vas a agregar otro submenu en contabilidad para ver el detallado de las ventas de los pedidos con la siguiente información:
+
+Mostrar una tabla com las siguientes métricas e información en el modulo 
+ # deL pedido
+usuario del sistema
+ Nombre del cliente
+Saldo a favor y nota de saldo a favor, 
+Descuento aplicado y nota, 
+Notas / observaciones del pedido
+cancelados ( si un pedido aprobado fue cancelado)
+
+ademas agregas metricas top con base a esta infromación, mostrando graficos hermosos, preciosos pero ante todo que nos proporcione una vision general de mi negocio, eso si, sin repetir las metricas que tengo en los submenu de ventas, metricas por arreglo, cuentas por pagar y caja.
+
+ademas en el submenu agrega filtros de estado, para ver los que se ha aplicado dewscuento, saldo a favor.  por favor que esto persista tambien en la bd y asegurar que cuando en el modulos de pedidos se inserte infroamción si se vea reflejada en este nuevo submenu, recuerda guardar la estetica y hermosura
+

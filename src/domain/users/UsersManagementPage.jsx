@@ -4,6 +4,7 @@ import { tenantConfig } from "../../config/tenantConfig.js";
 import { createApiClient } from "../../infrastructure/apiClient.js";
 import { AppSidebar } from "../../shared/AppSidebar.jsx";
 import { useSidebarState } from "../../shared/useSidebarState.js";
+import { Building2, Filter, RefreshCw, Search, Store } from "lucide-react";
 
 const MODULE_HELP = {
   pipeline: "Permite consultar y gestionar el flujo operativo general de pedidos.",
@@ -21,32 +22,17 @@ const MODULE_HELP = {
 const ROLE_TYPE_LABELS = [
   { pattern: /admin|administrador/, label: "Admin" },
   { pattern: /florista/, label: "Florista" },
+  { pattern: /recepci|recepcion/, label: "Recepcion" },
   { pattern: /pedido|ventas|comercial/, label: "Pedidos" },
   { pattern: /domicili|repart/, label: "Domiciliario" },
   { pattern: /inventar|bodega|almacen/, label: "Inventarista" },
   { pattern: /contab|caja|finan/, label: "Contabilidad" },
 ];
 
-const ROLE_MODULE_DEFAULTS = {
-  admin: ["pipeline", "pedidos", "produccion", "domicilios", "catalogo", "usuarios", "inventario", "contabilidad", "trazabilidad", "clientes"],
-  florista: ["produccion", "catalogo"],
-  pedidos: ["pedidos", "domicilios"],
-  domiciliario: ["domicilios"],
-  inventarista: ["catalogo", "inventario"],
-  contabilidad: ["contabilidad"],
-  operativo: ["pipeline", "pedidos", "produccion", "inventario"],
-  otro: [],
-};
-
 function roleTypeLabel(roleName) {
   const normalized = String(roleName || "").trim().toLowerCase();
   const found = ROLE_TYPE_LABELS.find(item => item.pattern.test(normalized));
   return found?.label || "Otro";
-}
-
-function defaultModulesForRole(roleName) {
-  const roleType = roleTypeLabel(roleName).toLowerCase();
-  return ROLE_MODULE_DEFAULTS[roleType] || [];
 }
 
 export function UsersManagementPage({
@@ -72,6 +58,10 @@ export function UsersManagementPage({
   onLogout,
 }) {
   const api = useMemo(() => createApiClient(tenantConfig), []);
+  const displayUserName = useMemo(
+    () => String(session?.nombre || session?.login || "Usuario").trim() || "Usuario",
+    [session]
+  );
 
   const { sidebarPinned, sidebarMobileOpen, setSidebarMobileOpen, toggleSidebar } = useSidebarState();
 
@@ -152,18 +142,17 @@ export function UsersManagementPage({
   ), [moduleItems]);
 
   const modulosCompatiblesRol = useMemo(() => {
-    const currentRole = visibleRoles.find(item => String(item.rolID) === String(form.rolID));
-    const allowedByRole = defaultModulesForRole(currentRole?.nombreRol);
-    if (allowedByRole.length === 0) return modulosActivosEmpresa;
-    return modulosActivosEmpresa.filter(modulo => allowedByRole.includes(modulo));
-  }, [visibleRoles, form.rolID, modulosActivosEmpresa]);
+    return modulosActivosEmpresa;
+  }, [modulosActivosEmpresa]);
 
   const editModulosCompatiblesRol = useMemo(() => {
-    const currentRole = visibleRoles.find(item => String(item.rolID) === String(editForm.rolID));
-    const allowedByRole = defaultModulesForRole(currentRole?.nombreRol);
-    if (allowedByRole.length === 0) return modulosActivosEmpresa;
-    return modulosActivosEmpresa.filter(modulo => allowedByRole.includes(modulo));
-  }, [visibleRoles, editForm.rolID, modulosActivosEmpresa]);
+    return modulosActivosEmpresa;
+  }, [modulosActivosEmpresa]);
+
+  const allUserRoleModulesSelected = modulosCompatiblesRol.length > 0
+    && modulosCompatiblesRol.every(modulo => (form.modulosAcceso || []).includes(modulo));
+  const allEditRoleModulesSelected = editModulosCompatiblesRol.length > 0
+    && editModulosCompatiblesRol.every(modulo => (editForm.modulosAcceso || []).includes(modulo));
 
   const resetForm = useCallback(() => {
     setForm(current => ({
@@ -199,7 +188,7 @@ export function UsersManagementPage({
   const userModulesSummary = useMemo(() => {
     if (modulesLoading) return "Cargando modulos...";
     if (modulosActivosEmpresa.length === 0) return "Sin modulos activos";
-    if (modulosCompatiblesRol.length === 0 && form.rolID) return "Sin modulos compatibles";
+    if (modulosCompatiblesRol.length === 0 && form.rolID) return "Sin modulos activos";
     if (selectedUserModulesCount === 0) return "Selecciona modulos";
     if (selectedUserModulesCount === modulosActivosEmpresa.length) return "Todos los modulos activos";
     return `${selectedUserModulesCount} modulos seleccionados`;
@@ -208,7 +197,7 @@ export function UsersManagementPage({
   const editUserModulesSummary = useMemo(() => {
     if (modulesLoading) return "Cargando modulos...";
     if (modulosActivosEmpresa.length === 0) return "Sin modulos activos";
-    if (editModulosCompatiblesRol.length === 0 && editForm.rolID) return "Sin modulos compatibles";
+    if (editModulosCompatiblesRol.length === 0 && editForm.rolID) return "Sin modulos activos";
     if (selectedEditUserModulesCount === 0) return "Selecciona modulos";
     if (selectedEditUserModulesCount === modulosActivosEmpresa.length) return "Todos los modulos activos";
     return `${selectedEditUserModulesCount} modulos seleccionados`;
@@ -368,7 +357,8 @@ export function UsersManagementPage({
   useEffect(() => {
     setForm(current => {
       const currentModules = Array.isArray(current.modulosAcceso) ? current.modulosAcceso : [];
-      const filtered = currentModules.filter(module => modulosActivosEmpresa.includes(String(module).toLowerCase()));
+      const allowedModules = modulosCompatiblesRol.length > 0 ? modulosCompatiblesRol : modulosActivosEmpresa;
+      const filtered = currentModules.filter(module => allowedModules.includes(String(module).toLowerCase()));
       const nextModules = filtered.length > 0
         ? filtered
         : (modulosCompatiblesRol.length > 0 ? modulosCompatiblesRol : modulosActivosEmpresa);
@@ -386,7 +376,8 @@ export function UsersManagementPage({
     if (editingUserId == null) return;
     setEditForm(current => {
       const currentModules = Array.isArray(current.modulosAcceso) ? current.modulosAcceso : [];
-      const filtered = currentModules.filter(module => modulosActivosEmpresa.includes(String(module).toLowerCase()));
+      const allowedModules = editModulosCompatiblesRol.length > 0 ? editModulosCompatiblesRol : modulosActivosEmpresa;
+      const filtered = currentModules.filter(module => allowedModules.includes(String(module).toLowerCase()));
       const nextModules = filtered.length > 0
         ? filtered
         : (editModulosCompatiblesRol.length > 0 ? editModulosCompatiblesRol : modulosActivosEmpresa);
@@ -409,7 +400,6 @@ export function UsersManagementPage({
     event.preventDefault();
     const nombre = String(form.nombre || "").trim();
     const login = String(form.login || "").trim().toLowerCase();
-    const email = String(form.email || "").trim().toLowerCase();
     const password = String(form.password || "");
     const rolID = Number(form.rolID);
     const sucursalValue = Number(form.sucursalID);
@@ -420,10 +410,6 @@ export function UsersManagementPage({
     }
     if (login.length < 3) {
       setError("El login debe tener al menos 3 caracteres.");
-      return;
-    }
-    if (email.length < 3) {
-      setError("El email es obligatorio.");
       return;
     }
     if (password.length < 6) {
@@ -438,19 +424,14 @@ export function UsersManagementPage({
       setError("Debes seleccionar una sucursal válida.");
       return;
     }
-    if (modulosCompatiblesRol.length > 0 && (form.modulosAcceso || []).length === 0) {
-      setError("Selecciona al menos un modulo de acceso para el usuario.");
-      return;
-    }
     setSaving(true);
     setError("");
     setInfo("");
     try {
-      await api.crearUsuarioGestion({
+      const response = await api.crearUsuarioGestion({
         empresaID: Number(empresaID),
         nombre,
         login,
-        email,
         password,
         rolID,
         sucursalID: sucursalValue,
@@ -458,6 +439,21 @@ export function UsersManagementPage({
         modulosAcceso: Array.isArray(form.modulosAcceso) ? form.modulosAcceso : [],
       });
 
+      const createdRole = visibleRoles.find(item => Number(item.rolID) === Number(rolID));
+      setItems(current => ([
+        {
+          userID: response?.userID,
+          empresaID: Number(empresaID),
+          sucursalID: sucursalValue,
+          nombre,
+          login,
+          email: response?.email || "",
+          rolID,
+          rol: createdRole?.nombreRol || String(rolID),
+          estado: form.estado,
+        },
+        ...current.filter(item => Number(item.userID) !== Number(response?.userID)),
+      ]));
       resetForm();
 
       await loadUsers();
@@ -474,7 +470,6 @@ export function UsersManagementPage({
     event.preventDefault();
     const nombre = String(editForm.nombre || "").trim();
     const login = String(editForm.login || "").trim().toLowerCase();
-    const email = String(editForm.email || "").trim().toLowerCase();
     const password = String(editForm.password || "");
     const rolID = Number(editForm.rolID);
     const sucursalValue = Number(editForm.sucursalID);
@@ -485,10 +480,6 @@ export function UsersManagementPage({
     }
     if (login.length < 3) {
       setError("El login debe tener al menos 3 caracteres.");
-      return;
-    }
-    if (email.length < 3) {
-      setError("El email es obligatorio.");
       return;
     }
     if (password.length > 0 && password.length < 6) {
@@ -503,10 +494,6 @@ export function UsersManagementPage({
       setError("Debes seleccionar una sucursal válida.");
       return;
     }
-    if (editModulosCompatiblesRol.length > 0 && (editForm.modulosAcceso || []).length === 0) {
-      setError("Selecciona al menos un modulo de acceso para el usuario.");
-      return;
-    }
     setSaving(true);
     setError("");
     setInfo("");
@@ -515,7 +502,6 @@ export function UsersManagementPage({
         userId: editingUserId,
         nombre,
         login,
-        email,
         password,
         rolID,
         sucursalID: sucursalValue,
@@ -646,6 +632,13 @@ export function UsersManagementPage({
     });
   };
 
+  const toggleAllUserModuleAccess = () => {
+    setForm(current => ({
+      ...current,
+      modulosAcceso: allUserRoleModulesSelected ? [] : modulosCompatiblesRol,
+    }));
+  };
+
   const toggleEditUserModuleAccess = modulo => {
     const normalized = String(modulo || "").trim().toLowerCase();
     if (!normalized) return;
@@ -659,6 +652,13 @@ export function UsersManagementPage({
           : [...currentModules, normalized],
       };
     });
+  };
+
+  const toggleAllEditUserModuleAccess = () => {
+    setEditForm(current => ({
+      ...current,
+      modulosAcceso: allEditRoleModulesSelected ? [] : editModulosCompatiblesRol,
+    }));
   };
 
   useEffect(() => {
@@ -701,56 +701,68 @@ export function UsersManagementPage({
         }}
       />
 
-      <main className="orders-admin-view">
-        <header className="orders-admin-header">
+      <main className="orders-admin-view users-page-view">
+        <header className="orders-admin-header orders-page-header users-page-header">
           <div>
             <button type="button" className="sidebar-trigger" onClick={toggleSidebar}>☰ Menú</button>
             <h1>Usuarios</h1>
-            <p className="orders-admin-subtitle">
-              {canViewUsuariosGlobal
-                ? "Control global de administradores, usuarios operativos, domiciliarios y floristas."
-                : "Control de usuarios operativos para tu empresa y sus sucursales."}
-            </p>
+            <p className="orders-admin-subtitle">Usuario: {displayUserName}</p>
+          </div>
+          <div className="header-actions">
+            <button type="button" className="btn-primary orders-header-refresh" onClick={loadUsers} disabled={loading}>
+              <RefreshCw size={18} strokeWidth={2} aria-hidden="true" />
+              {loading ? "Actualizando..." : "Actualizar"}
+            </button>
           </div>
         </header>
 
-        <section className="orders-filters users-filters">
+        <section className="orders-filters orders-page-filters users-filters">
           {canViewUsuariosGlobal ? (
-            <div className="filter-field">
-              <span>Empresa</span>
-              <select value={empresaID} onChange={event => setEmpresaID(Number(event.target.value))}>
-                {empresas.map(item => <option key={item.empresaID} value={item.empresaID}>{item.nombre}</option>)}
-              </select>
+            <div className="filter-field orders-filter-field">
+              <div className="orders-filter-control">
+                <Building2 size={17} strokeWidth={2} aria-hidden="true" />
+                <select value={empresaID} onChange={event => setEmpresaID(Number(event.target.value))}>
+                  {empresas.map(item => <option key={item.empresaID} value={item.empresaID}>{item.nombre}</option>)}
+                </select>
+              </div>
             </div>
           ) : (
-            <div className="filter-field">
-              <span>Empresa</span>
-              <input
-                type="text"
-                value={empresaSeleccionadaNombre}
-                readOnly
-                title="Tu alcance esta limitado a tu empresa"
-              />
+            <div className="filter-field orders-filter-field">
+              <div className="orders-filter-control">
+                <Building2 size={17} strokeWidth={2} aria-hidden="true" />
+                <input
+                  type="text"
+                  value={empresaSeleccionadaNombre}
+                  readOnly
+                  title="Tu alcance esta limitado a tu empresa"
+                />
+              </div>
             </div>
           )}
-          <div className="filter-field">
-            <span>Sucursal</span>
-            <select value={sucursalID} onChange={event => setSucursalID(event.target.value)}>
-              <option value="">Todas las sucursales</option>
-              {sucursales.map(item => <option key={item.sucursalID} value={item.sucursalID}>Sucursal {item.sucursalID}</option>)}
-            </select>
+          <div className="filter-field orders-filter-field">
+            <div className="orders-filter-control">
+              <Store size={17} strokeWidth={2} aria-hidden="true" />
+              <select value={sucursalID} onChange={event => setSucursalID(event.target.value)}>
+                <option value="">Todas las sucursales</option>
+                {sucursales.map(item => <option key={item.sucursalID} value={item.sucursalID}>Sucursal {item.sucursalID}</option>)}
+              </select>
+            </div>
           </div>
-          <div className="filter-field">
-            <span>Estado</span>
-            <select value={estadoFiltro} onChange={event => setEstadoFiltro(event.target.value)}>
-              <option value="">Todos los estados</option>
-              <option value="Activo">Activo</option>
-              <option value="Inactivo">Inactivo</option>
-            </select>
+          <div className="filter-field orders-filter-field">
+            <div className="orders-filter-control">
+              <Filter size={17} strokeWidth={2} aria-hidden="true" />
+              <select value={estadoFiltro} onChange={event => setEstadoFiltro(event.target.value)}>
+                <option value="">Todos los estados</option>
+                <option value="Activo">Activo</option>
+                <option value="Inactivo">Inactivo</option>
+              </select>
+            </div>
           </div>
-          <div className="filter-field filter-field--wide">
-            <span>Búsqueda</span>
-            <input type="text" placeholder="Buscar por nombre, login o email" value={q} onChange={event => setQ(event.target.value)} />
+          <div className="filter-field orders-filter-field users-search-filter">
+            <div className="orders-filter-control">
+              <Search size={17} strokeWidth={2} aria-hidden="true" />
+              <input type="text" placeholder="Buscar por nombre o login" value={q} onChange={event => setQ(event.target.value)} />
+            </div>
           </div>
         </section>
 
@@ -766,7 +778,6 @@ export function UsersManagementPage({
             <form className="users-create-form users-create-user-form" onSubmit={submitCreate}>
               <input type="text" placeholder="Nombre completo" value={form.nombre} onChange={event => setForm(current => ({ ...current, nombre: event.target.value }))} required />
               <input type="text" placeholder="Login unico" value={form.login} onChange={event => setForm(current => ({ ...current, login: event.target.value }))} required />
-              <input type="email" placeholder="Email" value={form.email} onChange={event => setForm(current => ({ ...current, email: event.target.value }))} required />
               <input
                 type="password"
                 placeholder="Contrasena"
@@ -799,10 +810,7 @@ export function UsersManagementPage({
                 <p className="users-modulo-company-label">Modulos de acceso para este usuario</p>
                 {modulesLoading ? <p className="orders-admin-subtitle">Cargando modulos disponibles...</p> : null}
                 {!modulesLoading && modulosConfiguradosEmpresa.length === 0 ? <p className="orders-admin-subtitle">No hay modulos configurados para esta empresa.</p> : null}
-                {!modulesLoading && modulosActivosEmpresa.length > 0 && modulosCompatiblesRol.length === 0 ? <p className="orders-admin-subtitle">El rol seleccionado no tiene modulos operativos compatibles.</p> : null}
-                {!modulesLoading && modulosActivosEmpresa.length > 0 && modulosCompatiblesRol.length > 0 && modulosCompatiblesRol.length !== modulosActivosEmpresa.length ? (
-                  <p className="orders-admin-subtitle">Se muestran todos los modulos activos de la empresa. Los no compatibles con el rol quedan bloqueados.</p>
-                ) : null}
+                {!modulesLoading && modulosActivosEmpresa.length > 0 && modulosCompatiblesRol.length === 0 ? <p className="orders-admin-subtitle">No hay modulos activos disponibles para asignar.</p> : null}
               <button
                 type="button"
                 className={`users-module-dropdown-trigger ${showUserModuleDropdown ? "is-open" : ""}`}
@@ -814,12 +822,20 @@ export function UsersManagementPage({
               </button>
                 {showUserModuleDropdown && modulosConfiguradosEmpresa.length > 0 ? (
                   <div className="users-module-dropdown-panel">
+                    <label className="users-user-module-item">
+                      <input
+                        type="checkbox"
+                        checked={allUserRoleModulesSelected}
+                        disabled={modulosCompatiblesRol.length === 0}
+                        onChange={toggleAllUserModuleAccess}
+                      />
+                      <span>{allUserRoleModulesSelected ? "Quitar todas las selecciones" : "Seleccionar todos los modulos permitidos"}</span>
+                    </label>
                     <div className="users-user-module-grid">
                       {modulosConfiguradosEmpresa.map(modulo => {
                         const checked = (form.modulosAcceso || []).includes(modulo);
-                        const compatible = modulosCompatiblesRol.includes(modulo);
                         const activeForEmpresa = modulosActivosEmpresa.includes(modulo);
-                        const enabled = compatible && activeForEmpresa;
+                        const enabled = activeForEmpresa;
                         return (
                           <label
                             key={modulo}
@@ -835,7 +851,7 @@ export function UsersManagementPage({
                               disabled={!enabled}
                               onChange={() => toggleUserModuleAccess(modulo)}
                             />
-                            <span>{modulo}{!activeForEmpresa ? " (inactivo en la empresa)" : compatible ? "" : " (no compatible con este rol)"}</span>
+                            <span>{modulo}{!activeForEmpresa ? " (inactivo en la empresa)" : ""}</span>
                           </label>
                         );
                       })}
@@ -844,7 +860,7 @@ export function UsersManagementPage({
                 ) : null}
               </div>
 
-              <button type="submit" className="btn-primary" disabled={saving || visibleRoles.length === 0 || (modulosCompatiblesRol.length > 0 && (form.modulosAcceso || []).length === 0)}>
+              <button type="submit" className="btn-primary" disabled={saving || visibleRoles.length === 0}>
                 {saving ? "Guardando..." : "Crear usuario"}
               </button>
             </form>
@@ -921,7 +937,6 @@ export function UsersManagementPage({
                   <th>Sucursal</th>
                   <th>Nombre</th>
                   <th>Login</th>
-                  <th>Email</th>
                   <th>Rol</th>
                   <th>Estado</th>
                   <th>Accion</th>
@@ -935,7 +950,6 @@ export function UsersManagementPage({
                     <td data-label="Sucursal">{item.sucursalID}</td>
                     <td data-label="Nombre">{item.nombre}</td>
                     <td data-label="Login">{item.login}</td>
-                    <td data-label="Email">{item.email}</td>
                     <td data-label="Rol">{item.rol}</td>
                     <td data-label="Estado"><span className={`order-badge ${String(item.estado).toLowerCase() === "activo" ? "is-entregado" : "is-rechazado"}`}>{item.estado}</span></td>
                     <td data-label="Accion">
@@ -1063,7 +1077,6 @@ export function UsersManagementPage({
             <form className="users-create-form users-create-user-form" onSubmit={submitEdit}>
               <input type="text" placeholder="Nombre completo" value={editForm.nombre} onChange={event => setEditForm(current => ({ ...current, nombre: event.target.value }))} required />
               <input type="text" placeholder="Login unico" value={editForm.login} onChange={event => setEditForm(current => ({ ...current, login: event.target.value }))} required />
-              <input type="email" placeholder="Email" value={editForm.email} onChange={event => setEditForm(current => ({ ...current, email: event.target.value }))} required />
               <div style={{ display: "grid", gap: 8 }}>
                 <input
                   type={passwordVisible ? "text" : "password"}
@@ -1099,10 +1112,7 @@ export function UsersManagementPage({
                 <p className="users-modulo-company-label">Modulos de acceso para este usuario</p>
                 {modulesLoading ? <p className="orders-admin-subtitle">Cargando modulos disponibles...</p> : null}
                 {!modulesLoading && modulosConfiguradosEmpresa.length === 0 ? <p className="orders-admin-subtitle">No hay modulos configurados para esta empresa.</p> : null}
-                {!modulesLoading && modulosActivosEmpresa.length > 0 && editModulosCompatiblesRol.length === 0 ? <p className="orders-admin-subtitle">El rol seleccionado no tiene modulos operativos compatibles.</p> : null}
-                {!modulesLoading && modulosActivosEmpresa.length > 0 && editModulosCompatiblesRol.length > 0 && editModulosCompatiblesRol.length !== modulosActivosEmpresa.length ? (
-                  <p className="orders-admin-subtitle">Se muestran todos los modulos activos de la empresa. Los no compatibles con el rol quedan bloqueados.</p>
-                ) : null}
+                {!modulesLoading && modulosActivosEmpresa.length > 0 && editModulosCompatiblesRol.length === 0 ? <p className="orders-admin-subtitle">No hay modulos activos disponibles para asignar.</p> : null}
                 <button
                   type="button"
                   className={`users-module-dropdown-trigger ${showEditModuleDropdown ? "is-open" : ""}`}
@@ -1114,12 +1124,20 @@ export function UsersManagementPage({
                 </button>
                 {showEditModuleDropdown && modulosConfiguradosEmpresa.length > 0 ? (
                   <div className="users-module-dropdown-panel">
+                    <label className="users-user-module-item">
+                      <input
+                        type="checkbox"
+                        checked={allEditRoleModulesSelected}
+                        disabled={editModulosCompatiblesRol.length === 0}
+                        onChange={toggleAllEditUserModuleAccess}
+                      />
+                      <span>{allEditRoleModulesSelected ? "Quitar todas las selecciones" : "Seleccionar todos los modulos permitidos"}</span>
+                    </label>
                     <div className="users-user-module-grid">
                       {modulosConfiguradosEmpresa.map(modulo => {
                         const checked = (editForm.modulosAcceso || []).includes(modulo);
-                        const compatible = editModulosCompatiblesRol.includes(modulo);
                         const activeForEmpresa = modulosActivosEmpresa.includes(modulo);
-                        const enabled = compatible && activeForEmpresa;
+                        const enabled = activeForEmpresa;
                         return (
                           <label
                             key={modulo}
@@ -1135,7 +1153,7 @@ export function UsersManagementPage({
                               disabled={!enabled}
                               onChange={() => toggleEditUserModuleAccess(modulo)}
                             />
-                            <span>{modulo}{!activeForEmpresa ? " (inactivo en la empresa)" : compatible ? "" : " (no compatible con este rol)"}</span>
+                            <span>{modulo}{!activeForEmpresa ? " (inactivo en la empresa)" : ""}</span>
                           </label>
                         );
                       })}
@@ -1145,7 +1163,7 @@ export function UsersManagementPage({
               </div>
 
               <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-                <button type="submit" className="btn-primary" disabled={saving || (editModulosCompatiblesRol.length > 0 && (editForm.modulosAcceso || []).length === 0)}>
+                <button type="submit" className="btn-primary" disabled={saving}>
                   {saving ? "Guardando..." : "Guardar cambios"}
                 </button>
                 <button type="button" className="btn-outline" onClick={closeEditDrawer}>

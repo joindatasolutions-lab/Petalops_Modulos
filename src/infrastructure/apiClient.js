@@ -346,7 +346,65 @@ export function createApiClient(config) {
       });
     },
 
-    async listarPedidos({ empresaId, sucursalId, q, estado, fechaDesde, fechaHasta, sinImprimir, page, pageSize }) {
+    async listarRecetas({ empresaId, q, soloActivos = true }) {
+      const params = new URLSearchParams();
+      params.set("empresaID", String(empresaId));
+      if (q) params.set("q", String(q));
+      params.set("soloActivos", soloActivos ? "true" : "false");
+      return requestJson(`/inventario/recetas?${params.toString()}`);
+    },
+
+    async obtenerReceta({ recetaId }) {
+      return requestJson(`/inventario/recetas/${recetaId}`);
+    },
+
+    async crearReceta({ empresaId, nombre, descripcion }) {
+      const params = new URLSearchParams();
+      params.set("empresaID", String(empresaId));
+      return requestJson(`/inventario/recetas?${params.toString()}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ nombre, descripcion }),
+      });
+    },
+
+    async actualizarReceta({ recetaId, nombre, descripcion, activo = true }) {
+      return requestJson(`/inventario/recetas/${recetaId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ nombre, descripcion, activo }),
+      });
+    },
+
+    async eliminarReceta({ recetaId }) {
+      return requestJson(`/inventario/recetas/${recetaId}`, {
+        method: "DELETE",
+      });
+    },
+
+    async agregarIngredienteReceta({ recetaId, inventarioID, cantidad }) {
+      return requestJson(`/inventario/recetas/${recetaId}/ingredientes`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ inventarioID, cantidad }),
+      });
+    },
+
+    async actualizarIngredienteReceta({ recetaId, detalleId, cantidad }) {
+      return requestJson(`/inventario/recetas/${recetaId}/ingredientes/${detalleId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ cantidad }),
+      });
+    },
+
+    async eliminarIngredienteReceta({ recetaId, detalleId }) {
+      return requestJson(`/inventario/recetas/${recetaId}/ingredientes/${detalleId}`, {
+        method: "DELETE",
+      });
+    },
+
+    async listarPedidos({ empresaId, sucursalId, q, estado, fechaDesde, fechaHasta, sinImprimir, soloTienda, page, pageSize }) {
       const params = new URLSearchParams();
       params.set("empresaID", String(empresaId));
       if (sucursalId != null) params.set("sucursalID", String(sucursalId));
@@ -355,6 +413,7 @@ export function createApiClient(config) {
       if (fechaDesde) params.set("fechaDesde", String(fechaDesde));
       if (fechaHasta) params.set("fechaHasta", String(fechaHasta));
       params.set("sinImprimir", sinImprimir ? "true" : "false");
+      if (soloTienda) params.set("soloTienda", "true");
       params.set("page", String(page || 1));
       params.set("pageSize", String(pageSize || 20));
 
@@ -610,13 +669,17 @@ export function createApiClient(config) {
       });
     },
 
-    async listarProduccion({ empresaId, sucursalId, fecha, estado, incluirCancelado = false }) {
+    async listarProduccion({ empresaId, sucursalId, fecha, estado, q, metricFilter, todasFechas = false, incluirCancelado = false, autoAsignarPendientesHoy = true }) {
       const params = new URLSearchParams();
       params.set("empresaID", String(empresaId));
       if (sucursalId != null) params.set("sucursalID", String(sucursalId));
       if (fecha) params.set("fecha", String(fecha));
       if (estado) params.set("estado", String(estado));
+      if (q) params.set("q", String(q));
+      if (metricFilter) params.set("metricFilter", String(metricFilter));
+      if (todasFechas) params.set("todasFechas", "true");
       params.set("incluirCancelado", incluirCancelado ? "true" : "false");
+      params.set("autoAsignarPendientesHoy", autoAsignarPendientesHoy ? "true" : "false");
 
       return requestJson(`/produccion?${params.toString()}`);
     },

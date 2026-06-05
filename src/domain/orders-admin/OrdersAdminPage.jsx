@@ -7,15 +7,33 @@ import { formatearCOP, normalizeStatus, splitDateTimeParts, toIsoDateEnd, toIsoD
 import { useDebouncedValue } from "../../shared/useDebouncedValue.js";
 import {
   IconCheck,
-  IconEye,
   IconFileText,
-  IconGift,
   IconInfoCircle,
-  IconRefresh,
   IconUser,
   IconWallet,
   IconX,
 } from "@tabler/icons-react";
+import {
+  CalendarDays,
+  CalendarCheck2,
+  CheckCircle2,
+  Clock3,
+  Copy,
+  Eye,
+  Filter,
+  Gift,
+  Mail,
+  MessageCircle,
+  MoreHorizontal,
+  Pencil,
+  Receipt,
+  RefreshCw,
+  RotateCw,
+  Search,
+  Truck,
+  UserCircle,
+  XCircle,
+} from "lucide-react";
 
 const BADGE_CLASS_BY_STATUS = {
   PENDIENTE: "is-pendiente",
@@ -25,6 +43,21 @@ const BADGE_CLASS_BY_STATUS = {
 };
 const LINK_PAYMENT_METHODS = new Set(["link bold", "link payu", "link wompi"]);
 const AUTO_REFRESH_INTERVAL_MS = 15000;
+
+function todayIsoDate() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function orderDeliveryDate(item) {
+  return splitDateTimeParts(item?.fechaEntrega).date;
+}
+
+function isPendingOutsideToday(item) {
+  const status = normalizeStatus(item?.estado);
+  if (status !== "PENDIENTE") return false;
+  const deliveryDate = orderDeliveryDate(item);
+  return Boolean(deliveryDate) && deliveryDate !== todayIsoDate();
+}
 
 function extractIndicativo(phone) {
   const raw = String(phone || "").trim();
@@ -61,6 +94,15 @@ function isCustomArrangement(producto) {
 
 function roundCurrency(value) {
   return Math.round(Number(value || 0) * 100) / 100;
+}
+
+function initialsFromName(value) {
+  const parts = String(value || "")
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+  if (parts.length === 0) return "CL";
+  return parts.slice(0, 2).map(part => part[0]).join("").toUpperCase();
 }
 
 function normalizeWholePeso(value) {
@@ -169,6 +211,7 @@ const initialFilters = {
   q: "",
   estado: "",
   sinImprimir: false,
+  soloTienda: false,
   fechaDesde: new Date().toISOString().slice(0, 10),
   fechaHasta: new Date().toISOString().slice(0, 10),
   page: 1,
@@ -265,6 +308,10 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
   const debouncedQuery = useDebouncedValue(filters.q, 300);
   const empresaId = Number(session?.empresaID || tenantConfig.empresaId);
   const sucursalId = Number(session?.sucursalID || tenantConfig.sucursalId);
+  const displayUserName = useMemo(
+    () => String(session?.nombre || session?.login || "Usuario").trim() || "Usuario",
+    [session]
+  );
   const pedidoMenuFields = useMemo(
     () => (Array.isArray(detalle?.camposEmpresa?.pedidoDetalle) ? detalle.camposEmpresa.pedidoDetalle : []),
     [detalle]
@@ -435,6 +482,7 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
         q: debouncedQuery,
         estado: filters.estado,
         sinImprimir: filters.sinImprimir,
+        soloTienda: filters.soloTienda,
         fechaDesde: toIsoDateStart(filters.fechaDesde),
         fechaHasta: toIsoDateEnd(filters.fechaHasta),
         page: filters.page,
@@ -454,7 +502,7 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
     } finally {
       if (!silent) setLoading(false);
     }
-  }, [api, debouncedQuery, filters.estado, filters.sinImprimir, filters.fechaDesde, filters.fechaHasta, filters.page, filters.pageSize, empresaId, sucursalId]);
+  }, [api, debouncedQuery, filters.estado, filters.sinImprimir, filters.soloTienda, filters.fechaDesde, filters.fechaHasta, filters.page, filters.pageSize, empresaId, sucursalId]);
 
   useEffect(() => {
     loadOrders(false);
@@ -669,14 +717,14 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
     }
   };
 
-  const optimisticStatusPatch = (pedidoId, nextStatus) => {
+  const optimisticStatusPatch = (pedidoId, nextStatus, motivoRechazo = null) => {
     setItems(current => current.map(item => Number(item.pedidoID) === Number(pedidoId)
-      ? { ...item, estado: nextStatus }
+      ? { ...item, estado: nextStatus, ...(motivoRechazo !== null ? { motivoRechazo } : {}) }
       : item));
 
     setDetalle(current => {
       if (!current || Number(selectedPedidoId) !== Number(pedidoId)) return current;
-      return { ...current, estado: nextStatus };
+      return { ...current, estado: nextStatus, ...(motivoRechazo !== null ? { motivoRechazo } : {}) };
     });
   };
 
@@ -705,18 +753,20 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
   };
 
   const rejectOrder = async pedidoId => {
-    const motivo = String(globalThis.prompt("Motivo de rechazo", "") || "").trim();
+    const item = items.find(current => Number(current.pedidoID) === Number(pedidoId));
+    const actionLabel = canInvoiceStatus(item?.estado) ? "cancelación" : "rechazo";
+    const motivo = String(globalThis.prompt(`Motivo de ${actionLabel}`, "") || "").trim();
     if (!motivo) {
-      globalThis.alert("Debes ingresar un motivo de rechazo.");
+      globalThis.alert(`Debes ingresar un motivo de ${actionLabel}.`);
       return;
     }
 
     try {
       const response = await api.rechazarPedido(pedidoId, motivo);
-      optimisticStatusPatch(pedidoId, response.estado || "RECHAZADO");
+      optimisticStatusPatch(pedidoId, response.estado || "RECHAZADO", response.motivo || motivo);
     } catch (nextError) {
       console.error("Error rechazando pedido:", nextError);
-      globalThis.alert("No fue posible rechazar el pedido.");
+      globalThis.alert(`No fue posible completar la ${actionLabel}.`);
     }
   };
 
@@ -1191,11 +1241,102 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
     await loadOrders(true);
   };
 
+  const toggleStoreDeliveries = () => {
+    applyFilterValue("soloTienda", !filters.soloTienda);
+  };
+
+  const focusOrderMetric = metric => {
+    const today = todayIsoDate();
+    setFilters(current => {
+      const base = {
+        ...current,
+        estado: "",
+        sinImprimir: false,
+        page: 1,
+      };
+
+      if (metric === "hoy") {
+        return { ...base, fechaDesde: today, fechaHasta: today };
+      }
+      if (metric === "aprobados") {
+        return { ...base, estado: "APROBADO" };
+      }
+      if (metric === "pendientes") {
+        return { ...base, estado: "CREADO" };
+      }
+      if (metric === "cancelados") {
+        return { ...base, estado: "CANCELADO" };
+      }
+      if (metric === "facturas") {
+        return { ...base, estado: "APROBADO", sinImprimir: true };
+      }
+      return base;
+    });
+  };
 
   const page = Number(filters.page || 1);
   const pageSize = Number(filters.pageSize || 20);
   const pages = Math.max(1, Math.ceil(Number(total || 0) / pageSize));
-
+  const activeOrderMetric = useMemo(() => {
+    const today = todayIsoDate();
+    if (filters.sinImprimir) return "facturas";
+    if (filters.estado === "APROBADO") return "aprobados";
+    if (filters.estado === "CREADO") return "pendientes";
+    if (filters.estado === "CANCELADO") return "cancelados";
+    if (!filters.estado && filters.fechaDesde === today && filters.fechaHasta === today) return "hoy";
+    return "";
+  }, [filters.estado, filters.fechaDesde, filters.fechaHasta, filters.sinImprimir]);
+  const ordersMetrics = useMemo(() => {
+    const today = todayIsoDate();
+    const facturasNoImpresasVisibles = items.filter(item => canInvoiceStatus(item.estado) && !item.facturaImpresa).length;
+    return {
+      total: items.length,
+      hoy: items.filter(item => {
+        const { date: fechaPedido } = splitDateTimeParts(item.fechaPedido || item.fecha);
+        const entrega = orderDeliveryDate(item);
+        return fechaPedido === today || entrega === today;
+      }).length,
+      aprobados: items.filter(item => normalizeStatus(item.estado) === "APROBADO").length,
+      pendientes: items.filter(item => isPendingStatus(item.estado) || normalizeStatus(item.estado) === "CREADO").length,
+      cancelados: items.filter(item => ["CANCELADO", "RECHAZADO"].includes(normalizeStatus(item.estado))).length,
+      facturasNoImpresas: Number(facturasPendientesImpresion || facturasNoImpresasVisibles || 0),
+    };
+  }, [facturasPendientesImpresion, items]);
+  const orderMetricCards = useMemo(() => {
+    const baseCards = [
+      { key: "hoy", label: "Pedidos hoy", shortLabel: "Hoy", value: Number(ordersMetrics.hoy || 0), tone: "is-primary", Icon: CalendarCheck2 },
+      { key: "aprobados", label: "Aprobados", shortLabel: "Aprobados", value: Number(ordersMetrics.aprobados || 0), tone: "is-green", Icon: CheckCircle2 },
+      { key: "pendientes", label: "Pendientes", shortLabel: "Pendientes", value: Number(ordersMetrics.pendientes || 0), tone: "is-blue", Icon: Clock3 },
+      { key: "cancelados", label: "Cancelados", shortLabel: "Cancelados", value: Number(ordersMetrics.cancelados || 0), tone: "is-orange", Icon: XCircle },
+      { key: "facturas", label: "Facturas no impresas", shortLabel: "Sin imprimir", value: Number(ordersMetrics.facturasNoImpresas || 0), tone: "is-purple", Icon: Receipt },
+    ];
+    const maxValue = Math.max(...baseCards.map(card => card.value), 1);
+    return baseCards.map(card => {
+      const ratio = card.value / maxValue;
+      const weightClass = card.value === 0
+        ? "is-zero"
+        : ratio >= 0.82
+          ? "is-dominant"
+          : ratio >= 0.42
+            ? "is-elevated"
+            : "is-soft";
+      const attentionClass = card.key === "facturas"
+        ? card.value >= 25
+          ? "is-critical"
+          : card.value > 0
+            ? "is-alert"
+            : ""
+        : card.key === "pendientes"
+          ? card.value >= 10
+            ? "is-alert"
+            : ""
+          : "";
+      return {
+        ...card,
+        className: `${card.tone} ${weightClass}${attentionClass ? ` ${attentionClass}` : ""}`,
+      };
+    });
+  }, [ordersMetrics]);
   return (
     <>
       <div className={`app-shell ${sidebarPinned ? "is-sidebar-pinned" : ""} ${sidebarMobileOpen ? "is-sidebar-mobile-open" : ""}`}>
@@ -1233,80 +1374,125 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
 
         <main className="orders-admin-view orders-page-view">
           <header className="orders-admin-header orders-page-header">
-            <div>
-              <h1>Pedidos</h1>
-              <p className="orders-admin-subtitle">Panel operativo para administrar pedidos de tus floristerías</p>
+            <div className="orders-page-heading">
+              <div className="orders-page-title-group">
+                <h1>Pedidos</h1>
+              </div>
+              <p className="orders-admin-subtitle">Usuario: {displayUserName}</p>
             </div>
             <div className="header-actions">
+              <button
+                type="button"
+                className={`btn-primary orders-header-refresh orders-store-toggle${filters.soloTienda ? " is-active" : ""}`}
+                onClick={toggleStoreDeliveries}
+                title={filters.soloTienda ? "Ver todos los pedidos" : "Ver entregas en tienda"}
+              >
+                <Gift size={18} strokeWidth={2} />
+                <span>{filters.soloTienda ? "Todos los pedidos" : "Entregas en tienda"}</span>
+              </button>
               <button type="button" className="btn-primary orders-header-refresh" onClick={refresh} title="Actualizar pedidos">
-                <IconRefresh size={15} stroke={2} />
+                <RotateCw size={18} strokeWidth={2} />
                 <span>Actualizar</span>
               </button>
             </div>
           </header>
 
+          <section className="orders-metrics-grid orders-bi-grid" aria-label="Indicadores de pedidos">
+            {orderMetricCards.map(card => {
+              const Icon = card.Icon;
+              const isActive = activeOrderMetric === card.key;
+              return (
+                <button
+                  key={card.key}
+                  type="button"
+                  className={`orders-bi-card ${card.className}${isActive ? " is-active" : ""}`}
+                  onClick={() => focusOrderMetric(card.key)}
+                  aria-pressed={isActive}
+                  aria-label={`${card.label}: ${card.value}`}
+                >
+                  <span className="orders-bi-icon-shell" aria-hidden="true">
+                    <Icon size={16} strokeWidth={2} />
+                  </span>
+                  <span className="orders-bi-label">{card.shortLabel}</span>
+                  <strong className="orders-bi-value">{card.value}</strong>
+                </button>
+              );
+            })}
+          </section>
+
           <section className="orders-filters orders-filters--four-col orders-page-filters">
-            <div className="filter-field">
-              <span>Búsqueda</span>
-              <input
-                type="text"
-                placeholder="Buscar pedido, cliente, destinatario..."
-                value={filters.q}
-                onChange={event => applyFilterValue("q", event.target.value)}
-              />
-            </div>
-            <div className="filter-field">
-              <span>Estado</span>
-              <select value={filters.estado} onChange={event => applyFilterValue("estado", event.target.value)}>
-                <option value="">Todos los estados</option>
-                <option value="CREADO">Creado</option>
-                <option value="APROBADO">Aprobado</option>
-                <option value="CANCELADO">Cancelado</option>
-              </select>
-            </div>
-            <div className="filter-field">
-              <span>Fecha Inicio</span>
-              <input
-                type="date"
-                value={filters.fechaDesde}
-                onChange={event => applyFilterValue("fechaDesde", event.target.value)}
-              />
-            </div>
-            <div className="filter-field">
-              <span>Fecha Fin</span>
-              <input
-                type="date"
-                value={filters.fechaHasta}
-                onChange={event => applyFilterValue("fechaHasta", event.target.value)}
-              />
-            </div>
-            <label className="filter-field filter-field-check orders-filter-check">
-              <span>Factura</span>
-              <div className="orders-filter-check-row">
+            <div className="filter-field orders-filter-field">
+              <div className="orders-filter-control">
+                <Search size={17} strokeWidth={2} aria-hidden="true" />
                 <input
-                  type="checkbox"
-                  checked={Boolean(filters.sinImprimir)}
-                  onChange={event => applyFilterValue("sinImprimir", event.target.checked)}
+                  type="text"
+                  placeholder="Buscar pedido, barrio, mensaje, pago, cuenta, celular, firma..."
+                  value={filters.q}
+                  onChange={event => applyFilterValue("q", event.target.value)}
                 />
-                <span>Sin imprimir</span>
               </div>
+            </div>
+            <div className="filter-field orders-filter-field">
+              <div className="orders-filter-control">
+                <CalendarDays size={17} strokeWidth={2} aria-hidden="true" />
+                <input
+                  type="date"
+                  value={filters.fechaDesde}
+                  onChange={event => applyFilterValue("fechaDesde", event.target.value)}
+                />
+              </div>
+            </div>
+            <div className="filter-field orders-filter-field">
+              <div className="orders-filter-control">
+                <CalendarDays size={17} strokeWidth={2} aria-hidden="true" />
+                <input
+                  type="date"
+                  value={filters.fechaHasta}
+                  onChange={event => applyFilterValue("fechaHasta", event.target.value)}
+                />
+              </div>
+            </div>
+            <label className="filter-field orders-filter-field orders-status-filter">
+              <details className="estado-filtro-dropdown">
+                <summary className="estado-filtro-summary">
+                  <Filter size={17} strokeWidth={2} aria-hidden="true" />
+                  Estados
+                </summary>
+                <div className="estado-filtro-panel">
+                  <div className="estado-filtro-list">
+                    {[
+                      { value: "", label: "Todos" },
+                      { value: "CREADO", label: "Creado" },
+                      { value: "APROBADO", label: "Aprobado" },
+                      { value: "CANCELADO", label: "Cancelado" },
+                    ].map(item => (
+                      <label key={item.value || "todos"} className="estado-filtro-item">
+                        <input
+                          type="radio"
+                          name="ordersEstadoFiltro"
+                          checked={filters.estado === item.value}
+                          onChange={() => applyFilterValue("estado", item.value)}
+                        />
+                        <span>{item.label}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              </details>
             </label>
           </section>
 
-          {!loading && facturasPendientesImpresion > 0 ? (
-            <section className="orders-alert-card" aria-live="polite">
-              <div className="orders-alert-card-copy">
-                <strong>Alerta de facturas pendientes</strong>
-                <span>
-                  Hay {facturasPendientesImpresion} pedido{facturasPendientesImpresion === 1 ? "" : "s"} aprobado{facturasPendientesImpresion === 1 ? "" : "s"} con factura sin imprimir en este rango.
-                </span>
+          {filters.soloTienda ? (
+            <section className="orders-store-submenu" aria-live="polite">
+              <div className="orders-store-submenu-icon">
+                <Gift size={18} strokeWidth={2} />
               </div>
-              <button
-                type="button"
-                className="btn-outline"
-                onClick={() => applyFilterValue("sinImprimir", !filters.sinImprimir)}
-              >
-                {filters.sinImprimir ? "Ver todos" : "Ver solo sin imprimir"}
+              <div className="orders-store-submenu-copy">
+                <strong>Entregas en tienda</strong>
+                <span>{total} arreglo{total === 1 ? "" : "s"} marcado{total === 1 ? "" : "s"} como recoger en tienda con los filtros actuales.</span>
+              </div>
+              <button type="button" className="btn-outline orders-store-submenu-clear" onClick={toggleStoreDeliveries}>
+                Ver todos
               </button>
             </section>
           ) : null}
@@ -1321,28 +1507,28 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
             <table className="orders-table">
               <thead>
                 <tr>
-                  <th>Fecha / Hora</th>
                   <th>ID Pedido</th>
-                  <th>Número</th>
+                  <th>Producto / Cliente</th>
                   <th>Cliente · Destinatario</th>
-                  <th>Entrega</th>
-                  <th>Producto(s)</th>
-                  <th>Total</th>
+                  <th>Fecha entrega</th>
+                  <th>Florista</th>
                   <th>Método pago</th>
                   <th>Estado</th>
+                  <th>Valor</th>
                   <th>Acciones</th>
                 </tr>
               </thead>
               <tbody>
                 {items.map(item => {
-                  const statusClass = statusBadgeClass(item.estado);
+                  const statusClass = statusBadgeClass(item.estado, item);
                   const productText = (item.productos || []).slice(0, 2).join(", ");
                   const waPhone = String(item.telefonoCompleto || item.telefono || "").trim().replace(/\+/g, "");
                   const pedidoId = Number(item.pedidoID);
-                  const canAct = isPendingStatus(item.estado);
+                  const canApproveAction = isPendingStatus(item.estado);
+                  const canCancelAction = canApproveAction || (isEmpresaAdminRole(session) && canInvoiceStatus(item.estado));
                   const isApproving = approvingPedidoIds.includes(Number(pedidoId));
-                  const approvalBlockedByTenant = canAct && item?.puedeAprobar === false;
-                  const approveDisabled = !canAct || approvalBlockedByTenant || isApproving;
+                  const approvalBlockedByTenant = canApproveAction && item?.puedeAprobar === false;
+                  const approveDisabled = !canApproveAction || approvalBlockedByTenant || isApproving;
                   const approveTitle = isApproving
                     ? "Otro usuario o esta sesión está aprobando este pedido"
                     : approvalBlockedByTenant
@@ -1350,68 +1536,112 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
                     : "Aprobar pedido";
                   const canDownloadInvoice = canInvoiceStatus(item.estado);
                   const canViewMessageCard = canMessageCardStatus(item.estado);
-                  const { date: fechaPedido, time: horaPedido } = splitDateTimeParts(item.fechaPedido || item.fecha);
                   const { date: fechaEntrega, time: horaEntrega } = splitDateTimeParts(item.fechaEntrega);
+                  const normalizedStatus = normalizeStatus(item.estado);
+                  const rowClass = [
+                    selectedPedidoId === pedidoId && drawerOpen ? "is-active" : "",
+                    "orders-row-card",
+                    normalizedStatus === "APROBADO" ? "orders-row-approved" : "",
+                    normalizedStatus === "CANCELADO" || normalizedStatus === "RECHAZADO" ? "orders-row-cancelled" : "",
+                    isPendingStatus(item.estado) || normalizedStatus === "CREADO" ? "orders-row-pending" : "",
+                  ].filter(Boolean).join(" ");
+                  const floristaName = item.floristaAsignado || item.florista || item.nombreFlorista || "Sin asignar";
 
                   return (
                     <tr
                       key={pedidoId || `${item.numeroPedido}-${item.fecha}`}
-                      className={selectedPedidoId === pedidoId && drawerOpen ? "is-active" : ""}
+                      className={rowClass}
                     >
-                      <td data-label="Fecha / Hora">
-                        <div className="orders-cell-stack">
-                          <strong>{fechaPedido || "-"}</strong>
-                          <span>{item.horaPedido || horaPedido || "-"}</span>
+                      <td data-label="ID Pedido">
+                        <span className="orders-order-badge">{item.numeroPedido ?? pedidoId ?? "-"}</span>
+                      </td>
+                      <td data-label="Producto" title={(item.productos || []).join(", ")}>
+                        <div className="orders-product-cell">
+                          <strong>{productText || "-"}</strong>
+                          <span className="orders-product-client-line">
+                            <span className="orders-client-avatar" aria-hidden="true">{initialsFromName(item.cliente)}</span>
+                            <span>
+                              <b>{item.cliente || "-"}</b>
+                              <small>Destinatario: {item.destinatario || "-"}</small>
+                            </span>
+                          </span>
                         </div>
                       </td>
-                      <td data-label="ID Pedido">{pedidoId || "-"}</td>
-                      <td data-label="Número">{item.numeroPedido ?? "-"}</td>
-                      <td data-label="Cliente · Destinatario">
-                        <div className="orders-cell-stack">
-                          <strong>{item.cliente || "-"}</strong>
-                          <span>→ {item.destinatario || "-"}</span>
+                      <td data-label="Cliente · Destinatario" className="orders-client-column">
+                        <div className="orders-client-cell">
+                          <span className="orders-client-avatar" aria-hidden="true">{initialsFromName(item.cliente)}</span>
+                          <div className="orders-cell-stack">
+                            <strong>{item.cliente || "-"}</strong>
+                            <span>Destinatario: {item.destinatario || "-"}</span>
+                          </div>
                         </div>
                       </td>
-                      <td data-label="Entrega">
+                      <td data-label="Fecha entrega">
                         <div className="orders-cell-stack orders-cell-stack--delivery">
-                          <span className="orders-delivery-pill">{item.horaEntrega || horaEntrega || "-"}</span>
-                          <span>{fechaEntrega || "-"}</span>
+                          <span><CalendarDays size={14} strokeWidth={2} /> {fechaEntrega || "-"}</span>
+                          <span className="orders-delivery-pill"><Clock3 size={14} strokeWidth={2} /> {item.horaEntrega || horaEntrega || "-"}</span>
                         </div>
                       </td>
-                      <td data-label="Producto(s)" title={(item.productos || []).join(", ")}>
-                        <div className="orders-product-cell">{productText || "-"}</div>
-                      </td>
-                      <td data-label="Total">
-                        <span className="orders-total-value">${formatearCOP(Number(item.total || 0))}</span>
+                      <td data-label="Florista">
+                        <div className={`orders-florist-cell${floristaName === "Sin asignar" ? " is-unassigned" : ""}`}>
+                          <span className="orders-client-avatar orders-florist-avatar" aria-hidden="true">
+                            {floristaName === "Sin asignar" ? <UserCircle size={18} strokeWidth={2} /> : initialsFromName(floristaName)}
+                          </span>
+                          <span>{floristaName}</span>
+                        </div>
                       </td>
                       <td data-label="Método pago">{item.metodoPago || "-"}</td>
                       <td data-label="Estado">
                         <div className="orders-cell-stack">
-                          <span className={`order-badge ${statusClass}`}>{item.estado || "-"}</span>
+                          <span className={`order-badge ${statusClass}`}>
+                            <span className="orders-status-icon" aria-hidden="true" />
+                            {item.estado || "-"}
+                          </span>
                           {canDownloadInvoice && !item.facturaImpresa ? (
                             <span className="orders-inline-alert">Factura pendiente</span>
                           ) : null}
+                          {["CANCELADO", "RECHAZADO"].includes(normalizeStatus(item.estado)) && item.motivoRechazo ? (
+                            <span className="orders-inline-alert" title={item.motivoRechazo}>Nota: {item.motivoRechazo}</span>
+                          ) : null}
                         </div>
+                      </td>
+                      <td data-label="Valor">
+                        <span className="orders-total-value">${formatearCOP(Number(item.total || 0))}</span>
                       </td>
                       <td data-label="Acciones">
                         <div className="order-actions">
-                          <a href={`https://wa.me/${waPhone}`} target="_blank" rel="noreferrer" className="order-icon" title="WhatsApp">💬</a>
-                          <button type="button" className="order-icon order-icon-view" onClick={() => openDetail(pedidoId)} title="Ver detalle"><IconEye size={16} stroke={1.9} /></button>
-                          <button type="button" className="order-icon order-icon-approve" onClick={() => approveOrder(pedidoId)} disabled={approveDisabled} title={approveTitle}><IconCheck size={16} stroke={2.1} /></button>
-                          <button type="button" className="order-icon order-icon-cancel" onClick={() => rejectOrder(pedidoId)} disabled={!canAct} title="Rechazar pedido"><IconX size={16} stroke={2.1} /></button>
-                          {canDownloadInvoice && (
-                            <button type="button" className="order-icon" onClick={() => downloadInvoice(pedidoId)} title="Descargar factura">🧾</button>
-                          )}
-                          {canViewMessageCard && (
-                            <button
-                              type="button"
-                              className="btn-outline order-message-btn"
-                              onClick={() => openMessageCard(item)}
-                              title="Ver mensaje e imprimir tarjeta"
-                            >
-                              Ver mensaje / Imprimir tarjeta
-                            </button>
-                          )}
+                          <button type="button" className="order-icon order-icon-view" onClick={() => openDetail(pedidoId)} title="Ver detalle" aria-label="Ver detalle"><Eye size={17} strokeWidth={2} /></button>
+                          <details className="orders-row-menu">
+                            <summary className="order-icon orders-row-menu-trigger" title="Más acciones" aria-label="Más acciones">
+                              <MoreHorizontal size={17} strokeWidth={2} />
+                            </summary>
+                            <div className="orders-row-menu-panel">
+                              <a href={`https://wa.me/${waPhone}`} target="_blank" rel="noreferrer" className="orders-row-menu-item">
+                                <MessageCircle size={16} strokeWidth={2} />
+                                <span>WhatsApp</span>
+                              </a>
+                              <button type="button" className="orders-row-menu-item" onClick={() => approveOrder(pedidoId)} disabled={approveDisabled} title={approveTitle}>
+                                <IconCheck size={16} stroke={2.1} />
+                                <span>Aprobar</span>
+                              </button>
+                              <button type="button" className="orders-row-menu-item" onClick={() => rejectOrder(pedidoId)} disabled={!canCancelAction} title={canInvoiceStatus(item.estado) ? "Cancelar pedido aprobado" : "Rechazar pedido"}>
+                                <IconX size={16} stroke={2.1} />
+                                <span>{canInvoiceStatus(item.estado) ? "Cancelar" : "Rechazar"}</span>
+                              </button>
+                              {canDownloadInvoice && (
+                                <button type="button" className="orders-row-menu-item" onClick={() => downloadInvoice(pedidoId)} title="Descargar factura">
+                                  <Receipt size={16} strokeWidth={2} />
+                                  <span>Factura</span>
+                                </button>
+                              )}
+                              {canViewMessageCard && (
+                                <button type="button" className="orders-row-menu-item" onClick={() => openMessageCard(item)} title="Ver mensaje e imprimir tarjeta">
+                                  <MessageCircle size={16} strokeWidth={2} />
+                                  <span>Mensaje / tarjeta</span>
+                                </button>
+                              )}
+                            </div>
+                          </details>
                         </div>
                       </td>
                     </tr>
@@ -1445,27 +1675,40 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
         </main>
       </div>
 
+      <div className={`orders-drawer-backdrop${drawerOpen ? " open" : ""}`} aria-hidden="true" />
+
       <aside className={`orders-drawer ${drawerOpen ? "open" : ""}`}>
-        <div className="orders-drawer-head">
-          <strong className="orders-drawer-title">
-            <IconFileText size={17} stroke={2} />
-            <span>Detalle pedido</span>
-          </strong>
+        <div className="orders-drawer-head orders-detail-premium-head">
+          <div className="orders-detail-head-copy">
+            <span className="orders-detail-eyebrow">Detalle pedido</span>
+            <strong className="orders-drawer-title">
+              Pedido #{detalle && !detalle.error ? (detalle.numeroPedido ?? selectedPedidoId ?? "-") : (selectedPedidoId ?? "-")}
+            </strong>
+            {detalle && !detalle.error ? (
+              <div className="orders-detail-head-meta">
+                <span className={`order-badge ${statusBadgeClass(detalle.estado)}`}>{detalle.estado || "-"}</span>
+                <span>{formatDisplayDate(detalle.destinatario?.fechaEntrega)}</span>
+                <span>${formatearCOP(Number(detalle.financiero?.total || 0))}</span>
+              </div>
+            ) : null}
+          </div>
           <div className="orders-drawer-head-main-actions">
             {!detalle?.error && detalle ? (
-              <button type="button" className="btn-outline" onClick={onToggleDetailEdit} title="Editar arreglo y entrega">
-                {isEditingDetail ? "Cancelar edición" : "Editar"}
+              <button type="button" className="btn-primary orders-detail-action-primary" onClick={onToggleDetailEdit} title="Editar arreglo y entrega">
+                <Pencil size={17} strokeWidth={2} />
+                <span>{isEditingDetail ? "Cancelar edición" : "Editar"}</span>
               </button>
             ) : null}
             {!detalle?.error && detalle ? (
               <button type="button" className="btn-outline" onClick={onStartDuplicateDetail} title="Duplicar pedido usando este detalle como base">
-                Duplicar
+                <Copy size={17} strokeWidth={2} />
+                <span>Duplicar</span>
               </button>
             ) : null}
-            {canInvoiceStatus(detalle?.estado) && selectedPedidoId && (
-              <button type="button" className="btn-outline" onClick={() => downloadInvoice(selectedPedidoId)} title="Descargar factura en PDF">Descargar factura</button>
-            )}
-            <button type="button" className="btn-outline" onClick={reloadDrawer} title="Recargar detalle del pedido">Recargar</button>
+            <button type="button" className="btn-outline orders-detail-action-ghost" onClick={reloadDrawer} title="Recargar detalle del pedido">
+              <RefreshCw size={17} strokeWidth={2} />
+              <span>Recargar</span>
+            </button>
           </div>
           <div className="orders-drawer-head-close">
             <button type="button" className="icon-btn" onClick={closeDrawer} title="Cerrar detalle">
@@ -2256,8 +2499,11 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
   );
 }
 
-function statusBadgeClass(status) {
+function statusBadgeClass(status, item = null) {
   const key = normalizeStatus(status);
+  if (key === "PENDIENTE" && item && isPendingOutsideToday(item)) {
+    return "is-pendiente-other-date";
+  }
   return BADGE_CLASS_BY_STATUS[key] || "is-pendiente";
 }
 
@@ -2285,6 +2531,28 @@ function normalizeDeliveryType(barrioNombre) {
   return value === "recoger en tienda" ? "recogida_en_tienda" : "domicilio";
 }
 
+function formatDisplayDate(value) {
+  const date = splitDateTimeParts(value).date || String(value || "").slice(0, 10);
+  if (!date) return "-";
+  const parsed = new Date(`${date}T12:00:00`);
+  if (Number.isNaN(parsed.getTime())) return date;
+  return new Intl.DateTimeFormat("es-CO", { day: "2-digit", month: "short", year: "numeric" }).format(parsed);
+}
+
+function OrderDetailAccordion({ title, icon, children, defaultOpen = false, className = "" }) {
+  return (
+    <details className={`order-detail-accordion${className ? ` ${className}` : ""}`} open={defaultOpen}>
+      <summary>
+        <span className="order-detail-accordion-icon">{icon}</span>
+        <span>{title}</span>
+      </summary>
+      <div className="order-detail-accordion-body">
+        {children}
+      </div>
+    </details>
+  );
+}
+
 function OrderDetail({ detalle, paymentTitle = "Método de pago", salesChannelTitle = "Celular Flora" }) {
   const productos = Array.isArray(detalle.productos) ? detalle.productos : [];
   const { date: fechaPedido, time: horaPedido } = splitDateTimeParts(detalle.fechaPedido || detalle.fecha);
@@ -2292,6 +2560,7 @@ function OrderDetail({ detalle, paymentTitle = "Método de pago", salesChannelTi
   const tipoDocumentoCliente = formatClienteTipoDocumento(detalle.cliente);
   const numeroDocumentoCliente = formatClienteNumeroDocumento(detalle.cliente);
   const paymentBreakdown = extractPaymentBreakdown(detalle.financiero);
+  const totalPedido = Number(detalle.financiero?.total || 0);
   const detailRow = (label, value, extraClass = "") => (
     <div className={`order-detail-row${extraClass ? ` ${extraClass}` : ""}`}>
       <span className="order-detail-label">{label}</span>
@@ -2300,79 +2569,107 @@ function OrderDetail({ detalle, paymentTitle = "Método de pago", salesChannelTi
   );
 
   return (
-    <>
-      <section className="order-block order-detail-section">
-        <h4><IconInfoCircle size={16} stroke={2} /> <span>Info general</span></h4>
-        {detailRow("ID Pedido", detalle.pedidoID ?? "-")}
-        {detailRow("Número", detalle.numeroPedido ?? "-")}
-        {detailRow("Fecha pedido", fechaPedido || "-")}
-        {detailRow("Hora pedido", detalle.horaPedido || horaPedido || "-")}
-        {detailRow("Estado", detalle.estado || "-")}
-        {detailRow("Factura", detalle.financiero?.facturaImpresa ? "Impresa" : "Pendiente por imprimir")}
-        {detalle.motivoRechazo ? detailRow("Motivo rechazo", detalle.motivoRechazo) : null}
+    <div className="orders-detail-premium">
+      <section className="orders-detail-kpis" aria-label="Resumen del pedido">
+        <div>
+          <span>Cliente</span>
+          <strong>{detalle.cliente?.nombre || "-"}</strong>
+        </div>
+        <div>
+          <span>Destinatario</span>
+          <strong>{detalle.destinatario?.nombre || "-"}</strong>
+        </div>
+        <div>
+          <span>Valor</span>
+          <strong>${formatearCOP(totalPedido)}</strong>
+        </div>
+        <div>
+          <span>Entrega</span>
+          <strong>{formatDisplayDate(detalle.destinatario?.fechaEntrega)}</strong>
+        </div>
       </section>
 
-      <section className="order-block order-detail-section">
-        <h4><IconUser size={16} stroke={2} /> <span>Cliente</span></h4>
-        {detailRow("Nombre", detalle.cliente?.nombre || "-", "is-accent-value")}
-        {detailRow("Teléfono", detalle.cliente?.telefonoCompleto || detalle.cliente?.telefono || "-")}
-        {detailRow("Email", detalle.cliente?.email || "-")}
-        {detailRow("Tipo documento", tipoDocumentoCliente)}
-        {detailRow("N documento", numeroDocumentoCliente)}
-      </section>
+      <OrderDetailAccordion title="Info general" icon={<IconInfoCircle size={17} stroke={2} />} defaultOpen>
+        <div className="orders-detail-data-grid">
+          {detailRow("Pedido", detalle.numeroPedido ?? detalle.pedidoID ?? "-")}
+          {detailRow("Estado", detalle.estado || "-")}
+          {detailRow("Fecha", formatDisplayDate(fechaPedido))}
+          {detailRow("Hora", detalle.horaPedido || horaPedido || "-")}
+          {detailRow("Factura", detalle.financiero?.facturaImpresa ? "Impresa" : "Pendiente")}
+          {detalle.motivoRechazo ? detailRow("Motivo", detalle.motivoRechazo) : null}
+        </div>
+      </OrderDetailAccordion>
 
-      <section className="order-block order-detail-section">
-        <h4><IconGift size={16} stroke={2} /> <span>Destinatario</span></h4>
-        {detailRow("Nombre", detalle.destinatario?.nombre || "-", "is-accent-value")}
-        {detailRow("Teléfono", detalle.destinatario?.telefono || "-")}
-        {detailRow("Dirección", detalle.destinatario?.direccion || "-")}
-        {detailRow("Barrio", detalle.destinatario?.barrio || "-")}
-        {detailRow("Fecha entrega", fechaEntrega || "-")}
-        {detailRow("Hora entrega", detalle.destinatario?.horaEntrega || horaEntrega || "-")}
-        {detailRow("Firma", detalle.destinatario?.firma || "-")}
-        {detailRow("Mensaje", detalle.destinatario?.mensajeTarjeta || "-")}
-        {detailRow("Observaciones personalizados", detalle.destinatario?.observacionGeneral || "-")}
-      </section>
+      <OrderDetailAccordion title="Cliente" icon={<IconUser size={17} stroke={2} />}>
+        <div className="orders-detail-person-card">
+          <span className="orders-client-avatar">{initialsFromName(detalle.cliente?.nombre)}</span>
+          <div>
+            <strong>{detalle.cliente?.nombre || "-"}</strong>
+            <a href={detalle.cliente?.telefonoCompleto || detalle.cliente?.telefono ? `tel:${detalle.cliente?.telefonoCompleto || detalle.cliente?.telefono}` : undefined}>
+              {detalle.cliente?.telefonoCompleto || detalle.cliente?.telefono || "-"}
+            </a>
+            <a href={detalle.cliente?.email ? `mailto:${detalle.cliente.email}` : undefined}>
+              {detalle.cliente?.email || "-"}
+            </a>
+            <small>{[tipoDocumentoCliente, numeroDocumentoCliente].filter(Boolean).join(" ") || "Sin documento"}</small>
+          </div>
+        </div>
+      </OrderDetailAccordion>
 
-      <section className="order-block order-detail-section">
-        <h4><IconWallet size={16} stroke={2} /> <span>Resumen financiero</span></h4>
-        {detailRow("Subtotal", `$${formatearCOP(Number(detalle.financiero?.subtotal || 0))}`)}
-        {detailRow("IVA", `$${formatearCOP(Number(detalle.financiero?.iva || 0))}`)}
-        {detailRow("Domicilio", `$${formatearCOP(Number(detalle.financiero?.domicilio || 0))}`)}
-        {Number(detalle.financiero?.recargoLinkMonto || 0) > 0 ? detailRow("Recargo link", `+$${formatearCOP(Number(detalle.financiero?.recargoLinkMonto || 0))}`) : null}
-        {Number(detalle.financiero?.descuentoMonto || 0) > 0 ? detailRow("Descuento", `-$${formatearCOP(Number(detalle.financiero?.descuentoMonto || 0))}`) : null}
-        {detalle.financiero?.descuentoNota ? detailRow("Nota descuento", detalle.financiero.descuentoNota) : null}
-        {Number(detalle.financiero?.saldoFavorMonto || 0) > 0 ? detailRow("Saldo a favor", `-$${formatearCOP(Number(detalle.financiero?.saldoFavorMonto || 0))}`) : null}
-        {detalle.financiero?.saldoFavorNota ? detailRow("Nota saldo a favor", detalle.financiero.saldoFavorNota) : null}
-        {detailRow("Total", `$${formatearCOP(Number(detalle.financiero?.total || 0))}`, "is-accent-value")}
-        {detailRow("Estado pago", detalle.financiero?.estadoPago || "-")}
-        {detailRow(paymentTitle, formatMetodoPago(detalle.financiero))}
-        {paymentBreakdown.length > 0 ? detailRow("Desglose pagos", paymentBreakdown.map(item => `${item.metodo}: $${formatearCOP(item.monto)}`).join(" · ")) : null}
-        {detailRow("Cuenta bancaria", detalle.financiero?.cuentaBancaria || "-")}
-        {detailRow(salesChannelTitle, detalle.financiero?.canalFlora || "-")}
-      </section>
+      <OrderDetailAccordion title="Destinatario" icon={<Gift size={17} strokeWidth={2} />}>
+        <div className="orders-detail-destination-card">
+          <strong>{detalle.destinatario?.nombre || "-"}</strong>
+          <p><Truck size={15} strokeWidth={2} /> {detalle.destinatario?.direccion || "-"}</p>
+          <p><Filter size={15} strokeWidth={2} /> {detalle.destinatario?.barrio || "-"}</p>
+          <p><CalendarDays size={15} strokeWidth={2} /> {formatDisplayDate(fechaEntrega)} · {detalle.destinatario?.horaEntrega || horaEntrega || "-"}</p>
+          <p><Mail size={15} strokeWidth={2} /> {detalle.destinatario?.mensajeTarjeta || "Sin mensaje"}</p>
+          <p><Pencil size={15} strokeWidth={2} /> {detalle.destinatario?.firma || "Sin firma"}</p>
+          {detalle.destinatario?.observacionGeneral ? <small>{detalle.destinatario.observacionGeneral}</small> : null}
+        </div>
+      </OrderDetailAccordion>
 
-      <section className="order-block order-detail-section">
-        <h4><IconFileText size={16} stroke={2} /> <span>Productos</span></h4>
+      <OrderDetailAccordion title="Productos" icon={<IconFileText size={17} stroke={2} />} className="orders-detail-products-accordion">
         {productos.length === 0 ? (
-          <p>Sin productos</p>
+          <p className="orders-detail-empty">Sin productos</p>
         ) : (
-          productos.map((producto, index) => (
-            <div key={`${producto.detalleID || producto.productoID || producto.nombreProducto}-${index}`} className="order-block order-product-card">
-              <div className="order-product-card-head">
-                <strong>{`Arreglo ${index + 1}`}</strong>
-                <span>{`Detalle #${producto.detalleID ?? "-"}`}</span>
-              </div>
-              {detailRow("Código de arreglo", producto.codigoProducto || "-")}
-              {detailRow("Nombre del arreglo", producto.nombreProducto || "-", "is-accent-value")}
-              {detailRow("Cantidad", String(Number(producto.cantidad || 0)))}
-              {detailRow("Notas Producción", producto.observaciones || "-")}
-              {detailRow("Subtotal", `$${formatearCOP(Number(producto.subtotal || 0))}`)}
-            </div>
-          ))
+          <div className="orders-detail-product-list">
+            {productos.map((producto, index) => (
+              <article key={`${producto.detalleID || producto.productoID || producto.nombreProducto}-${index}`} className="orders-detail-product-card">
+                <div className="orders-detail-product-card-head">
+                  <strong>{producto.nombreProducto || `Arreglo ${index + 1}`}</strong>
+                  <span>Código {producto.codigoProducto || "-"}</span>
+                </div>
+                <div className="orders-detail-product-meta">
+                  <span>Cantidad <strong>{Number(producto.cantidad || 0)}</strong></span>
+                  <span>Subtotal <strong>${formatearCOP(Number(producto.subtotal || 0))}</strong></span>
+                </div>
+                {producto.observaciones ? <p>{producto.observaciones}</p> : null}
+              </article>
+            ))}
+          </div>
         )}
-      </section>
-    </>
+      </OrderDetailAccordion>
+
+      <OrderDetailAccordion title="Resumen financiero" icon={<IconWallet size={17} stroke={2} />}>
+        <div className="orders-detail-financial-total">
+          <span>Total</span>
+          <strong>${formatearCOP(totalPedido)}</strong>
+        </div>
+        <div className="orders-detail-data-grid orders-detail-financial-grid">
+          {detailRow("Subtotal", `$${formatearCOP(Number(detalle.financiero?.subtotal || 0))}`)}
+          {detailRow("IVA", `$${formatearCOP(Number(detalle.financiero?.iva || 0))}`)}
+          {detailRow("Domicilio", `$${formatearCOP(Number(detalle.financiero?.domicilio || 0))}`)}
+          {Number(detalle.financiero?.recargoLinkMonto || 0) > 0 ? detailRow("Recargo link", `+$${formatearCOP(Number(detalle.financiero?.recargoLinkMonto || 0))}`) : null}
+          {Number(detalle.financiero?.descuentoMonto || 0) > 0 ? detailRow("Descuento", `-$${formatearCOP(Number(detalle.financiero?.descuentoMonto || 0))}`) : null}
+          {Number(detalle.financiero?.saldoFavorMonto || 0) > 0 ? detailRow("Saldo a favor", `-$${formatearCOP(Number(detalle.financiero?.saldoFavorMonto || 0))}`) : null}
+          {detailRow("Estado pago", detalle.financiero?.estadoPago || "-")}
+          {detailRow(paymentTitle, formatMetodoPago(detalle.financiero))}
+          {paymentBreakdown.length > 0 ? detailRow("Desglose pagos", paymentBreakdown.map(item => `${item.metodo}: $${formatearCOP(item.monto)}`).join(" · ")) : null}
+          {detailRow("Cuenta bancaria", detalle.financiero?.cuentaBancaria || "-")}
+          {detailRow(salesChannelTitle, detalle.financiero?.canalFlora || "-")}
+        </div>
+      </OrderDetailAccordion>
+    </div>
   );
 }
 
@@ -2507,6 +2804,7 @@ function formatFechaEntregaTarjeta(value) {
 function resolveFirmaTarjeta(value) {
   return String(value || "").trim();
 }
+
 
 
 
