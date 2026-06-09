@@ -26,6 +26,7 @@ import {
   MessageCircle,
   MoreHorizontal,
   Pencil,
+  Plus,
   Receipt,
   RefreshCw,
   RotateCw,
@@ -46,6 +47,13 @@ const AUTO_REFRESH_INTERVAL_MS = 15000;
 
 function todayIsoDate() {
   return new Date().toISOString().slice(0, 10);
+}
+
+function shiftIsoDate(isoDate, days) {
+  const parsed = new Date(`${isoDate}T12:00:00`);
+  if (Number.isNaN(parsed.getTime())) return isoDate;
+  parsed.setDate(parsed.getDate() + days);
+  return parsed.toISOString().slice(0, 10);
 }
 
 function orderDeliveryDate(item) {
@@ -103,6 +111,90 @@ function initialsFromName(value) {
     .filter(Boolean);
   if (parts.length === 0) return "CL";
   return parts.slice(0, 2).map(part => part[0]).join("").toUpperCase();
+}
+
+function resolveDisplayOrderNumber(item) {
+  const candidates = [
+    item?.numeroPedido,
+    item?.numero_pedido,
+    item?.codigoPedido,
+    item?.codigo_pedido,
+  ];
+
+  for (const value of candidates) {
+    const text = String(value ?? "").trim();
+    if (text) return text;
+  }
+
+  return "-";
+}
+
+function textFromValue(value) {
+  if (value == null) return "";
+  if (typeof value === "object") {
+    return String(
+      value.nombreCompleto ||
+      value.nombre_completo ||
+      value.nombre ||
+      value.name ||
+      value.label ||
+      ""
+    ).trim();
+  }
+  return String(value).trim();
+}
+
+function resolveFloristaName(item) {
+  const candidates = [
+    item?.floristaAsignado,
+    item?.florista_asignado,
+    item?.floristaNombre,
+    item?.nombreFlorista,
+    item?.nombre_florista,
+    item?.florista,
+    item?.empleadoFlorista,
+    item?.nombreEmpleadoFlorista,
+    item?.produccion?.floristaAsignado,
+    item?.produccion?.florista_asignado,
+    item?.produccion?.floristaNombre,
+    item?.produccion?.nombreFlorista,
+    item?.produccion?.florista,
+    item?.produccion?.empleado,
+    item?.asignacionProduccion?.florista,
+    item?.asignacionProduccion?.floristaAsignado,
+  ];
+
+  for (const value of candidates) {
+    const text = textFromValue(value);
+    if (text) return text;
+  }
+
+  const productionRows = [
+    ...(Array.isArray(item?.producciones) ? item.producciones : []),
+    ...(Array.isArray(item?.produccionItems) ? item.produccionItems : []),
+    ...(Array.isArray(item?.detallesProduccion) ? item.detallesProduccion : []),
+  ];
+  const names = Array.from(new Set(productionRows.map(resolveFloristaName).filter(name => name && name !== "Sin asignar")));
+  if (names.length > 0) return names.join(", ");
+
+  return "Sin asignar";
+}
+
+function buildOrdersMetrics(items, facturasPendientesImpresion = 0, targetDate = todayIsoDate()) {
+  const rows = Array.isArray(items) ? items : [];
+  const facturasNoImpresasVisibles = rows.filter(item => canInvoiceStatus(item.estado) && !item.facturaImpresa).length;
+  return {
+    total: rows.length,
+    hoy: rows.filter(item => {
+      const { date: fechaPedido } = splitDateTimeParts(item.fechaPedido || item.fecha);
+      const entrega = orderDeliveryDate(item);
+      return fechaPedido === targetDate || entrega === targetDate;
+    }).length,
+    aprobados: rows.filter(item => normalizeStatus(item.estado) === "APROBADO").length,
+    pendientes: rows.filter(item => isPendingStatus(item.estado) || normalizeStatus(item.estado) === "CREADO").length,
+    cancelados: rows.filter(item => ["CANCELADO", "RECHAZADO"].includes(normalizeStatus(item.estado))).length,
+    facturasNoImpresas: Number(facturasPendientesImpresion || facturasNoImpresasVisibles || 0),
+  };
 }
 
 function normalizeWholePeso(value) {
@@ -234,6 +326,9 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
   const [items, setItems] = useState([]);
   const [total, setTotal] = useState(0);
   const [facturasPendientesImpresion, setFacturasPendientesImpresion] = useState(0);
+  const [metricItems, setMetricItems] = useState([]);
+  const [metricFacturasPendientesImpresion, setMetricFacturasPendientesImpresion] = useState(0);
+  const [yesterdayMetrics, setYesterdayMetrics] = useState(() => buildOrdersMetrics([], 0, shiftIsoDate(todayIsoDate(), -1)));
   const [filters, setFilters] = useState(initialFilters);
   const [selectedPedidoId, setSelectedPedidoId] = useState(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -493,20 +588,71 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
       setTotal(Number(data.total || 0));
       setFacturasPendientesImpresion(Number(data.facturasPendientesImpresion || 0));
       setError("");
+
+      void api.listarPedidos({
+        empresaId,
+        sucursalId,
+        q: debouncedQuery,
+        estado: "",
+        sinImprimir: false,
+        soloTienda: filters.soloTienda,
+        fechaDesde: toIsoDateStart(filters.fechaDesde),
+        fechaHasta: toIsoDateEnd(filters.fechaHasta),
+        page: 1,
+        pageSize: 10000,
+      }).then(metricsData => {
+        setMetricItems(Array.isArray(metricsData.items) ? metricsData.items : []);
+        setMetricFacturasPendientesImpresion(Number(metricsData.facturasPendientesImpresion || 0));
+      }).catch(metricsError => {
+        console.warn("No fue posible cargar métricas globales de pedidos:", metricsError);
+        setMetricItems(Array.isArray(data.items) ? data.items : []);
+        setMetricFacturasPendientesImpresion(Number(data.facturasPendientesImpresion || 0));
+      });
     } catch (nextError) {
       console.error("Error cargando pedidos:", nextError);
       setItems([]);
       setTotal(0);
       setFacturasPendientesImpresion(0);
+      setMetricItems([]);
+      setMetricFacturasPendientesImpresion(0);
       setError("No fue posible cargar pedidos.");
     } finally {
       if (!silent) setLoading(false);
     }
   }, [api, debouncedQuery, filters.estado, filters.sinImprimir, filters.soloTienda, filters.fechaDesde, filters.fechaHasta, filters.page, filters.pageSize, empresaId, sucursalId]);
 
+  const loadYesterdayMetrics = useCallback(async () => {
+    const yesterday = shiftIsoDate(todayIsoDate(), -1);
+    try {
+      const data = await api.listarPedidos({
+        empresaId,
+        sucursalId,
+        q: "",
+        estado: "",
+        sinImprimir: false,
+        soloTienda: filters.soloTienda,
+        fechaDesde: toIsoDateStart(yesterday),
+        fechaHasta: toIsoDateEnd(yesterday),
+        page: 1,
+        pageSize: 1000,
+      });
+      setYesterdayMetrics(buildOrdersMetrics(
+        Array.isArray(data.items) ? data.items : [],
+        Number(data.facturasPendientesImpresion || 0),
+        yesterday
+      ));
+    } catch {
+      setYesterdayMetrics(buildOrdersMetrics([], 0, yesterday));
+    }
+  }, [api, empresaId, filters.soloTienda, sucursalId]);
+
   useEffect(() => {
     loadOrders(false);
   }, [loadOrders]);
+
+  useEffect(() => {
+    loadYesterdayMetrics();
+  }, [loadYesterdayMetrics]);
 
   useEffect(() => {
     const intervalId = globalThis.setInterval(() => {
@@ -717,14 +863,14 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
     }
   };
 
-  const optimisticStatusPatch = (pedidoId, nextStatus, motivoRechazo = null) => {
+  const optimisticStatusPatch = (pedidoId, nextStatus, motivoRechazo = null, extraPatch = {}) => {
     setItems(current => current.map(item => Number(item.pedidoID) === Number(pedidoId)
-      ? { ...item, estado: nextStatus, ...(motivoRechazo !== null ? { motivoRechazo } : {}) }
+      ? { ...item, estado: nextStatus, ...extraPatch, ...(motivoRechazo !== null ? { motivoRechazo } : {}) }
       : item));
 
     setDetalle(current => {
       if (!current || Number(selectedPedidoId) !== Number(pedidoId)) return current;
-      return { ...current, estado: nextStatus, ...(motivoRechazo !== null ? { motivoRechazo } : {}) };
+      return { ...current, estado: nextStatus, ...extraPatch, ...(motivoRechazo !== null ? { motivoRechazo } : {}) };
     });
   };
 
@@ -742,7 +888,13 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
     setApprovingPedidoIds(current => [...current, Number(pedidoId)]);
     try {
       const response = await api.aprobarPedido(pedidoId);
-      optimisticStatusPatch(pedidoId, response.estado || "APROBADO");
+      const floristaAsignado = resolveFloristaName(response);
+      optimisticStatusPatch(
+        pedidoId,
+        response.estado || "APROBADO",
+        null,
+        floristaAsignado !== "Sin asignar" ? { floristaAsignado } : {}
+      );
       await loadOrders(true);
     } catch (nextError) {
       console.error("Error aprobando pedido:", nextError);
@@ -1288,27 +1440,26 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
   }, [filters.estado, filters.fechaDesde, filters.fechaHasta, filters.sinImprimir]);
   const ordersMetrics = useMemo(() => {
     const today = todayIsoDate();
-    const facturasNoImpresasVisibles = items.filter(item => canInvoiceStatus(item.estado) && !item.facturaImpresa).length;
-    return {
-      total: items.length,
-      hoy: items.filter(item => {
-        const { date: fechaPedido } = splitDateTimeParts(item.fechaPedido || item.fecha);
-        const entrega = orderDeliveryDate(item);
-        return fechaPedido === today || entrega === today;
-      }).length,
-      aprobados: items.filter(item => normalizeStatus(item.estado) === "APROBADO").length,
-      pendientes: items.filter(item => isPendingStatus(item.estado) || normalizeStatus(item.estado) === "CREADO").length,
-      cancelados: items.filter(item => ["CANCELADO", "RECHAZADO"].includes(normalizeStatus(item.estado))).length,
-      facturasNoImpresas: Number(facturasPendientesImpresion || facturasNoImpresasVisibles || 0),
-    };
-  }, [facturasPendientesImpresion, items]);
+    const sourceItems = metricItems.length > 0 ? metricItems : items;
+    const sourceFacturas = metricItems.length > 0 ? metricFacturasPendientesImpresion : facturasPendientesImpresion;
+    return buildOrdersMetrics(sourceItems, sourceFacturas, today);
+  }, [facturasPendientesImpresion, items, metricFacturasPendientesImpresion, metricItems]);
+  const headerSalesSummary = useMemo(() => {
+    const today = todayIsoDate();
+    const todayRows = (Array.isArray(items) ? items : []).filter(item => {
+      const { date: fechaPedido } = splitDateTimeParts(item.fechaPedido || item.fecha);
+      const entrega = orderDeliveryDate(item);
+      return fechaPedido === today || entrega === today;
+    });
+    return todayRows.reduce((sum, item) => sum + Number(item.total || item.valorTotal || item.totalPedido || 0), 0);
+  }, [items]);
   const orderMetricCards = useMemo(() => {
     const baseCards = [
-      { key: "hoy", label: "Pedidos hoy", shortLabel: "Hoy", value: Number(ordersMetrics.hoy || 0), tone: "is-primary", Icon: CalendarCheck2 },
-      { key: "aprobados", label: "Aprobados", shortLabel: "Aprobados", value: Number(ordersMetrics.aprobados || 0), tone: "is-green", Icon: CheckCircle2 },
-      { key: "pendientes", label: "Pendientes", shortLabel: "Pendientes", value: Number(ordersMetrics.pendientes || 0), tone: "is-blue", Icon: Clock3 },
-      { key: "cancelados", label: "Cancelados", shortLabel: "Cancelados", value: Number(ordersMetrics.cancelados || 0), tone: "is-orange", Icon: XCircle },
-      { key: "facturas", label: "Facturas no impresas", shortLabel: "Sin imprimir", value: Number(ordersMetrics.facturasNoImpresas || 0), tone: "is-purple", Icon: Receipt },
+      { key: "hoy", label: "Pedidos hoy", shortLabel: "Pedidos hoy", value: Number(ordersMetrics.hoy || 0), tone: "is-primary", Icon: CalendarCheck2, helperText: "Operacion diaria" },
+      { key: "aprobados", label: "Aprobados", shortLabel: "Aprobados", value: Number(ordersMetrics.aprobados || 0), tone: "is-green", Icon: CheckCircle2, helperText: "Ultimos 7 dias" },
+      { key: "pendientes", label: "Pendientes", shortLabel: "Pendientes", value: Number(ordersMetrics.pendientes || 0), tone: "is-blue", Icon: Clock3, helperText: "Requieren atencion" },
+      { key: "cancelados", label: "Cancelados", shortLabel: "Cancelados", value: Number(ordersMetrics.cancelados || 0), tone: "is-orange", Icon: XCircle, helperText: "Ultimos 7 dias" },
+      { key: "facturas", label: "Facturas no impresas", shortLabel: "Sin imprimir", value: Number(ordersMetrics.facturasNoImpresas || 0), tone: "is-purple", Icon: Receipt, helperText: "Por imprimir" },
     ];
     const maxValue = Math.max(...baseCards.map(card => card.value), 1);
     return baseCards.map(card => {
@@ -1331,12 +1482,22 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
             ? "is-alert"
             : ""
           : "";
+      const previousValue = Number(yesterdayMetrics?.[card.key === "facturas" ? "facturasNoImpresas" : card.key] || 0);
+      const delta = card.value - previousValue;
+      const comparisonClass = delta > 0 ? "is-up" : delta < 0 ? "is-down" : "is-flat";
+      const comparisonLabel = delta === 0
+        ? "Igual que ayer"
+        : `${delta > 0 ? "+" : "-"}${Math.abs(delta)} vs ayer`;
       return {
         ...card,
+        trendRatio: ratio,
+        previousValue,
+        comparisonClass,
+        comparisonLabel,
         className: `${card.tone} ${weightClass}${attentionClass ? ` ${attentionClass}` : ""}`,
       };
     });
-  }, [ordersMetrics]);
+  }, [ordersMetrics, yesterdayMetrics]);
   return (
     <>
       <div className={`app-shell ${sidebarPinned ? "is-sidebar-pinned" : ""} ${sidebarMobileOpen ? "is-sidebar-mobile-open" : ""}`}>
@@ -1375,58 +1536,78 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
         <main className="orders-admin-view orders-page-view">
           <header className="orders-admin-header orders-page-header">
             <div className="orders-page-heading">
-              <div className="orders-page-title-group">
+              <div className="orders-page-breadcrumb" aria-label="Ruta">
+                <span>Operaciones</span>
+                <span>/</span>
+                <strong>Pedidos</strong>
+              </div>
+              <div className="orders-page-title-row">
                 <h1>Pedidos</h1>
               </div>
-              <p className="orders-admin-subtitle">Usuario: {displayUserName}</p>
+              <p className="orders-admin-subtitle orders-page-description">Consulta pedidos, revisa estados y gestiona la operacion diaria.</p>
+              <span className="orders-user-pill"><span aria-hidden="true" /> Sesion activa: {displayUserName}</span>
             </div>
-            <div className="header-actions">
-              <button
-                type="button"
-                className={`btn-primary orders-header-refresh orders-store-toggle${filters.soloTienda ? " is-active" : ""}`}
-                onClick={toggleStoreDeliveries}
-                title={filters.soloTienda ? "Ver todos los pedidos" : "Ver entregas en tienda"}
-              >
-                <Gift size={18} strokeWidth={2} />
-                <span>{filters.soloTienda ? "Todos los pedidos" : "Entregas en tienda"}</span>
-              </button>
-              <button type="button" className="btn-primary orders-header-refresh" onClick={refresh} title="Actualizar pedidos">
-                <RotateCw size={18} strokeWidth={2} />
-                <span>Actualizar</span>
-              </button>
+            <div className="orders-header-side">
+              <div className="header-actions">
+                <button
+                  type="button"
+                  className={`btn-primary orders-header-refresh orders-store-toggle${filters.soloTienda ? " is-active" : ""}`}
+                  onClick={toggleStoreDeliveries}
+                  title={filters.soloTienda ? "Ver todos los pedidos" : "Ver entregas en tienda"}
+                >
+                  <Gift size={18} strokeWidth={2} />
+                  <span>{filters.soloTienda ? "Todos los pedidos" : "Entregas en tienda"}</span>
+                </button>
+                <button type="button" className="btn-primary orders-header-refresh" onClick={refresh} title="Actualizar pedidos">
+                  <RotateCw size={18} strokeWidth={2} />
+                  <span>Actualizar</span>
+                </button>
+                <button type="button" className="btn-primary orders-new-order-btn" onClick={() => window.alert("El flujo de nuevo pedido se configura desde checkout.")} title="Nuevo pedido">
+                  <Plus size={18} strokeWidth={2.2} />
+                  <span>Nuevo pedido</span>
+                </button>
+              </div>
+              <div className="orders-header-metrics" aria-label="Resumen de pedidos">
+                <article className="orders-header-metric-card is-sale">
+                  <span className="orders-header-metric-icon" aria-hidden="true">
+                    <IconWallet size={17} stroke={2.2} />
+                  </span>
+                  <strong>${formatearCOP(headerSalesSummary)}</strong>
+                  <span>Venta hoy</span>
+                </article>
+                {orderMetricCards.map(card => {
+                  const Icon = card.Icon;
+                  const isActive = activeOrderMetric === card.key;
+                  return (
+                    <button
+                      key={card.key}
+                      type="button"
+                      className={`orders-header-metric-card ${card.className}${isActive ? " is-active" : ""}`}
+                      onClick={() => focusOrderMetric(card.key)}
+                      aria-pressed={isActive}
+                      aria-label={`${card.label}: ${card.value}`}
+                    >
+                      <span className="orders-header-metric-icon" aria-hidden="true">
+                        <Icon size={17} strokeWidth={2.2} />
+                      </span>
+                      <strong>{card.value}</strong>
+                      <span>{card.shortLabel}</span>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           </header>
 
-          <section className="orders-metrics-grid orders-bi-grid" aria-label="Indicadores de pedidos">
-            {orderMetricCards.map(card => {
-              const Icon = card.Icon;
-              const isActive = activeOrderMetric === card.key;
-              return (
-                <button
-                  key={card.key}
-                  type="button"
-                  className={`orders-bi-card ${card.className}${isActive ? " is-active" : ""}`}
-                  onClick={() => focusOrderMetric(card.key)}
-                  aria-pressed={isActive}
-                  aria-label={`${card.label}: ${card.value}`}
-                >
-                  <span className="orders-bi-icon-shell" aria-hidden="true">
-                    <Icon size={16} strokeWidth={2} />
-                  </span>
-                  <span className="orders-bi-label">{card.shortLabel}</span>
-                  <strong className="orders-bi-value">{card.value}</strong>
-                </button>
-              );
-            })}
-          </section>
-
-          <section className="orders-filters orders-filters--four-col orders-page-filters">
+          <section className="orders-page-section">
+            <h2 className="orders-section-title">Filtros</h2>
+            <div className="orders-filters orders-filters--four-col orders-page-filters">
             <div className="filter-field orders-filter-field">
               <div className="orders-filter-control">
                 <Search size={17} strokeWidth={2} aria-hidden="true" />
                 <input
                   type="text"
-                  placeholder="Buscar pedido, barrio, mensaje, pago, cuenta, celular, firma..."
+                  placeholder="Buscar pedido, cliente, celular..."
                   value={filters.q}
                   onChange={event => applyFilterValue("q", event.target.value)}
                 />
@@ -1452,34 +1633,24 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
                 />
               </div>
             </div>
-            <label className="filter-field orders-filter-field orders-status-filter">
-              <details className="estado-filtro-dropdown">
-                <summary className="estado-filtro-summary">
-                  <Filter size={17} strokeWidth={2} aria-hidden="true" />
-                  Estados
-                </summary>
-                <div className="estado-filtro-panel">
-                  <div className="estado-filtro-list">
-                    {[
-                      { value: "", label: "Todos" },
-                      { value: "CREADO", label: "Creado" },
-                      { value: "APROBADO", label: "Aprobado" },
-                      { value: "CANCELADO", label: "Cancelado" },
-                    ].map(item => (
-                      <label key={item.value || "todos"} className="estado-filtro-item">
-                        <input
-                          type="radio"
-                          name="ordersEstadoFiltro"
-                          checked={filters.estado === item.value}
-                          onChange={() => applyFilterValue("estado", item.value)}
-                        />
-                        <span>{item.label}</span>
-                      </label>
-                    ))}
-                  </div>
-                </div>
-              </details>
-            </label>
+            <div className="orders-status-chips" aria-label="Filtros rapidos">
+              <button type="button" className={`orders-status-chip is-all${!filters.estado && !filters.sinImprimir ? " is-active" : ""}`} onClick={() => setFilters(current => ({ ...current, estado: "", sinImprimir: false, page: 1 }))}>
+                Todos
+              </button>
+              <button type="button" className={`orders-status-chip is-pending${filters.estado === "CREADO" && !filters.sinImprimir ? " is-active" : ""}`} onClick={() => focusOrderMetric("pendientes")}>
+                <span aria-hidden="true" /> Pendientes
+              </button>
+              <button type="button" className={`orders-status-chip is-approved${filters.estado === "APROBADO" && !filters.sinImprimir ? " is-active" : ""}`} onClick={() => focusOrderMetric("aprobados")}>
+                <span aria-hidden="true" /> Aprobados
+              </button>
+              <button type="button" className={`orders-status-chip is-cancelled${filters.estado === "CANCELADO" && !filters.sinImprimir ? " is-active" : ""}`} onClick={() => focusOrderMetric("cancelados")}>
+                <span aria-hidden="true" /> Cancelados
+              </button>
+              <button type="button" className={`orders-status-chip is-print${filters.sinImprimir ? " is-active" : ""}`} onClick={() => focusOrderMetric("facturas")}>
+                <span aria-hidden="true" /> Sin imprimir
+              </button>
+            </div>
+            </div>
           </section>
 
           {filters.soloTienda ? (
@@ -1503,27 +1674,29 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
             <p className="orders-message">No hay pedidos para los filtros seleccionados.</p>
           )}
 
-          <section className="orders-table-wrap orders-page-table-wrap">
-            <table className="orders-table">
-              <thead>
-                <tr>
-                  <th>ID Pedido</th>
-                  <th>Producto / Cliente</th>
-                  <th>Cliente · Destinatario</th>
-                  <th>Fecha entrega</th>
-                  <th>Florista</th>
-                  <th>Método pago</th>
-                  <th>Estado</th>
-                  <th>Valor</th>
-                  <th>Acciones</th>
-                </tr>
-              </thead>
-              <tbody>
+          <section className="orders-page-section">
+            <h2 className="orders-section-title">Listado de pedidos</h2>
+            <div className="orders-table-wrap orders-page-table-wrap">
+              <table className="orders-table">
+                <thead>
+                  <tr>
+                    <th>Número pedido</th>
+                    <th>Producto / Cliente</th>
+                    <th>Fecha entrega</th>
+                    <th>Florista</th>
+                    <th>Método pago</th>
+                    <th>Estado</th>
+                    <th>Valor</th>
+                    <th>Acciones</th>
+                  </tr>
+                </thead>
+                <tbody>
                 {items.map(item => {
                   const statusClass = statusBadgeClass(item.estado, item);
                   const productText = (item.productos || []).slice(0, 2).join(", ");
                   const waPhone = String(item.telefonoCompleto || item.telefono || "").trim().replace(/\+/g, "");
                   const pedidoId = Number(item.pedidoID);
+                  const displayOrderNumber = resolveDisplayOrderNumber(item);
                   const canApproveAction = isPendingStatus(item.estado);
                   const canCancelAction = canApproveAction || (isEmpresaAdminRole(session) && canInvoiceStatus(item.estado));
                   const isApproving = approvingPedidoIds.includes(Number(pedidoId));
@@ -1545,15 +1718,15 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
                     normalizedStatus === "CANCELADO" || normalizedStatus === "RECHAZADO" ? "orders-row-cancelled" : "",
                     isPendingStatus(item.estado) || normalizedStatus === "CREADO" ? "orders-row-pending" : "",
                   ].filter(Boolean).join(" ");
-                  const floristaName = item.floristaAsignado || item.florista || item.nombreFlorista || "Sin asignar";
+                  const floristaName = resolveFloristaName(item);
 
                   return (
                     <tr
                       key={pedidoId || `${item.numeroPedido}-${item.fecha}`}
                       className={rowClass}
                     >
-                      <td data-label="ID Pedido">
-                        <span className="orders-order-badge">{item.numeroPedido ?? pedidoId ?? "-"}</span>
+                      <td data-label="Número pedido">
+                        <span className={`orders-order-badge ${statusClass}`}>{displayOrderNumber}</span>
                       </td>
                       <td data-label="Producto" title={(item.productos || []).join(", ")}>
                         <div className="orders-product-cell">
@@ -1567,15 +1740,6 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
                           </span>
                         </div>
                       </td>
-                      <td data-label="Cliente · Destinatario" className="orders-client-column">
-                        <div className="orders-client-cell">
-                          <span className="orders-client-avatar" aria-hidden="true">{initialsFromName(item.cliente)}</span>
-                          <div className="orders-cell-stack">
-                            <strong>{item.cliente || "-"}</strong>
-                            <span>Destinatario: {item.destinatario || "-"}</span>
-                          </div>
-                        </div>
-                      </td>
                       <td data-label="Fecha entrega">
                         <div className="orders-cell-stack orders-cell-stack--delivery">
                           <span><CalendarDays size={14} strokeWidth={2} /> {fechaEntrega || "-"}</span>
@@ -1583,7 +1747,7 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
                         </div>
                       </td>
                       <td data-label="Florista">
-                        <div className={`orders-florist-cell${floristaName === "Sin asignar" ? " is-unassigned" : ""}`}>
+                        <div className={`orders-florist-cell${floristaName === "Sin asignar" ? " is-unassigned" : " is-assigned"}${normalizedStatus === "APROBADO" ? " is-approved" : ""}`}>
                           <span className="orders-client-avatar orders-florist-avatar" aria-hidden="true">
                             {floristaName === "Sin asignar" ? <UserCircle size={18} strokeWidth={2} /> : initialsFromName(floristaName)}
                           </span>
@@ -1647,8 +1811,9 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
                     </tr>
                   );
                 })}
-              </tbody>
-            </table>
+                </tbody>
+              </table>
+            </div>
           </section>
 
           <footer className="orders-pager">

@@ -83,11 +83,11 @@ export function AppSidebar({
     <>
       <aside className="app-sidebar">
         <div className="sidebar-brand">
-          <img src="/petalops-compact.png" alt="PetalOps" className="sidebar-brand-logo-compact" />
-          <img src="/petalops-compact.png" alt="" className="sidebar-brand-logo-full" />
+          <img src="/logo.png" alt="PetalOps" className="sidebar-brand-logo-compact" />
+          <img src="/logo.png" alt="" className="sidebar-brand-logo-full" />
           <div className="sidebar-brand-wordmark">
             <strong>PetalOps</strong>
-            <span>Gestión Floral</span>
+            <span>GESTION OPERATIVA</span>
           </div>
         </div>
 

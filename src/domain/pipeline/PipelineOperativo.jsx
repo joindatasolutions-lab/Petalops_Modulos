@@ -285,54 +285,59 @@ export function PipelineOperativo({
 
         {/* ── HEADER — mismas clases que Pedidos y Producción ── */}
         <header className="orders-admin-header orders-page-header pipeline-page-header">
-          <div>
-            <h1>Pipeline</h1>
-            <p className="orders-admin-subtitle">Usuario: {displayUserName}</p>
+          <div className="orders-page-heading">
+            <div className="orders-page-breadcrumb" aria-label="Ruta">
+              <span>Ventas</span>
+              <span>/</span>
+              <strong>Pipeline</strong>
+            </div>
+            <div className="orders-page-title-row">
+              <h1>Pipeline</h1>
+            </div>
+            <p className="orders-admin-subtitle orders-page-description">
+              Visualiza y mueve pedidos entre etapas operativas.
+            </p>
+            <span className="orders-user-pill">
+              <span aria-hidden="true" />
+              Sesion activa: {displayUserName}
+            </span>
           </div>
-          <div className="header-actions">
-            <button
-              type="button"
-              className="btn-primary orders-header-refresh"
-              title="Actualizar pipeline"
-              onClick={loadBoard}
-            >
-              <RotateCw size={18} strokeWidth={2} />
-              <span>Actualizar</span>
-            </button>
+          <div className="orders-header-side">
+            <div className="header-actions">
+              <button
+                type="button"
+                className="btn-primary orders-header-refresh"
+                title="Actualizar pipeline"
+                onClick={loadBoard}
+              >
+                <RotateCw size={18} strokeWidth={2} />
+                <span>Actualizar</span>
+              </button>
+            </div>
+            <div className="orders-header-metrics pipeline-header-metrics" aria-label="Resumen pipeline">
+              <article className="orders-header-metric-card is-primary">
+                <span className="orders-header-metric-icon" aria-hidden="true"><ListChecks size={18} strokeWidth={2} /></span>
+                <strong>{pipelineMetrics.activos}</strong>
+                <span>Activos</span>
+              </article>
+              <article className="orders-header-metric-card is-warning">
+                <span className="orders-header-metric-icon" aria-hidden="true"><Timer size={18} strokeWidth={2} /></span>
+                <strong>{pipelineMetrics.enProduccion}</strong>
+                <span>En produccion</span>
+              </article>
+              <article className="orders-header-metric-card is-info">
+                <span className="orders-header-metric-icon" aria-hidden="true"><Truck size={18} strokeWidth={2} /></span>
+                <strong>{pipelineMetrics.enCamino}</strong>
+                <span>En camino</span>
+              </article>
+              <article className="orders-header-metric-card is-success">
+                <span className="orders-header-metric-icon" aria-hidden="true"><CheckCircle2 size={18} strokeWidth={2} /></span>
+                <strong>{pipelineMetrics.entregados}</strong>
+                <span>Entregados</span>
+              </article>
+            </div>
           </div>
         </header>
-
-        {/* ── KPI METRICS — igual que producción/inventario ── */}
-        <section className="orders-metrics-grid pipeline-metrics-grid" aria-label="Indicadores pipeline">
-          <article className="orders-metric-card pipeline-metric-card">
-            <span className="orders-metric-icon" aria-hidden="true"><ListChecks size={18} strokeWidth={2} /></span>
-            <span className="orders-metric-copy">
-              <span className="orders-metric-label">Pedidos activos</span>
-              <strong className="orders-metric-value">{pipelineMetrics.activos}</strong>
-            </span>
-          </article>
-          <article className="orders-metric-card pipeline-metric-card">
-            <span className="orders-metric-icon" aria-hidden="true"><Timer size={18} strokeWidth={2} /></span>
-            <span className="orders-metric-copy">
-              <span className="orders-metric-label">En producción</span>
-              <strong className="orders-metric-value">{pipelineMetrics.enProduccion}</strong>
-            </span>
-          </article>
-          <article className="orders-metric-card pipeline-metric-card">
-            <span className="orders-metric-icon" aria-hidden="true"><Truck size={18} strokeWidth={2} /></span>
-            <span className="orders-metric-copy">
-              <span className="orders-metric-label">En camino</span>
-              <strong className="orders-metric-value">{pipelineMetrics.enCamino}</strong>
-            </span>
-          </article>
-          <article className="orders-metric-card pipeline-metric-card">
-            <span className="orders-metric-icon" aria-hidden="true"><CheckCircle2 size={18} strokeWidth={2} /></span>
-            <span className="orders-metric-copy">
-              <span className="orders-metric-label">Entregados hoy</span>
-              <strong className="orders-metric-value">{pipelineMetrics.entregados}</strong>
-            </span>
-          </article>
-        </section>
 
         {/* ── FILTROS ── */}
         <PipelineFilters filters={filters} onChange={onChangeFilter} />

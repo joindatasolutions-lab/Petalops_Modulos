@@ -980,91 +980,105 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
       />
 
       <main className="orders-admin-view production-page-view">
-        <div className="production-topbar">
-          <div className="production-topbar-left">
-            <span className="production-topbar-title">Producción</span>
-            <span className="production-topbar-user">Usuario: {displayUserName}</span>
-          </div>
-          <div className="production-topbar-actions">
-            <div className="production-menu-dropdown" ref={productionMenuRef}>
-              <button
-                type="button"
-                className={`btn-outline production-topbar-btn production-menu-trigger${productionMenuOpen ? " is-open" : ""}`}
-                onClick={() => setProductionMenuOpen(open => !open)}
-                aria-expanded={productionMenuOpen}
-                aria-haspopup="menu"
-                title="Cambiar vista de producción"
-              >
-                {(() => {
-                  const activeOption = visibleSubmenuOptions.find(item => item.key === submenu) || visibleSubmenuOptions[0] || SUBMENU_OPTIONS[0];
-                  const ActiveIcon = PRODUCTION_SUBMENU_ICONS[activeOption.key] || ClipboardList;
-                  return (
-                    <>
-                      <ActiveIcon size={18} strokeWidth={2} />
-                      <span>{activeOption.label}</span>
-                      <ChevronDown size={16} strokeWidth={2} className="production-menu-chevron" />
-                    </>
-                  );
-                })()}
-              </button>
-
-              {productionMenuOpen ? (
-                <div className="production-menu-panel" role="menu" onClick={() => setProductionMenuOpen(false)}>
-                  {visibleSubmenuOptions.map(item => {
-                    const ItemIcon = PRODUCTION_SUBMENU_ICONS[item.key] || ClipboardList;
-                    return (
-                      <button
-                        key={item.key}
-                        type="button"
-                        className={`production-menu-option${submenu === item.key ? " is-active" : ""}`}
-                        onClick={() => {
-                          setSubmenu(item.key);
-                          setProductionMenuOpen(false);
-                        }}
-                        role="menuitem"
-                      >
-                        <span className="production-menu-option-icon"><ItemIcon size={17} strokeWidth={2} /></span>
-                        <span>{item.label}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-              ) : null}
+        <header className="orders-admin-header orders-page-header production-page-header">
+          <div className="orders-page-heading">
+            <div className="orders-page-breadcrumb" aria-label="Ruta">
+              <span>Operaciones</span>
+              <span>/</span>
+              <strong>Producción</strong>
             </div>
-            <button type="button" className="btn-primary production-topbar-btn production-topbar-btn-primary" title="Recargar vista" onClick={refreshAll}>
-              <RotateCw size={18} strokeWidth={2} />
-              <span>Actualizar</span>
-            </button>
+            <div className="orders-page-title-row">
+              <h1>Producción</h1>
+            </div>
+            <p className="orders-admin-subtitle orders-page-description">
+              Organiza asignaciones, estados y entregas de producción diaria.
+            </p>
+            <span className="orders-user-pill">
+              <span aria-hidden="true" />
+              Sesion activa: {displayUserName}
+            </span>
           </div>
-        </div>
+          <div className="orders-header-side">
+            <div className="header-actions">
+              <div className="production-menu-dropdown" ref={productionMenuRef}>
+                <button
+                  type="button"
+                  className={`btn-outline orders-header-refresh production-topbar-btn production-menu-trigger${productionMenuOpen ? " is-open" : ""}`}
+                  onClick={() => setProductionMenuOpen(open => !open)}
+                  aria-expanded={productionMenuOpen}
+                  aria-haspopup="menu"
+                  title="Cambiar vista de producción"
+                >
+                  {(() => {
+                    const activeOption = visibleSubmenuOptions.find(item => item.key === submenu) || visibleSubmenuOptions[0] || SUBMENU_OPTIONS[0];
+                    const ActiveIcon = PRODUCTION_SUBMENU_ICONS[activeOption.key] || ClipboardList;
+                    return (
+                      <>
+                        <ActiveIcon size={18} strokeWidth={2} />
+                        <span>{activeOption.label}</span>
+                        <ChevronDown size={16} strokeWidth={2} className="production-menu-chevron" />
+                      </>
+                    );
+                  })()}
+                </button>
 
-        <section className="production-metrics-grid" aria-label="Indicadores de producción">
-          <button type="button" className="production-metric-card" onClick={() => focusMetric(null)}>
-            <span className="production-metric-icon" aria-hidden="true"><ListChecks size={18} strokeWidth={2} /></span>
-            <span className="production-metric-label">Pedidos visibles</span>
-            <strong className="production-metric-value">{metrics.total}</strong>
-          </button>
-          <button type="button" className={`production-metric-card ${activeMetricFilter === "pendientesHoy" ? "is-active" : ""}`} onClick={() => focusMetric("pendientesHoy")}>
-            <span className="production-metric-icon" aria-hidden="true"><CalendarCheck2 size={18} strokeWidth={2} /></span>
-            <span className="production-metric-label">Pendientes hoy</span>
-            <strong className="production-metric-value">{metrics.pendientesHoy}</strong>
-          </button>
-          <button type="button" className={`production-metric-card ${metrics.sinAsignar > 0 ? "is-warning" : ""} ${activeMetricFilter === "sinAsignar" ? "is-active" : ""}`} onClick={() => focusMetric("sinAsignar")}>
-            <span className="production-metric-icon" aria-hidden="true"><UserX size={18} strokeWidth={2} /></span>
-            <span className="production-metric-label">Pendientes sin asignar</span>
-            <strong className="production-metric-value">{metrics.sinAsignar}</strong>
-          </button>
-          <button type="button" className={`production-metric-card ${metrics.atrasados > 0 ? "is-danger" : ""} ${activeMetricFilter === "atrasados" ? "is-active" : ""}`} onClick={() => focusMetric("atrasados")}>
-            <span className="production-metric-icon" aria-hidden="true"><TriangleAlert size={18} strokeWidth={2} /></span>
-            <span className="production-metric-label">Pendientes atrasados</span>
-            <strong className="production-metric-value">{metrics.atrasados}</strong>
-          </button>
-          <button type="button" className={`production-metric-card ${metrics.pendientesFuturos > 0 ? "is-warning" : ""} ${activeMetricFilter === "pendientesFuturos" ? "is-active" : ""}`} onClick={() => focusMetric("pendientesFuturos")}>
-            <span className="production-metric-icon" aria-hidden="true"><CalendarClock size={18} strokeWidth={2} /></span>
-            <span className="production-metric-label">Pendientes futuros</span>
-            <strong className="production-metric-value">{metrics.pendientesFuturos}</strong>
-          </button>
-        </section>
+                {productionMenuOpen ? (
+                  <div className="production-menu-panel" role="menu" onClick={() => setProductionMenuOpen(false)}>
+                    {visibleSubmenuOptions.map(item => {
+                      const ItemIcon = PRODUCTION_SUBMENU_ICONS[item.key] || ClipboardList;
+                      return (
+                        <button
+                          key={item.key}
+                          type="button"
+                          className={`production-menu-option${submenu === item.key ? " is-active" : ""}`}
+                          onClick={() => {
+                            setSubmenu(item.key);
+                            setProductionMenuOpen(false);
+                          }}
+                          role="menuitem"
+                        >
+                          <span className="production-menu-option-icon"><ItemIcon size={17} strokeWidth={2} /></span>
+                          <span>{item.label}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                ) : null}
+              </div>
+              <button type="button" className="btn-primary orders-header-refresh production-topbar-btn production-topbar-btn-primary" title="Recargar vista" onClick={refreshAll}>
+                <RotateCw size={18} strokeWidth={2} />
+                <span>Actualizar</span>
+              </button>
+            </div>
+            <div className="orders-header-metrics production-header-metrics" aria-label="Indicadores de producción">
+              <button type="button" className="orders-header-metric-card is-primary" onClick={() => focusMetric(null)}>
+                <span className="orders-header-metric-icon" aria-hidden="true"><ListChecks size={18} strokeWidth={2} /></span>
+                <strong>{metrics.total}</strong>
+                <span>Visibles</span>
+              </button>
+              <button type="button" className={`orders-header-metric-card is-green ${activeMetricFilter === "pendientesHoy" ? "is-active" : ""}`} onClick={() => focusMetric("pendientesHoy")}>
+                <span className="orders-header-metric-icon" aria-hidden="true"><CalendarCheck2 size={18} strokeWidth={2} /></span>
+                <strong>{metrics.pendientesHoy}</strong>
+                <span>Pendientes hoy</span>
+              </button>
+              <button type="button" className={`orders-header-metric-card is-blue ${metrics.sinAsignar > 0 ? "is-warning" : ""} ${activeMetricFilter === "sinAsignar" ? "is-active" : ""}`} onClick={() => focusMetric("sinAsignar")}>
+                <span className="orders-header-metric-icon" aria-hidden="true"><UserX size={18} strokeWidth={2} /></span>
+                <strong>{metrics.sinAsignar}</strong>
+                <span>Sin asignar</span>
+              </button>
+              <button type="button" className={`orders-header-metric-card is-orange ${metrics.atrasados > 0 ? "is-danger" : ""} ${activeMetricFilter === "atrasados" ? "is-active" : ""}`} onClick={() => focusMetric("atrasados")}>
+                <span className="orders-header-metric-icon" aria-hidden="true"><TriangleAlert size={18} strokeWidth={2} /></span>
+                <strong>{metrics.atrasados}</strong>
+                <span>Atrasados</span>
+              </button>
+              <button type="button" className={`orders-header-metric-card is-purple ${metrics.pendientesFuturos > 0 ? "is-warning" : ""} ${activeMetricFilter === "pendientesFuturos" ? "is-active" : ""}`} onClick={() => focusMetric("pendientesFuturos")}>
+                <span className="orders-header-metric-icon" aria-hidden="true"><CalendarClock size={18} strokeWidth={2} /></span>
+                <strong>{metrics.pendientesFuturos}</strong>
+                <span>Futuros</span>
+              </button>
+            </div>
+          </div>
+        </header>
 
         {activeMetricMeta ? (
           <section className="production-alert-card production-ops-panel" ref={productionListRef} aria-label="Panel operativo de KPI seleccionado">
