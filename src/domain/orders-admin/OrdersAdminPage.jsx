@@ -1,9 +1,10 @@
-﻿import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { tenantConfig } from "../../config/tenantConfig.js";
+import { useRef } from "react";
 import { createApiClient } from "../../infrastructure/apiClient.js";
 import { AppSidebar } from "../../shared/AppSidebar.jsx";
 import { useSidebarState } from "../../shared/useSidebarState.js";
-import { formatearCOP, normalizeStatus, splitDateTimeParts, toIsoDateEnd, toIsoDateStart } from "../../shared/utils.js";
+import { formatearCOP, normalizeStatus, shiftIsoDate, splitDateTimeParts, todayIsoDateBogota, toIsoDateEnd, toIsoDateStart } from "../../shared/utils.js";
 import { useDebouncedValue } from "../../shared/useDebouncedValue.js";
 import {
   IconCheck,
@@ -17,6 +18,9 @@ import {
   CalendarDays,
   CalendarCheck2,
   CheckCircle2,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   Clock3,
   Copy,
   Eye,
@@ -24,7 +28,7 @@ import {
   Gift,
   Mail,
   MessageCircle,
-  MoreHorizontal,
+  MoreVertical,
   Pencil,
   Plus,
   Receipt,
@@ -44,20 +48,76 @@ const BADGE_CLASS_BY_STATUS = {
 };
 const LINK_PAYMENT_METHODS = new Set(["link bold", "link payu", "link wompi"]);
 const AUTO_REFRESH_INTERVAL_MS = 15000;
+const ORDERS_FILTER_CACHE_LIMIT = 8;
+const PAGE_SIZE_OPTIONS = [10, 20, 50];
+const CANCELADO_PEDIDO_ESTADO_ID = 6;
 
 function todayIsoDate() {
-  return new Date().toISOString().slice(0, 10);
+  return todayIsoDateBogota();
 }
 
-function shiftIsoDate(isoDate, days) {
-  const parsed = new Date(`${isoDate}T12:00:00`);
-  if (Number.isNaN(parsed.getTime())) return isoDate;
-  parsed.setDate(parsed.getDate() + days);
-  return parsed.toISOString().slice(0, 10);
+function isoDateFromParts(year, month, day) {
+  return new Date(Date.UTC(year, month, day, 12, 0, 0)).toISOString().slice(0, 10);
+}
+
+function currentBogotaDateParts() {
+  const [year, month, day] = todayIsoDate().split("-").map(Number);
+  return { year, month: month - 1, day };
+}
+
+function thisWeekRangeIso() {
+  const { year, month, day } = currentBogotaDateParts();
+  const current = new Date(Date.UTC(year, month, day, 12, 0, 0));
+  const dayOfWeek = current.getUTCDay() || 7;
+  const start = new Date(current);
+  start.setUTCDate(current.getUTCDate() - dayOfWeek + 1);
+  const end = new Date(start);
+  end.setUTCDate(start.getUTCDate() + 6);
+  return {
+    fechaDesde: start.toISOString().slice(0, 10),
+    fechaHasta: end.toISOString().slice(0, 10),
+  };
+}
+
+function thisMonthRangeIso() {
+  const { year, month } = currentBogotaDateParts();
+  return {
+    fechaDesde: isoDateFromParts(year, month, 1),
+    fechaHasta: isoDateFromParts(year, month + 1, 0),
+  };
+}
+
+function buildPaginationItems(page, pages) {
+  const currentPage = Math.max(1, Math.min(Number(page || 1), Number(pages || 1)));
+  const totalPages = Math.max(1, Number(pages || 1));
+  if (totalPages <= 7) return Array.from({ length: totalPages }, (_, index) => index + 1);
+  if (currentPage <= 4) return [1, 2, 3, 4, 5, "ellipsis-end", totalPages];
+  if (currentPage >= totalPages - 3) return [1, "ellipsis-start", totalPages - 4, totalPages - 3, totalPages - 2, totalPages - 1, totalPages];
+  return [1, "ellipsis-start", currentPage - 1, currentPage, currentPage + 1, "ellipsis-end", totalPages];
 }
 
 function orderDeliveryDate(item) {
   return splitDateTimeParts(item?.fechaEntrega).date;
+}
+
+function orderCreatedDate(item) {
+  return splitDateTimeParts(item?.fecha_pedido || item?.fechaPedido || item?.fecha || item?.createdAt || item?.created_at).date;
+}
+
+function isTodaySalesOrder(item, targetDate) {
+  const createdDate = orderCreatedDate(item);
+  const deliveryDate = orderDeliveryDate(item);
+  return createdDate === targetDate || deliveryDate === targetDate;
+}
+
+function isCountableSalesOrder(item) {
+  return normalizeStatus(item?.estado) === "APROBADO";
+}
+
+function calculateTodaySalesTotal(items, targetDate = todayIsoDate()) {
+  return (Array.isArray(items) ? items : [])
+    .filter(item => isTodaySalesOrder(item, targetDate) && isCountableSalesOrder(item))
+    .reduce((sum, item) => sum + resolveOrderListTotal(item), 0);
 }
 
 function isPendingOutsideToday(item) {
@@ -119,6 +179,14 @@ function resolveDisplayOrderNumber(item) {
     item?.numero_pedido,
     item?.codigoPedido,
     item?.codigo_pedido,
+    item?.pedido?.numeroPedido,
+    item?.pedido?.numero_pedido,
+    item?.pedido?.codigoPedido,
+    item?.pedido?.codigo_pedido,
+    item?.data?.numeroPedido,
+    item?.data?.numero_pedido,
+    item?.data?.codigoPedido,
+    item?.data?.codigo_pedido,
   ];
 
   for (const value of candidates) {
@@ -127,6 +195,194 @@ function resolveDisplayOrderNumber(item) {
   }
 
   return "-";
+}
+
+function resolveOrderId(item) {
+  const candidates = [
+    item?.pedidoID,
+    item?.pedidoId,
+    item?.pedido_id,
+    item?.idPedido,
+    item?.id_pedido,
+    item?.id,
+    item?.pedido?.pedidoID,
+    item?.pedido?.pedidoId,
+    item?.pedido?.pedido_id,
+    item?.pedido?.idPedido,
+    item?.pedido?.id_pedido,
+    item?.pedido?.id,
+    item?.data?.pedidoID,
+    item?.data?.pedidoId,
+    item?.data?.pedido_id,
+    item?.data?.idPedido,
+    item?.data?.id_pedido,
+    item?.data?.id,
+  ];
+
+  for (const value of candidates) {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed) && parsed > 0) return parsed;
+  }
+
+  const displayNumber = Number(resolveDisplayOrderNumber(item));
+  if (Number.isFinite(displayNumber) && displayNumber > 0) return displayNumber;
+
+  return null;
+}
+
+function resolveAssignedOrderNumber(...sources) {
+  for (const source of sources) {
+    const displayNumber = resolveDisplayOrderNumber(source);
+    if (displayNumber && displayNumber !== "-") return displayNumber;
+  }
+  return "";
+}
+
+function resolveProductImageUrl(value) {
+  if (!value || typeof value !== "object") return "";
+  const candidates = [
+    value.imagen_url,
+    value.imagenUrl,
+    value.imagen,
+    value.imageUrl,
+    value.image_url,
+    value.fotoUrl,
+    value.foto_url,
+    value.urlImagen,
+    value.url_imagen,
+    value.productoImagenUrl,
+    value.producto_imagen_url,
+    value.imagenProducto,
+    value.imagen_producto,
+    value.imagenPrincipal,
+    value.imagen_principal,
+    value.foto,
+    value.url,
+    value.imagenes?.[0]?.url,
+    value.imagenes?.[0]?.imagenUrl,
+    value.imagenes?.[0]?.imagen_url,
+    value.images?.[0]?.url,
+    value.images?.[0]?.imageUrl,
+    value.producto?.imagenUrl,
+    value.producto?.imagen_url,
+  ];
+  return String(candidates.find(candidate => String(candidate || "").trim()) || "").trim();
+}
+
+function normalizeOrderProducts(item) {
+  const sources = [
+    item?.productosDetalle,
+    item?.productos_detalle,
+    item?.detalles,
+    item?.detalleProductos,
+    item?.productos,
+  ];
+  const source = sources.find(Array.isArray) || [];
+
+  return source
+    .map((product, index) => {
+      if (product && typeof product === "object") {
+        return {
+          key: String(product.detalleID || product.productoID || product.id || product.codigoProducto || index),
+          productId: getProductoId(product),
+          name: String(product.nombreProducto || product.nombre || product.producto || product.descripcion || "").trim(),
+          code: String(product.codigoProducto || product.codigo || product.sku || "").trim(),
+          codigoProducto: String(product.codigoProducto || product.codigo_producto || product.codigo || product.sku || "").trim(),
+          codigoCatalogo: String(product.codigoCatalogo || product.codigo_catalogo || product.catalogCode || "").trim(),
+          nombreProducto: String(product.nombreProducto || product.nombre || product.producto || product.descripcion || "").trim(),
+          imageUrl: resolveProductImageUrl(product),
+        };
+      }
+      return {
+        key: String(index),
+        productId: null,
+        name: String(product || "").trim(),
+        code: "",
+        imageUrl: "",
+      };
+    })
+    .filter(product => product.name || product.code || product.imageUrl);
+}
+
+function displayProductCode(product, empresaId = null) {
+  const productEmpresaId = Number(product?.empresaID || product?.empresaId || product?.empresa_id || empresaId);
+  const isEmpresaCatalogCode = productEmpresaId === 3;
+  const catalogCode = String(product?.codigoCatalogo || product?.codigo_catalogo || product?.catalogCode || product?.codigo_catalogo_producto || "").trim();
+  const productCode = String(product?.codigoProducto || product?.codigo_producto || product?.codigo || product?.code || "").trim();
+  return isEmpresaCatalogCode ? (catalogCode || productCode) : productCode;
+}
+
+function orderProductLabel(product, empresaId = null) {
+  if (typeof product === "string") return product.trim();
+  const code = displayProductCode(product, empresaId);
+  const name = String(product?.nombreProducto || product?.name || "").trim();
+  if (code && name) return `${code} - ${name}`;
+  return name || code;
+}
+
+function productLookupKey(value) {
+  return String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .toLowerCase();
+}
+
+function buildCatalogProductIndex(items) {
+  const index = new Map();
+  for (const item of Array.isArray(items) ? items : []) {
+    if (item.id != null) index.set(`id:${item.id}`, item);
+    const codeKeys = [
+      item.codigo,
+      item.codigoProducto,
+      item.codigoCatalogo,
+      item.code,
+    ]
+      .map(productLookupKey)
+      .filter(Boolean);
+    const nameKey = productLookupKey(item.nombre);
+    for (const codeKey of codeKeys) {
+      index.set(`code:${codeKey}`, item);
+    }
+    if (nameKey) index.set(`name:${nameKey}`, item);
+  }
+  return index;
+}
+
+function resolveCatalogProduct(product, catalogIndex) {
+  if (!catalogIndex || catalogIndex.size === 0) return null;
+  if (product?.productId != null) {
+    const byId = catalogIndex.get(`id:${product.productId}`);
+    if (byId) return byId;
+  }
+  const codeKeys = [
+    product?.code,
+    product?.codigo,
+    product?.codigoProducto,
+    product?.codigoCatalogo,
+  ]
+    .map(productLookupKey)
+    .filter(Boolean);
+  for (const codeKey of codeKeys) {
+    const byCode = catalogIndex.get(`code:${codeKey}`);
+    if (byCode) return byCode;
+  }
+  const nameKey = productLookupKey(product?.name || product?.nombre || product?.nombreProducto);
+  return nameKey ? catalogIndex.get(`name:${nameKey}`) || null : null;
+}
+
+function resolveOrderProductSummary(item, catalogIndex = new Map(), empresaId = null) {
+  const products = normalizeOrderProducts(item).map(product => {
+    if (product.imageUrl) return product;
+    const catalogProduct = resolveCatalogProduct(product, catalogIndex);
+    return catalogProduct?.imageUrl ? { ...product, imageUrl: catalogProduct.imageUrl } : product;
+  });
+  const names = products.map(product => orderProductLabel(product, empresaId ?? item?.empresaID ?? item?.empresaId)).filter(Boolean);
+  return {
+    products,
+    productText: names.slice(0, 2).join(", "),
+    title: names.join(", "),
+  };
 }
 
 function textFromValue(value) {
@@ -180,9 +436,12 @@ function resolveFloristaName(item) {
   return "Sin asignar";
 }
 
-function buildOrdersMetrics(items, facturasPendientesImpresion = 0, targetDate = todayIsoDate()) {
+export function buildOrdersMetrics(items, facturasPendientesImpresion = 0, targetDate = todayIsoDate()) {
   const rows = Array.isArray(items) ? items : [];
   const facturasNoImpresasVisibles = rows.filter(item => canInvoiceStatus(item.estado) && !item.facturaImpresa).length;
+  const facturasNoImpresas = rows.length > 0
+    ? facturasNoImpresasVisibles
+    : Number(facturasPendientesImpresion || 0);
   return {
     total: rows.length,
     hoy: rows.filter(item => {
@@ -193,8 +452,206 @@ function buildOrdersMetrics(items, facturasPendientesImpresion = 0, targetDate =
     aprobados: rows.filter(item => normalizeStatus(item.estado) === "APROBADO").length,
     pendientes: rows.filter(item => isPendingStatus(item.estado) || normalizeStatus(item.estado) === "CREADO").length,
     cancelados: rows.filter(item => ["CANCELADO", "RECHAZADO"].includes(normalizeStatus(item.estado))).length,
-    facturasNoImpresas: Number(facturasPendientesImpresion || facturasNoImpresasVisibles || 0),
+    facturasNoImpresas,
   };
+}
+
+export function filterOrdersByStatus(items, estado) {
+  const rows = Array.isArray(items) ? items : [];
+  const normalizedFilter = normalizeStatus(estado);
+  if (!normalizedFilter) return rows;
+
+  return rows.filter(item => {
+    const status = normalizeStatus(item?.estado);
+    if (normalizedFilter === "APROBADO") return status === "APROBADO";
+    if (normalizedFilter === "CREADO") return status === "CREADO" || isPendingStatus(status);
+    if (normalizedFilter === "CANCELADO") return status === "CANCELADO" || status === "RECHAZADO";
+    return status === normalizedFilter;
+  });
+}
+
+function normalizeOrderSearchText(value) {
+  return String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .toLowerCase();
+}
+
+export function isStorePickupOrder(item) {
+  if (!item || typeof item !== "object") return false;
+  if (item.soloTienda === true || item.entregaEnTienda === true || item.recogerEnTienda === true) return true;
+  if (item.solo_tienda === true || item.entrega_en_tienda === true || item.recoger_en_tienda === true) return true;
+
+  const text = [
+    item?.tipoEntrega,
+    item?.tipo_entrega,
+    item?.entregaTipo,
+    item?.entrega_tipo,
+    item?.tipoEntregaNombre,
+    item?.tipo_entrega_nombre,
+    item?.modalidadEntrega,
+    item?.modalidad_entrega,
+    item?.barrio,
+    item?.barrioNombre,
+    item?.barrio_nombre,
+    item?.destinatario?.tipoEntrega,
+    item?.destinatario?.tipo_entrega,
+    item?.destinatario?.barrio,
+    item?.destinatario?.barrioNombre,
+    item?.entrega?.tipoEntrega,
+    item?.entrega?.tipo_entrega,
+    item?.entrega?.barrio,
+    item?.entrega?.barrioNombre,
+  ].map(normalizeOrderSearchText).filter(Boolean).join(" ");
+
+  const compact = text.replace(/[^a-z0-9]+/g, "");
+  return compact.includes("tienda")
+    && (
+      compact.includes("recoger")
+      || compact.includes("recogida")
+      || compact.includes("retiro")
+      || compact.includes("retirar")
+      || compact.includes("entregaentienda")
+      || compact.includes("entregasentienda")
+    );
+}
+
+function filterStorePickupOrders(items) {
+  return (Array.isArray(items) ? items : []).filter(isStorePickupOrder);
+}
+
+function paymentMethodSearchValues(item) {
+  const financiero = item?.financiero || item?.financial || {};
+  const directValues = [
+    item?.metodoPago,
+    item?.metodo_pago,
+    item?.medioPago,
+    item?.medio_pago,
+    financiero?.metodoPago,
+    financiero?.metodo_pago,
+    financiero?.medioPago,
+    financiero?.medio_pago,
+    financiero?.cuentaBancaria,
+  ];
+  const arraySources = [
+    item?.metodosPago,
+    item?.metodos_pago,
+    financiero?.metodosPago,
+    financiero?.metodos_pago,
+    item?.detallePago,
+    item?.desglosePago,
+    financiero?.detallePago,
+    financiero?.desglosePago,
+    financiero?.metodosPagoDetalle,
+    financiero?.paymentBreakdown,
+  ];
+
+  return [
+    ...directValues,
+    ...arraySources.flatMap(source => {
+      if (!Array.isArray(source)) return [];
+      return source.map(value => {
+        if (value && typeof value === "object") {
+          return value.metodo || value.metodoPago || value.nombre || value.cuenta || value.label || "";
+        }
+        return value;
+      });
+    }),
+  ]
+    .map(value => String(value || "").trim())
+    .filter(Boolean);
+}
+
+function isPaymentSearchTerm(value) {
+  const search = normalizeOrderSearchText(value);
+  if (!search) return false;
+  const paymentKeywords = [
+    "efectivo",
+    "link",
+    "bold",
+    "payu",
+    "wompi",
+    "transferencia",
+    "tarjeta",
+    "nequi",
+    "daviplata",
+    "bancolombia",
+    "rappi",
+    "datafono",
+    "credito",
+    "debito",
+  ];
+  return paymentKeywords.some(keyword => keyword.includes(search) || search.includes(keyword));
+}
+
+function orderNumberSearchValues(item) {
+  return [
+    resolveDisplayOrderNumber(item),
+    item?.pedidoID,
+    item?.pedidoId,
+    item?.pedido_id,
+    item?.numeroPedido,
+    item?.numero_pedido,
+    item?.codigoPedido,
+    item?.codigo_pedido,
+    item?.pedido?.pedidoID,
+    item?.pedido?.pedidoId,
+    item?.pedido?.pedido_id,
+    item?.pedido?.numeroPedido,
+    item?.pedido?.numero_pedido,
+    item?.pedido?.codigoPedido,
+    item?.pedido?.codigo_pedido,
+    item?.data?.pedidoID,
+    item?.data?.pedidoId,
+    item?.data?.pedido_id,
+    item?.data?.numeroPedido,
+    item?.data?.numero_pedido,
+    item?.data?.codigoPedido,
+    item?.data?.codigo_pedido,
+  ]
+    .map(value => String(value ?? "").trim())
+    .filter(value => value && value !== "-");
+}
+
+function orderMatchesNumberSearch(item, search) {
+  return orderNumberSearchValues(item).some(value => normalizeOrderSearchText(value).includes(search));
+}
+
+export function filterOrdersBySearch(items, searchValue, empresaId = null) {
+  const search = normalizeOrderSearchText(searchValue);
+  const rows = Array.isArray(items) ? items : [];
+  if (!search) return rows;
+
+  const orderNumberMatches = rows.filter(item => orderMatchesNumberSearch(item, search));
+  if (orderNumberMatches.length > 0) return orderNumberMatches;
+
+  return rows.filter(item => {
+    const productSummary = resolveOrderProductSummary(item, new Map(), empresaId);
+    const values = [
+      item?.cliente,
+      item?.clienteNombre,
+      item?.cliente_nombre,
+      item?.destinatario,
+      item?.destinatarioNombre,
+      item?.destinatario_nombre,
+      item?.telefono,
+      item?.telefonoCompleto,
+      item?.celular,
+      item?.email,
+      productSummary.productText,
+      productSummary.title,
+      ...paymentMethodSearchValues(item),
+    ];
+    return values.some(value => normalizeOrderSearchText(value).includes(search));
+  });
+}
+
+export function filterOrdersByPaymentMethod(items, paymentMethod) {
+  const search = normalizeOrderSearchText(paymentMethod);
+  const rows = Array.isArray(items) ? items : [];
+  if (!search) return rows;
+  return rows.filter(item => paymentMethodSearchValues(item).some(value => normalizeOrderSearchText(value).includes(search)));
 }
 
 function normalizeWholePeso(value) {
@@ -245,8 +702,8 @@ function buildOrderFinancialPreview(
   const totalAntesDescuento = roundCurrency(baseTotal + recargoMonto);
   const descuentoMonto = Math.max(0, Math.min(totalAntesDescuento, normalizeWholePeso(descuentoMontoInput) ?? 0));
   const totalDespuesDescuento = roundCurrency(totalAntesDescuento - descuentoMonto);
-  const saldoFavorMonto = Math.max(0, Math.min(totalDespuesDescuento, normalizeWholePeso(saldoFavorMontoInput) ?? 0));
-  const total = roundCurrency(totalDespuesDescuento - saldoFavorMonto);
+  const saldoFavorMonto = Math.max(0, normalizeWholePeso(saldoFavorMontoInput) ?? 0);
+  const total = roundCurrency(totalDespuesDescuento + saldoFavorMonto);
   return {
     subtotal,
     iva,
@@ -259,6 +716,133 @@ function buildOrderFinancialPreview(
     saldoFavorMonto,
     total,
   };
+}
+
+function getOrderFinancialTotal(financiero) {
+  const storedTotal = roundCurrency(financiero?.total ?? 0);
+  const hasFinancialParts = [
+    "subtotal",
+    "iva",
+    "domicilio",
+    "recargoLinkMonto",
+    "descuentoMonto",
+    "saldoFavorMonto",
+  ].some(key => financiero?.[key] != null);
+
+  if (!hasFinancialParts) return storedTotal;
+
+  const subtotal = roundCurrency(financiero?.subtotal ?? 0);
+  const iva = roundCurrency(financiero?.iva ?? 0);
+  const domicilio = roundCurrency(financiero?.domicilio ?? 0);
+  const recargo = roundCurrency(financiero?.recargoLinkMonto ?? 0);
+  const descuento = roundCurrency(financiero?.descuentoMonto ?? 0);
+  const saldoFavor = roundCurrency(financiero?.saldoFavorMonto ?? 0);
+  return roundCurrency(subtotal + iva + domicilio + recargo - descuento + saldoFavor);
+}
+
+function resolveOrderListTotal(item) {
+  const financiero = item?.financiero || item?.financial || item;
+  const storedTotal = roundCurrency(item?.total ?? item?.valorTotal ?? item?.totalPedido ?? financiero?.total ?? 0);
+  const hasFinancialParts = [
+    "subtotal",
+    "iva",
+    "domicilio",
+    "costoDomicilio",
+    "costo_domicilio",
+    "recargoLinkMonto",
+    "descuentoMonto",
+    "saldoFavorMonto",
+  ].some(key => financiero?.[key] != null || item?.[key] != null);
+
+  if (!hasFinancialParts) return storedTotal;
+
+  const subtotal = roundCurrency(financiero?.subtotal ?? item?.subtotal ?? 0);
+  const iva = roundCurrency(financiero?.iva ?? item?.iva ?? 0);
+  const domicilio = roundCurrency(
+    financiero?.domicilio ??
+    financiero?.costoDomicilio ??
+    financiero?.costo_domicilio ??
+    item?.domicilio ??
+    item?.costoDomicilio ??
+    item?.costo_domicilio ??
+    0
+  );
+  const recargo = roundCurrency(financiero?.recargoLinkMonto ?? item?.recargoLinkMonto ?? 0);
+  const descuento = roundCurrency(financiero?.descuentoMonto ?? item?.descuentoMonto ?? 0);
+  const saldoFavor = roundCurrency(financiero?.saldoFavorMonto ?? item?.saldoFavorMonto ?? 0);
+  return roundCurrency(subtotal + iva + domicilio + recargo - descuento + saldoFavor);
+}
+
+export function extractOrdersPayloadItems(payload) {
+  if (Array.isArray(payload)) return payload;
+  const candidates = [
+    payload?.items,
+    payload?.pedidos,
+    payload?.pedido,
+    payload?.orders,
+    payload?.rows,
+    payload?.data,
+    payload?.data?.items,
+    payload?.data?.pedidos,
+    payload?.data?.pedido,
+    payload?.data?.orders,
+    payload?.data?.rows,
+    payload?.result,
+    payload?.result?.items,
+    payload?.result?.pedidos,
+    payload?.result?.orders,
+    payload?.result?.rows,
+    payload?.resultados,
+    payload?.resultados?.items,
+    payload?.resultados?.pedidos,
+  ];
+  return candidates.find(Array.isArray) || [];
+}
+
+function hasOrdersPayloadTotal(payload) {
+  const candidates = [
+    payload?.total,
+    payload?.totalItems,
+    payload?.totalRegistros,
+    payload?.total_registros,
+    payload?.totalRows,
+    payload?.total_rows,
+    payload?.count,
+    payload?.data?.total,
+    payload?.data?.totalItems,
+    payload?.data?.totalRegistros,
+    payload?.data?.total_registros,
+    payload?.data?.count,
+    payload?.result?.total,
+    payload?.result?.totalItems,
+    payload?.result?.totalRegistros,
+    payload?.result?.count,
+  ];
+  return candidates.some(item => item != null && item !== "" && Number.isFinite(Number(item)));
+}
+
+export function resolveOrdersPayloadTotal(payload, fallbackItems) {
+  const candidates = [
+    payload?.total,
+    payload?.totalItems,
+    payload?.totalRegistros,
+    payload?.total_registros,
+    payload?.totalRows,
+    payload?.total_rows,
+    payload?.count,
+    payload?.data?.total,
+    payload?.data?.totalItems,
+    payload?.data?.totalRegistros,
+    payload?.data?.total_registros,
+    payload?.data?.count,
+    payload?.result?.total,
+    payload?.result?.totalItems,
+    payload?.result?.totalRegistros,
+    payload?.result?.count,
+  ];
+  const value = candidates.find(item => item != null && item !== "");
+  const total = Number(value);
+  return Number.isFinite(total) ? total : fallbackItems.length;
 }
 
 function extractPaymentBreakdown(financiero) {
@@ -280,6 +864,16 @@ function extractPaymentBreakdown(financiero) {
       };
     })
     .filter(Boolean);
+}
+
+function normalizePaymentBreakdownForTotal(paymentBreakdown, totalPedido) {
+  if (!Array.isArray(paymentBreakdown) || paymentBreakdown.length !== 1) return paymentBreakdown;
+  const total = roundCurrency(totalPedido);
+  if (total <= 0) return paymentBreakdown;
+  return paymentBreakdown.map(item => ({
+    ...item,
+    monto: total,
+  }));
 }
 
 function extractPaymentAmounts(financiero, paymentMethods = []) {
@@ -304,11 +898,38 @@ const initialFilters = {
   estado: "",
   sinImprimir: false,
   soloTienda: false,
-  fechaDesde: new Date().toISOString().slice(0, 10),
-  fechaHasta: new Date().toISOString().slice(0, 10),
+  metodoPago: "",
+  fechaDesde: todayIsoDateBogota(),
+  fechaHasta: todayIsoDateBogota(),
   page: 1,
-  pageSize: 20
+  pageSize: 10
 };
+
+function buildOrdersCacheKey({ empresaId, sucursalId, q, estado, sinImprimir, soloTienda, metodoPago, fechaDesde, fechaHasta, page, pageSize }) {
+  return [
+    empresaId,
+    sucursalId,
+    q || "",
+    estado || "",
+    sinImprimir ? "1" : "0",
+    soloTienda ? "1" : "0",
+    metodoPago || "",
+    fechaDesde || "",
+    fechaHasta || "",
+    page || 1,
+    pageSize || 50,
+  ].join("|");
+}
+
+function rememberOrdersCache(cache, key, value) {
+  if (!cache || !key) return;
+  if (cache.has(key)) cache.delete(key);
+  cache.set(key, value);
+  while (cache.size > ORDERS_FILTER_CACHE_LIMIT) {
+    const oldestKey = cache.keys().next().value;
+    cache.delete(oldestKey);
+  }
+}
 
 const MESSAGE_CARD_FONT_OPTIONS = [
   { value: "Georgia, serif", label: "Georgia" },
@@ -320,7 +941,7 @@ const MESSAGE_CARD_FONT_OPTIONS = [
   { value: "'Crimson Text', serif", label: "Crimson Text" },
   { value: "'Great Vibes', cursive", label: "Great Vibes" }
 ];
-export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canViewProduccion, canViewDomicilios, canViewInventario, canViewContabilidad, canViewTrazabilidad, canViewClientesPanel, canViewUsuariosPanel, onLogout, onGoPipeline, onGoPedidos, onGoProduccion, onGoDomicilios, onGoInventario, onGoContabilidad, onGoTrazabilidad, onGoClientes, onGoUsuarios }) {
+export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canViewProduccion, canViewDomicilios, canViewBarrios, canViewInventario, canViewContabilidad, canViewTrazabilidad, canViewClientesPanel, canViewUsuariosPanel, onLogout, onGoPipeline, onGoPedidos, onGoProduccion, onGoDomicilios, onGoBarrios, onGoInventario, onGoContabilidad, onGoTrazabilidad, onGoClientes, onGoUsuarios }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [items, setItems] = useState([]);
@@ -329,6 +950,7 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
   const [metricItems, setMetricItems] = useState([]);
   const [metricFacturasPendientesImpresion, setMetricFacturasPendientesImpresion] = useState(0);
   const [yesterdayMetrics, setYesterdayMetrics] = useState(() => buildOrdersMetrics([], 0, shiftIsoDate(todayIsoDate(), -1)));
+  const [todaySalesTotal, setTodaySalesTotal] = useState(0);
   const [filters, setFilters] = useState(initialFilters);
   const [selectedPedidoId, setSelectedPedidoId] = useState(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -398,8 +1020,16 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
   const [detailAddPrecio, setDetailAddPrecio] = useState(null);
   const [detailAddSaving, setDetailAddSaving] = useState(false);
   const [approvingPedidoIds, setApprovingPedidoIds] = useState([]);
+  const [openOrderActionsId, setOpenOrderActionsId] = useState(null);
+  const [catalogProducts, setCatalogProducts] = useState([]);
+  const [orderNotification, setOrderNotification] = useState(null);
 
   const api = useMemo(() => createApiClient(tenantConfig), []);
+  const ordersRequestTracker = useMemo(() => ({ current: 0 }), []);
+  const visibleOrdersLoadingRequest = useRef(0);
+  const loadOrdersRef = useRef(null);
+  const loadTodaySalesSummaryRef = useRef(null);
+  const ordersFilterCache = useMemo(() => new Map(), []);
   const debouncedQuery = useDebouncedValue(filters.q, 300);
   const empresaId = Number(session?.empresaID || tenantConfig.empresaId);
   const sucursalId = Number(session?.sucursalID || tenantConfig.sucursalId);
@@ -424,6 +1054,76 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
     [pedidoMenuFields]
   );
   const canEditClientIdentity = useMemo(() => isEmpresaAdminRole(session), [session]);
+  const catalogProductIndex = useMemo(
+    () => buildCatalogProductIndex(catalogProducts),
+    [catalogProducts]
+  );
+  const detailEmpresaId = useMemo(
+    () => Number(detalle?.empresaID || detalle?.empresaId || empresaId),
+    [detalle, empresaId]
+  );
+  const detailEditCatalogProduct = useMemo(() => {
+    const selected = detailEditCatalog.find(item => String(item.id) === String(detailEditProductoID));
+    if (selected) return selected;
+    if (detailEditProductoID) {
+      const byId = catalogProductIndex.get(`id:${detailEditProductoID}`);
+      if (byId) return byId;
+    }
+    return resolveCatalogProduct({
+      code: detailEditProductoCodigo,
+      codigoProducto: detailEditProductoCodigo,
+      name: detailEditNombreArreglo,
+      nombre: detailEditNombreArreglo,
+    }, catalogProductIndex);
+  }, [catalogProductIndex, detailEditCatalog, detailEditNombreArreglo, detailEditProductoCodigo, detailEditProductoID]);
+  const detailAddCatalogProduct = useMemo(() => {
+    const selected = detailEditCatalog.find(item => String(item.id) === String(detailAddProductoID));
+    if (selected) return selected;
+    if (detailAddProductoID) {
+      const byId = catalogProductIndex.get(`id:${detailAddProductoID}`);
+      if (byId) return byId;
+    }
+    return resolveCatalogProduct({
+      code: detailAddProductoCodigo,
+      codigoProducto: detailAddProductoCodigo,
+      name: detailAddNombreArreglo,
+      nombre: detailAddNombreArreglo,
+    }, catalogProductIndex);
+  }, [catalogProductIndex, detailAddNombreArreglo, detailAddProductoCodigo, detailAddProductoID, detailEditCatalog]);
+  const detailProducts = useMemo(
+    () => (Array.isArray(detalle?.productos) ? detalle.productos : []),
+    [detalle]
+  );
+  const detailSelectedProduct = useMemo(() => {
+    if (detailProducts.length === 0) return null;
+    if (detailEditDetalleID) {
+      const byDetailId = detailProducts.find(product => String(product?.detalleID ?? "") === String(detailEditDetalleID));
+      if (byDetailId) return byDetailId;
+    }
+    if (detailEditProductoID) {
+      const byProductId = detailProducts.find(product => String(getProductoId(product) ?? "") === String(detailEditProductoID));
+      if (byProductId) return byProductId;
+    }
+    return detailProducts[0];
+  }, [detailEditDetalleID, detailEditProductoID, detailProducts]);
+  const detailEditDisplayProductoCodigo = useMemo(() => (
+    displayProductCode(
+      detailSelectedProduct || detailEditCatalogProduct || {
+        codigo: detailEditProductoCodigo,
+        codigoProducto: detailEditProductoCodigo,
+      },
+      detailEmpresaId
+    ) || detailEditProductoCodigo
+  ), [detailEditCatalogProduct, detailEditProductoCodigo, detailEmpresaId, detailSelectedProduct]);
+  const detailAddDisplayProductoCodigo = useMemo(() => (
+    displayProductCode(
+      detailAddCatalogProduct || {
+        codigo: detailAddProductoCodigo,
+        codigoProducto: detailAddProductoCodigo,
+      },
+      detailEmpresaId
+    ) || detailAddProductoCodigo
+  ), [detailAddCatalogProduct, detailAddProductoCodigo, detailEmpresaId]);
   const detailEditSelectedPaymentMethods = useMemo(
     () => normalizePaymentMethods(detailEditMetodosPago),
     [detailEditMetodosPago]
@@ -478,23 +1178,20 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
     [detalle, detailEditBarrioNombre, detailEditSelectedBarrio, detailEditSelectedPaymentMethods, detailEditOmitirRecargoLink, detailEditDescuentoMonto, detailEditSaldoFavorMonto]
   );
   const detailEditShowPriceField = detailEditCustomPriceEnabled || detailEditPrecio != null;
-  const detailProducts = useMemo(
-    () => (Array.isArray(detalle?.productos) ? detalle.productos : []),
-    [detalle]
-  );
   const detailEditSelectedProductLabel = useMemo(() => {
-    const selected = detailEditCatalog.find(item => String(item.id) === detailEditProductoID);
+    const selected = detailSelectedProduct || detailEditCatalogProduct;
     if (selected) {
-      return buildProductoLabel(selected);
+      return buildProductoLabel(selected, detailEmpresaId);
     }
     if (detailEditNombreArreglo || detailEditProductoCodigo) {
       return buildProductoLabel({
         codigo: detailEditProductoCodigo,
+        codigoProducto: detailEditProductoCodigo,
         nombre: detailEditNombreArreglo,
-      });
+      }, detailEmpresaId);
     }
     return "— Selecciona un arreglo —";
-  }, [detailEditCatalog, detailEditNombreArreglo, detailEditProductoCodigo, detailEditProductoID]);
+  }, [detailEditCatalogProduct, detailEditNombreArreglo, detailEditProductoCodigo, detailEmpresaId, detailSelectedProduct]);
   const detailAddIsCustomArrangement = useMemo(
     () => isCustomArrangement({
       codigo: detailAddProductoCodigo,
@@ -504,24 +1201,24 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
     [detailAddNombreArreglo, detailAddProductoCodigo]
   );
   const detailAddSelectedProductLabel = useMemo(() => {
-    const selected = detailEditCatalog.find(item => String(item.id) === String(detailAddProductoID));
-    if (selected) {
-      return buildProductoLabel(selected);
+    if (detailAddCatalogProduct) {
+      return buildProductoLabel(detailAddCatalogProduct, detailEmpresaId);
     }
     if (detailAddNombreArreglo || detailAddProductoCodigo) {
       return buildProductoLabel({
         codigo: detailAddProductoCodigo,
+        codigoProducto: detailAddProductoCodigo,
         nombre: detailAddNombreArreglo,
-      });
+      }, detailEmpresaId);
     }
     return "— Selecciona un arreglo —";
-  }, [detailAddNombreArreglo, detailAddProductoCodigo, detailAddProductoID, detailEditCatalog]);
+  }, [detailAddCatalogProduct, detailAddNombreArreglo, detailAddProductoCodigo, detailEmpresaId]);
 
   const applySelectedDetailProduct = useCallback((product, nextDetalleId = null) => {
     if (!product) return;
     const detalleId = nextDetalleId ?? (product?.detalleID != null ? Number(product.detalleID) : null);
     const productoId = getProductoId(product);
-    const productoCodigo = String(product?.codigoProducto || product?.codigo || "").trim();
+    const productoCodigo = displayProductCode(product, detailEmpresaId);
     const productoNombre = String(product?.nombreProducto || product?.nombre || "").trim();
     const productoObservaciones = String(product?.observaciones || "").trim();
     const productoPrecio = normalizeWholePeso(product?.precioUnitario ?? product?.precio ?? product?.subtotal ?? 0);
@@ -538,7 +1235,7 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
       nombre: productoNombre,
       observaciones: productoObservaciones,
     }));
-  }, []);
+  }, [detailEmpresaId]);
 
   const loadBarrioOptions = useCallback(async (query = "") => {
     const text = String(query || "").trim();
@@ -565,50 +1262,94 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
   }, [api, detailEditBarrioNombre, empresaId, sucursalId]);
 
   const loadOrders = useCallback(async (silent = false) => {
+    if (silent && visibleOrdersLoadingRequest.current) return;
+
+    const requestId = silent ? ordersRequestTracker.current : ordersRequestTracker.current + 1;
     if (!silent) {
+      ordersRequestTracker.current = requestId;
+    }
+    const requestFilters = {
+      empresaId,
+      sucursalId,
+      q: debouncedQuery,
+      backendQ: isPaymentSearchTerm(debouncedQuery) ? "" : debouncedQuery,
+      estado: filters.estado,
+      sinImprimir: filters.sinImprimir,
+      soloTienda: filters.soloTienda,
+      metodoPago: filters.metodoPago,
+      fechaDesde: filters.fechaDesde,
+      fechaHasta: filters.fechaHasta,
+      page: filters.page,
+      pageSize: filters.pageSize,
+    };
+    const cacheKey = buildOrdersCacheKey(requestFilters);
+    const cached = !silent ? ordersFilterCache.get(cacheKey) : null;
+
+    if (cached) {
+      setItems(cached.items);
+      setTotal(cached.total);
+      setFacturasPendientesImpresion(cached.facturasPendientesImpresion);
+      setMetricItems(cached.metricItems);
+      setMetricFacturasPendientesImpresion(cached.metricFacturasPendientesImpresion);
+      setError("");
+      if (!silent) {
+        visibleOrdersLoadingRequest.current = 0;
+        setLoading(false);
+      }
+    }
+
+    if (!silent && !cached) {
+      visibleOrdersLoadingRequest.current = requestId;
       setLoading(true);
       setError("");
     }
 
     try {
       const data = await api.listarPedidos({
-        empresaId,
-        sucursalId,
-        q: debouncedQuery,
-        estado: filters.estado,
-        sinImprimir: filters.sinImprimir,
-        soloTienda: filters.soloTienda,
-        fechaDesde: toIsoDateStart(filters.fechaDesde),
-        fechaHasta: toIsoDateEnd(filters.fechaHasta),
-        page: filters.page,
-        pageSize: filters.pageSize
+        empresaId: requestFilters.empresaId,
+        sucursalId: requestFilters.sucursalId,
+        q: requestFilters.backendQ,
+        estado: requestFilters.estado,
+        sinImprimir: requestFilters.sinImprimir,
+        soloTienda: false,
+        fechaDesde: toIsoDateStart(requestFilters.fechaDesde),
+        fechaHasta: toIsoDateEnd(requestFilters.fechaHasta),
+        page: requestFilters.soloTienda ? 1 : requestFilters.page,
+        pageSize: requestFilters.soloTienda ? 300 : requestFilters.pageSize
       });
 
-      setItems(Array.isArray(data.items) ? data.items : []);
-      setTotal(Number(data.total || 0));
-      setFacturasPendientesImpresion(Number(data.facturasPendientesImpresion || 0));
+      if (!silent && requestId !== ordersRequestTracker.current) return;
+      if (silent && (requestId !== ordersRequestTracker.current || visibleOrdersLoadingRequest.current)) return;
+
+      const loadedItems = extractOrdersPayloadItems(data);
+      const storeItems = requestFilters.soloTienda ? filterStorePickupOrders(loadedItems) : loadedItems;
+      const statusItems = filterOrdersByStatus(storeItems, requestFilters.estado);
+      const paymentItems = filterOrdersByPaymentMethod(statusItems, requestFilters.metodoPago);
+      const visibleItems = filterOrdersBySearch(paymentItems, requestFilters.q, requestFilters.empresaId);
+      const nextTotal = requestFilters.soloTienda || requestFilters.estado ? visibleItems.length : resolveOrdersPayloadTotal(data, visibleItems);
+      const nextFacturasPendientesImpresion = Number(data.facturasPendientesImpresion || 0);
+      const nextCacheValue = {
+        items: visibleItems,
+        total: nextTotal,
+        facturasPendientesImpresion: nextFacturasPendientesImpresion,
+        metricItems: visibleItems,
+        metricFacturasPendientesImpresion: nextFacturasPendientesImpresion,
+      };
+      rememberOrdersCache(ordersFilterCache, cacheKey, nextCacheValue);
+      setItems(visibleItems);
+      setTotal(nextTotal);
+      setFacturasPendientesImpresion(nextFacturasPendientesImpresion);
+      setMetricItems(visibleItems);
+      setMetricFacturasPendientesImpresion(nextFacturasPendientesImpresion);
       setError("");
-
-      void api.listarPedidos({
-        empresaId,
-        sucursalId,
-        q: debouncedQuery,
-        estado: "",
-        sinImprimir: false,
-        soloTienda: filters.soloTienda,
-        fechaDesde: toIsoDateStart(filters.fechaDesde),
-        fechaHasta: toIsoDateEnd(filters.fechaHasta),
-        page: 1,
-        pageSize: 10000,
-      }).then(metricsData => {
-        setMetricItems(Array.isArray(metricsData.items) ? metricsData.items : []);
-        setMetricFacturasPendientesImpresion(Number(metricsData.facturasPendientesImpresion || 0));
-      }).catch(metricsError => {
-        console.warn("No fue posible cargar métricas globales de pedidos:", metricsError);
-        setMetricItems(Array.isArray(data.items) ? data.items : []);
-        setMetricFacturasPendientesImpresion(Number(data.facturasPendientesImpresion || 0));
-      });
+      return nextCacheValue;
     } catch (nextError) {
+      if (!silent && requestId !== ordersRequestTracker.current) return;
+      if (silent && (requestId !== ordersRequestTracker.current || visibleOrdersLoadingRequest.current)) return;
+      if (cached) {
+        setError("");
+        return cached;
+      }
       console.error("Error cargando pedidos:", nextError);
       setItems([]);
       setTotal(0);
@@ -617,9 +1358,12 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
       setMetricFacturasPendientesImpresion(0);
       setError("No fue posible cargar pedidos.");
     } finally {
-      if (!silent) setLoading(false);
+      if (!silent && visibleOrdersLoadingRequest.current === requestId) {
+        visibleOrdersLoadingRequest.current = 0;
+        setLoading(false);
+      }
     }
-  }, [api, debouncedQuery, filters.estado, filters.sinImprimir, filters.soloTienda, filters.fechaDesde, filters.fechaHasta, filters.page, filters.pageSize, empresaId, sucursalId]);
+  }, [api, debouncedQuery, filters.estado, filters.sinImprimir, filters.soloTienda, filters.metodoPago, filters.fechaDesde, filters.fechaHasta, filters.page, filters.pageSize, empresaId, ordersFilterCache, ordersRequestTracker, sucursalId]);
 
   const loadYesterdayMetrics = useCallback(async () => {
     const yesterday = shiftIsoDate(todayIsoDate(), -1);
@@ -634,10 +1378,10 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
         fechaDesde: toIsoDateStart(yesterday),
         fechaHasta: toIsoDateEnd(yesterday),
         page: 1,
-        pageSize: 1000,
+        pageSize: 50,
       });
       setYesterdayMetrics(buildOrdersMetrics(
-        Array.isArray(data.items) ? data.items : [],
+        extractOrdersPayloadItems(data),
         Number(data.facturasPendientesImpresion || 0),
         yesterday
       ));
@@ -646,21 +1390,94 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
     }
   }, [api, empresaId, filters.soloTienda, sucursalId]);
 
+  const loadTodaySalesSummary = useCallback(async () => {
+    const today = todayIsoDate();
+    const pageSize = 300;
+    const dateRequestVariants = [
+      { fechaDesde: today, fechaHasta: today, stopOnPreviousDays: false },
+      { fechaDesde: toIsoDateStart(today), fechaHasta: toIsoDateEnd(today), stopOnPreviousDays: false },
+      { fechaDesde: "", fechaHasta: "", stopOnPreviousDays: true },
+    ];
+
+    try {
+      for (const requestVariant of dateRequestVariants) {
+        const rowsByKey = new Map();
+
+        for (let pageIndex = 1; pageIndex <= 25; pageIndex += 1) {
+          const data = await api.listarPedidos({
+            empresaId,
+            sucursalId,
+            q: "",
+            estado: "",
+            sinImprimir: false,
+            soloTienda: false,
+            fechaDesde: requestVariant.fechaDesde,
+            fechaHasta: requestVariant.fechaHasta,
+            page: pageIndex,
+            pageSize,
+          });
+
+          const rows = extractOrdersPayloadItems(data);
+          rows.forEach((item, index) => {
+            const displayNumber = String(resolveDisplayOrderNumber(item) || "").trim();
+            const key = item?.pedidoID != null
+              ? `pedido:${item.pedidoID}`
+              : item?.id != null
+                ? `id:${item.id}`
+                : displayNumber && displayNumber !== "-"
+                  ? `numero:${displayNumber}`
+                  : `row:${pageIndex}-${index}`;
+            rowsByKey.set(key, item);
+          });
+
+          const payloadHasTotal = hasOrdersPayloadTotal(data);
+          const totalRows = resolveOrdersPayloadTotal(data, rows);
+          const datedRows = rows.map(orderCreatedDate).filter(Boolean);
+          const reachedPreviousDays = requestVariant.stopOnPreviousDays && datedRows.length > 0 && datedRows.every(date => date < today);
+          if (!Array.isArray(rows) || rows.length < pageSize || (payloadHasTotal && rowsByKey.size >= totalRows) || reachedPreviousDays) break;
+        }
+
+        const totalSales = calculateTodaySalesTotal(Array.from(rowsByKey.values()), today);
+        if (totalSales > 0 || rowsByKey.size > 0) {
+          setTodaySalesTotal(totalSales);
+          return;
+        }
+      }
+
+      setTodaySalesTotal(0);
+    } catch (nextError) {
+      console.error("Error cargando venta del día:", nextError);
+    }
+  }, [api, empresaId, sucursalId]);
+
   useEffect(() => {
     loadOrders(false);
   }, [loadOrders]);
+
+  useEffect(() => {
+    loadOrdersRef.current = loadOrders;
+  }, [loadOrders]);
+
+  useEffect(() => {
+    loadTodaySalesSummaryRef.current = loadTodaySalesSummary;
+  }, [loadTodaySalesSummary]);
 
   useEffect(() => {
     loadYesterdayMetrics();
   }, [loadYesterdayMetrics]);
 
   useEffect(() => {
+    loadTodaySalesSummary();
+  }, [loadTodaySalesSummary]);
+
+  useEffect(() => {
     const intervalId = globalThis.setInterval(() => {
-      if (document?.hidden) return;
-      loadOrders(true);
+      if (globalThis.document?.hidden) return;
+      loadOrdersRef.current?.(true);
+      loadTodaySalesSummaryRef.current?.();
     }, AUTO_REFRESH_INTERVAL_MS);
     return () => globalThis.clearInterval(intervalId);
-  }, [loadOrders]);
+  }, []);
 
 
   useEffect(() => {
@@ -814,6 +1631,12 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
   }, [drawerOpen]);
 
   useEffect(() => {
+    if (!orderNotification) return undefined;
+    const timeoutId = globalThis.setTimeout(() => setOrderNotification(null), 5200);
+    return () => globalThis.clearTimeout(timeoutId);
+  }, [orderNotification]);
+
+  useEffect(() => {
     if (!isEditingDetail) return;
     // Carga el catálogo completo al abrir modo edición.
     let disposed = false;
@@ -842,11 +1665,14 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
   }, [detailEditBarrioQuery, isEditingDetail, loadBarrioOptions]);
 
   const applyFilterValue = (name, value) => {
-    setFilters(current => ({
-      ...current,
-      [name]: value,
-      page: 1
-    }));
+    setFilters(current => {
+      if (current[name] === value && Number(current.page || 1) === 1) return current;
+      return {
+        ...current,
+        [name]: value,
+        page: 1
+      };
+    });
   };
 
   const openDetail = async pedidoId => {
@@ -864,7 +1690,7 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
   };
 
   const optimisticStatusPatch = (pedidoId, nextStatus, motivoRechazo = null, extraPatch = {}) => {
-    setItems(current => current.map(item => Number(item.pedidoID) === Number(pedidoId)
+    setItems(current => current.map(item => Number(resolveOrderId(item)) === Number(pedidoId)
       ? { ...item, estado: nextStatus, ...extraPatch, ...(motivoRechazo !== null ? { motivoRechazo } : {}) }
       : item));
 
@@ -875,7 +1701,7 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
   };
 
   const approveOrder = async pedidoId => {
-    const item = items.find(current => Number(current.pedidoID) === Number(pedidoId));
+    const item = items.find(current => Number(resolveOrderId(current)) === Number(pedidoId));
     if (item?.puedeAprobar === false) {
       globalThis.alert(item.motivoBloqueoAprobacion || "Completa la información requerida antes de aprobar.");
       return;
@@ -895,7 +1721,19 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
         null,
         floristaAsignado !== "Sin asignar" ? { floristaAsignado } : {}
       );
-      await loadOrders(true);
+      const refreshed = await loadOrders(true);
+      await loadTodaySalesSummary();
+      const refreshedItem = (Array.isArray(refreshed?.items) ? refreshed.items : [])
+        .find(current => Number(resolveOrderId(current)) === Number(pedidoId));
+      const assignedOrderNumber = resolveAssignedOrderNumber(response, response?.pedido, response?.data, refreshedItem);
+      await downloadInvoice(pedidoId, { refreshAfter: false });
+      setOrderNotification({
+        tone: "success",
+        title: "Pedido aprobado",
+        message: assignedOrderNumber
+          ? `El pedido #${assignedOrderNumber} fue creado correctamente y ya quedó aprobado.`
+          : "El pedido quedó aprobado correctamente. El número se asignará en unos momentos.",
+      });
     } catch (nextError) {
       console.error("Error aprobando pedido:", nextError);
       globalThis.alert(nextError?.detail || nextError?.message || "No fue posible aprobar el pedido.");
@@ -905,8 +1743,9 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
   };
 
   const rejectOrder = async pedidoId => {
-    const item = items.find(current => Number(current.pedidoID) === Number(pedidoId));
-    const actionLabel = canInvoiceStatus(item?.estado) ? "cancelación" : "rechazo";
+    const item = items.find(current => Number(resolveOrderId(current)) === Number(pedidoId));
+    const isCancellation = canInvoiceStatus(item?.estado);
+    const actionLabel = isCancellation ? "cancelación" : "rechazo";
     const motivo = String(globalThis.prompt(`Motivo de ${actionLabel}`, "") || "").trim();
     if (!motivo) {
       globalThis.alert(`Debes ingresar un motivo de ${actionLabel}.`);
@@ -914,15 +1753,57 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
     }
 
     try {
-      const response = await api.rechazarPedido(pedidoId, motivo);
-      optimisticStatusPatch(pedidoId, response.estado || "RECHAZADO", response.motivo || motivo);
+      const response = isCancellation
+        ? await api.cambiarEstadoPedidoPipeline({ pedidoId, nuevoEstadoId: CANCELADO_PEDIDO_ESTADO_ID })
+        : await api.rechazarPedido(pedidoId, motivo);
+
+      if (isCancellation) {
+        console.info("Respuesta cancelación pedido:", response);
+        ordersFilterCache.clear();
+        const refreshed = await loadOrders(true);
+        await loadTodaySalesSummary();
+        if (Number(selectedPedidoId) === Number(pedidoId)) {
+          await reloadDrawer();
+        }
+        const refreshedItem = (Array.isArray(refreshed?.items) ? refreshed.items : [])
+          .find(current => Number(resolveOrderId(current)) === Number(pedidoId));
+        const orderNumber = resolveAssignedOrderNumber(response, response?.pedido, response?.data, refreshedItem, item);
+        setOrderNotification({
+          tone: "danger",
+          title: "Pedido cancelado",
+          message: orderNumber
+            ? `El pedido #${orderNumber} fue cancelado correctamente.`
+            : "El pedido fue cancelado correctamente.",
+        });
+        return;
+      }
+
+      const nextStatus = response.estado || "RECHAZADO";
+      const orderNumber = resolveAssignedOrderNumber(response, response?.pedido, response?.data, item);
+      optimisticStatusPatch(pedidoId, nextStatus, response.motivo || motivo);
+      ordersFilterCache.clear();
+      await loadOrders(true);
+      await loadTodaySalesSummary();
+      setOrderNotification({
+        tone: "danger",
+        title: "Pedido rechazado",
+        message: orderNumber
+          ? `El pedido #${orderNumber} fue rechazado correctamente.`
+          : "El pedido fue rechazado correctamente.",
+      });
     } catch (nextError) {
       console.error("Error rechazando pedido:", nextError);
       globalThis.alert(`No fue posible completar la ${actionLabel}.`);
     }
   };
 
-  const downloadInvoice = async pedidoId => {
+  const downloadInvoice = async (pedidoId, options = {}) => {
+    const { refreshAfter = true } = options;
+    if (!pedidoId) {
+      globalThis.alert("No fue posible descargar la factura: el pedido no tiene un identificador válido.");
+      return false;
+    }
+
     try {
       const { blob, filename } = await api.descargarFacturaPedido(pedidoId);
       const url = URL.createObjectURL(blob);
@@ -933,18 +1814,27 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
       link.click();
       link.remove();
       URL.revokeObjectURL(url);
-      await loadOrders(true);
-      if (Number(selectedPedidoId) === Number(pedidoId)) {
+      if (refreshAfter) {
+        await loadOrders(true);
+      }
+      if (refreshAfter && Number(selectedPedidoId) === Number(pedidoId)) {
         await reloadDrawer();
       }
+      return true;
     } catch (nextError) {
       console.error("Error descargando factura:", nextError);
-      globalThis.alert("No fue posible descargar la factura del pedido.");
+      globalThis.alert(nextError?.detail || nextError?.message || "No fue posible descargar la factura del pedido.");
+      return false;
     }
   };
 
   const openMessageCard = async item => {
-    const pedidoId = Number(item?.pedidoID);
+    const pedidoId = resolveOrderId(item);
+    if (!pedidoId) {
+      globalThis.alert("No fue posible generar el mensaje: el pedido no tiene un identificador válido.");
+      return;
+    }
+
     setMessageCardOrder(item || null);
     try {
       const payload = await api.obtenerMensajeTarjeta(pedidoId);
@@ -966,7 +1856,7 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
   };
 
   const saveMessageCard = async () => {
-    const pedidoId = Number(messageCardOrder?.pedidoID || selectedPedidoId || 0);
+    const pedidoId = Number(resolveOrderId(messageCardOrder) || selectedPedidoId || 0);
     if (!pedidoId || messageCardSaving) return;
     setMessageCardSaving(true);
     setMessageCardError("");
@@ -996,7 +1886,10 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
     }
   };
 
-  const refresh = () => loadOrders(false);
+  const refresh = () => {
+    loadOrders(false);
+    loadTodaySalesSummary();
+  };
 
   const closeDrawer = () => {
     setDrawerOpen(false);
@@ -1009,8 +1902,10 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
     if (!q) return detailEditCatalog;
     return detailEditCatalog.filter(item => {
       const codigo = String(item.codigo || "").toLowerCase();
+      const codigoProducto = String(item.codigoProducto || "").toLowerCase();
+      const codigoCatalogo = String(item.codigoCatalogo || "").toLowerCase();
       const nombre = String(item.nombre || "").toLowerCase();
-      return codigo.includes(q) || nombre.includes(q);
+      return codigo.includes(q) || codigoProducto.includes(q) || codigoCatalogo.includes(q) || nombre.includes(q);
     });
   }, [detailEditCatalog, detailEditFilterText]);
   const filteredAddDetailCatalog = useMemo(() => {
@@ -1018,8 +1913,10 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
     if (!q) return detailEditCatalog;
     return detailEditCatalog.filter(item => {
       const codigo = String(item.codigo || "").toLowerCase();
+      const codigoProducto = String(item.codigoProducto || "").toLowerCase();
+      const codigoCatalogo = String(item.codigoCatalogo || "").toLowerCase();
       const nombre = String(item.nombre || "").toLowerCase();
-      return codigo.includes(q) || nombre.includes(q);
+      return codigo.includes(q) || codigoProducto.includes(q) || codigoCatalogo.includes(q) || nombre.includes(q);
     });
   }, [detailAddFilterText, detailEditCatalog]);
 
@@ -1248,6 +2145,7 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
           canalFlora: validatedCanalFlora,
         });
         await loadOrders(true);
+        await loadTodaySalesSummary();
         await openDetail(created.pedidoID);
         setIsDuplicatingDetail(false);
       } else {
@@ -1285,6 +2183,10 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
           canalFlora: validatedCanalFlora,
         });
         await reloadDrawer();
+      }
+      const hasCashPayment = Number.isFinite(paymentValidation.cashAmount) && paymentValidation.cashAmount > 0;
+      if (hasCashPayment && typeof window !== "undefined") {
+        window.dispatchEvent(new Event("pedidoGuardadoEfectivo"));
       }
       setIsEditingDetail(false);
     } catch (nextError) {
@@ -1377,6 +2279,7 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
         detalleID: Number(detalleId),
       });
       await loadOrders(true);
+      await loadTodaySalesSummary();
     } catch (nextError) {
       if (previousDetalle) {
         setDetalle(previousDetalle);
@@ -1391,10 +2294,44 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
     if (!selectedPedidoId) return;
     await openDetail(selectedPedidoId);
     await loadOrders(true);
+    await loadTodaySalesSummary();
   };
 
   const toggleStoreDeliveries = () => {
     applyFilterValue("soloTienda", !filters.soloTienda);
+  };
+
+  const applyDatePreset = preset => {
+    const today = todayIsoDate();
+    const ranges = {
+      hoy: { fechaDesde: today, fechaHasta: today },
+      ayer: { fechaDesde: shiftIsoDate(today, -1), fechaHasta: shiftIsoDate(today, -1) },
+      manana: { fechaDesde: shiftIsoDate(today, 1), fechaHasta: shiftIsoDate(today, 1) },
+      semana: thisWeekRangeIso(),
+      mes: thisMonthRangeIso(),
+    };
+    const range = ranges[preset] || ranges.hoy;
+    setFilters(current => {
+      if (current.fechaDesde === range.fechaDesde && current.fechaHasta === range.fechaHasta && Number(current.page || 1) === 1) {
+        return current;
+      }
+      return { ...current, ...range, page: 1 };
+    });
+  };
+
+  const clearOrderFilters = () => {
+    const today = todayIsoDate();
+    setFilters(current => ({
+      ...current,
+      q: "",
+      estado: "",
+      sinImprimir: false,
+      soloTienda: false,
+      metodoPago: "",
+      fechaDesde: today,
+      fechaHasta: today,
+      page: 1,
+    }));
   };
 
   const focusOrderMetric = metric => {
@@ -1427,8 +2364,11 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
   };
 
   const page = Number(filters.page || 1);
-  const pageSize = Number(filters.pageSize || 20);
+  const pageSize = Number(filters.pageSize || 50);
   const pages = Math.max(1, Math.ceil(Number(total || 0) / pageSize));
+  const visibleFrom = items.length > 0 ? ((page - 1) * pageSize) + 1 : 0;
+  const visibleTo = items.length > 0 ? Math.min(Number(total || 0), ((page - 1) * pageSize) + items.length) : 0;
+  const pagerItems = buildPaginationItems(page, pages);
   const activeOrderMetric = useMemo(() => {
     const today = todayIsoDate();
     if (filters.sinImprimir) return "facturas";
@@ -1438,21 +2378,41 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
     if (!filters.estado && filters.fechaDesde === today && filters.fechaHasta === today) return "hoy";
     return "";
   }, [filters.estado, filters.fechaDesde, filters.fechaHasta, filters.sinImprimir]);
+  const activeDatePreset = useMemo(() => {
+    const today = todayIsoDate();
+    const yesterday = shiftIsoDate(today, -1);
+    const tomorrow = shiftIsoDate(today, 1);
+    const week = thisWeekRangeIso();
+    const month = thisMonthRangeIso();
+    if (filters.fechaDesde === today && filters.fechaHasta === today) return "hoy";
+    if (filters.fechaDesde === yesterday && filters.fechaHasta === yesterday) return "ayer";
+    if (filters.fechaDesde === tomorrow && filters.fechaHasta === tomorrow) return "manana";
+    if (filters.fechaDesde === week.fechaDesde && filters.fechaHasta === week.fechaHasta) return "semana";
+    if (filters.fechaDesde === month.fechaDesde && filters.fechaHasta === month.fechaHasta) return "mes";
+    return "";
+  }, [filters.fechaDesde, filters.fechaHasta]);
   const ordersMetrics = useMemo(() => {
     const today = todayIsoDate();
     const sourceItems = metricItems.length > 0 ? metricItems : items;
     const sourceFacturas = metricItems.length > 0 ? metricFacturasPendientesImpresion : facturasPendientesImpresion;
     return buildOrdersMetrics(sourceItems, sourceFacturas, today);
   }, [facturasPendientesImpresion, items, metricFacturasPendientesImpresion, metricItems]);
-  const headerSalesSummary = useMemo(() => {
-    const today = todayIsoDate();
-    const todayRows = (Array.isArray(items) ? items : []).filter(item => {
-      const { date: fechaPedido } = splitDateTimeParts(item.fechaPedido || item.fecha);
-      const entrega = orderDeliveryDate(item);
-      return fechaPedido === today || entrega === today;
+  const visibleTodaySalesSummary = useMemo(() => {
+    const rowsByKey = new Map();
+    [...items, ...metricItems].forEach((item, index) => {
+      const displayNumber = String(resolveDisplayOrderNumber(item) || "").trim();
+      const key = item?.pedidoID != null
+        ? `pedido:${item.pedidoID}`
+        : item?.id != null
+          ? `id:${item.id}`
+          : displayNumber && displayNumber !== "-"
+            ? `numero:${displayNumber}`
+            : `row:${index}`;
+      rowsByKey.set(key, item);
     });
-    return todayRows.reduce((sum, item) => sum + Number(item.total || item.valorTotal || item.totalPedido || 0), 0);
-  }, [items]);
+    return calculateTodaySalesTotal(Array.from(rowsByKey.values()), todayIsoDate());
+  }, [items, metricItems]);
+  const headerSalesSummary = todaySalesTotal > 0 ? todaySalesTotal : visibleTodaySalesSummary;
   const orderMetricCards = useMemo(() => {
     const baseCards = [
       { key: "hoy", label: "Pedidos hoy", shortLabel: "Pedidos hoy", value: Number(ordersMetrics.hoy || 0), tone: "is-primary", Icon: CalendarCheck2, helperText: "Operacion diaria" },
@@ -1513,6 +2473,7 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
             pedidos: canViewPedidos,
             produccion: canViewProduccion,
             domicilios: canViewDomicilios,
+            barrios: canViewBarrios,
             inventario: canViewInventario,
             contabilidad: canViewContabilidad,
             trazabilidad: canViewTrazabilidad,
@@ -1524,6 +2485,7 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
             pedidos: onGoPedidos,
             produccion: onGoProduccion,
             domicilios: onGoDomicilios,
+            barrios: onGoBarrios,
             inventario: onGoInventario,
             contabilidad: onGoContabilidad,
             trazabilidad: onGoTrazabilidad,
@@ -1531,9 +2493,34 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
             usuarios: onGoUsuarios,
           }}
           badges={{ pedidos: total }}
+          sessionLabel={`Sesion activa: ${displayUserName}`}
         />
 
         <main className="orders-admin-view orders-page-view">
+          {orderNotification ? (
+            <aside className={`orders-approval-notification${orderNotification.tone === "danger" ? " is-danger" : ""}`} role="status" aria-live="polite">
+              <span className="orders-approval-notification-icon" aria-hidden="true">
+                {orderNotification.tone === "danger" ? (
+                  <XCircle size={21} strokeWidth={2.4} />
+                ) : (
+                  <CheckCircle2 size={21} strokeWidth={2.4} />
+                )}
+              </span>
+              <div>
+                <strong>{orderNotification.title}</strong>
+                <p>{orderNotification.message}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setOrderNotification(null)}
+                title="Cerrar notificación"
+                aria-label="Cerrar notificación"
+              >
+                <IconX size={16} stroke={2.2} />
+              </button>
+            </aside>
+          ) : null}
+
           <header className="orders-admin-header orders-page-header">
             <div className="orders-page-heading">
               <div className="orders-page-breadcrumb" aria-label="Ruta">
@@ -1542,11 +2529,20 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
                 <strong>Pedidos</strong>
               </div>
               <div className="orders-page-title-row">
+                <img src="/logo.png" alt="PetalOps" className="orders-mobile-brand-logo" />
                 <h1>Pedidos</h1>
               </div>
               <p className="orders-admin-subtitle orders-page-description">Consulta pedidos, revisa estados y gestiona la operacion diaria.</p>
-              <span className="orders-user-pill"><span aria-hidden="true" /> Sesion activa: {displayUserName}</span>
             </div>
+            <label className="orders-header-search" aria-label="Buscar pedidos">
+              <Search size={17} strokeWidth={2} aria-hidden="true" />
+              <input
+                type="search"
+                value={filters.q}
+                onChange={event => applyFilterValue("q", event.target.value)}
+                placeholder="Buscar pedido, cliente, destinatario, ..."
+              />
+            </label>
             <div className="orders-header-side">
               <div className="header-actions">
                 <button
@@ -1565,6 +2561,7 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
                 <button type="button" className="btn-primary orders-new-order-btn" onClick={() => window.alert("El flujo de nuevo pedido se configura desde checkout.")} title="Nuevo pedido">
                   <Plus size={18} strokeWidth={2.2} />
                   <span>Nuevo pedido</span>
+                  <ChevronDown size={15} strokeWidth={2.2} />
                 </button>
               </div>
               <div className="orders-header-metrics" aria-label="Resumen de pedidos">
@@ -1599,57 +2596,43 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
             </div>
           </header>
 
-          <section className="orders-page-section">
-            <h2 className="orders-section-title">Filtros</h2>
-            <div className="orders-filters orders-filters--four-col orders-page-filters">
-            <div className="filter-field orders-filter-field">
-              <div className="orders-filter-control">
-                <Search size={17} strokeWidth={2} aria-hidden="true" />
-                <input
-                  type="text"
-                  placeholder="Buscar pedido, cliente, celular..."
-                  value={filters.q}
-                  onChange={event => applyFilterValue("q", event.target.value)}
-                />
+          <section className="orders-filter-section" aria-label="Filtros de pedidos">
+            <header className="orders-filter-section-head">
+              <Filter size={15} strokeWidth={2.2} aria-hidden="true" />
+              <h2>Filtros</h2>
+            </header>
+
+            <div className="orders-filter-ribbon">
+              <div className="orders-date-presets" aria-label="Rangos rápidos">
+                {[
+                  ["hoy", "Hoy"],
+                  ["ayer", "Ayer"],
+                  ["manana", "Mañana"],
+                  ["semana", "Esta semana"],
+                  ["mes", "Este mes"],
+                ].map(([key, label]) => (
+                  <button
+                    key={key}
+                    type="button"
+                    className={`orders-date-preset${activeDatePreset === key ? " is-active" : ""}`}
+                    onClick={() => applyDatePreset(key)}
+                  >
+                    {label}
+                  </button>
+                ))}
               </div>
-            </div>
-            <div className="filter-field orders-filter-field">
-              <div className="orders-filter-control">
-                <CalendarDays size={17} strokeWidth={2} aria-hidden="true" />
-                <input
-                  type="date"
-                  value={filters.fechaDesde}
-                  onChange={event => applyFilterValue("fechaDesde", event.target.value)}
-                />
-              </div>
-            </div>
-            <div className="filter-field orders-filter-field">
-              <div className="orders-filter-control">
-                <CalendarDays size={17} strokeWidth={2} aria-hidden="true" />
-                <input
-                  type="date"
-                  value={filters.fechaHasta}
-                  onChange={event => applyFilterValue("fechaHasta", event.target.value)}
-                />
-              </div>
-            </div>
-            <div className="orders-status-chips" aria-label="Filtros rapidos">
-              <button type="button" className={`orders-status-chip is-all${!filters.estado && !filters.sinImprimir ? " is-active" : ""}`} onClick={() => setFilters(current => ({ ...current, estado: "", sinImprimir: false, page: 1 }))}>
-                Todos
+
+              <label className="orders-filter-date-range">
+                <CalendarDays size={16} strokeWidth={2} aria-hidden="true" />
+                <input type="date" value={filters.fechaDesde} onChange={event => applyFilterValue("fechaDesde", event.target.value)} />
+                <span aria-hidden="true">→</span>
+                <input type="date" value={filters.fechaHasta} onChange={event => applyFilterValue("fechaHasta", event.target.value)} />
+              </label>
+
+              <button type="button" className="orders-filter-link" onClick={clearOrderFilters}>
+                <RotateCw size={15} strokeWidth={2} aria-hidden="true" />
+                <span>Limpiar filtros</span>
               </button>
-              <button type="button" className={`orders-status-chip is-pending${filters.estado === "CREADO" && !filters.sinImprimir ? " is-active" : ""}`} onClick={() => focusOrderMetric("pendientes")}>
-                <span aria-hidden="true" /> Pendientes
-              </button>
-              <button type="button" className={`orders-status-chip is-approved${filters.estado === "APROBADO" && !filters.sinImprimir ? " is-active" : ""}`} onClick={() => focusOrderMetric("aprobados")}>
-                <span aria-hidden="true" /> Aprobados
-              </button>
-              <button type="button" className={`orders-status-chip is-cancelled${filters.estado === "CANCELADO" && !filters.sinImprimir ? " is-active" : ""}`} onClick={() => focusOrderMetric("cancelados")}>
-                <span aria-hidden="true" /> Cancelados
-              </button>
-              <button type="button" className={`orders-status-chip is-print${filters.sinImprimir ? " is-active" : ""}`} onClick={() => focusOrderMetric("facturas")}>
-                <span aria-hidden="true" /> Sin imprimir
-              </button>
-            </div>
             </div>
           </section>
 
@@ -1669,7 +2652,20 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
           ) : null}
 
           {error && <p className="orders-message">{error}</p>}
-          {loading && <p className="orders-message">Cargando pedidos...</p>}
+          {loading && (
+            <div className="orders-loading-card" role="status" aria-live="polite">
+              <span className="orders-loading-orbit" aria-hidden="true">
+                <Search size={16} strokeWidth={2.2} />
+              </span>
+              <div className="orders-loading-copy">
+                <strong>Buscando pedidos</strong>
+                <span>Aplicando filtros y actualizando resultados</span>
+              </div>
+              <span className="orders-loading-track" aria-hidden="true">
+                <span />
+              </span>
+            </div>
+          )}
           {!loading && !error && items.length === 0 && (
             <p className="orders-message">No hay pedidos para los filtros seleccionados.</p>
           )}
@@ -1677,25 +2673,37 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
           <section className="orders-page-section">
             <h2 className="orders-section-title">Listado de pedidos</h2>
             <div className="orders-table-wrap orders-page-table-wrap">
-              <table className="orders-table">
+              <table className="orders-table orders-list-table">
+                <colgroup>
+                  <col className="orders-list-col-number" />
+                  <col className="orders-list-col-created" />
+                  <col className="orders-list-col-client" />
+                  <col className="orders-list-col-delivery" />
+                  <col className="orders-list-col-products" />
+                  <col className="orders-list-col-total" />
+                  <col className="orders-list-col-payment" />
+                  <col className="orders-list-col-status" />
+                  <col className="orders-list-col-actions" />
+                </colgroup>
                 <thead>
                   <tr>
-                    <th>Número pedido</th>
-                    <th>Producto / Cliente</th>
-                    <th>Fecha entrega</th>
-                    <th>Florista</th>
+                    <th>Número</th>
+                    <th>Fecha / Hora</th>
+                    <th>Cliente · Destinatario</th>
+                    <th>Entrega</th>
+                    <th>Producto(s)</th>
+                    <th>Total</th>
                     <th>Método pago</th>
                     <th>Estado</th>
-                    <th>Valor</th>
                     <th>Acciones</th>
                   </tr>
                 </thead>
                 <tbody>
                 {items.map(item => {
                   const statusClass = statusBadgeClass(item.estado, item);
-                  const productText = (item.productos || []).slice(0, 2).join(", ");
+                  const productSummary = resolveOrderProductSummary(item, new Map(), empresaId);
                   const waPhone = String(item.telefonoCompleto || item.telefono || "").trim().replace(/\+/g, "");
-                  const pedidoId = Number(item.pedidoID);
+                  const pedidoId = resolveOrderId(item);
                   const displayOrderNumber = resolveDisplayOrderNumber(item);
                   const canApproveAction = isPendingStatus(item.estado);
                   const canCancelAction = canApproveAction || (isEmpresaAdminRole(session) && canInvoiceStatus(item.estado));
@@ -1707,9 +2715,14 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
                     : approvalBlockedByTenant
                     ? (item.motivoBloqueoAprobacion || "Completa la información requerida antes de aprobar")
                     : "Aprobar pedido";
-                  const canDownloadInvoice = canInvoiceStatus(item.estado);
+                  const canDownloadInvoice = Boolean(pedidoId) && canInvoiceStatus(item.estado);
                   const canViewMessageCard = canMessageCardStatus(item.estado);
+                  const { date: fechaPedido, time: horaPedido } = splitDateTimeParts(item.fecha_pedido || item.fechaPedido);
+                  const { time: horaCreacion } = splitDateTimeParts(item.created_at || item.createdAt);
+                  const horaRegistroPedido = horaPedido || item.horaPedido || item.hora_pedido || item.hora || horaCreacion;
                   const { date: fechaEntrega, time: horaEntrega } = splitDateTimeParts(item.fechaEntrega);
+                  const primaryProduct = productSummary.products?.[0] || null;
+                  const primaryProductLabel = orderProductLabel(primaryProduct, empresaId) || productSummary.productText || "-";
                   const normalizedStatus = normalizeStatus(item.estado);
                   const rowClass = [
                     selectedPedidoId === pedidoId && drawerOpen ? "is-active" : "",
@@ -1718,41 +2731,131 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
                     normalizedStatus === "CANCELADO" || normalizedStatus === "RECHAZADO" ? "orders-row-cancelled" : "",
                     isPendingStatus(item.estado) || normalizedStatus === "CREADO" ? "orders-row-pending" : "",
                   ].filter(Boolean).join(" ");
-                  const floristaName = resolveFloristaName(item);
 
                   return (
                     <tr
                       key={pedidoId || `${item.numeroPedido}-${item.fecha}`}
                       className={rowClass}
                     >
-                      <td data-label="Número pedido">
+                      <td className="orders-mobile-card-cell" colSpan={9}>
+                        <article className="orders-mobile-card">
+                          <header className="orders-mobile-card-head">
+                            <span className={`orders-order-badge ${statusClass}`}>{displayOrderNumber}</span>
+                            <span className={`order-badge ${statusClass}`}>
+                              <span className="orders-status-icon" aria-hidden="true" />
+                              {item.estado || "-"}
+                            </span>
+                          </header>
+
+                          <div className="orders-mobile-card-grid">
+                            <section className="orders-mobile-card-block orders-mobile-product-block">
+                              <span className="orders-mobile-label">Producto</span>
+                              <div className="orders-mobile-product">
+                                <strong>{primaryProductLabel}</strong>
+                              </div>
+                            </section>
+
+                            <section className="orders-mobile-card-block">
+                              <span className="orders-mobile-label">Cliente</span>
+                              <strong>{item.cliente || "-"}</strong>
+                            </section>
+
+                            <section className="orders-mobile-card-block">
+                              <span className="orders-mobile-label">Fecha entrega</span>
+                              <strong>{fechaEntrega || "-"}</strong>
+                            </section>
+
+                            <section className="orders-mobile-card-block">
+                              <span className="orders-mobile-label">Hora entrega</span>
+                              <strong>{item.horaEntrega || horaEntrega || "-"}</strong>
+                            </section>
+
+                            <section className="orders-mobile-card-block">
+                              <span className="orders-mobile-label">Destinatario</span>
+                              <strong>{item.destinatario || "-"}</strong>
+                            </section>
+
+                            <section className="orders-mobile-card-block">
+                              <span className="orders-mobile-label">Total</span>
+                              <strong>${formatearCOP(resolveOrderListTotal(item))}</strong>
+                            </section>
+                          </div>
+
+                          <footer className="orders-mobile-card-actions">
+                            <button type="button" className="order-icon order-icon-view" onClick={() => openDetail(pedidoId)} title="Ver detalle" aria-label="Ver detalle"><Eye size={17} strokeWidth={2} /></button>
+                            <div className="order-actions-menu">
+                              <button
+                                type="button"
+                                className="order-icon order-icon-more"
+                                onClick={() => setOpenOrderActionsId(current => current === pedidoId ? null : pedidoId)}
+                                title="Más acciones"
+                                aria-label="Más acciones"
+                                aria-expanded={openOrderActionsId === pedidoId}
+                              >
+                                <MoreVertical size={17} strokeWidth={2} />
+                              </button>
+                              {openOrderActionsId === pedidoId ? (
+                                <div className={`order-actions-popover ${items.length <= 2 ? "order-actions-popover--open-down" : ""}`} role="menu">
+                                  <button type="button" role="menuitem" onClick={() => { setOpenOrderActionsId(null); openDetail(pedidoId); }}>
+                                    <Eye size={14} strokeWidth={2} />
+                                    <span>Ver detalle</span>
+                                  </button>
+                                  <button type="button" role="menuitem" className="is-approve" onClick={() => { setOpenOrderActionsId(null); approveOrder(pedidoId); }} disabled={approveDisabled} title={approveTitle}>
+                                    <IconCheck size={14} stroke={2.1} />
+                                    <span>Aprobar</span>
+                                  </button>
+                                  <button type="button" role="menuitem" className="is-cancel" onClick={() => { setOpenOrderActionsId(null); rejectOrder(pedidoId); }} disabled={!canCancelAction} title={canInvoiceStatus(item.estado) ? "Cancelar pedido aprobado" : "Rechazar pedido"}>
+                                    <IconX size={14} stroke={2.1} />
+                                    <span>Cancelar</span>
+                                  </button>
+                                  <a href={`https://wa.me/${waPhone}`} target="_blank" rel="noreferrer" role="menuitem" className="is-whatsapp" onClick={() => setOpenOrderActionsId(null)}>
+                                    <MessageCircle size={14} strokeWidth={2} />
+                                    <span>Enviar WhatsApp</span>
+                                  </a>
+                                  {canDownloadInvoice && (
+                                    <button type="button" role="menuitem" className="is-invoice" onClick={() => { setOpenOrderActionsId(null); downloadInvoice(pedidoId); }}>
+                                      <Receipt size={14} strokeWidth={2} />
+                                      <span>Generar factura</span>
+                                    </button>
+                                  )}
+                                  {canViewMessageCard && (
+                                    <button type="button" role="menuitem" className="is-card" onClick={() => { setOpenOrderActionsId(null); openMessageCard(item); }}>
+                                      <Mail size={14} strokeWidth={2} />
+                                      <span>Mensaje</span>
+                                    </button>
+                                  )}
+                                </div>
+                              ) : null}
+                            </div>
+                          </footer>
+                        </article>
+                      </td>
+                      <td data-label="Número">
                         <span className={`orders-order-badge ${statusClass}`}>{displayOrderNumber}</span>
                       </td>
-                      <td data-label="Producto" title={(item.productos || []).join(", ")}>
-                        <div className="orders-product-cell">
-                          <strong>{productText || "-"}</strong>
-                          <span className="orders-product-client-line">
-                            <span className="orders-client-avatar" aria-hidden="true">{initialsFromName(item.cliente)}</span>
-                            <span>
-                              <b>{item.cliente || "-"}</b>
-                              <small>Destinatario: {item.destinatario || "-"}</small>
-                            </span>
-                          </span>
+                      <td data-label="Fecha/Hora">
+                        <div className="orders-cell-stack">
+                          <strong>{fechaPedido || "-"}</strong>
+                          <small>{horaRegistroPedido || "-"}</small>
                         </div>
                       </td>
-                      <td data-label="Fecha entrega">
+                      <td data-label="Cliente · Destinatario">
+                        <div className="orders-cell-stack orders-client-destination-cell">
+                          <strong>{item.cliente || "-"}</strong>
+                          <small>→ {item.destinatario || "-"}</small>
+                        </div>
+                      </td>
+                      <td data-label="Entrega">
                         <div className="orders-cell-stack orders-cell-stack--delivery">
-                          <span><CalendarDays size={14} strokeWidth={2} /> {fechaEntrega || "-"}</span>
                           <span className="orders-delivery-pill"><Clock3 size={14} strokeWidth={2} /> {item.horaEntrega || horaEntrega || "-"}</span>
+                          <span>{fechaEntrega || "-"}</span>
                         </div>
                       </td>
-                      <td data-label="Florista">
-                        <div className={`orders-florist-cell${floristaName === "Sin asignar" ? " is-unassigned" : " is-assigned"}${normalizedStatus === "APROBADO" ? " is-approved" : ""}`}>
-                          <span className="orders-client-avatar orders-florist-avatar" aria-hidden="true">
-                            {floristaName === "Sin asignar" ? <UserCircle size={18} strokeWidth={2} /> : initialsFromName(floristaName)}
-                          </span>
-                          <span>{floristaName}</span>
-                        </div>
+                      <td data-label="Producto(s)" title={productSummary.title}>
+                        <span className="orders-products-inline">{productSummary.productText || "-"}</span>
+                      </td>
+                      <td data-label="Total">
+                        <span className="orders-total-value">${formatearCOP(resolveOrderListTotal(item))}</span>
                       </td>
                       <td data-label="Método pago">{item.metodoPago || "-"}</td>
                       <td data-label="Estado">
@@ -1769,43 +2872,53 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
                           ) : null}
                         </div>
                       </td>
-                      <td data-label="Valor">
-                        <span className="orders-total-value">${formatearCOP(Number(item.total || 0))}</span>
-                      </td>
                       <td data-label="Acciones">
                         <div className="order-actions">
                           <button type="button" className="order-icon order-icon-view" onClick={() => openDetail(pedidoId)} title="Ver detalle" aria-label="Ver detalle"><Eye size={17} strokeWidth={2} /></button>
-                          <details className="orders-row-menu">
-                            <summary className="order-icon orders-row-menu-trigger" title="Más acciones" aria-label="Más acciones">
-                              <MoreHorizontal size={17} strokeWidth={2} />
-                            </summary>
-                            <div className="orders-row-menu-panel">
-                              <a href={`https://wa.me/${waPhone}`} target="_blank" rel="noreferrer" className="orders-row-menu-item">
-                                <MessageCircle size={16} strokeWidth={2} />
-                                <span>WhatsApp</span>
-                              </a>
-                              <button type="button" className="orders-row-menu-item" onClick={() => approveOrder(pedidoId)} disabled={approveDisabled} title={approveTitle}>
-                                <IconCheck size={16} stroke={2.1} />
-                                <span>Aprobar</span>
-                              </button>
-                              <button type="button" className="orders-row-menu-item" onClick={() => rejectOrder(pedidoId)} disabled={!canCancelAction} title={canInvoiceStatus(item.estado) ? "Cancelar pedido aprobado" : "Rechazar pedido"}>
-                                <IconX size={16} stroke={2.1} />
-                                <span>{canInvoiceStatus(item.estado) ? "Cancelar" : "Rechazar"}</span>
-                              </button>
-                              {canDownloadInvoice && (
-                                <button type="button" className="orders-row-menu-item" onClick={() => downloadInvoice(pedidoId)} title="Descargar factura">
-                                  <Receipt size={16} strokeWidth={2} />
-                                  <span>Factura</span>
+                          <div className="order-actions-menu">
+                            <button
+                              type="button"
+                              className="order-icon order-icon-more"
+                              onClick={() => setOpenOrderActionsId(current => current === pedidoId ? null : pedidoId)}
+                              title="Más acciones"
+                              aria-label="Más acciones"
+                              aria-expanded={openOrderActionsId === pedidoId}
+                            >
+                              <MoreVertical size={17} strokeWidth={2} />
+                            </button>
+                            {openOrderActionsId === pedidoId ? (
+                              <div className={`order-actions-popover ${items.length <= 2 ? "order-actions-popover--open-down" : ""}`} role="menu">
+                                <button type="button" role="menuitem" onClick={() => { setOpenOrderActionsId(null); openDetail(pedidoId); }}>
+                                  <Eye size={14} strokeWidth={2} />
+                                  <span>Ver detalle</span>
                                 </button>
-                              )}
-                              {canViewMessageCard && (
-                                <button type="button" className="orders-row-menu-item" onClick={() => openMessageCard(item)} title="Ver mensaje e imprimir tarjeta">
-                                  <MessageCircle size={16} strokeWidth={2} />
-                                  <span>Mensaje / tarjeta</span>
+                                <button type="button" role="menuitem" className="is-approve" onClick={() => { setOpenOrderActionsId(null); approveOrder(pedidoId); }} disabled={approveDisabled} title={approveTitle}>
+                                  <IconCheck size={14} stroke={2.1} />
+                                  <span>Aprobar</span>
                                 </button>
-                              )}
-                            </div>
-                          </details>
+                                <button type="button" role="menuitem" className="is-cancel" onClick={() => { setOpenOrderActionsId(null); rejectOrder(pedidoId); }} disabled={!canCancelAction} title={canInvoiceStatus(item.estado) ? "Cancelar pedido aprobado" : "Rechazar pedido"}>
+                                  <IconX size={14} stroke={2.1} />
+                                  <span>Cancelar</span>
+                                </button>
+                                <a href={`https://wa.me/${waPhone}`} target="_blank" rel="noreferrer" role="menuitem" className="is-whatsapp" onClick={() => setOpenOrderActionsId(null)}>
+                                  <MessageCircle size={14} strokeWidth={2} />
+                                  <span>Enviar WhatsApp</span>
+                                </a>
+                                {canDownloadInvoice && (
+                                  <button type="button" role="menuitem" className="is-invoice" onClick={() => { setOpenOrderActionsId(null); downloadInvoice(pedidoId); }}>
+                                    <Receipt size={14} strokeWidth={2} />
+                                    <span>Generar factura</span>
+                                  </button>
+                                )}
+                                {canViewMessageCard && (
+                                  <button type="button" role="menuitem" className="is-card" onClick={() => { setOpenOrderActionsId(null); openMessageCard(item); }}>
+                                    <Mail size={14} strokeWidth={2} />
+                                    <span>Mensaje</span>
+                                  </button>
+                                )}
+                              </div>
+                            ) : null}
+                          </div>
                         </div>
                       </td>
                     </tr>
@@ -1816,26 +2929,56 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
             </div>
           </section>
 
-          <footer className="orders-pager">
-            <button
-              type="button"
-              className="btn-outline"
-              title="Ir a la página anterior"
-              onClick={() => setFilters(current => ({ ...current, page: Math.max(1, Number(current.page || 1) - 1) }))}
-              disabled={page <= 1}
-            >
-              Anterior
-            </button>
-            <span>Página {page} de {pages} · {total} pedidos</span>
-            <button
-              type="button"
-              className="btn-outline"
-              title="Ir a la página siguiente"
-              onClick={() => setFilters(current => ({ ...current, page: Number(current.page || 1) + 1 }))}
-              disabled={page >= pages}
-            >
-              Siguiente
-            </button>
+          <footer className="records-pager orders-records-pager" aria-label="Paginación de pedidos">
+            <p>Mostrando {visibleFrom} a {visibleTo} de {total} pedidos</p>
+            <nav className="records-pager-pages" aria-label="Páginas de pedidos">
+              <button
+                type="button"
+                className="records-pager-arrow"
+                title="Ir a la página anterior"
+                onClick={() => setFilters(current => ({ ...current, page: Math.max(1, Number(current.page || 1) - 1) }))}
+                disabled={page <= 1}
+              >
+                <ChevronLeft size={16} strokeWidth={2.4} aria-hidden="true" />
+              </button>
+              {pagerItems.map(item => (
+                typeof item === "number" ? (
+                  <button
+                    key={item}
+                    type="button"
+                    className={`records-pager-page${item === page ? " is-active" : ""}`}
+                    onClick={() => setFilters(current => ({ ...current, page: item }))}
+                    aria-current={item === page ? "page" : undefined}
+                  >
+                    {item}
+                  </button>
+                ) : (
+                  <span key={item} className="records-pager-ellipsis">...</span>
+                )
+              ))}
+              <button
+                type="button"
+                className="records-pager-arrow"
+                title="Ir a la página siguiente"
+                onClick={() => setFilters(current => ({ ...current, page: Math.min(pages, Number(current.page || 1) + 1) }))}
+                disabled={page >= pages}
+              >
+                <ChevronRight size={16} strokeWidth={2.4} aria-hidden="true" />
+              </button>
+            </nav>
+            <label className="records-pager-size">
+              <span>Mostrar</span>
+              <select
+                value={pageSize}
+                onChange={event => setFilters(current => ({ ...current, page: 1, pageSize: Number(event.target.value) }))}
+                title="Registros por página"
+              >
+                {PAGE_SIZE_OPTIONS.map(option => (
+                  <option key={option} value={option}>{option}</option>
+                ))}
+              </select>
+              <span>por página</span>
+            </label>
           </footer>
         </main>
       </div>
@@ -1853,7 +2996,7 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
               <div className="orders-detail-head-meta">
                 <span className={`order-badge ${statusBadgeClass(detalle.estado)}`}>{detalle.estado || "-"}</span>
                 <span>{formatDisplayDate(detalle.destinatario?.fechaEntrega)}</span>
-                <span>${formatearCOP(Number(detalle.financiero?.total || 0))}</span>
+                <span>${formatearCOP(getOrderFinancialTotal(detalle.financiero))}</span>
               </div>
             ) : null}
           </div>
@@ -1926,7 +3069,7 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
                                 className="order-detail-product-chip-main"
                                 onClick={() => setDetailEditDetalleID(detalleId)}
                               >
-                                {producto.codigoProducto || `Arreglo ${index + 1}`}
+                                {displayProductCode(producto, empresaId) || `Arreglo ${index + 1}`}
                               </button>
                               <button
                                 type="button"
@@ -1992,7 +3135,7 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
                                   className={`order-combobox-option${String(item.id) === detailAddProductoID ? " is-selected" : ""}`}
                                   onClick={() => {
                                     setDetailAddProductoID(String(item.id));
-                                    setDetailAddProductoCodigo(String(item.codigo || ""));
+                                    setDetailAddProductoCodigo(displayProductCode(item, detailEmpresaId));
                                     setDetailAddNombreArreglo(String(item.nombre || ""));
                                     setDetailAddCantidad(1);
                                     setDetailAddPrecio(item.precio != null ? normalizeWholePeso(item.precio) : null);
@@ -2000,7 +3143,7 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
                                     setDetailAddFilterText("");
                                   }}
                                 >
-                                  {buildProductoLabel(item)}
+                                  {buildProductoLabel(item, detailEmpresaId)}
                                   {item.precio != null ? <span className="order-combobox-price">${formatearCOP(Number(item.precio))}</span> : null}
                                 </li>
                               ))}
@@ -2037,7 +3180,7 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
                           Código
                           <input
                             type="text"
-                            value={detailAddProductoCodigo}
+                            value={detailAddDisplayProductoCodigo}
                             readOnly
                             className="order-detail-edit-readonly"
                           />
@@ -2075,7 +3218,7 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
                       Código de arreglo
                       <input
                         type="text"
-                        value={detailEditProductoCodigo}
+                        value={detailEditDisplayProductoCodigo}
                         readOnly
                         className="order-detail-edit-readonly"
                       />
@@ -2154,7 +3297,7 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
                                 className={`order-combobox-option${String(item.id) === detailEditProductoID ? " is-selected" : ""}`}
                                 onClick={() => {
                                   setDetailEditProductoID(String(item.id));
-                                  setDetailEditProductoCodigo(String(item.codigo || ""));
+                                  setDetailEditProductoCodigo(displayProductCode(item, detailEmpresaId));
                                   setDetailEditNombreArreglo(String(item.nombre || ""));
                                   setDetailEditCantidad(Number(detalle?.productos?.[0]?.cantidad || 1));
                                   setDetailEditProductoObservaciones("");
@@ -2168,7 +3311,7 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
                                 setDetailEditFilterText("");
                                 }}
                               >
-                                {buildProductoLabel(item)}
+                                {buildProductoLabel(item, detailEmpresaId)}
                                 {item.precio != null ? <span className="order-combobox-price">${formatearCOP(Number(item.precio))}</span> : null}
                               </li>
                             ))}
@@ -2513,7 +3656,7 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
                                 <span>Descuento: -${formatearCOP(detailEditFinancialPreview.descuentoMonto)}</span>
                               ) : null}
                               {detailEditFinancialPreview.saldoFavorMonto > 0 ? (
-                                <span>Saldo a favor: -${formatearCOP(detailEditFinancialPreview.saldoFavorMonto)}</span>
+                                <span>Saldo a favor: ${formatearCOP(detailEditFinancialPreview.saldoFavorMonto)}</span>
                               ) : null}
                               <strong>Total ajustado: ${formatearCOP(detailEditFinancialPreview.total)}</strong>
                             </div>
@@ -2549,6 +3692,7 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
 
               <OrderDetail
                 detalle={detalle}
+                empresaId={empresaId}
                 paymentTitle={paymentFieldConfig?.titulo || "Método de pago"}
                 salesChannelTitle={salesChannelFieldConfig?.titulo || "Celular Flora"}
               />
@@ -2718,14 +3862,17 @@ function OrderDetailAccordion({ title, icon, children, defaultOpen = false, clas
   );
 }
 
-function OrderDetail({ detalle, paymentTitle = "Método de pago", salesChannelTitle = "Celular Flora" }) {
+function OrderDetail({ detalle, empresaId = null, paymentTitle = "Método de pago", salesChannelTitle = "Celular Flora" }) {
   const productos = Array.isArray(detalle.productos) ? detalle.productos : [];
   const { date: fechaPedido, time: horaPedido } = splitDateTimeParts(detalle.fechaPedido || detalle.fecha);
   const { date: fechaEntrega, time: horaEntrega } = splitDateTimeParts(detalle.destinatario?.fechaEntrega);
   const tipoDocumentoCliente = formatClienteTipoDocumento(detalle.cliente);
   const numeroDocumentoCliente = formatClienteNumeroDocumento(detalle.cliente);
-  const paymentBreakdown = extractPaymentBreakdown(detalle.financiero);
-  const totalPedido = Number(detalle.financiero?.total || 0);
+  const totalPedido = getOrderFinancialTotal(detalle.financiero);
+  const paymentBreakdown = normalizePaymentBreakdownForTotal(
+    extractPaymentBreakdown(detalle.financiero),
+    totalPedido
+  );
   const detailRow = (label, value, extraClass = "") => (
     <div className={`order-detail-row${extraClass ? ` ${extraClass}` : ""}`}>
       <span className="order-detail-label">{label}</span>
@@ -2760,7 +3907,7 @@ function OrderDetail({ detalle, paymentTitle = "Método de pago", salesChannelTi
           {detailRow("Estado", detalle.estado || "-")}
           {detailRow("Fecha", formatDisplayDate(fechaPedido))}
           {detailRow("Hora", detalle.horaPedido || horaPedido || "-")}
-          {detailRow("Factura", detalle.financiero?.facturaImpresa ? "Impresa" : "Pendiente")}
+          {detailRow("Factura", canInvoiceStatus(detalle.estado) ? (detalle.financiero?.facturaImpresa ? "Impresa" : "Pendiente") : "No aplica")}
           {detalle.motivoRechazo ? detailRow("Motivo", detalle.motivoRechazo) : null}
         </div>
       </OrderDetailAccordion>
@@ -2801,8 +3948,7 @@ function OrderDetail({ detalle, paymentTitle = "Método de pago", salesChannelTi
             {productos.map((producto, index) => (
               <article key={`${producto.detalleID || producto.productoID || producto.nombreProducto}-${index}`} className="orders-detail-product-card">
                 <div className="orders-detail-product-card-head">
-                  <strong>{producto.nombreProducto || `Arreglo ${index + 1}`}</strong>
-                  <span>Código {producto.codigoProducto || "-"}</span>
+                  <strong>{orderProductLabel(producto, empresaId) || `Arreglo ${index + 1}`}</strong>
                 </div>
                 <div className="orders-detail-product-meta">
                   <span>Cantidad <strong>{Number(producto.cantidad || 0)}</strong></span>
@@ -2826,7 +3972,7 @@ function OrderDetail({ detalle, paymentTitle = "Método de pago", salesChannelTi
           {detailRow("Domicilio", `$${formatearCOP(Number(detalle.financiero?.domicilio || 0))}`)}
           {Number(detalle.financiero?.recargoLinkMonto || 0) > 0 ? detailRow("Recargo link", `+$${formatearCOP(Number(detalle.financiero?.recargoLinkMonto || 0))}`) : null}
           {Number(detalle.financiero?.descuentoMonto || 0) > 0 ? detailRow("Descuento", `-$${formatearCOP(Number(detalle.financiero?.descuentoMonto || 0))}`) : null}
-          {Number(detalle.financiero?.saldoFavorMonto || 0) > 0 ? detailRow("Saldo a favor", `-$${formatearCOP(Number(detalle.financiero?.saldoFavorMonto || 0))}`) : null}
+          {Number(detalle.financiero?.saldoFavorMonto || 0) > 0 ? detailRow("Saldo a favor", `$${formatearCOP(Number(detalle.financiero?.saldoFavorMonto || 0))}`) : null}
           {detailRow("Estado pago", detalle.financiero?.estadoPago || "-")}
           {detailRow(paymentTitle, formatMetodoPago(detalle.financiero))}
           {paymentBreakdown.length > 0 ? detailRow("Desglose pagos", paymentBreakdown.map(item => `${item.metodo}: $${formatearCOP(item.monto)}`).join(" · ")) : null}
@@ -2849,8 +3995,12 @@ function normalizeCatalogItem(raw) {
   return {
     id,
     codigo: String(raw?.codigoProducto || raw?.codigo || raw?.sku || "").trim(),
+    codigoProducto: String(raw?.codigoProducto || raw?.codigo_producto || raw?.codigo || raw?.sku || "").trim(),
+    codigoCatalogo: String(raw?.codigoCatalogo || raw?.codigo_catalogo || raw?.catalogCode || "").trim(),
     nombre: String(raw?.nombreProducto || raw?.nombre || raw?.descripcion || "").trim(),
+    nombreProducto: String(raw?.nombreProducto || raw?.nombre || raw?.descripcion || "").trim(),
     descripcion: String(raw?.descripcion || raw?.observaciones || "").trim(),
+    imageUrl: resolveProductImageUrl(raw),
     precio,
   };
 }
@@ -2875,8 +4025,8 @@ function dedupeCatalogItems(items) {
   return Array.from(map.values());
 }
 
-function buildProductoLabel(producto) {
-  const codigo = String(producto?.codigo || "").trim();
+function buildProductoLabel(producto, empresaId = null) {
+  const codigo = displayProductCode(producto, empresaId);
   const nombre = String(producto?.nombre || "").trim();
   if (codigo && nombre) return `${codigo} - ${nombre}`;
   if (nombre) return nombre;

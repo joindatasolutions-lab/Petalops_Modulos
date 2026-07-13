@@ -5,9 +5,10 @@ const SIDEBAR_STORAGE_KEY = "petalops.sidebar.pinned";
 function readSidebarPinnedPreference() {
   try {
     const raw = globalThis.localStorage?.getItem(SIDEBAR_STORAGE_KEY);
+    if (raw == null) return true;
     return raw === "true";
   } catch {
-    return false;
+    return true;
   }
 }
 

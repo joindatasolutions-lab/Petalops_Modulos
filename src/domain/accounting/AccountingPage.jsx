@@ -5,9 +5,7 @@ import { createApiClient } from "../../infrastructure/apiClient.js";
 import { AppSidebar } from "../../shared/AppSidebar.jsx";
 import { useSidebarState } from "../../shared/useSidebarState.js";
 import { formatearCOP, normalizeStatus, splitDateTimeParts, toIsoDateEnd, toIsoDateStart } from "../../shared/utils.js";
-import { Activity, BadgeDollarSign, BarChart3, Brain, CalendarDays, ChevronDown, CircleAlert, CircleCheck, CreditCard, ListChecks, RefreshCw, Receipt, Sparkles, Wallet } from "lucide-react";
-
-const CASH_CLOSING_STORAGE_KEY = "petalops_accounting_cash_closing";
+import { Activity, BadgeDollarSign, Banknote, BarChart3, Brain, CalendarDays, ChevronDown, CircleAlert, CircleCheck, Columns3, CreditCard, Download, FileSpreadsheet, FileText, Filter, ListChecks, MoreHorizontal, Package, Receipt, RefreshCw, Search, ShoppingCart, Sparkles, Tag, Wallet, XCircle } from "lucide-react";
 
 const ACCOUNTING_VIEWS = [
   { key: "ventas", label: "Ventas" },
@@ -33,9 +31,52 @@ const initialFilters = {
 const initialCashForm = {
   fecha: "",
   base: "",
+  efectivo: "",
   gasto: "",
   guardado: "",
+  totalEfectivo: "",
+  observacion: "",
 };
+
+function getAdjustmentNoteItems(row) {
+  const items = [];
+  const saldoNota = String(row?.saldoFavorNota || "").trim();
+  const descuentoNota = String(row?.descuentoNota || "").trim();
+
+  if (saldoNota) {
+    items.push({
+      label: "Saldo a favor",
+      value: Number(row?.saldoFavorMonto || 0),
+      note: saldoNota,
+    });
+  }
+
+  if (descuentoNota) {
+    items.push({
+      label: "Descuento",
+      value: Number(row?.descuentoMonto || 0),
+      note: descuentoNota,
+    });
+  }
+
+  return items;
+}
+
+export function filterAccountingDetailRows(rows, detailFilter = "todos") {
+  return (Array.isArray(rows) ? rows : []).filter(row => {
+    if (detailFilter === "descuento") return Number(row.descuentoMonto || 0) > 0;
+    if (detailFilter === "saldo") return Number(row.saldoFavorMonto || 0) > 0;
+    if (detailFilter === "cancelados") return Boolean(row.cancelado) || ["CANCELADO", "RECHAZADO"].includes(normalizeStatus(row.estado));
+    if (detailFilter === "conNotas") return getAdjustmentNoteItems(row).length > 0;
+    return true;
+  });
+}
+
+function formatAdjustmentNotesForExport(row) {
+  const items = getAdjustmentNoteItems(row);
+  if (items.length === 0) return "";
+  return items.map(item => item.note).join(" | ");
+}
 
 export function AccountingPage({
   session,
@@ -43,6 +84,7 @@ export function AccountingPage({
   canViewPedidos,
   canViewProduccion,
   canViewDomicilios,
+  canViewBarrios,
   canViewInventario,
   canViewContabilidad,
   canViewTrazabilidad,
@@ -52,6 +94,7 @@ export function AccountingPage({
   onGoPedidos,
   onGoProduccion,
   onGoDomicilios,
+  onGoBarrios,
   onGoInventario,
   onGoContabilidad,
   onGoTrazabilidad,
@@ -92,8 +135,10 @@ export function AccountingPage({
   const [paymentAccountRows, setPaymentAccountRows] = useState([]);
   const [accountingDetailRows, setAccountingDetailRows] = useState([]);
   const [detailFilter, setDetailFilter] = useState("todos");
+  const [selectedAccountingCase, setSelectedAccountingCase] = useState(null);
   const [selectedArrangementKeys, setSelectedArrangementKeys] = useState([]);
-  const [cashHistoryVersion, setCashHistoryVersion] = useState(0);
+  const [cashHistoryRows, setCashHistoryRows] = useState([]);
+  const [cashLoading, setCashLoading] = useState(false);
 
   const loadAccountingData = useCallback(async () => {
     setLoading(true);
@@ -125,16 +170,165 @@ export function AccountingPage({
     loadAccountingData();
   }, [loadAccountingData]);
 
-  useEffect(() => {
-    const saved = readCashClosing(empresaId, sucursalId, cashForm.fecha);
+  const loadCashClosings = useCallback(async () => {
+    setCashLoading(true);
+    try {
+      const monthRange = getAccountingPeriodRange("month");
+      const payload = await api.listarCierresCaja({
+        empresaId,
+        sucursalId,
+        fechaDesde: monthRange.fechaDesde,
+        fechaHasta: monthRange.fechaHasta,
+      });
+      const rows = Array.isArray(payload?.items)
+        ? payload.items
+        : Array.isArray(payload)
+          ? payload
+          : [];
+      setCashHistoryRows(rows
+        .map(row => normalizeCashClosingRow(row))
+        .filter(row => row && row.fecha >= monthRange.fechaDesde && row.fecha <= monthRange.fechaHasta));
+    } catch (nextError) {
+      setCashHistoryRows([]);
+      if (nextError?.status === 404) {
+        setError("");
+        return;
+      }
+      setError(nextError?.detail || nextError?.message || "No fue posible cargar los cierres de caja desde la base de datos.");
+    } finally {
+      setCashLoading(false);
+    }
+  }, [api, empresaId, sucursalId]);
+
+  const loadCashClosingForDate = useCallback(async fecha => {
+    const targetFecha = String(fecha || "").slice(0, 10);
+    if (!targetFecha) return null;
+    const payload = await api.listarCierresCaja({
+      empresaId,
+      sucursalId,
+      fechaDesde: targetFecha,
+      fechaHasta: targetFecha,
+    });
+    const rows = Array.isArray(payload?.items)
+      ? payload.items
+      : Array.isArray(payload)
+        ? payload
+        : [];
+    return rows
+      .map(row => normalizeCashClosingRow(row, targetFecha))
+      .filter(Boolean)
+      .find(row => row.fecha === targetFecha) || null;
+  }, [api, empresaId, sucursalId]);
+
+  const loadCashDayFromAccountingSummary = useCallback(async () => {
+    const payload = await api.obtenerResumenContabilidad({
+      empresaId,
+      sucursalId,
+      fechaDesde: cashForm.fecha,
+      fechaHasta: cashForm.fecha,
+    });
+    const row = normalizeCashSummaryRow(payload, cashForm.fecha);
     setCashForm(current => ({
       ...current,
-      base: saved?.base ?? "",
-      gasto: saved?.gasto ?? "",
-      guardado: saved?.guardado ?? "",
+      fecha: row?.fecha || current.fecha,
+      efectivo: row?.efectivo ?? "",
+      totalEfectivo: "",
     }));
-    setInfo("");
-  }, [cashForm.fecha, empresaId, sucursalId, cashHistoryVersion]);
+    return row;
+  }, [api, cashForm.fecha, empresaId, sucursalId]);
+
+  const loadCashDay = useCallback(async () => {
+    if (!cashForm.fecha || !empresaId || !sucursalId) return;
+    setCashLoading(true);
+    try {
+      let savedClosing = null;
+      try {
+        savedClosing = await loadCashClosingForDate(cashForm.fecha);
+      } catch (closingError) {
+        if (closingError?.status !== 404) throw closingError;
+      }
+      if (savedClosing) {
+        setCashForm(current => ({
+          ...current,
+          fecha: savedClosing.fecha || current.fecha,
+          base: savedClosing.base ?? "",
+          efectivo: savedClosing.efectivo ?? "",
+          gasto: savedClosing.gasto ?? "",
+          guardado: savedClosing.guardado ?? "",
+          totalEfectivo: savedClosing.totalEfectivo ?? "",
+          observacion: savedClosing.observacion ?? "",
+        }));
+        setError("");
+        setInfo("");
+        return;
+      }
+
+      const payload = await api.obtenerCierreCajaDia({
+        empresaId,
+        sucursalId,
+        fecha: cashForm.fecha,
+      });
+      const row = normalizeCashClosingRow(payload, cashForm.fecha);
+      setCashForm(current => ({
+        ...current,
+        fecha: row?.fecha || current.fecha,
+        base: row?.base ?? "",
+        efectivo: row?.efectivo ?? "",
+        gasto: row?.gasto ?? "",
+        guardado: row?.guardado ?? "",
+        totalEfectivo: row?.totalEfectivo ?? "",
+        observacion: row?.observacion ?? "",
+      }));
+      setError("");
+      setInfo("");
+    } catch (nextError) {
+      if (nextError?.status === 404) {
+        try {
+          const row = await loadCashDayFromAccountingSummary();
+          setError("");
+          setInfo(row
+            ? "Efectivo cargado desde el resumen contable. Los endpoints de cierre de caja no estan publicados."
+            : "No hay efectivo registrado para esa fecha. Los endpoints de cierre de caja no estan publicados.");
+        } catch (summaryError) {
+          setError(summaryError?.detail || summaryError?.message || "No fue posible consultar el efectivo desde el resumen contable.");
+        }
+        return;
+      }
+      setCashForm(current => ({
+        ...current,
+        base: "",
+        efectivo: "",
+        gasto: "",
+        guardado: "",
+        totalEfectivo: "",
+        observacion: "",
+      }));
+      setError(nextError?.detail || nextError?.message || "No fue posible consultar la caja del día.");
+    } finally {
+      setCashLoading(false);
+    }
+  }, [api, cashForm.fecha, empresaId, sucursalId, loadCashClosingForDate, loadCashDayFromAccountingSummary]);
+
+  useEffect(() => {
+    loadCashClosings();
+  }, [loadCashClosings]);
+
+  useEffect(() => {
+    loadCashDay();
+  }, [loadCashDay]);
+
+  useEffect(() => {
+    if (activeView !== "caja") return;
+    loadCashDay();
+  }, [activeView, loadCashDay]);
+
+  useEffect(() => {
+    const handleCashOrderSaved = () => {
+      void loadCashDay();
+    };
+    window.addEventListener("pedidoGuardadoEfectivo", handleCashOrderSaved);
+    return () => window.removeEventListener("pedidoGuardadoEfectivo", handleCashOrderSaved);
+  }, [loadCashDay]);
 
   useEffect(() => {
     setSelectedArrangementKeys(arrangementRows.map(item => item.key));
@@ -152,7 +346,7 @@ export function AccountingPage({
   }, [accountingMenuOpen]);
 
   const summaryTotals = useMemo(() => {
-    return orderRows.reduce((acc, row) => ({
+    const totals = orderRows.reduce((acc, row) => ({
       cantidadPedidos: acc.cantidadPedidos + Number(row.cantidadPedidos || 0),
       pedidosCancelados: acc.pedidosCancelados + Number(row.pedidosCancelados || 0),
       totalArreglos: acc.totalArreglos + Number(row.totalArreglos || 0),
@@ -173,27 +367,39 @@ export function AccountingPage({
       totalDescuentos: 0,
       totalSaldoFavor: 0,
     });
-  }, [orderRows]);
+
+    if (!accountingDetailRows.length) {
+      return {
+        ...totals,
+        cantidadPedidos: Math.max(0, totals.cantidadPedidos - totals.pedidosCancelados),
+      };
+    }
+
+    const pedidosAprobados = accountingDetailRows.filter(row => (
+      normalizeStatus(row.estado) === "APROBADO" && !row.cancelado
+    )).length;
+    const pedidosCancelados = accountingDetailRows.filter(row => (
+      Boolean(row.cancelado) || ["CANCELADO", "RECHAZADO"].includes(normalizeStatus(row.estado))
+    )).length;
+
+    return {
+      ...totals,
+      cantidadPedidos: pedidosAprobados,
+      pedidosCancelados,
+    };
+  }, [orderRows, accountingDetailRows]);
 
   const filteredAccountingDetailRows = useMemo(() => {
-    return accountingDetailRows.filter(row => {
-      if (detailFilter === "descuento") return Number(row.descuentoMonto || 0) > 0;
-      if (detailFilter === "saldo") return Number(row.saldoFavorMonto || 0) > 0;
-      if (detailFilter === "cancelados") return Boolean(row.cancelado);
-      if (detailFilter === "conNotas") {
-        return Boolean(String(row.descuentoNota || row.saldoFavorNota || row.observaciones || row.notaCancelacion || "").trim());
-      }
-      return true;
-    });
+    return filterAccountingDetailRows(accountingDetailRows, detailFilter);
   }, [accountingDetailRows, detailFilter]);
 
   const detailInsight = useMemo(() => {
     const pedidosConDescuento = accountingDetailRows.filter(row => Number(row.descuentoMonto || 0) > 0);
     const pedidosConSaldo = accountingDetailRows.filter(row => Number(row.saldoFavorMonto || 0) > 0);
     const pedidosConNotas = accountingDetailRows.filter(row =>
-      String(row.descuentoNota || row.saldoFavorNota || row.observaciones || row.notaCancelacion || "").trim()
+      getAdjustmentNoteItems(row).length > 0
     );
-    const cancelados = accountingDetailRows.filter(row => Boolean(row.cancelado));
+    const cancelados = accountingDetailRows.filter(row => Boolean(row.cancelado) || ["CANCELADO", "RECHAZADO"].includes(normalizeStatus(row.estado)));
     const cuentaRows = accountingDetailRows.reduce((map, row) => {
       const cuenta = String(row.cuentaPago || "Sin especificar").trim() || "Sin especificar";
       const current = map.get(cuenta) || { cuenta, pedidos: 0, totalVenta: 0 };
@@ -271,8 +477,9 @@ export function AccountingPage({
     const ticketPromedio = summaryTotals.cantidadPedidos > 0
       ? roundMoney(summaryTotals.totalVenta / summaryTotals.cantidadPedidos)
       : 0;
-    const cancelacionesPct = summaryTotals.cantidadPedidos > 0
-      ? roundMoney((summaryTotals.pedidosCancelados / summaryTotals.cantidadPedidos) * 100)
+    const totalPedidosConEstadoFinal = summaryTotals.cantidadPedidos + summaryTotals.pedidosCancelados;
+    const cancelacionesPct = totalPedidosConEstadoFinal > 0
+      ? roundMoney((summaryTotals.pedidosCancelados / totalPedidosConEstadoFinal) * 100)
       : 0;
     return {
       ticketPromedio,
@@ -294,6 +501,30 @@ export function AccountingPage({
       height: maxValue > 0 ? Math.max((Number(row.totalVenta || 0) / maxValue) * 100, 8) : 0,
     }));
   }, [orderRows]);
+
+  const salesTrendChart = useMemo(() => {
+    const rows = salesTrendRows;
+    const width = 1000;
+    const height = 190;
+    const paddingX = 34;
+    const paddingTop = 22;
+    const paddingBottom = 34;
+    const plotHeight = height - paddingTop - paddingBottom;
+    const maxValue = Math.max(...rows.map(row => Number(row.value || 0)), 0);
+    const points = rows.map((row, index) => {
+      const x = rows.length <= 1
+        ? width / 2
+        : paddingX + (index * (width - paddingX * 2)) / (rows.length - 1);
+      const ratio = maxValue > 0 ? Number(row.value || 0) / maxValue : 0;
+      const y = paddingTop + (1 - ratio) * plotHeight;
+      return { ...row, x, y };
+    });
+    const linePath = points.map((point, index) => `${index === 0 ? "M" : "L"} ${point.x} ${point.y}`).join(" ");
+    const areaPath = points.length > 0
+      ? `${linePath} L ${points[points.length - 1].x} ${height - paddingBottom} L ${points[0].x} ${height - paddingBottom} Z`
+      : "";
+    return { width, height, points, linePath, areaPath };
+  }, [salesTrendRows]);
 
   const monthlySalesRows = useMemo(() => {
     const grouped = new Map();
@@ -383,19 +614,42 @@ export function AccountingPage({
   }, [arrangementRows, summaryTotals.totalVenta, topPaymentAccount, executiveMetrics.ticketPromedio, detailInsight.cancelados]);
 
   const baseValue = parseMoneyInput(cashForm.base);
+  const efectivoValue = parseMoneyInput(cashForm.efectivo);
   const gastoValue = parseMoneyInput(cashForm.gasto);
   const guardadoInputValue = parseMoneyInput(cashForm.guardado);
-  const efectivoValue = roundMoney(summaryTotals.totalEfectivo);
   const totalEfectivoCaja = roundMoney(baseValue + efectivoValue - gastoValue);
   const guardadoValue = roundMoney(guardadoInputValue);
   const nuevaBaseValue = roundMoney(totalEfectivoCaja - guardadoValue);
-  const cashHistoryRows = useMemo(
-    () => listCashClosings(empresaId, sucursalId),
-    [empresaId, sucursalId, cashHistoryVersion]
-  );
+  const todayCashDate = formatAccountingLocalDate(new Date());
+  const selectedCashDate = String(cashForm.fecha || "").slice(0, 10);
+  const selectedCashClosingExists = cashHistoryRows.some(row => row.fecha === selectedCashDate);
+  const isPastCashDate = Boolean(selectedCashDate) && selectedCashDate < todayCashDate;
+  const isFutureCashDate = Boolean(selectedCashDate) && selectedCashDate > todayCashDate;
+  const isLockedPastCashClosing = isPastCashDate && selectedCashClosingExists;
+  const canEditCashClosing = !isFutureCashDate;
+  const activePeriodPreset = useMemo(() => {
+    const presets = ["today", "yesterday", "7days", "30days", "month"];
+    const match = presets.find(preset => {
+      const range = getAccountingPeriodRange(preset);
+      return filters.fechaDesde === range.fechaDesde && filters.fechaHasta === range.fechaHasta;
+    });
+    if (match) return match;
+    return "";
+  }, [filters.fechaDesde, filters.fechaHasta]);
 
   const applyFilter = (field, value) => {
     setFilters(current => ({ ...current, [field]: value }));
+  };
+
+  const applyPeriodPreset = preset => {
+    const nextRange = getAccountingPeriodRange(preset);
+    setFilters(current => ({ ...current, ...nextRange }));
+  };
+
+  const showAccountingDetail = filterKey => {
+    setActiveView("detalle");
+    setDetailFilter(filterKey);
+    setSelectedAccountingCase(null);
   };
 
   const toggleArrangementSelection = arrangementKey => {
@@ -414,24 +668,62 @@ export function AccountingPage({
     setSelectedArrangementKeys([]);
   };
 
-  const saveCashClosing = () => {
+  const saveCashClosing = async () => {
     if (!cashForm.fecha) {
       setInfo("Selecciona una fecha para guardar el cierre.");
+      return;
+    }
+    if (!empresaId || !sucursalId) {
+      setInfo("Empresa y sucursal son obligatorias para guardar caja.");
+      return;
+    }
+    if (isFutureCashDate) {
+      setInfo("No se puede operar una caja futura.");
+      return;
+    }
+    const values = [baseValue, efectivoValue, gastoValue, totalEfectivoCaja, guardadoValue, nuevaBaseValue];
+    if (values.some(value => !Number.isFinite(value) || value < 0)) {
+      setInfo("Todos los valores de caja deben ser números mayores o iguales a cero.");
       return;
     }
 
     setSaving(true);
     try {
-      writeCashClosing(empresaId, sucursalId, cashForm.fecha, {
+      const savedPayload = await api.guardarCierreCaja({
+        empresaId,
+        sucursalId,
+        fecha: cashForm.fecha,
         base: baseValue,
         efectivo: efectivoValue,
         gasto: gastoValue,
         totalEfectivo: totalEfectivoCaja,
         guardado: guardadoValue,
         nuevaBase: nuevaBaseValue,
+        observacion: cashForm.observacion || "",
+        usuarioId: session?.userID || session?.usuarioID || session?.idUsuario || null,
       });
-      setCashHistoryVersion(current => current + 1);
-      setInfo(`Cierre guardado para ${cashForm.fecha}.`);
+      const savedRow = hasCashClosingData(savedPayload)
+        ? normalizeCashClosingRow(savedPayload, cashForm.fecha)
+        : null;
+      if (savedRow) {
+        setCashForm(current => ({
+          ...current,
+          fecha: savedRow.fecha || current.fecha,
+          base: savedRow.base ?? current.base,
+          efectivo: savedRow.efectivo ?? current.efectivo,
+          gasto: savedRow.gasto ?? current.gasto,
+          guardado: savedRow.guardado ?? current.guardado,
+          totalEfectivo: savedRow.totalEfectivo ?? current.totalEfectivo,
+          observacion: savedRow.observacion ?? current.observacion,
+        }));
+      }
+      await loadCashDay();
+      await loadCashClosings();
+      setInfo(`Cierre guardado en base de datos para ${cashForm.fecha}.`);
+    } catch (nextError) {
+      setError(nextError?.status === 404
+        ? "El endpoint para guardar cierres de caja no esta publicado en el backend."
+        : nextError?.detail || nextError?.message || "No fue posible guardar el cierre de caja en la base de datos.");
     } finally {
       setSaving(false);
     }
@@ -453,13 +745,13 @@ export function AccountingPage({
     exportRowsToExcel(
       orderRows.map(row => ({
         Fecha: row.fecha,
-        "Cantidad de pedidos": row.cantidadPedidos,
+        "Pedidos aprobados": row.cantidadPedidos,
         "Pedidos cancelados": row.pedidosCancelados,
         "Total arreglos": row.totalArreglos,
         "Total domicilios": row.totalDomicilios,
         "Recargos link": row.totalRecargos,
         Descuentos: row.totalDescuentos,
-        "Saldo a favor": row.totalSaldoFavor,
+        "Saldo a favor": Number(row.totalSaldoFavor || 0),
         "Total venta": row.totalVenta,
       })),
       `contabilidad-ventas-${filters.fechaDesde}-${filters.fechaHasta}.xlsx`,
@@ -474,13 +766,12 @@ export function AccountingPage({
         "Usuario sistema": row.usuarioSistema || "",
         Cliente: row.cliente || "",
         "Cuenta de pago": row.cuentaPago || "",
-        Estado: row.estado || "",
-        "Saldo a favor": row.saldoFavorMonto || 0,
+        Estado: row.cancelado ? "Cancelado" : row.estado || "",
+        "Saldo a favor": Number(row.saldoFavorMonto || 0),
         "Nota saldo a favor": row.saldoFavorNota || "",
         "Descuento aplicado": row.descuentoMonto || 0,
         "Nota descuento": row.descuentoNota || "",
-        "Notas / observaciones": row.observaciones || "",
-        Cancelado: row.cancelado ? "Si" : "No",
+        "Notas descuentos/saldos a favor": formatAdjustmentNotesForExport(row),
         "Nota cancelacion": row.notaCancelacion || "",
       })),
       `contabilidad-detalle-ventas-${filters.fechaDesde}-${filters.fechaHasta}.xlsx`,
@@ -526,6 +817,7 @@ export function AccountingPage({
         Efectivo: row.efectivo,
         Gasto: row.gasto,
         TotalEfectivo: row.totalEfectivo,
+        Guardado: row.guardado,
         NuevaBase: row.nuevaBase,
       })),
       `contabilidad-caja-${cashForm.fecha || filters.fechaHasta}.xlsx`,
@@ -547,6 +839,7 @@ export function AccountingPage({
           pedidos: canViewPedidos,
           produccion: canViewProduccion,
           domicilios: canViewDomicilios,
+          barrios: canViewBarrios,
           inventario: canViewInventario,
           contabilidad: canViewContabilidad,
           trazabilidad: canViewTrazabilidad,
@@ -558,6 +851,7 @@ export function AccountingPage({
           pedidos: onGoPedidos,
           produccion: onGoProduccion,
           domicilios: onGoDomicilios,
+          barrios: onGoBarrios,
           inventario: onGoInventario,
           contabilidad: onGoContabilidad,
           trazabilidad: onGoTrazabilidad,
@@ -568,74 +862,122 @@ export function AccountingPage({
 
       <main className="orders-admin-view accounting-view accounting-page-view">
         <header className="orders-admin-header orders-page-header accounting-page-header">
-          <div>
-            <h1>Contabilidad</h1>
-            <p className="orders-admin-subtitle">Usuario: {displayUserName}</p>
-          </div>
-          <div className="header-actions">
-            <div className="accounting-menu-dropdown" ref={accountingMenuRef}>
-              <button
-                type="button"
-                className={`btn-outline accounting-menu-trigger${accountingMenuOpen ? " is-open" : ""}`}
-                onClick={() => setAccountingMenuOpen(current => !current)}
-                aria-expanded={accountingMenuOpen}
-                aria-haspopup="menu"
-              >
-                {(() => {
-                  const activeOption = ACCOUNTING_VIEWS.find(item => item.key === activeView) || ACCOUNTING_VIEWS[0];
-                  const ActiveIcon = ACCOUNTING_VIEW_ICONS[activeOption.key] || ListChecks;
-                  return (
-                    <>
-                      <ActiveIcon size={18} strokeWidth={2} aria-hidden="true" />
-                      <span>{activeOption.label}</span>
-                      <ChevronDown size={16} strokeWidth={2} aria-hidden="true" />
-                    </>
-                  );
-                })()}
-              </button>
-              {accountingMenuOpen ? (
-                <div className="accounting-menu-panel" role="menu">
-                  {ACCOUNTING_VIEWS.map(item => {
-                    const Icon = ACCOUNTING_VIEW_ICONS[item.key] || ListChecks;
-                    return (
-                      <button
-                        key={item.key}
-                        type="button"
-                        role="menuitem"
-                        className={activeView === item.key ? "is-active" : ""}
-                        onClick={() => {
-                          setActiveView(item.key);
-                          setAccountingMenuOpen(false);
-                        }}
-                      >
-                        <Icon size={16} strokeWidth={2} aria-hidden="true" />
-                        <span>{item.label}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-              ) : null}
+          <div className="orders-page-heading">
+            <div className="orders-page-breadcrumb" aria-label="Ruta">
+              <span>Finanzas</span>
+              <span>/</span>
+              <strong>Contabilidad</strong>
             </div>
-            <button type="button" className="btn-primary orders-header-refresh" onClick={loadAccountingData} disabled={loading}>
-              <RefreshCw size={18} strokeWidth={2} aria-hidden="true" />
-              {loading ? "Actualizando..." : "Actualizar"}
+            <div className="orders-page-title-row">
+              <h1>Contabilidad</h1>
+            </div>
+            <p className="orders-admin-subtitle orders-page-description">
+              Controla ventas, recaudos, descuentos, saldos a favor y cierres de caja por periodo.
+            </p>
+            <span className="orders-user-pill">
+              <span aria-hidden="true" />
+              Sesion activa: {displayUserName}
+            </span>
+          </div>
+          <div className="orders-header-side">
+            <div className="header-actions">
+              <div className="accounting-menu-dropdown" ref={accountingMenuRef}>
+                <button
+                  type="button"
+                  className={`btn-outline accounting-menu-trigger${accountingMenuOpen ? " is-open" : ""}`}
+                  onClick={() => setAccountingMenuOpen(current => !current)}
+                  aria-expanded={accountingMenuOpen}
+                  aria-haspopup="menu"
+                >
+                  {(() => {
+                    const activeOption = ACCOUNTING_VIEWS.find(item => item.key === activeView) || ACCOUNTING_VIEWS[0];
+                    const ActiveIcon = ACCOUNTING_VIEW_ICONS[activeOption.key] || ListChecks;
+                    return (
+                      <>
+                        <ActiveIcon size={18} strokeWidth={2} aria-hidden="true" />
+                        <span>{activeOption.label}</span>
+                        <ChevronDown size={16} strokeWidth={2} aria-hidden="true" />
+                      </>
+                    );
+                  })()}
+                </button>
+                {accountingMenuOpen ? (
+                  <div className="accounting-menu-panel" role="menu">
+                    {ACCOUNTING_VIEWS.map(item => {
+                      const Icon = ACCOUNTING_VIEW_ICONS[item.key] || ListChecks;
+                      return (
+                        <button
+                          key={item.key}
+                          type="button"
+                          role="menuitem"
+                          className={activeView === item.key ? "is-active" : ""}
+                          onClick={() => {
+                            setActiveView(item.key);
+                            setAccountingMenuOpen(false);
+                          }}
+                        >
+                          <Icon size={16} strokeWidth={2} aria-hidden="true" />
+                          <span>{item.label}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                ) : null}
+              </div>
+              <button type="button" className="btn-primary orders-header-refresh" onClick={loadAccountingData} disabled={loading}>
+                <RefreshCw size={18} strokeWidth={2} aria-hidden="true" />
+                {loading ? "Actualizando..." : "Actualizar"}
             </button>
+          </div>
+          <div className="orders-header-metrics accounting-header-metrics" aria-label="Resumen contabilidad">
+            <article className="orders-header-metric-card is-primary">
+                <span className="orders-header-metric-icon" aria-hidden="true"><ShoppingCart size={20} strokeWidth={2} /></span>
+                <strong>${formatearCOP(summaryTotals.totalVenta)}</strong>
+                <span>Total venta</span>
+              </article>
+              <article className="orders-header-metric-card is-success">
+                <span className="orders-header-metric-icon" aria-hidden="true"><Banknote size={20} strokeWidth={2} /></span>
+                <strong>${formatearCOP(summaryTotals.totalEfectivo)}</strong>
+                <span>Efectivo</span>
+              </article>
+              <article className="orders-header-metric-card is-info">
+                <span className="orders-header-metric-icon" aria-hidden="true"><Package size={20} strokeWidth={2} /></span>
+                <strong>{summaryTotals.cantidadPedidos}</strong>
+                <span>Pedidos aprobados</span>
+              </article>
+              <article className="orders-header-metric-card is-danger">
+                <span className="orders-header-metric-icon" aria-hidden="true"><XCircle size={20} strokeWidth={2} /></span>
+                <strong>{summaryTotals.pedidosCancelados}</strong>
+                <span>Cancelados</span>
+              </article>
+              <article className="orders-header-metric-card is-warning">
+                <span className="orders-header-metric-icon" aria-hidden="true"><Receipt size={20} strokeWidth={2} /></span>
+                <strong>${formatearCOP(executiveMetrics.ticketPromedio)}</strong>
+                <span>Ticket prom.</span>
+              </article>
+            </div>
           </div>
         </header>
 
         <section className="orders-filters orders-page-filters accounting-filters">
-          <label className="filter-field orders-filter-field">
-            <div className="orders-filter-control">
-              <CalendarDays size={17} strokeWidth={2} aria-hidden="true" />
-              <input type="date" value={filters.fechaDesde} onChange={event => applyFilter("fechaDesde", event.target.value)} />
-            </div>
-          </label>
-          <label className="filter-field orders-filter-field">
-            <div className="orders-filter-control">
-              <CalendarDays size={17} strokeWidth={2} aria-hidden="true" />
-              <input type="date" value={filters.fechaHasta} onChange={event => applyFilter("fechaHasta", event.target.value)} />
-            </div>
-          </label>
+          <div className="accounting-date-range-control">
+            <CalendarDays size={16} strokeWidth={2} aria-hidden="true" />
+            <input type="date" value={filters.fechaDesde} onChange={event => applyFilter("fechaDesde", event.target.value)} />
+            <span>-</span>
+            <input type="date" value={filters.fechaHasta} onChange={event => applyFilter("fechaHasta", event.target.value)} />
+            <ChevronDown size={15} strokeWidth={2} aria-hidden="true" />
+          </div>
+          <div className="accounting-period-tabs" aria-label="Atajos de periodo">
+            <button type="button" className={activePeriodPreset === "today" ? "is-active" : ""} onClick={() => applyPeriodPreset("today")}>Hoy</button>
+            <button type="button" className={activePeriodPreset === "yesterday" ? "is-active" : ""} onClick={() => applyPeriodPreset("yesterday")}>Ayer</button>
+            <button type="button" className={activePeriodPreset === "7days" ? "is-active" : ""} onClick={() => applyPeriodPreset("7days")}>7 dias</button>
+            <button type="button" className={activePeriodPreset === "30days" ? "is-active" : ""} onClick={() => applyPeriodPreset("30days")}>30 dias</button>
+            <button type="button" className={activePeriodPreset === "month" ? "is-active" : ""} onClick={() => applyPeriodPreset("month")}>Este mes</button>
+          </div>
+          <button type="button" className="accounting-filter-chip">
+            <Filter size={15} strokeWidth={2} aria-hidden="true" />
+            <span>Filtros</span>
+          </button>
           {activeView === "arreglos" ? (
             <details className="accounting-arrangements-filter">
               <summary>
@@ -674,9 +1016,16 @@ export function AccountingPage({
             </details>
           ) : null}
           <div className="accounting-filter-actions">
-            <button type="button" className="btn-primary" onClick={loadAccountingData} disabled={loading}>
-              <RefreshCw size={17} strokeWidth={2} aria-hidden="true" />
-              {loading ? "Cargando..." : "Actualizar resumen"}
+            <button type="button" className="btn-outline accounting-export-btn" onClick={exportVentas} disabled={orderRows.length === 0}>
+              <FileSpreadsheet size={15} strokeWidth={2} aria-hidden="true" />
+              Exportar Excel
+            </button>
+            <button type="button" className="btn-outline accounting-export-btn">
+              <FileText size={15} strokeWidth={2} aria-hidden="true" />
+              Exportar PDF
+            </button>
+            <button type="button" className="btn-outline accounting-more-btn" title="Mas acciones">
+              <MoreHorizontal size={17} strokeWidth={2} aria-hidden="true" />
             </button>
           </div>
         </section>
@@ -686,49 +1035,36 @@ export function AccountingPage({
 
         {activeView === "ventas" ? (
           <>
+            <section className="accounting-reference-main">
+              <article className="accounting-reference-panel accounting-reference-financial">
+                <div className="accounting-reference-panel-head">
+                  <div>
+                    <h3>Resumen financiero</h3>
+                    <span>Las cifras incluyen impuestos y movimientos registrados en el periodo.</span>
+                  </div>
+                  <CircleAlert size={15} strokeWidth={2} aria-hidden="true" />
+                </div>
             <section className="accounting-summary-cards accounting-summary-cards--top">
               <article className="order-block accounting-stat-card">
-                <span>Pedidos</span>
-                <strong>{summaryTotals.cantidadPedidos}</strong>
-              </article>
-              <article className="order-block accounting-stat-card">
-                <span>Cancelados</span>
-                <strong>{summaryTotals.pedidosCancelados}</strong>
-              </article>
-              <article className="order-block accounting-stat-card">
-                <span>Arreglos florales</span>
-                <strong>${formatearCOP(summaryTotals.totalArreglos)}</strong>
-              </article>
-              <article className="order-block accounting-stat-card">
-                <span>Domicilios</span>
-                <strong>${formatearCOP(summaryTotals.totalDomicilios)}</strong>
-              </article>
-              <article className="order-block accounting-stat-card">
-                <span>Total venta</span>
-                <strong>${formatearCOP(summaryTotals.totalVenta)}</strong>
-              </article>
-              <article className="order-block accounting-stat-card">
-                <span>Recargos link</span>
-                <strong>${formatearCOP(summaryTotals.totalRecargos)}</strong>
+                <span>Ventas brutas</span>
+                <strong>${formatearCOP(summaryTotals.totalArreglos + summaryTotals.totalDomicilios + summaryTotals.totalRecargos)}</strong>
               </article>
               <article className="order-block accounting-stat-card">
                 <span>Descuentos</span>
-                <strong>${formatearCOP(summaryTotals.totalDescuentos)}</strong>
+                <strong>-${formatearCOP(summaryTotals.totalDescuentos)}</strong>
               </article>
               <article className="order-block accounting-stat-card">
                 <span>Saldo a favor</span>
-                <strong>${formatearCOP(summaryTotals.totalSaldoFavor)}</strong>
+                <strong>${formatearCOP(Number(summaryTotals.totalSaldoFavor || 0))}</strong>
               </article>
-            </section>
-
-            <section className="accounting-health-strip" aria-label="Salud del negocio">
-              {businessHealthRows.map(item => (
-                <article key={item.key} className={`accounting-health-pill is-${item.status}`}>
-                  {item.status === "good" ? <CircleCheck size={17} strokeWidth={2} aria-hidden="true" /> : <CircleAlert size={17} strokeWidth={2} aria-hidden="true" />}
-                  <span>{item.label}</span>
-                  <strong>{item.value}</strong>
-                </article>
-              ))}
+              <article className="order-block accounting-stat-card">
+                <span>Ventas netas</span>
+                <strong>${formatearCOP(summaryTotals.totalVenta)}</strong>
+              </article>
+              <article className="order-block accounting-stat-card">
+                <span>Ajustes / cancelaciones</span>
+                <strong>{summaryTotals.pedidosCancelados}</strong>
+              </article>
             </section>
 
             <section className="accounting-intelligence-grid">
@@ -743,12 +1079,27 @@ export function AccountingPage({
                 <div className="accounting-line-chart" aria-label="Grafico de ventas por dia">
                   {salesTrendRows.length === 0 ? (
                     <p className="accounting-empty-state">No hay ventas para graficar.</p>
-                  ) : salesTrendRows.map(row => (
-                    <div key={row.key} className="accounting-line-column" title={`${row.label}: $${formatearCOP(row.value)}`}>
-                      <span style={{ height: `${row.height}%` }} />
-                      <small>{String(row.label).slice(5)}</small>
-                    </div>
-                  ))}
+                  ) : (
+                    <svg
+                      className="accounting-trend-svg"
+                      viewBox={`0 0 ${salesTrendChart.width} ${salesTrendChart.height}`}
+                      role="img"
+                      aria-label="Ventas por dia"
+                      preserveAspectRatio="none"
+                    >
+                      <path className="accounting-trend-area" d={salesTrendChart.areaPath} />
+                      <path className="accounting-trend-line" d={salesTrendChart.linePath} />
+                      {salesTrendChart.points.map(point => (
+                        <g key={point.key}>
+                          <line className="accounting-trend-guide" x1={point.x} x2={point.x} y1={point.y} y2="156" />
+                          <circle className="accounting-trend-dot" cx={point.x} cy={point.y} r="5">
+                            <title>{`${point.label}: $${formatearCOP(point.value)}`}</title>
+                          </circle>
+                          <text className="accounting-trend-label" x={point.x} y="178">{String(point.label).slice(5)}</text>
+                        </g>
+                      ))}
+                    </svg>
+                  )}
                 </div>
               </article>
 
@@ -801,8 +1152,92 @@ export function AccountingPage({
                 </div>
               </div>
             </section>
+              </article>
+
+              <article className="accounting-reference-panel accounting-reference-cash">
+                <div className="accounting-reference-panel-head">
+                  <div>
+                    <h3>Conciliacion y caja</h3>
+                    <span>Sigue los pasos para validar el cuadre correcto.</span>
+                  </div>
+                  <CircleAlert size={15} strokeWidth={2} aria-hidden="true" />
+                </div>
+                <div className="accounting-cash-guide-note">
+                  <CircleCheck size={15} strokeWidth={2} aria-hidden="true" />
+                  <span>Sigue los pasos para cerrar tu caja y asegurar el cuadre correcto.</span>
+                </div>
+                <div className="accounting-cash-steps">
+                  {[
+                    ["Base inicial", baseValue],
+                    ["Ingresos en efectivo", efectivoValue],
+                    ["Gastos en efectivo", gastoValue],
+                    ["Guardado (retiros)", guardadoValue],
+                  ].map(([label, value], index) => (
+                    <div key={label} className="accounting-cash-step">
+                      <span>{index + 1}</span>
+                      <strong>{label}</strong>
+                      <em>${formatearCOP(value)}</em>
+                    </div>
+                  ))}
+                </div>
+                <div className="accounting-cash-result">
+                  <p><span>Nueva base (esperada)</span><strong>${formatearCOP(nuevaBaseValue)}</strong></p>
+                  <p><span>Nueva base (contada)</span><strong>${formatearCOP(nuevaBaseValue)}</strong></p>
+                </div>
+                <div className="accounting-cash-ok-card">
+                  <CircleCheck size={18} strokeWidth={2} aria-hidden="true" />
+                  <div>
+                    <strong>Cuadre correcto</strong>
+                    <span>La caja esta cuadrada.</span>
+                  </div>
+                  <em>Diferencia<br /><b>$0</b></em>
+                </div>
+              </article>
+            </section>
+
+            <section className="accounting-reference-alerts" aria-label="Alertas financieras">
+              <article className="accounting-reference-alert is-discount">
+                <span><Tag size={18} strokeWidth={2} aria-hidden="true" /></span>
+                <div>
+                  <p>Descuentos aplicados</p>
+                  <strong>${formatearCOP(detailInsight.totalDescuentos)}</strong>
+                  <small>{summaryTotals.totalVenta > 0 ? `${roundMoney((detailInsight.totalDescuentos / summaryTotals.totalVenta) * 100)}% de las ventas` : "0% de las ventas"}</small>
+                </div>
+                <button type="button" onClick={() => showAccountingDetail("descuento")}>Ver detalle</button>
+              </article>
+              <article className="accounting-reference-alert is-balance">
+                <span><BadgeDollarSign size={18} strokeWidth={2} aria-hidden="true" /></span>
+                <div>
+                  <p>Saldo a favor</p>
+                  <strong>${formatearCOP(detailInsight.totalSaldoFavor)}</strong>
+                  <small>{detailInsight.pedidosConSaldo} pedidos</small>
+                </div>
+                <button type="button" onClick={() => showAccountingDetail("saldo")}>Ver detalle</button>
+              </article>
+              <article className="accounting-reference-alert is-cancel">
+                <span><XCircle size={18} strokeWidth={2} aria-hidden="true" /></span>
+                <div>
+                  <p>Pedidos cancelados</p>
+                  <strong>{detailInsight.cancelados}</strong>
+                  <small>{summaryTotals.cantidadPedidos > 0 ? `${executiveMetrics.cancelacionesPct}% del total` : "0% del total"}</small>
+                </div>
+                <button type="button" onClick={() => showAccountingDetail("cancelados")}>Ver detalle</button>
+              </article>
+            </section>
 
             <div className="accounting-table-actions">
+              <div>
+                <h3>Auditoria de pedidos</h3>
+                <span>Mostrando resumen financiero por dia del periodo.</span>
+              </div>
+              <div className="accounting-table-tools">
+                <label>
+                  <Search size={15} strokeWidth={2} aria-hidden="true" />
+                  <input type="search" placeholder="Buscar pedido, cliente o usuario..." />
+                </label>
+                <button type="button" className="btn-outline"><Columns3 size={15} strokeWidth={2} aria-hidden="true" /> Columnas</button>
+                <button type="button" className="btn-outline"><Download size={15} strokeWidth={2} aria-hidden="true" /></button>
+              </div>
               <button type="button" className="btn-outline" onClick={exportVentas} disabled={orderRows.length === 0}>
                 Descargar Excel
               </button>
@@ -836,7 +1271,7 @@ export function AccountingPage({
                       <td>${formatearCOP(row.totalDomicilios)}</td>
                       <td>${formatearCOP(row.totalRecargos)}</td>
                       <td>${formatearCOP(row.totalDescuentos)}</td>
-                      <td>${formatearCOP(row.totalSaldoFavor)}</td>
+                      <td>${formatearCOP(Number(row.totalSaldoFavor || 0))}</td>
                       <td>${formatearCOP(row.totalVenta)}</td>
                     </tr>
                   ))}
@@ -851,7 +1286,7 @@ export function AccountingPage({
                       <th>${formatearCOP(summaryTotals.totalDomicilios)}</th>
                       <th>${formatearCOP(summaryTotals.totalRecargos)}</th>
                       <th>${formatearCOP(summaryTotals.totalDescuentos)}</th>
-                      <th>${formatearCOP(summaryTotals.totalSaldoFavor)}</th>
+                      <th>${formatearCOP(Number(summaryTotals.totalSaldoFavor || 0))}</th>
                       <th>${formatearCOP(summaryTotals.totalVenta)}</th>
                     </tr>
                   </tfoot>
@@ -866,7 +1301,7 @@ export function AccountingPage({
             <div className="looker-header accounting-arrangements-head">
               <div>
                 <h4>Detalle de ventas por pedido</h4>
-                <p className="orders-admin-subtitle">Control de descuentos, saldo a favor, notas operativas y cancelaciones del periodo.</p>
+                <p className="orders-admin-subtitle">Control de descuentos aplicados por saldo a favor o descuento comercial, saldos a favor por pagos excedidos, notas operativas y cancelaciones del periodo.</p>
               </div>
               <div className="accounting-arrangements-actions">
                 <button type="button" className="btn-outline" onClick={exportDetalleVentas} disabled={filteredAccountingDetailRows.length === 0}>
@@ -877,11 +1312,11 @@ export function AccountingPage({
 
             <section className="accounting-summary-cards accounting-summary-cards--detail">
               <article className="order-block accounting-stat-card">
-                <span>Total descuentos</span>
+                <span>Descuento</span>
                 <strong>${formatearCOP(detailInsight.totalDescuentos)}</strong>
               </article>
               <article className="order-block accounting-stat-card">
-                <span>Total saldo a favor</span>
+                <span>Saldo a favor</span>
                 <strong>${formatearCOP(detailInsight.totalSaldoFavor)}</strong>
               </article>
               <article className="order-block accounting-stat-card">
@@ -908,9 +1343,9 @@ export function AccountingPage({
               </div>
               <div className="accounting-smart-insights">
                 {[
-                  detailInsight.totalDescuentos > 0 ? `Hay $${formatearCOP(detailInsight.totalDescuentos)} en descuentos aplicados.` : "No hay descuentos aplicados en el periodo.",
-                  detailInsight.totalSaldoFavor > 0 ? `El saldo a favor acumulado es $${formatearCOP(detailInsight.totalSaldoFavor)}.` : "No hay saldos a favor pendientes.",
-                  detailInsight.pedidosConNotas > 0 ? `${detailInsight.pedidosConNotas} pedidos tienen notas u observaciones.` : "No hay notas operativas relevantes.",
+                  detailInsight.totalDescuentos > 0 ? `Hay $${formatearCOP(detailInsight.totalDescuentos)} en descuentos aplicados por saldo a favor o descuento comercial.` : "No hay descuentos aplicados en el periodo.",
+                  detailInsight.totalSaldoFavor > 0 ? `El saldo a favor por pagos excedidos acumulado es $${formatearCOP(detailInsight.totalSaldoFavor)}.` : "No hay saldos a favor pendientes.",
+                  detailInsight.pedidosConNotas > 0 ? `${detailInsight.pedidosConNotas} pedidos tienen notas de descuentos o saldos a favor.` : "No hay notas de descuentos o saldos a favor.",
                   detailInsight.cancelados > 0 ? `${detailInsight.cancelados} pedidos fueron cancelados.` : "No existen cancelaciones en el periodo.",
                 ].map((item, index) => (
                   <div key={`detail-insight-${index}`} className="accounting-smart-card">
@@ -932,14 +1367,14 @@ export function AccountingPage({
                 <h5>Pedidos destacados</h5>
                 <div className="accounting-detail-highlight-grid">
                   <p>
-                    <span>Mayor descuento</span>
+                    <span>Mayor descuento aplicado</span>
                     <strong>{detailInsight.topDescuento ? `#${detailInsight.topDescuento.numeroPedido || detailInsight.topDescuento.pedidoID}` : "-"}</strong>
                     <small>{detailInsight.topDescuento ? `$${formatearCOP(detailInsight.topDescuento.descuentoMonto)}` : "Sin descuentos"}</small>
                   </p>
                   <p>
                     <span>Mayor saldo a favor</span>
                     <strong>{detailInsight.topSaldo ? `#${detailInsight.topSaldo.numeroPedido || detailInsight.topSaldo.pedidoID}` : "-"}</strong>
-                    <small>{detailInsight.topSaldo ? `$${formatearCOP(detailInsight.topSaldo.saldoFavorMonto)}` : "Sin saldos"}</small>
+                    <small>{detailInsight.topSaldo ? `$${formatearCOP(Number(detailInsight.topSaldo.saldoFavorMonto || 0))}` : "Sin saldos"}</small>
                   </p>
                   <p>
                     <span>Cuenta más usada</span>
@@ -953,7 +1388,7 @@ export function AccountingPage({
             <section className="accounting-detail-filters" aria-label="Filtros detalle de ventas">
               {[
                 ["todos", "Todos"],
-                ["descuento", "Con descuento"],
+                ["descuento", "Con descuento aplicado"],
                 ["saldo", "Con saldo a favor"],
                 ["cancelados", "Cancelados"],
                 ["conNotas", "Con notas"],
@@ -969,6 +1404,35 @@ export function AccountingPage({
               ))}
             </section>
 
+            {selectedAccountingCase ? (
+              <section className="accounting-case-detail-card" aria-label="Detalle del caso contable">
+                <div>
+                  <span>Pedido</span>
+                  <strong>#{selectedAccountingCase.numeroPedido || selectedAccountingCase.codigoPedido || selectedAccountingCase.pedidoID}</strong>
+                </div>
+                <div>
+                  <span>Cliente</span>
+                  <strong>{selectedAccountingCase.cliente || "-"}</strong>
+                  <small>{selectedAccountingCase.telefono || selectedAccountingCase.telefonoCliente || selectedAccountingCase.celular || "-"}</small>
+                </div>
+                <div>
+                  <span>Cuenta pago</span>
+                  <strong>{selectedAccountingCase.cuentaPago || "-"}</strong>
+                </div>
+                <div>
+                  <span>Descuento aplicado</span>
+                  <strong>${formatearCOP(selectedAccountingCase.descuentoMonto || 0)}</strong>
+                  <small>{selectedAccountingCase.descuentoNota || "Sin nota"}</small>
+                </div>
+                <div>
+                  <span>Saldo a favor</span>
+                  <strong>${formatearCOP(Number(selectedAccountingCase.saldoFavorMonto || 0))}</strong>
+                  <small>{selectedAccountingCase.saldoFavorNota || "Sin nota"}</small>
+                </div>
+                <button type="button" className="btn-outline" onClick={() => setSelectedAccountingCase(null)}>Cerrar</button>
+              </section>
+            ) : null}
+
             <section className="orders-table-wrap">
               <table className="orders-table accounting-table accounting-detail-table">
                 <thead>
@@ -978,39 +1442,64 @@ export function AccountingPage({
                     <th>Cliente</th>
                     <th>Cuenta pago</th>
                     <th>Saldo a favor</th>
-                    <th>Descuento</th>
-                    <th>Notas / observaciones</th>
-                    <th>Cancelado</th>
+                    <th>Descuento aplicado</th>
+                    <th>Notas descuentos/saldos a favor</th>
+                    <th>Estado</th>
+                    <th>Acciones</th>
                   </tr>
                 </thead>
                 <tbody>
                   {filteredAccountingDetailRows.length === 0 ? (
                     <tr>
-                      <td colSpan={8}>{loading ? "Cargando detalle..." : "No hay pedidos para el filtro seleccionado."}</td>
+                      <td colSpan={9}>{loading ? "Cargando detalle..." : "No hay pedidos para el filtro seleccionado."}</td>
                     </tr>
-                  ) : filteredAccountingDetailRows.map(row => (
+                  ) : filteredAccountingDetailRows.map(row => {
+                    const adjustmentNotes = getAdjustmentNoteItems(row);
+                    return (
                     <tr key={`${row.pedidoID}-${row.numeroPedido}`}>
                       <td>{row.numeroPedido || row.codigoPedido || row.pedidoID}</td>
                       <td>{row.usuarioSistema || "-"}</td>
-                      <td>{row.cliente || "-"}</td>
+                      <td>
+                        <strong>{row.cliente || "-"}</strong>
+                        <span>{row.telefono || row.telefonoCliente || row.celular || "-"}</span>
+                      </td>
                       <td>{row.cuentaPago || "-"}</td>
                       <td>
-                        <strong>${formatearCOP(row.saldoFavorMonto || 0)}</strong>
-                        <span>{row.saldoFavorNota || "-"}</span>
+                        <strong>${formatearCOP(Number(row.saldoFavorMonto || 0))}</strong>
                       </td>
                       <td>
                         <strong>${formatearCOP(row.descuentoMonto || 0)}</strong>
-                        <span>{row.descuentoNota || "-"}</span>
                       </td>
-                      <td>{row.observaciones || "-"}</td>
+                      <td>
+                        {adjustmentNotes.length > 0 ? (
+                          <div className="accounting-adjustment-notes">
+                            {adjustmentNotes.map(item => (
+                              <span key={`${item.label}-${item.note}`}>
+                                {item.note}
+                              </span>
+                            ))}
+                          </div>
+                        ) : "-"}
+                      </td>
                       <td>
                         <span className={`order-badge ${row.cancelado ? "is-cancelado" : "is-aprobado"}`}>
                           {row.cancelado ? "Cancelado" : row.estado || "Activo"}
                         </span>
                         {row.notaCancelacion ? <small>{row.notaCancelacion}</small> : null}
                       </td>
+                      <td>
+                        <button
+                          type="button"
+                          className="btn-outline accounting-row-detail-btn"
+                          title="Ver informacion del caso"
+                          onClick={() => setSelectedAccountingCase(row)}
+                        >
+                          Ver detalle
+                        </button>
+                      </td>
                     </tr>
-                  ))}
+                    );
+                  })}
                 </tbody>
               </table>
             </section>
@@ -1271,7 +1760,7 @@ export function AccountingPage({
             <div className="looker-header">
               <div>
                 <h4>Caja</h4>
-                <p className="orders-admin-subtitle">Cierre de efectivo por fecha. El guardado se conserva localmente en este navegador.</p>
+                <p className="orders-admin-subtitle">Cierre de efectivo por fecha. Los datos se consultan y guardan en base de datos.</p>
               </div>
             </div>
 
@@ -1308,11 +1797,11 @@ export function AccountingPage({
             <div className="accounting-cash-grid">
               <label className="order-detail-edit-label">
                 Fecha
-                <input type="date" value={cashForm.fecha} onChange={event => setCashForm(current => ({ ...current, fecha: event.target.value }))} />
+                <input type="date" max={todayCashDate} value={cashForm.fecha} onChange={event => setCashForm(current => ({ ...current, fecha: event.target.value }))} />
               </label>
               <label className="order-detail-edit-label">
                 Base
-                <input type="number" min="0" step="0.01" value={cashForm.base} onChange={event => setCashForm(current => ({ ...current, base: event.target.value }))} placeholder="0.00" />
+                <input type="number" min="0" step="0.01" value={cashForm.base} onChange={event => setCashForm(current => ({ ...current, base: event.target.value }))} placeholder="0.00" disabled={!canEditCashClosing} />
               </label>
               <label className="order-detail-edit-label">
                 Efectivo
@@ -1320,7 +1809,7 @@ export function AccountingPage({
               </label>
               <label className="order-detail-edit-label">
                 Gasto
-                <input type="number" min="0" step="0.01" value={cashForm.gasto} onChange={event => setCashForm(current => ({ ...current, gasto: event.target.value }))} placeholder="0.00" />
+                <input type="number" min="0" step="0.01" value={cashForm.gasto} onChange={event => setCashForm(current => ({ ...current, gasto: event.target.value }))} placeholder="0.00" disabled={!canEditCashClosing} />
               </label>
               <label className="order-detail-edit-label">
                 T. Efectivo
@@ -1328,16 +1817,20 @@ export function AccountingPage({
               </label>
               <label className="order-detail-edit-label">
                 Guardado
-                <input type="number" min="0" step="0.01" value={cashForm.guardado} onChange={event => setCashForm(current => ({ ...current, guardado: event.target.value }))} placeholder="0.00" />
+                <input type="number" min="0" step="0.01" value={cashForm.guardado} onChange={event => setCashForm(current => ({ ...current, guardado: event.target.value }))} placeholder="0.00" disabled={!canEditCashClosing} />
               </label>
               <label className="order-detail-edit-label">
                 Nueva Base
                 <input type="text" value={`$${formatearCOP(nuevaBaseValue)}`} readOnly className="order-detail-edit-readonly" />
               </label>
+              <label className="order-detail-edit-label">
+                Observación
+                <input type="text" value={cashForm.observacion} onChange={event => setCashForm(current => ({ ...current, observacion: event.target.value }))} placeholder="Observación del cierre" disabled={!canEditCashClosing} />
+              </label>
             </div>
 
             <div className="order-detail-edit-actions">
-              <button type="button" className="btn-primary" onClick={saveCashClosing} disabled={saving}>
+              <button type="button" className="btn-primary" onClick={saveCashClosing} disabled={saving || !canEditCashClosing}>
                 {saving ? "Guardando..." : "Guardar cierre"}
               </button>
               <button type="button" className="btn-outline" onClick={exportCaja} disabled={cashHistoryRows.length === 0}>
@@ -1345,22 +1838,30 @@ export function AccountingPage({
               </button>
             </div>
 
-            <section className="orders-table-wrap">
+            <section className="orders-table-wrap accounting-cash-history">
+              <div className="accounting-cash-history-head">
+                <div>
+                  <h4>Dias cerrados</h4>
+                  <p className="orders-admin-subtitle">Historial de cierres guardados para esta empresa y sucursal.</p>
+                </div>
+                <span>{cashHistoryRows.length} cierres</span>
+              </div>
               <table className="orders-table accounting-table">
                 <thead>
                   <tr>
-                    <th>Fecha</th>
+                    <th>Dia cerrado</th>
                     <th>Base</th>
                     <th>Efectivo</th>
                     <th>Gasto</th>
                     <th>Total_Efectivo</th>
+                    <th>Guardado</th>
                     <th>Nueva_Base</th>
                   </tr>
                 </thead>
                 <tbody>
                   {cashHistoryRows.length === 0 ? (
                     <tr>
-                      <td colSpan={6}>No hay cierres de caja guardados.</td>
+                      <td colSpan={7}>{cashLoading ? "Cargando cierres de caja..." : "No hay cierres de caja guardados en base de datos."}</td>
                     </tr>
                   ) : cashHistoryRows.map(row => (
                     <tr key={row.fecha}>
@@ -1369,6 +1870,7 @@ export function AccountingPage({
                       <td>${formatearCOP(row.efectivo)}</td>
                       <td>${formatearCOP(row.gasto)}</td>
                       <td>${formatearCOP(row.totalEfectivo)}</td>
+                      <td>${formatearCOP(row.guardado)}</td>
                       <td>${formatearCOP(row.nuevaBase)}</td>
                     </tr>
                   ))}
@@ -1449,6 +1951,7 @@ function buildAccountingRows(items) {
       totalDomicilios: 0,
       totalRecargos: 0,
       totalDescuentos: 0,
+      totalSaldoFavor: 0,
       totalVenta: 0,
       totalEfectivo: 0,
     };
@@ -1459,14 +1962,16 @@ function buildAccountingRows(items) {
     const arreglos = roundMoney((financiero?.subtotal ?? 0) + (financiero?.iva ?? 0));
     const recargos = roundMoney(financiero?.recargoLinkMonto ?? 0);
     const descuentos = roundMoney(financiero?.descuentoMonto ?? 0);
+    const saldoFavor = roundMoney(financiero?.saldoFavorMonto ?? financiero?.saldoFavor ?? financiero?.saldoAFavor ?? 0);
     const status = normalizeStatus(item?.order?.estado || item?.detail?.estado);
 
-    current.cantidadPedidos += 1;
+    if (status === "APROBADO") current.cantidadPedidos += 1;
     if (status === "CANCELADO" || status === "RECHAZADO") current.pedidosCancelados += 1;
     current.totalArreglos += arreglos;
     current.totalDomicilios += domicilio;
     current.totalRecargos += recargos;
     current.totalDescuentos += descuentos;
+    current.totalSaldoFavor += saldoFavor;
     current.totalVenta += total;
     current.totalEfectivo += extractCashAmount(financiero, total);
 
@@ -1657,50 +2162,120 @@ function parseMoneyInput(value) {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
+function formatAccountingLocalDate(date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function getAccountingPeriodRange(preset) {
+  const today = new Date();
+  const end = formatAccountingLocalDate(today);
+  const start = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+
+  if (preset === "yesterday") {
+    start.setDate(start.getDate() - 1);
+    const date = formatAccountingLocalDate(start);
+    return { fechaDesde: date, fechaHasta: date };
+  }
+
+  if (preset === "7days") start.setDate(start.getDate() - 6);
+  if (preset === "30days") start.setDate(start.getDate() - 29);
+  if (preset === "month") start.setDate(1);
+
+  return {
+    fechaDesde: preset === "today" ? end : formatAccountingLocalDate(start),
+    fechaHasta: end,
+  };
+}
+
 function roundMoney(value) {
   return Math.round(Number(value || 0) * 100) / 100;
 }
 
-function storageKeyFor(empresaId, sucursalId, fecha) {
-  return `${empresaId}:${sucursalId}:${fecha}`;
+function normalizeCashSummaryRow(raw, fallbackFecha = "") {
+  const rows = Array.isArray(raw?.orderRows)
+    ? raw.orderRows
+    : Array.isArray(raw?.items)
+      ? raw.items
+      : Array.isArray(raw)
+        ? raw
+        : raw && typeof raw === "object"
+          ? [raw]
+          : [];
+  const targetFecha = String(fallbackFecha || "").slice(0, 10);
+  const source = rows.find(row => {
+    const rowFecha = String(row?.fecha || row?.fechaOperacion || row?.fecha_operacion || "").slice(0, 10);
+    return targetFecha && rowFecha === targetFecha;
+  }) || (rows.length === 1 ? rows[0] : null);
+
+  if (!source || typeof source !== "object") return null;
+  const fecha = String(source.fecha || source.fechaOperacion || source.fecha_operacion || fallbackFecha || "").slice(0, 10);
+  const efectivo = roundMoney(
+    source.efectivo
+    ?? source.efectivoVentas
+    ?? source.efectivo_ventas
+    ?? source.totalEfectivoVentas
+    ?? source.total_efectivo_ventas
+    ?? source.totalEfectivo
+    ?? source.total_efectivo
+  );
+  return fecha ? { fecha, efectivo } : null;
 }
 
-function readCashClosing(empresaId, sucursalId, fecha) {
+function getCashClosingSource(raw) {
+  return raw?.item || raw?.data || (Array.isArray(raw?.items) ? raw.items[0] : null) || raw;
+}
+
+function hasCashClosingData(raw) {
+  const source = getCashClosingSource(raw);
+  if (!source || typeof source !== "object") return false;
+  return [
+    "base",
+    "baseInicial",
+    "base_inicial",
+    "efectivo",
+    "efectivoVentas",
+    "efectivo_ventas",
+    "gasto",
+    "gastos",
+    "totalGastos",
+    "total_gastos",
+    "guardado",
+    "montoGuardado",
+    "monto_guardado",
+    "nuevaBase",
+    "nueva_base",
+  ].some(key => Object.prototype.hasOwnProperty.call(source, key));
+}
+
+function normalizeCashClosingRow(raw, fallbackFecha = "") {
+  const source = getCashClosingSource(raw);
+  if (!source || typeof source !== "object") return null;
+  const fecha = String(source.fecha || source.fechaOperacion || source.fecha_operacion || fallbackFecha || "").slice(0, 10);
   if (!fecha) return null;
-  try {
-    const raw = globalThis.localStorage?.getItem(CASH_CLOSING_STORAGE_KEY);
-    const parsed = raw ? JSON.parse(raw) : {};
-    return parsed?.[storageKeyFor(empresaId, sucursalId, fecha)] || null;
-  } catch {
-    return null;
-  }
-}
-
-function writeCashClosing(empresaId, sucursalId, fecha, value) {
-  const raw = globalThis.localStorage?.getItem(CASH_CLOSING_STORAGE_KEY);
-  const parsed = raw ? JSON.parse(raw) : {};
-  parsed[storageKeyFor(empresaId, sucursalId, fecha)] = value;
-  globalThis.localStorage?.setItem(CASH_CLOSING_STORAGE_KEY, JSON.stringify(parsed));
-}
-
-function listCashClosings(empresaId, sucursalId) {
-  try {
-    const raw = globalThis.localStorage?.getItem(CASH_CLOSING_STORAGE_KEY);
-    const parsed = raw ? JSON.parse(raw) : {};
-    const prefix = `${empresaId}:${sucursalId}:`;
-
-    return Object.entries(parsed)
-      .filter(([key]) => key.startsWith(prefix))
-      .map(([key, value]) => ({
-        fecha: key.slice(prefix.length),
-        base: roundMoney(value?.base),
-        efectivo: roundMoney(value?.efectivo),
-        gasto: roundMoney(value?.gasto),
-        totalEfectivo: roundMoney(value?.totalEfectivo),
-        nuevaBase: roundMoney(value?.nuevaBase),
-      }))
-      .sort((a, b) => b.fecha.localeCompare(a.fecha));
-  } catch {
-    return [];
-  }
+  const base = roundMoney(source.base ?? source.baseInicial ?? source.base_inicial);
+  const efectivo = roundMoney(
+    source.efectivo
+    ?? source.efectivoVentas
+    ?? source.efectivo_ventas
+    ?? source.totalEfectivoVentas
+    ?? source.total_efectivo_ventas
+  );
+  const gasto = roundMoney(source.gasto ?? source.gastos ?? source.totalGastos ?? source.total_gastos);
+  const totalEfectivo = roundMoney(source.totalEfectivo ?? source.total_efectivo ?? (base + efectivo - gasto));
+  const guardado = roundMoney(source.guardado ?? source.montoGuardado ?? source.monto_guardado);
+  const nuevaBase = roundMoney(source.nuevaBase ?? source.nueva_base);
+  const observacion = String(source.observacion ?? "").trim();
+  return {
+    fecha,
+    base,
+    efectivo,
+    gasto,
+    totalEfectivo,
+    guardado,
+    nuevaBase,
+    observacion,
+  };
 }

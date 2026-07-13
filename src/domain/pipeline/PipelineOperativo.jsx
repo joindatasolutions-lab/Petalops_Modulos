@@ -19,6 +19,17 @@ import { PipelineColumn } from "./PipelineColumn.jsx";
 import { PipelineFilters } from "./PipelineFilters.jsx";
 import { PedidoModal } from "./PedidoModal.jsx";
 
+const PIPELINE_STAGES = [
+  "creado",
+  "aprobado",
+  "pendiente_produccion",
+  "en_produccion",
+  "listo",
+  "en_camino",
+  "entregado",
+  "cancelado",
+];
+
 const PIPELINE_COLUMNS = [
   { key: "pedido_inicial",  title: "Creado / Aprobado",       stages: ["creado", "aprobado"],                    dropStage: "aprobado" },
   { key: "produccion_base", title: "Pendiente / En producción", stages: ["pendiente_produccion", "en_produccion"], dropStage: "en_produccion" },
@@ -41,13 +52,22 @@ const PIPELINE_TABS = [
 
 const INITIAL_FILTERS = {
   sucursalID: null,
-  fecha: new Date().toISOString().slice(0, 10),
+  fechaDesde: new Date().toISOString().slice(0, 10),
+  fechaHasta: new Date().toISOString().slice(0, 10),
   domiciliarioID: "",
   floristaID: "",
   numeroPedido: "",
+  estadoStage: "",
   soloAtrasados: false,
   soloEnProduccion: false,
 };
+
+function normalizePipelineBoard(payload) {
+  return PIPELINE_STAGES.reduce((board, stage) => ({
+    ...board,
+    [stage]: Array.isArray(payload?.[stage]) ? payload[stage] : [],
+  }), {});
+}
 
 function todayIsoDate() { return new Date().toISOString().slice(0, 10); }
 
@@ -100,20 +120,17 @@ function formatApprovalAction(value) {
 
 export function PipelineOperativo({
   session,
-  canViewPipeline, canViewPedidos, canViewProduccion, canViewDomicilios,
+  canViewPipeline, canViewPedidos, canViewProduccion, canViewDomicilios, canViewBarrios,
   canViewInventario, canViewContabilidad, canViewTrazabilidad,
   canViewClientesPanel, canViewUsuariosPanel,
-  onGoPipeline, onGoPedidos, onGoProduccion, onGoDomicilios, onGoInventario,
+  onGoPipeline, onGoPedidos, onGoProduccion, onGoDomicilios, onGoBarrios, onGoInventario,
   onGoContabilidad, onGoTrazabilidad, onGoClientes, onGoUsuarios, onLogout,
 }) {
   const api = useMemo(() => createApiClient(tenantConfig), []);
   const { sidebarPinned, sidebarMobileOpen, setSidebarMobileOpen, toggleSidebar } = useSidebarState();
 
   const [filters, setFilters] = useState(INITIAL_FILTERS);
-  const [board, setBoard] = useState({
-    creado: [], aprobado: [], pendiente_produccion: [],
-    en_produccion: [], listo: [], en_camino: [], entregado: [], cancelado: [],
-  });
+  const [board, setBoard] = useState(() => normalizePipelineBoard());
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [selected, setSelected] = useState(null);
@@ -155,14 +172,16 @@ export function PipelineOperativo({
       const data = await api.listarPipelinePedidos({
         empresaId,
         sucursalId: activeSucursalId,
-        fecha: filters.fecha || null,
+        fecha: filters.fechaDesde && filters.fechaDesde === filters.fechaHasta ? filters.fechaDesde : null,
+        fechaDesde: filters.fechaDesde || null,
+        fechaHasta: filters.fechaHasta || filters.fechaDesde || null,
         domiciliarioId: filters.domiciliarioID,
         floristaId: filters.floristaID,
         numeroPedido: filters.numeroPedido,
         soloAtrasados: filters.soloAtrasados,
         soloEnProduccion: filters.soloEnProduccion,
       });
-      setBoard(data);
+      setBoard(normalizePipelineBoard(data));
     } catch (nextError) {
       setError(nextError?.message || "No fue posible cargar el pipeline.");
     } finally {
@@ -266,7 +285,13 @@ export function PipelineOperativo({
     }
   };
 
-  const buildColumnItems = stages => stages.flatMap(stage => Array.isArray(board?.[stage]) ? board[stage] : []);
+  const buildColumnItems = stages => {
+    const selectedStage = String(filters.estadoStage || "").trim();
+    const visibleStages = selectedStage
+      ? stages.filter(stage => stage === selectedStage)
+      : stages;
+    return visibleStages.flatMap(stage => Array.isArray(board?.[stage]) ? board[stage] : []);
+  };
 
   return (
     <div className={`app-shell ${sidebarPinned ? "is-sidebar-pinned" : ""} ${sidebarMobileOpen ? "is-sidebar-mobile-open" : ""}`}>
@@ -277,8 +302,8 @@ export function PipelineOperativo({
         toggleSidebar={toggleSidebar}
         closeSidebarMobile={() => setSidebarMobileOpen(false)}
         onLogout={onLogout}
-        permissions={{ pipeline: canViewPipeline, pedidos: canViewPedidos, produccion: canViewProduccion, domicilios: canViewDomicilios, inventario: canViewInventario, contabilidad: canViewContabilidad, trazabilidad: canViewTrazabilidad, clientes: canViewClientesPanel, usuarios: canViewUsuariosPanel }}
-        navigation={{ pipeline: onGoPipeline, pedidos: onGoPedidos, produccion: onGoProduccion, domicilios: onGoDomicilios, inventario: onGoInventario, contabilidad: onGoContabilidad, trazabilidad: onGoTrazabilidad, clientes: onGoClientes, usuarios: onGoUsuarios }}
+        permissions={{ pipeline: canViewPipeline, pedidos: canViewPedidos, produccion: canViewProduccion, domicilios: canViewDomicilios, barrios: canViewBarrios, inventario: canViewInventario, contabilidad: canViewContabilidad, trazabilidad: canViewTrazabilidad, clientes: canViewClientesPanel, usuarios: canViewUsuariosPanel }}
+        navigation={{ pipeline: onGoPipeline, pedidos: onGoPedidos, produccion: onGoProduccion, domicilios: onGoDomicilios, barrios: onGoBarrios, inventario: onGoInventario, contabilidad: onGoContabilidad, trazabilidad: onGoTrazabilidad, clientes: onGoClientes, usuarios: onGoUsuarios }}
       />
 
       <main className="orders-admin-view pipeline-view">

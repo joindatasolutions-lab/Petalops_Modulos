@@ -3,7 +3,7 @@ import { tenantConfig } from "../../config/tenantConfig.js";
 import { createApiClient } from "../../infrastructure/apiClient.js";
 import { AppSidebar } from "../../shared/AppSidebar.jsx";
 import { useSidebarState } from "../../shared/useSidebarState.js";
-import { formatDateOnly, formatDateTimeCompact, normalizeStatus } from "../../shared/utils.js";
+import { formatDateOnly, formatDateTimeCompact, normalizeStatus, toIsoDateEnd, toIsoDateStart } from "../../shared/utils.js";
 import {
   IconCalendarPlus,
   IconX,
@@ -14,9 +14,11 @@ import {
   CalendarClock,
   CalendarDays,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  CirclePlay,
   ClipboardList,
   Eye,
-  Filter,
   FileText,
   Flower2,
   ListChecks,
@@ -29,11 +31,12 @@ import {
   UserX,
 } from "lucide-react";
 
-const ESTADOS_UI = ["Pendiente", "EnProduccion", "ParaEntrega", "Cancelado"];
-const ESTADOS_FILTRO_DEFAULT = ["Pendiente", "EnProduccion"];
+export const ESTADOS_UI = ["Pendiente", "EnProduccion", "ParaEntrega", "Cancelado"];
+const ESTADOS_FILTRO_DEFAULT = ESTADOS_UI;
 const ESTADOS_FLORISTA = ["Activo", "Inactivo", "Incapacidad"];
 const ESTADOS_FLORISTA_BASICOS = ["Activo", "Inactivo"];
 const DEFAULT_USER = "admin.demo";
+const PAGE_SIZE_OPTIONS = [10, 20, 50];
 const LOOKER_STUDIO_URL = "https://lookerstudio.google.com/embed/reporting/d08a04af-ed8e-4dde-a83c-90888bfde39d/page/p_mp7qxa6dzd";
 const SUBMENU_OPTIONS = [
   { key: "pedidos", label: "Pedidos" },
@@ -53,11 +56,35 @@ const BADGE_CLASS_BY_STATUS = {
   PENDIENTE: "is-pendiente",
   ENPRODUCCION: "is-produccion",
   PARAENTREGA: "is-entrega",
-  CANCELADO: "is-rechazado"
+  ENTREGADO: "is-entregado",
+  CANCELADO: "is-rechazado",
+  RECHAZADO: "is-rechazado"
+};
+const COLOMBIA_UTC_OFFSET_MINUTES = -5 * 60;
+const PRODUCTION_STATUS_CHIP_CLASS = {
+  PENDIENTE: "is-pending",
+  ENPRODUCCION: "is-production",
+  PARAENTREGA: "is-delivery",
+  CANCELADO: "is-cancelled",
 };
 
 function todayIsoDate() {
-  return new Date().toISOString().slice(0, 10);
+  const formatter = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Bogota",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  });
+  return formatter.format(new Date());
+}
+
+function productionHeaderDateLabel() {
+  return new Intl.DateTimeFormat("es-CO", {
+    timeZone: "America/Bogota",
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  }).format(new Date()).replace(".", "");
 }
 
 function normalizeSearchText(value) {
@@ -90,12 +117,60 @@ function resolveProgrammedDate(item) {
   return toIsoDate(item?.fechaProgramadaProduccion || item?.fechaEntrega);
 }
 
+function formatDateTimeBogotaFromUtc(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+  const hasTimezone = /(?:Z|[+-]\d{2}:?\d{2})$/i.test(raw);
+  const normalized = raw.includes("T") ? raw : raw.replace(" ", "T");
+  const parsed = new Date(hasTimezone ? normalized : `${normalized}Z`);
+  if (Number.isNaN(parsed.getTime())) return formatDateTimeCompact(value);
+
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Bogota",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).formatToParts(parsed);
+  const getPart = type => parts.find(part => part.type === type)?.value || "";
+  return `${getPart("year")}-${getPart("month")}-${getPart("day")} ${getPart("hour")}:${getPart("minute")}`;
+}
+
+function normalizeDeliveryTime(value) {
+  const match = String(value || "").trim().match(/^(\d{1,2}):(\d{2})(?::\d{2})?/);
+  if (!match) return null;
+  const hours = Number(match[1]);
+  const minutes = Number(match[2]);
+  if (!Number.isInteger(hours) || !Number.isInteger(minutes) || hours > 23 || minutes > 59) return null;
+  return { hours, minutes };
+}
+
+function deliveryTargetTimestamp(item) {
+  const date = formatDateOnly(item?.fechaEntrega);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return null;
+
+  const fallbackTime = formatDateTimeCompact(item?.fechaEntrega).split(" ")[1];
+  const time = normalizeDeliveryTime(item?.horaEntrega || fallbackTime);
+  if (!time) return null;
+
+  const [year, month, day] = date.split("-").map(Number);
+  return Date.UTC(
+    year,
+    month - 1,
+    day,
+    time.hours,
+    time.minutes - COLOMBIA_UTC_OFFSET_MINUTES,
+    0,
+    0
+  );
+}
+
 function minutesUntilDelivery(item) {
-  const raw = item?.fechaEntrega;
-  if (!raw) return null;
-  const parsed = new Date(raw);
-  if (Number.isNaN(parsed.getTime())) return null;
-  return Math.round((parsed.getTime() - Date.now()) / 60000);
+  const targetTimestamp = deliveryTargetTimestamp(item);
+  if (targetTimestamp == null || Number.isNaN(targetTimestamp)) return null;
+  return Math.round((targetTimestamp - Date.now()) / 60000);
 }
 
 function formatDurationFromMinutes(totalMinutes) {
@@ -108,7 +183,11 @@ function formatDurationFromMinutes(totalMinutes) {
   return `${hours} h ${minutes} min`;
 }
 
-function deliveryTimingStatus(item) {
+export function deliveryTimingStatus(item) {
+  if (normalizeStatus(item?.estado).replace(/_/g, "") === "PARAENTREGA") {
+    return { label: "Finalizado", className: "is-entrega", remainingLabel: "Finalizado" };
+  }
+
   const remaining = minutesUntilDelivery(item);
   if (remaining == null) {
     return { label: "Sin hora", className: "is-neutral", remainingLabel: "-" };
@@ -145,24 +224,79 @@ function flattenPipelineCards(payload) {
   return stages.flatMap(stage => (Array.isArray(payload?.[stage]) ? payload[stage] : []));
 }
 
+function extractListPayloadItems(payload) {
+  if (Array.isArray(payload)) return payload;
+  const candidates = [
+    payload?.items,
+    payload?.pedidos,
+    payload?.pedido,
+    payload?.orders,
+    payload?.rows,
+    payload?.data,
+    payload?.data?.items,
+    payload?.data?.pedidos,
+    payload?.data?.orders,
+    payload?.result,
+    payload?.result?.items,
+    payload?.result?.pedidos,
+    payload?.resultados,
+  ];
+  return candidates.find(Array.isArray) || [];
+}
+
+function extractOrderProducts(order) {
+  const products = [
+    order?.productosDetalle,
+    order?.productos_detalle,
+    order?.detalles,
+    order?.detalle,
+    order?.pedidoDetalles,
+    order?.pedido_detalles,
+    order?.detallesPedido,
+    order?.detalles_pedido,
+    order?.detalleProductos,
+    order?.detalle_productos,
+    order?.productos,
+    order?.items,
+  ].find(Array.isArray) || [];
+
+  return products.length > 0 ? products : (order && typeof order === "object" ? [order] : []);
+}
+
 function productionSelectionKey(item) {
   const pedidoId = Number(item?.pedidoID || 0);
   if (pedidoId > 0) return `pedido-${pedidoId}`;
   return `produccion-${Number(item?.idProduccion || 0)}`;
 }
 
-function buildVisibleProductionItems(sourceItems, currentFloristaId, busquedaGeneral, soloMisAsignados, groupByPedido = true) {
+export function productionItemMatchesSearch(item, searchValue) {
+  const search = normalizeSearchText(searchValue);
+  if (!search) return true;
+
+  const searchableValues = [
+    item?.floristaAsignado,
+    item?.cliente,
+    item?.numeroPedido,
+    item?.numero_pedido,
+    item?.nombreArreglo,
+    item?.producto,
+    item?.nombreProducto,
+    item?.codigoArreglo,
+    item?.codigo_arreglo,
+    ...catalogCodeCandidates(item),
+    ...productCodeCandidates(item),
+  ];
+
+  return searchableValues.some(value => normalizeSearchText(value).includes(search));
+}
+
+export function buildVisibleProductionItems(sourceItems, currentFloristaId, busquedaGeneral, soloMisAsignados, groupByPedido = true) {
   const search = normalizeSearchText(busquedaGeneral);
   const filtered = sourceItems.filter(item => {
     if (!search && soloMisAsignados && currentFloristaId != null && Number(item?.floristaID) !== Number(currentFloristaId)) {
       return false;
     }
-    if (search) {
-      const matchesFlorista = normalizeSearchText(item?.floristaAsignado).includes(search);
-      const matchesCliente = normalizeSearchText(item?.cliente).includes(search);
-      const matchesPedido = normalizeSearchText(item?.numeroPedido).includes(search);
-      if (!matchesFlorista && !matchesCliente && !matchesPedido) return false;
-    }
+    if (search && !productionItemMatchesSearch(item, search)) return false;
     return true;
   });
 
@@ -186,7 +320,8 @@ function buildVisibleProductionItems(sourceItems, currentFloristaId, busquedaGen
         produccionIds: [item.idProduccion],
         pedidoDetalleIds: item.pedidoDetalleID != null ? [item.pedidoDetalleID] : [],
         productosAgrupados: [item.nombreArreglo || item.producto].filter(Boolean),
-        codigosAgrupados: [item.codigoArreglo].filter(Boolean),
+        codigosAgrupados: productCodeCandidates(item),
+        codigosCatalogoAgrupados: catalogCodeCandidates(item),
         cantidadProducciones: 1,
       });
       continue;
@@ -195,18 +330,21 @@ function buildVisibleProductionItems(sourceItems, currentFloristaId, busquedaGen
     current.produccionIds.push(item.idProduccion);
     if (item.pedidoDetalleID != null) current.pedidoDetalleIds.push(item.pedidoDetalleID);
     if (item.nombreArreglo || item.producto) current.productosAgrupados.push(item.nombreArreglo || item.producto);
-    if (item.codigoArreglo) current.codigosAgrupados.push(item.codigoArreglo);
     current.cantidadProducciones += 1;
     if (!current.floristaID && item.floristaID) current.floristaID = item.floristaID;
     if (!current.floristaAsignado && item.floristaAsignado) current.floristaAsignado = item.floristaAsignado;
     if (!current.observacion && item.observacion) current.observacion = item.observacion;
     if (!current.notasProduccion && item.notasProduccion) current.notasProduccion = item.notasProduccion;
     if (!current.observacionesPersonalizados && item.observacionesPersonalizados) current.observacionesPersonalizados = item.observacionesPersonalizados;
+    current.codigosAgrupados.push(...productCodeCandidates(item));
+    current.codigosCatalogoAgrupados.push(...catalogCodeCandidates(item));
+    if (!resolveProductImageUrl(current) && resolveProductImageUrl(item)) current.imageUrl = resolveProductImageUrl(item);
   }
 
   return Array.from(grouped.values()).map(item => {
     const productosUnicos = Array.from(new Set((item.productosAgrupados || []).filter(Boolean)));
     const codigosUnicos = Array.from(new Set((item.codigosAgrupados || []).filter(Boolean)));
+    const codigosCatalogoUnicos = Array.from(new Set((item.codigosCatalogoAgrupados || []).filter(Boolean)));
     return {
       ...item,
       idProduccion: Number(item.produccionIds?.[0] || item.idProduccion),
@@ -214,6 +352,9 @@ function buildVisibleProductionItems(sourceItems, currentFloristaId, busquedaGen
       nombreArreglo: productosUnicos.join(" + "),
       producto: productosUnicos.join(" + "),
       codigoArreglo: codigosUnicos.join(" + "),
+      codigoCatalogo: codigosCatalogoUnicos[0] || item.codigoCatalogo || item.codigo_catalogo || "",
+      codigosCatalogo: codigosCatalogoUnicos,
+      codigos: codigosUnicos,
     };
   }).sort((left, right) => {
     const numeroLeft = Number(left?.numeroPedido || 0);
@@ -283,7 +424,121 @@ function productionStatusBadgeClass(item) {
   return isPendingOutsideToday(item) ? `${baseClass} is-pendiente-other-date` : baseClass;
 }
 
-function nextFloristaStatus(status) {
+function isCanceledProductionStatus(item) {
+  return ["CANCELADO", "RECHAZADO"].includes(normalizeStatus(item?.estado));
+}
+
+function hasCanceledOrderStatus(item) {
+  const candidates = [
+    item?.estadoPedido,
+    item?.estado_pedido,
+    item?.pedidoEstado,
+    item?.pedido_estado,
+    item?.estadoPedidoCodigo,
+    item?.estado_pedido_codigo,
+    item?.codigoEstadoPedido,
+    item?.codigo_estado_pedido,
+    item?.pedido?.estado,
+    item?.pedido?.estadoCodigo,
+    item?.pedido?.estado_codigo,
+  ];
+  return candidates.some(value => ["CANCELADO", "RECHAZADO"].includes(normalizeStatus(value)));
+}
+
+export function normalizeProductionItemStatus(item) {
+  if (!item || typeof item !== "object") return item;
+  if (!hasCanceledOrderStatus(item) && !isCanceledProductionStatus(item)) return item;
+  return {
+    ...item,
+    estado: "Cancelado",
+    estadoProduccionOriginal: item.estado,
+  };
+}
+
+export function productionItemFromCanceledOrder(order) {
+  if (!order || typeof order !== "object") return null;
+  const pedidoID = order.pedidoID ?? order.pedidoId ?? order.idPedido ?? order.id_pedido ?? order.id;
+  const numeroPedido = order.numeroPedido ?? order.numero_pedido ?? order.codigoPedido ?? order.codigo_pedido ?? pedidoID;
+  const productSource = [
+    order.productosDetalle,
+    order.productos_detalle,
+    order.detalles,
+    order.detalleProductos,
+    order.productos,
+  ].find(Array.isArray)?.[0] || order;
+  const productName = String(
+    productSource?.nombreProducto ||
+    productSource?.nombre_producto ||
+    productSource?.nombreArreglo ||
+    productSource?.nombre_arreglo ||
+    productSource?.producto ||
+    productSource?.nombre ||
+    order.resumenProductos ||
+    order.resumen_productos ||
+    ""
+  ).trim();
+  const fechaEntrega = order.fechaEntrega || order.fecha_entrega || order.destinatario?.fechaEntrega || order.destinatario?.fecha_entrega || "";
+  const horaEntrega = order.horaEntrega || order.hora_entrega || order.destinatario?.horaEntrega || order.destinatario?.hora_entrega || formatDateTimeCompact(fechaEntrega).split(" ")[1] || "";
+  return normalizeProductionItemStatus({
+    ...order,
+    idProduccion: order.idProduccion ?? order.produccionID ?? pedidoID,
+    pedidoID,
+    numeroPedido,
+    nombreArreglo: productName,
+    producto: productName,
+    codigoCatalogo: catalogCodeCandidates(productSource)[0] || catalogCodeCandidates(order)[0] || "",
+    codigoProducto: productCodeCandidates(productSource)[0] || productCodeCandidates(order)[0] || "",
+    cliente: order.cliente || order.clienteNombre || order.cliente_nombre || order.cliente?.nombreCompleto || order.cliente?.nombre || order.destinatario || order.destinatario?.nombre || "",
+    fechaEntrega,
+    horaEntrega,
+    floristaID: order.floristaID ?? order.floristaId ?? null,
+    floristaAsignado: order.floristaAsignado || order.florista_asignado || "",
+    fechaAsignacion: order.fechaAsignacion || order.fecha_asignacion || "",
+    estado: "Cancelado",
+    estadoPedido: order.estado || order.estadoPedido || "Cancelado",
+    imageUrl: resolveProductImageUrl(productSource) || resolveProductImageUrl(order),
+  });
+}
+
+function mergeProductionItemsByOrder(items, extraItems) {
+  const map = new Map();
+  [...(Array.isArray(items) ? items : []), ...(Array.isArray(extraItems) ? extraItems : [])].forEach(item => {
+    if (!item) return;
+    const key = String(item?.pedidoID || item?.numeroPedido || item?.idProduccion || "");
+    if (!key) return;
+    map.set(key, item);
+  });
+  return Array.from(map.values());
+}
+
+export function shouldIncludeCanceledProduction(estadosFiltro) {
+  return (Array.isArray(estadosFiltro) ? estadosFiltro : [])
+    .some(estado => ["CANCELADO", "RECHAZADO"].includes(normalizeStatus(estado)));
+}
+
+export function productionBackendStatusFilter(estadosFiltro) {
+  const statuses = (Array.isArray(estadosFiltro) ? estadosFiltro : [])
+    .map(status => String(status || "").trim())
+    .filter(Boolean);
+  if (statuses.length !== 1) return undefined;
+  return statuses[0];
+}
+
+export function productionSelectedStatusKey(estadosFiltro) {
+  const statuses = (Array.isArray(estadosFiltro) ? estadosFiltro : [])
+    .map(status => String(status || "").trim())
+    .filter(Boolean);
+  if (statuses.length === ESTADOS_UI.length) return "todos";
+  if (statuses.length === 1) return normalizeStatus(statuses[0]).replace(/_/g, "");
+  return "custom";
+}
+
+function productionStatusChipClass(status) {
+  const normalized = normalizeStatus(status).replace(/_/g, "");
+  return PRODUCTION_STATUS_CHIP_CLASS[normalized] || "is-all";
+}
+
+export function nextFloristaStatus(status) {
   const normalized = normalizeStatus(status).replace(/_/g, "");
   if (normalized === "PENDIENTE") return "EnProduccion";
   if (normalized === "ENPRODUCCION") return "ParaEntrega";
@@ -297,8 +552,25 @@ function nextFloristaLabel(status) {
   return null;
 }
 
+export function shouldShowFloristaStateAction(status) {
+  const normalized = normalizeStatus(status).replace(/_/g, "");
+  return normalized === "PENDIENTE" || normalized === "ENPRODUCCION" || normalized === "PARAENTREGA";
+}
+
+export function isProductionReadyForDelivery(status) {
+  return normalizeStatus(status).replace(/_/g, "") === "PARAENTREGA";
+}
+
+export function productionStateActionClass(status) {
+  const normalized = normalizeStatus(status).replace(/_/g, "");
+  if (normalized === "PENDIENTE") return "is-pendiente";
+  if (normalized === "ENPRODUCCION") return "is-produccion";
+  if (normalized === "PARAENTREGA") return "is-entrega";
+  return "";
+}
+
 function arregloCodeLabel(item) {
-  return item?.codigoArreglo || "-";
+  return item?.codigoCatalogo || item?.codigoArreglo || item?.codigoProducto || "-";
 }
 
 function normalizeRole(value) {
@@ -309,7 +581,645 @@ function isFloristaActivo(item) {
   return String(item?.estado || "").trim().toLowerCase() === "activo" && Boolean(item?.activo);
 }
 
-export function ProductionPage({ session, canViewPipeline, canViewPedidos, canViewProduccion, canViewDomicilios, canViewInventario, canViewContabilidad, canViewTrazabilidad, canViewClientesPanel, canViewUsuariosPanel, onLogout, onGoPipeline, onGoPedidos, onGoProduccion, onGoDomicilios, onGoInventario, onGoContabilidad, onGoTrazabilidad, onGoClientes, onGoUsuarios }) {
+function normalizeImageFieldKey(value) {
+  return String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]/gi, "")
+    .toLowerCase();
+}
+
+function normalizeImageCandidate(value) {
+  if (value == null) return "";
+  if (typeof value === "string" || typeof value === "number") {
+    const text = String(value).trim();
+    if (!text || text === "[object Object]") return "";
+    return text;
+  }
+  return "";
+}
+
+function looksLikeImageUrl(value) {
+  const text = normalizeImageCandidate(value);
+  if (!text) return false;
+  return /^(https?:)?\/\//i.test(text)
+    || /^(data|blob):/i.test(text)
+    || text.startsWith("/")
+    || /\.(?:avif|gif|jpe?g|png|svg|webp)(?:[?#].*)?$/i.test(text)
+    || /(?:^|\/)(?:uploads|upload|media|images|imagenes|catalogo|productos|products)\//i.test(text);
+}
+
+function findNestedProductImageUrl(value, depth = 0, seen = new WeakSet()) {
+  if (!value || typeof value !== "object" || depth > 5 || seen.has(value)) return "";
+  seen.add(value);
+
+  const imageKeys = new Set([
+    "imagenurl",
+    "imageurl",
+    "image",
+    "imagen",
+    "imageurl",
+    "fotourl",
+    "urlfoto",
+    "urlimagen",
+    "productoimagen",
+    "productoimagenurl",
+    "imagenproducto",
+    "imagenprincipal",
+    "thumbnail",
+    "thumbnailurl",
+    "src",
+  ]);
+
+  const entries = Array.isArray(value)
+    ? value.map((item, index) => [String(index), item])
+    : Object.entries(value);
+
+  for (const [key, candidate] of entries) {
+    const normalizedKey = normalizeImageFieldKey(key);
+    if (!imageKeys.has(normalizedKey) && normalizedKey !== "url") continue;
+
+    const directValue = normalizeImageCandidate(candidate);
+    if (directValue && (normalizedKey !== "url" || looksLikeImageUrl(directValue))) return directValue;
+
+    const nestedValue = findNestedProductImageUrl(candidate, depth + 1, seen);
+    if (nestedValue) return nestedValue;
+  }
+
+  for (const [, candidate] of entries) {
+    const nestedValue = findNestedProductImageUrl(candidate, depth + 1, seen);
+    if (nestedValue) return nestedValue;
+  }
+
+  return "";
+}
+
+function resolveProductImageUrl(value) {
+  if (!value || typeof value !== "object") return "";
+  const candidates = [
+    value.imagen_url,
+    value.imagenUrl,
+    value.imagen,
+    value.imageUrl,
+    value.imageurl,
+    value.image_url,
+    value.fotoUrl,
+    value.foto_url,
+    value.urlImagen,
+    value.url_imagen,
+    value.productoImagenUrl,
+    value.productoImagen,
+    value.producto_imagen,
+    value.producto_imagen_url,
+    value.imagenProducto,
+    value.imagen_producto,
+    value.imagenPrincipal,
+    value.imagen_principal,
+    value.url_foto,
+    value.urlFoto,
+    value.fotoProducto,
+    value.foto_producto,
+    value.thumbnail,
+    value.thumbnailUrl,
+    value.thumbnail_url,
+    value.img,
+    value.src,
+    value.foto,
+    value.url,
+    value.archivo?.url,
+    value.media?.url,
+    value.imagenes?.[0]?.url,
+    value.imagenes?.[0]?.imagenUrl,
+    value.imagenes?.[0]?.imagen_url,
+    value.images?.[0]?.url,
+    value.images?.[0]?.imageUrl,
+    value.images?.[0]?.imageurl,
+    value.images?.[0]?.image_url,
+    value.producto?.imagenUrl,
+    value.producto?.imageUrl,
+    value.producto?.imageurl,
+    value.producto?.imagen_url,
+    value.producto?.image_url,
+  ];
+  const direct = candidates.map(normalizeImageCandidate).find(Boolean);
+  return direct || findNestedProductImageUrl(value);
+}
+
+function getProductoId(raw) {
+  if (!raw || typeof raw !== "object") return null;
+  const candidates = [raw.productoID, raw.productoId, raw.id_producto, raw.idProducto, raw.id];
+  for (const value of candidates) {
+    if (value == null || value === "") continue;
+    const num = Number(value);
+    if (!Number.isNaN(num)) return num;
+  }
+  return null;
+}
+
+function isEmpresaCatalogCode(empresaId) {
+  return Number(empresaId) === 3;
+}
+
+function shouldUseCatalogCodeForProduction() {
+  return false;
+}
+
+function normalizeCodeCandidates(candidates) {
+  return Array.from(new Set(candidates
+    .map(candidate => String(candidate || "").trim())
+    .filter(Boolean)));
+}
+
+export function catalogCodeCandidates(value) {
+  if (!value || typeof value !== "object") return [];
+  const explicitCandidates = [
+    value.codigoCatalogo,
+    value.codigo_catalogo,
+    value.catalogCode,
+    value.codigo_catalogo_producto,
+    value.producto?.codigoCatalogo,
+    value.producto?.codigo_catalogo,
+    value.producto?.catalogCode,
+  ];
+  const explicitCodes = normalizeCodeCandidates(explicitCandidates);
+  if (explicitCodes.length > 0) return explicitCodes;
+
+  const fallbackCandidates = [
+    value.codigoArreglo,
+    value.codigo_arreglo,
+    value.producto?.codigoArreglo,
+    value.producto?.codigo_arreglo,
+    value.codigo,
+    value.code,
+    value.sku,
+    value.producto?.codigo,
+    value.producto?.sku,
+  ];
+
+  if (Array.isArray(value.codigosCatalogo)) fallbackCandidates.push(...value.codigosCatalogo);
+  if (Array.isArray(value.codigos_catalogo)) fallbackCandidates.push(...value.codigos_catalogo);
+  if (Array.isArray(value.codigoCatalogos)) fallbackCandidates.push(...value.codigoCatalogos);
+  if (Array.isArray(value.catalogCodes)) fallbackCandidates.push(...value.catalogCodes);
+
+  return normalizeCodeCandidates(fallbackCandidates);
+}
+
+export function productCodeCandidates(value) {
+  if (!value || typeof value !== "object") return [];
+  const candidates = [
+    value.codigoProducto,
+    value.codigo_producto,
+    value.productoCodigo,
+    value.producto_codigo,
+    value.producto?.codigoProducto,
+    value.producto?.codigo_producto,
+    value.codigoArreglo,
+    value.codigo_arreglo,
+    value.producto?.codigoArreglo,
+    value.producto?.codigo_arreglo,
+    value.codigo,
+    value.code,
+    value.sku,
+    value.referencia,
+    value.ref,
+    value.producto?.codigo,
+    value.producto?.sku,
+  ];
+
+  if (Array.isArray(value.codigos)) candidates.push(...value.codigos);
+  if (Array.isArray(value.codigoProductos)) candidates.push(...value.codigoProductos);
+  if (Array.isArray(value.codigosProducto)) candidates.push(...value.codigosProducto);
+
+  return normalizeCodeCandidates(candidates);
+}
+
+function normalizeCatalogItem(raw) {
+  const id = getProductoId(raw);
+  const codigos = Array.from(new Set(productCodeCandidates(raw)));
+  const explicitCatalogCodes = catalogCodeCandidates(raw);
+  const codigosCatalogo = explicitCatalogCodes.length > 0
+    ? Array.from(new Set(explicitCatalogCodes))
+    : codigos;
+  const codigo = codigos[0] || "";
+  const nombre = String(raw?.nombreProducto || raw?.nombre_producto || raw?.nombreArreglo || raw?.nombre_arreglo || raw?.nombre || raw?.descripcion || raw?.titulo || "").trim();
+  const imageUrl = resolveProductImageUrl(raw);
+  if (id == null && !codigo && !nombre) return null;
+  return { id, codigo, codigos, codigosCatalogo, nombre, imageUrl };
+}
+
+function extractCatalogRows(payload) {
+  if (Array.isArray(payload?.items)) return payload.items;
+  if (Array.isArray(payload?.productos)) return payload.productos;
+  if (Array.isArray(payload?.catalogo)) return payload.catalogo;
+  if (Array.isArray(payload?.data)) return payload.data;
+  if (Array.isArray(payload?.data?.items)) return payload.data.items;
+  if (Array.isArray(payload?.data?.productos)) return payload.data.productos;
+  if (Array.isArray(payload?.data?.catalogo)) return payload.data.catalogo;
+  if (Array.isArray(payload?.result?.items)) return payload.result.items;
+  if (Array.isArray(payload?.result?.productos)) return payload.result.productos;
+  if (Array.isArray(payload?.resultados)) return payload.resultados;
+  if (Array.isArray(payload)) return payload;
+  return [];
+}
+
+function dedupeCatalogItems(items) {
+  const map = new Map();
+  for (const item of items) {
+    if (!item) continue;
+    const key = item.id != null
+      ? `id:${item.id}`
+      : item.codigo
+        ? `code:${productLookupKey(item.codigo)}`
+        : `name:${productLookupKey(item.nombre)}:${item.imageUrl || ""}`;
+    map.set(key, item);
+  }
+  return Array.from(map.values());
+}
+
+function productLookupKey(value) {
+  return String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .toLowerCase();
+}
+
+function productNamesCompatible(left, right) {
+  const leftKey = productLookupKey(firstProductToken(left));
+  const rightKey = productLookupKey(firstProductToken(right));
+  return Boolean(leftKey && rightKey && (leftKey === rightKey || leftKey.includes(rightKey) || rightKey.includes(leftKey)));
+}
+
+function catalogIndexEntries(catalogIndex, key) {
+  const value = catalogIndex.get(key);
+  if (!value) return [];
+  return Array.isArray(value) ? value.filter(Boolean) : [value];
+}
+
+function addCatalogIndexEntry(index, key, item) {
+  if (!key || !item?.imageUrl) return;
+  const current = index.get(key);
+  if (!current) {
+    index.set(key, [item]);
+    return;
+  }
+  const next = Array.isArray(current) ? current : [current];
+  if (!next.some(candidate => candidate === item || (candidate.id != null && item.id != null && Number(candidate.id) === Number(item.id)))) {
+    next.push(item);
+  }
+  index.set(key, next);
+}
+
+function findCatalogMatchByName(catalogIndex, name) {
+  const nameKey = productLookupKey(name);
+  const firstNameKey = productLookupKey(firstProductToken(name));
+  return [
+    ...catalogIndexEntries(catalogIndex, `name:${nameKey}`),
+    ...catalogIndexEntries(catalogIndex, `name:${firstNameKey}`),
+  ].find(product => product?.imageUrl && productNamesCompatible(name, product.nombre));
+}
+
+function findCatalogMatchByCodes(catalogIndex, codes, keyPrefix, name = "") {
+  const codeKeys = Array.from(new Set(codes.flatMap(candidate => [candidate, firstProductToken(candidate)]).map(productLookupKey).filter(Boolean)));
+  const matches = codeKeys.flatMap(codeKey => catalogIndexEntries(catalogIndex, `${keyPrefix}:${codeKey}`));
+  if (!matches.length) return null;
+  if (name) {
+    const compatible = matches.find(product => product?.imageUrl && productNamesCompatible(name, product.nombre));
+    if (compatible) return compatible;
+    const exactName = findCatalogMatchByName(catalogIndex, name);
+    if (exactName) return exactName;
+  }
+  return matches.find(product => product?.imageUrl) || null;
+}
+
+function buildCatalogProductIndex(items) {
+  const index = new Map();
+  for (const item of Array.isArray(items) ? items : []) {
+    if (!item?.imageUrl) continue;
+    if (item.id != null) addCatalogIndexEntry(index, `id:${item.id}`, item);
+    const codeKeys = Array.from(new Set([item.codigo, ...(Array.isArray(item.codigos) ? item.codigos : [])].map(productLookupKey).filter(Boolean)));
+    const catalogCodeKeys = Array.from(new Set((Array.isArray(item.codigosCatalogo) ? item.codigosCatalogo : []).map(productLookupKey).filter(Boolean)));
+    const nameKey = productLookupKey(item.nombre);
+    for (const codeKey of codeKeys) addCatalogIndexEntry(index, `code:${codeKey}`, item);
+    for (const catalogCodeKey of catalogCodeKeys) addCatalogIndexEntry(index, `catalog-code:${catalogCodeKey}`, item);
+    if (nameKey) addCatalogIndexEntry(index, `name:${nameKey}`, item);
+  }
+  return index;
+}
+
+function firstProductToken(value) {
+  return String(value || "").split(/\s+\+\s+|,\s*/).map(part => part.trim()).find(Boolean) || "";
+}
+
+function catalogQueriesFromItems(items, preferCatalogCode = false) {
+  const queries = new Set();
+  for (const item of Array.isArray(items) ? items : []) {
+    const product = String(item?.nombreArreglo || item?.producto || "").trim();
+    const firstProduct = firstProductToken(product);
+    const codes = preferCatalogCode ? catalogCodeCandidates(item) : productCodeCandidates(item);
+    const firstCodes = codes.map(firstProductToken);
+    const values = preferCatalogCode ? [...codes, ...firstCodes, product, firstProduct] : [...codes, ...firstCodes, product, firstProduct];
+    values.forEach(value => {
+      const query = String(value || "").trim();
+      if (query && query.length > 1) queries.add(query);
+    });
+  }
+  return Array.from(queries).slice(0, 16);
+}
+
+async function resolveCatalogImageByProductionCode(api, empresaId, sucursalId, item, catalogIndex = new Map()) {
+  const preferCatalogCode = shouldUseCatalogCodeForProduction() || isEmpresaCatalogCode(empresaId);
+  const queries = catalogQueriesFromItems([item], preferCatalogCode).slice(0, 6);
+  const sourceNameKey = productLookupKey(firstProductToken(item?.nombreArreglo || item?.producto || item?.nombreProducto || item?.nombre || ""));
+  for (const query of queries) {
+    const lookupKey = productLookupKey(query);
+    const indexedProduct = preferCatalogCode
+      ? findCatalogMatchByCodes(catalogIndex, [query], "catalog-code", sourceNameKey)
+      : findCatalogMatchByCodes(catalogIndex, [query], "code", sourceNameKey) || findCatalogMatchByName(catalogIndex, query);
+    if (indexedProduct?.imageUrl) return indexedProduct.imageUrl;
+
+    try {
+      const payload = await api.buscarArreglosCatalogo({ empresaId, sucursalId, q: query });
+      const products = extractCatalogRows(payload)
+        .map(raw => normalizeCatalogItem(raw))
+        .filter(Boolean);
+      const exactCodeMatches = products.filter(product => {
+        const codesToMatch = preferCatalogCode
+          ? product.codigosCatalogo
+          : [product.codigo, ...(Array.isArray(product.codigos) ? product.codigos : [])];
+        const codeMatches = (Array.isArray(codesToMatch) ? codesToMatch : [])
+          .some(code => productLookupKey(code) === lookupKey);
+        const nameMatches = !preferCatalogCode && productLookupKey(product.nombre) === lookupKey;
+        return (codeMatches || nameMatches) && product.imageUrl;
+      });
+      const exactMatch = exactCodeMatches.find(product => {
+        const productNameKey = productLookupKey(firstProductToken(product.nombre));
+        return sourceNameKey && productNameKey && (sourceNameKey === productNameKey || sourceNameKey.includes(productNameKey) || productNameKey.includes(sourceNameKey));
+      }) || exactCodeMatches[0];
+      const withImage = exactMatch || (!preferCatalogCode ? products.find(product => product.imageUrl) : null);
+      if (withImage?.imageUrl) return withImage.imageUrl;
+    } catch (catalogError) {
+      console.warn("No fue posible resolver imagen desde catálogo por código:", catalogError);
+    }
+  }
+  return "";
+}
+
+function resolveImageSrc(imageUrl, apiBaseUrl) {
+  const value = String(imageUrl || "").trim();
+  if (!value) return "";
+  if (/^(https?:)?\/\//i.test(value) || value.startsWith("data:") || value.startsWith("blob:")) return value;
+  const base = String(apiBaseUrl || "").replace(/\/+$/, "");
+  if (!base || base === "/api") return `${base}${value.startsWith("/") ? value : `/${value}`}`;
+  return `${base}${value.startsWith("/") ? value : `/${value}`}`;
+}
+
+export function resolveProductionProduct(item, catalogIndex = new Map(), options = {}) {
+  const preferCatalogCode = Boolean(options.preferCatalogCode);
+  const allowDirectImage = options.allowDirectImage !== false;
+  const name = String(item?.nombreArreglo || item?.producto || item?.nombreProducto || item?.nombre || "").trim();
+  const codes = preferCatalogCode ? catalogCodeCandidates(item) : productCodeCandidates(item);
+  const code = codes[0] || "";
+  const directImageUrl = resolveProductImageUrl(item);
+  const productId = getProductoId(item);
+  const byId = productId != null
+    ? catalogIndexEntries(catalogIndex, `id:${productId}`).find(product => product?.imageUrl)
+    : null;
+  const byName = findCatalogMatchByName(catalogIndex, name);
+  const byCatalogCode = findCatalogMatchByCodes(catalogIndex, catalogCodeCandidates(item), "catalog-code", name);
+  const byProductCode = findCatalogMatchByCodes(catalogIndex, productCodeCandidates(item), "code", name);
+  const catalogProduct = byId || byName || (preferCatalogCode ? byCatalogCode || byProductCode : byProductCode || byCatalogCode);
+  const imageUrl = catalogProduct?.imageUrl || (allowDirectImage ? directImageUrl : "");
+
+  return {
+    name: name || catalogProduct?.nombre || "",
+    code: code || catalogProduct?.codigo || "",
+    imageUrl,
+  };
+}
+
+function productionProductMatches(sourceItem, product, options = {}) {
+  if (!sourceItem || !product) return false;
+  const sourceDetailId = String(sourceItem?.pedidoDetalleID || sourceItem?.pedidoDetalleId || sourceItem?.detalleID || sourceItem?.detalleId || "").trim();
+  const productDetailId = String(product?.pedidoDetalleID || product?.pedidoDetalleId || product?.detalleID || product?.detalleId || product?.idDetalle || product?.id_detalle || "").trim();
+  if (sourceDetailId && productDetailId && sourceDetailId === productDetailId) return true;
+
+  if (options.preferCatalogCode) {
+    const sourceCatalogCodes = catalogCodeCandidates(sourceItem).map(productLookupKey).filter(Boolean);
+    const productCatalogCodes = catalogCodeCandidates(product).map(productLookupKey).filter(Boolean);
+    if (sourceCatalogCodes.length > 0) {
+      return sourceCatalogCodes.some(sourceCode => productCatalogCodes.includes(sourceCode));
+    }
+  }
+
+  const sourceProductId = getProductoId(sourceItem);
+  const productId = getProductoId(product);
+  if (sourceProductId != null && productId != null && Number(sourceProductId) === Number(productId)) return true;
+
+  const sourceCodes = productCodeCandidates(sourceItem).map(productLookupKey).filter(Boolean);
+  const productCodes = productCodeCandidates(product).map(productLookupKey).filter(Boolean);
+  if (sourceCodes.some(sourceCode => productCodes.some(productCode => sourceCode === productCode || sourceCode.includes(productCode) || productCode.includes(sourceCode)))) return true;
+
+  const sourceName = productLookupKey(firstProductToken(sourceItem?.nombreArreglo || sourceItem?.producto || ""));
+  const productName = productLookupKey(product?.nombreArreglo || product?.nombreProducto || product?.producto || product?.nombre || product?.descripcion || "");
+  return Boolean(sourceName && productName && (sourceName === productName || sourceName.includes(productName) || productName.includes(sourceName)));
+}
+
+function productionItemKey(item) {
+  return String(item?.idProduccion || item?.pedidoDetalleID || item?.pedidoID || item?.numeroPedido || "").trim();
+}
+
+function productionPedidoId(item) {
+  const candidates = [item?.pedidoID, item?.pedidoId, item?.pedido_id, item?.idPedido, item?.id_pedido];
+  for (const value of candidates) {
+    if (value == null || value === "") continue;
+    const parsed = Number(value);
+    if (Number.isFinite(parsed) && parsed > 0) return parsed;
+  }
+  return null;
+}
+
+function pipelinePedidoId(payload, sourceItem) {
+  const cards = flattenPipelineCards(payload);
+  const sourceOrder = String(sourceItem?.numeroPedido || sourceItem?.numero_pedido || "").trim();
+  const matchingCard = cards.find(card => {
+    const cardOrder = String(card?.numeroPedido || card?.numero_pedido || card?.numero_pedido_display || "").trim();
+    if (sourceOrder && cardOrder && cardOrder !== sourceOrder) return false;
+    return productionProductMatches(sourceItem, card) || !sourceOrder || cardOrder === sourceOrder;
+  });
+  const candidates = [
+    matchingCard?.id_pedido,
+    matchingCard?.idPedido,
+    matchingCard?.pedidoID,
+    matchingCard?.pedidoId,
+    matchingCard?.pedido_id,
+  ];
+  for (const value of candidates) {
+    if (value == null || value === "") continue;
+    const parsed = Number(value);
+    if (Number.isFinite(parsed) && parsed > 0) return parsed;
+  }
+  return null;
+}
+
+export function resolveDetailProductionImageUrl(detail, catalogIndex = new Map(), sourceItem = null, empresaId = null) {
+  const preferCatalogCode = shouldUseCatalogCodeForProduction() || isEmpresaCatalogCode(empresaId ?? sourceItem?.empresaID ?? sourceItem?.empresaId ?? sourceItem?.empresa_id);
+  const products = Array.isArray(detail?.productos) ? detail.productos : [];
+  const orderedProducts = sourceItem
+    ? [
+      ...products.filter(product => productionProductMatches(sourceItem, product, { preferCatalogCode })),
+      ...products.filter(product => !productionProductMatches(sourceItem, product, { preferCatalogCode })),
+    ]
+    : products;
+  for (const product of orderedProducts) {
+    const imageUrl = resolveProductionProduct(product, catalogIndex, { preferCatalogCode, allowDirectImage: false }).imageUrl;
+    if (imageUrl) return imageUrl;
+  }
+  const detailImageUrl = resolveProductImageUrl(detail);
+  if (!preferCatalogCode && detailImageUrl) return detailImageUrl;
+  return "";
+}
+
+export function resolvePipelineProductionImageUrl(payload, sourceItem, catalogIndex = new Map(), empresaId = null) {
+  const preferCatalogCode = shouldUseCatalogCodeForProduction() || isEmpresaCatalogCode(empresaId ?? sourceItem?.empresaID ?? sourceItem?.empresaId ?? sourceItem?.empresa_id);
+  const cards = flattenPipelineCards(payload);
+  const sourceOrder = String(sourceItem?.numeroPedido || sourceItem?.numero_pedido || "").trim();
+  const matchingCards = cards.filter(card => {
+    const cardOrder = String(card?.numeroPedido || card?.numero_pedido || card?.pedidoID || "").trim();
+    return !sourceOrder || cardOrder === sourceOrder;
+  });
+  const orderedCards = [
+    ...matchingCards.filter(card => productionProductMatches(sourceItem, card, { preferCatalogCode })),
+    ...matchingCards.filter(card => !productionProductMatches(sourceItem, card, { preferCatalogCode })),
+  ];
+  for (const card of orderedCards) {
+    const imageUrl = resolveProductionProduct(card, catalogIndex, { preferCatalogCode, allowDirectImage: false }).imageUrl;
+    if (imageUrl) return imageUrl;
+  }
+  return "";
+}
+
+export async function resolvePedidoListProductionImageUrl(api, empresaId, sucursalId, sourceItem, catalogIndex = new Map()) {
+  const numeroPedido = String(sourceItem?.numeroPedido || sourceItem?.numero_pedido || "").trim();
+  if (!numeroPedido) return "";
+
+  const preferCatalogCode = shouldUseCatalogCodeForProduction() || isEmpresaCatalogCode(empresaId ?? sourceItem?.empresaID ?? sourceItem?.empresaId ?? sourceItem?.empresa_id);
+  const payload = await api.listarPedidos({
+    empresaId,
+    sucursalId,
+    q: numeroPedido,
+    sinImprimir: false,
+    soloTienda: false,
+    page: 1,
+    pageSize: 10,
+  });
+  const orders = extractListPayloadItems(payload);
+  const matchingOrder = orders.find(order => {
+    const orderNumber = String(order?.numeroPedido || order?.numero_pedido || order?.codigoPedido || order?.codigo_pedido || "").trim();
+    return orderNumber === numeroPedido;
+  }) || orders[0];
+  const products = extractOrderProducts(matchingOrder);
+
+  const orderedProducts = [
+    ...products.filter(product => productionProductMatches(sourceItem, product, { preferCatalogCode })),
+    ...products.filter(product => !productionProductMatches(sourceItem, product, { preferCatalogCode })),
+  ];
+
+  const directMatchedImageUrl = orderedProducts
+    .filter(product => productionProductMatches(sourceItem, product, { preferCatalogCode }))
+    .map(resolveProductImageUrl)
+    .find(Boolean);
+  if (directMatchedImageUrl) return directMatchedImageUrl;
+
+  for (const product of orderedProducts) {
+    const indexedImageUrl = resolveProductionProduct(product, catalogIndex, { preferCatalogCode, allowDirectImage: !preferCatalogCode }).imageUrl;
+    if (indexedImageUrl) return indexedImageUrl;
+
+    const catalogImageUrl = await resolveCatalogImageByProductionCode(api, empresaId, sucursalId, product, catalogIndex);
+    if (catalogImageUrl) return catalogImageUrl;
+  }
+
+  return "";
+}
+
+function productionImageCacheKeys(item, options = {}) {
+  const preferCatalogCode = Boolean(options.preferCatalogCode);
+  const itemKeys = [];
+  const codeKeys = [];
+  const nameKeys = [];
+  const itemKey = productionItemKey(item);
+  if (itemKey) itemKeys.push(`item:${itemKey}`);
+
+  const codeCandidates = preferCatalogCode ? catalogCodeCandidates(item) : productCodeCandidates(item);
+  codeCandidates.forEach(value => {
+    const key = productLookupKey(value);
+    if (key) codeKeys.push(`${preferCatalogCode ? "catalog-code" : "code"}:${key}`);
+  });
+
+  [
+    item?.nombreArreglo,
+    item?.nombre_arreglo,
+    item?.producto,
+    item?.nombreProducto,
+    item?.nombre_producto,
+    item?.nombre,
+    firstProductToken(item?.nombreArreglo || item?.producto || item?.nombreProducto || item?.nombre),
+  ].forEach(value => {
+    const key = productLookupKey(value);
+    if (key) nameKeys.push(`name:${key}`);
+  });
+
+  const keys = preferCatalogCode ? [...itemKeys, ...nameKeys, ...codeKeys] : [...itemKeys, ...codeKeys, ...nameKeys];
+
+  return Array.from(new Set(keys));
+}
+
+function cachedProductionImageForItem(item, imageCache = {}, options = {}) {
+  const preferCatalogCode = Boolean(options.preferCatalogCode);
+  const keys = productionImageCacheKeys(item, options);
+  for (const key of keys) {
+    const imageUrl = imageCache[key];
+    if (imageUrl) return imageUrl;
+  }
+  return "";
+}
+
+function catalogOrCachedProductionImageForItem(item, catalogIndex = new Map(), imageCache = {}, empresaId = null) {
+  const preferCatalogCode = shouldUseCatalogCodeForProduction() || isEmpresaCatalogCode(empresaId ?? item?.empresaID ?? item?.empresaId ?? item?.empresa_id);
+  const directImageUrl = resolveProductImageUrl(item);
+  const catalogImageUrl = resolveProductionProduct(item, catalogIndex, {
+    preferCatalogCode,
+    allowDirectImage: false,
+  }).imageUrl;
+  if (catalogImageUrl) return catalogImageUrl;
+  const cachedImageUrl = cachedProductionImageForItem(item, imageCache, { preferCatalogCode });
+  if (preferCatalogCode && cachedImageUrl && cachedImageUrl === directImageUrl) return "";
+  return cachedImageUrl;
+}
+
+function resolveProductionDisplayImageUrl(item, catalogIndex = new Map(), imageCache = {}, empresaId = null) {
+  const preferCatalogCode = shouldUseCatalogCodeForProduction() || isEmpresaCatalogCode(empresaId ?? item?.empresaID ?? item?.empresaId ?? item?.empresa_id);
+  const directImageUrl = resolveProductImageUrl(item);
+  const trustedImageUrl = catalogOrCachedProductionImageForItem(item, catalogIndex, imageCache, empresaId);
+  return trustedImageUrl || (!preferCatalogCode ? directImageUrl : "");
+}
+
+function productInitials(value) {
+  const words = String(value || "").trim().split(/\s+/).filter(Boolean);
+  if (words.length === 0) return "PR";
+  return words.slice(0, 2).map(word => word[0]).join("").toUpperCase();
+}
+
+function buildPaginationItems(page, pages) {
+  const currentPage = Math.max(1, Math.min(Number(page || 1), Number(pages || 1)));
+  const totalPages = Math.max(1, Number(pages || 1));
+  if (totalPages <= 7) return Array.from({ length: totalPages }, (_, index) => index + 1);
+  if (currentPage <= 4) return [1, 2, 3, 4, 5, "ellipsis-end", totalPages];
+  if (currentPage >= totalPages - 3) return [1, "ellipsis-start", totalPages - 4, totalPages - 3, totalPages - 2, totalPages - 1, totalPages];
+  return [1, "ellipsis-start", currentPage - 1, currentPage, currentPage + 1, "ellipsis-end", totalPages];
+}
+
+export function ProductionPage({ session, canViewPipeline, canViewPedidos, canViewCatalogo, canViewProduccion, canViewDomicilios, canViewBarrios, canViewInventario, canViewContabilidad, canViewTrazabilidad, canViewClientesPanel, canViewUsuariosPanel, onLogout, onGoPipeline, onGoPedidos, onGoProduccion, onGoDomicilios, onGoBarrios, onGoInventario, onGoContabilidad, onGoTrazabilidad, onGoClientes, onGoUsuarios }) {
   const api = useMemo(() => createApiClient(tenantConfig), []);
   const empresaId = Number(session?.empresaID || tenantConfig.empresaId);
   const sucursalId = Number(session?.sucursalID || tenantConfig.sucursalId);
@@ -318,6 +1228,7 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
   const canManageProductionActions = Boolean(session?.esGlobalJoin) || ["admin", "empresa_admin"].includes(normalizedRole);
   const canManageStateAndRecalculate = isSuperAdmin;
   const canFloristaQuickState = !canManageProductionActions;
+  const canResolveProductionImages = Boolean(canViewProduccion);
   const displayUserName = useMemo(
     () => String(session?.nombre || session?.login || "Usuario").trim() || "Usuario",
     [session]
@@ -341,11 +1252,15 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
   const productionMetricasRef = useRef(productionMetricas);
   const [floristas, setFloristas] = useState([]);
   const [floristasDisponibilidad, setFloristasDisponibilidad] = useState([]);
+  const [catalogProducts, setCatalogProducts] = useState([]);
+  const [productionProductImages, setProductionProductImages] = useState({});
 
   const [selectedFloristaById, setSelectedFloristaById] = useState({});
   const [selectedEstadoById, setSelectedEstadoById] = useState({});
   const [selectedItem, setSelectedItem] = useState(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [assignmentItem, setAssignmentItem] = useState(null);
+  const [assignmentDrawerOpen, setAssignmentDrawerOpen] = useState(false);
 
   const [usuarioCambio] = useState(() => String(session?.email || session?.nombre || DEFAULT_USER));
   const [motivoAccion, setMotivoAccion] = useState("");
@@ -360,6 +1275,8 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
   const [busquedaGeneral, setBusquedaGeneral] = useState("");
   const [soloMisAsignados, setSoloMisAsignados] = useState(!canManageProductionActions);
   const [activeMetricFilter, setActiveMetricFilter] = useState(null);
+  const [productionPage, setProductionPage] = useState(1);
+  const [productionPageSize, setProductionPageSize] = useState(10);
   const productionListRef = useRef(null);
   const productionMenuRef = useRef(null);
 
@@ -400,11 +1317,19 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
     () => inferCurrentFloristaId(session, allFloristas),
     [session, allFloristas]
   );
+  const selectedStatusKey = useMemo(
+    () => productionSelectedStatusKey(estadosFiltro),
+    [estadosFiltro]
+  );
 
   const ownFloristaDisponibilidad = useMemo(() => {
     if (currentFloristaId == null) return null;
     return floristasDisponibilidad.find(item => Number(item.idFlorista) === Number(currentFloristaId)) || null;
   }, [currentFloristaId, floristasDisponibilidad]);
+  const catalogProductIndex = useMemo(
+    () => buildCatalogProductIndex(catalogProducts),
+    [catalogProducts]
+  );
 
   const canChangeOwnProductionState = useCallback((item) => {
     if (!canFloristaQuickState || currentFloristaId == null) return false;
@@ -474,6 +1399,28 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
     if (!activeMetricFilter) return visibleItems;
     return visibleItems.filter(item => matchesProductionMetric(item, activeMetricFilter));
   }, [activeMetricFilter, visibleItems]);
+  const productionTotal = focusedVisibleItems.length;
+  const productionPages = Math.max(1, Math.ceil(productionTotal / productionPageSize));
+  const productionVisibleFrom = productionTotal > 0 ? ((productionPage - 1) * productionPageSize) + 1 : 0;
+  const productionVisibleTo = productionTotal > 0 ? Math.min(productionTotal, productionVisibleFrom + productionPageSize - 1) : 0;
+  const productionPagerItems = useMemo(
+    () => buildPaginationItems(productionPage, productionPages),
+    [productionPage, productionPages]
+  );
+  const paginatedProductionItems = useMemo(() => {
+    const start = (productionPage - 1) * productionPageSize;
+    return focusedVisibleItems.slice(start, start + productionPageSize);
+  }, [focusedVisibleItems, productionPage, productionPageSize]);
+
+  useEffect(() => {
+    setProductionPage(1);
+  }, [activeMetricFilter, busquedaGeneral, fecha, estadosFiltro, soloMisAsignados, productionPageSize]);
+
+  useEffect(() => {
+    if (productionPage > productionPages) {
+      setProductionPage(productionPages);
+    }
+  }, [productionPage, productionPages]);
 
   const focusMetric = useCallback(metricKey => {
     setSubmenu("pedidos");
@@ -500,15 +1447,12 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
 
   const toggleEstadoFiltro = useCallback((estadoItem) => {
     setActiveMetricFilter(null);
-    setEstadosFiltro(current => {
-      const exists = current.includes(estadoItem);
-      if (exists) {
-        // Mantener al menos un estado activo para evitar vista vacía accidental.
-        if (current.length === 1) return current;
-        return current.filter(item => item !== estadoItem);
-      }
-      return [...current, estadoItem];
-    });
+    setEstadosFiltro([estadoItem]);
+  }, []);
+
+  const selectAllProductionStatuses = useCallback(() => {
+    setActiveMetricFilter(null);
+    setEstadosFiltro(ESTADOS_UI);
   }, []);
 
   const loadItems = useCallback(async () => {
@@ -516,6 +1460,8 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
     setError("");
 
     try {
+      const shouldIncludeCanceled = shouldIncludeCanceledProduction(estadosFiltro);
+      const backendStatusFilter = productionBackendStatusFilter(estadosFiltro);
       const expectedMetricCount = activeMetricFilter
         ? Number(productionMetricasRef.current?.[activeMetricFilter] || 0)
         : 0;
@@ -523,14 +1469,14 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
         empresaId,
         sucursalId,
         fecha: searchOverridesFilters || activeMetricFilter ? undefined : fecha,
-        estado: undefined,
+        estado: searchOverridesFilters || activeMetricFilter ? undefined : backendStatusFilter,
         q: searchOverridesFilters ? busquedaGeneral : undefined,
         metricFilter: searchOverridesFilters ? undefined : activeMetricFilter,
         todasFechas: !searchOverridesFilters && !activeMetricFilter && !fecha,
-        incluirCancelado: false,
+        incluirCancelado: shouldIncludeCanceled,
         autoAsignarPendientesHoy: !activeMetricFilter && !searchOverridesFilters,
       });
-      let nextItemsRaw = Array.isArray(produccion.items) ? produccion.items : [];
+      let nextItemsRaw = (Array.isArray(produccion.items) ? produccion.items : []).map(normalizeProductionItemStatus);
       const responseMetricas = produccion?.metricas || {};
       const activeMetricCount = activeMetricFilter ? Number(responseMetricas?.[activeMetricFilter] || 0) : 0;
       if (activeMetricFilter && nextItemsRaw.length === 0 && Math.max(activeMetricCount, expectedMetricCount) > 0) {
@@ -541,10 +1487,11 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
           estado: undefined,
           metricFilter: undefined,
           todasFechas: true,
-          incluirCancelado: false,
+          incluirCancelado: shouldIncludeCanceled,
           autoAsignarPendientesHoy: false,
         });
         nextItemsRaw = (Array.isArray(fallbackResponse.items) ? fallbackResponse.items : [])
+          .map(normalizeProductionItemStatus)
           .filter(item => matchesProductionMetric(item, activeMetricFilter));
       }
       if (searchOverridesFilters && nextItemsRaw.length === 0) {
@@ -571,24 +1518,57 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
                 empresaId,
                 sucursalId,
                 fecha: candidateDate,
-                estado: undefined,
-                incluirCancelado: false,
+                estado: backendStatusFilter,
+                incluirCancelado: shouldIncludeCanceled,
               })
             )
           );
-          nextItemsRaw = fallbackResponses.flatMap(response => (Array.isArray(response?.items) ? response.items : []));
+          nextItemsRaw = fallbackResponses
+            .flatMap(response => (Array.isArray(response?.items) ? response.items : []))
+            .map(normalizeProductionItemStatus);
+        }
+      }
+      if (searchOverridesFilters && nextItemsRaw.length === 0) {
+        const fallbackResponse = await api.listarProduccion({
+          empresaId,
+          sucursalId,
+          fecha: undefined,
+          estado: backendStatusFilter,
+          metricFilter: undefined,
+          todasFechas: true,
+          incluirCancelado: shouldIncludeCanceled,
+          autoAsignarPendientesHoy: false,
+        });
+        nextItemsRaw = (Array.isArray(fallbackResponse.items) ? fallbackResponse.items : [])
+          .map(normalizeProductionItemStatus)
+          .filter(item => productionItemMatchesSearch(item, busquedaGeneral));
+      }
+      if (shouldIncludeCanceled && !activeMetricFilter) {
+        try {
+          const canceledOrdersPayload = await api.listarPedidos({
+            empresaId,
+            sucursalId,
+            q: searchOverridesFilters ? busquedaGeneral : "",
+            estado: "CANCELADO",
+            sinImprimir: false,
+            soloTienda: false,
+            fechaDesde: searchOverridesFilters || !fecha ? undefined : toIsoDateStart(fecha),
+            fechaHasta: searchOverridesFilters || !fecha ? undefined : toIsoDateEnd(fecha),
+            page: 1,
+            pageSize: 300,
+          });
+          const canceledProductionItems = extractListPayloadItems(canceledOrdersPayload)
+            .map(productionItemFromCanceledOrder)
+            .filter(Boolean);
+          nextItemsRaw = mergeProductionItemsByOrder(nextItemsRaw, canceledProductionItems);
+        } catch (canceledOrdersError) {
+          console.warn("No fue posible cargar pedidos cancelados para producción:", canceledOrdersError);
         }
       }
       const nextItems = activeMetricFilter
-        ? nextItemsRaw
+        ? nextItemsRaw.filter(item => !isCanceledProductionStatus(item))
         : searchOverridesFilters
-        ? nextItemsRaw.filter(item => {
-          const search = normalizeSearchText(busquedaGeneral);
-          const matchesFlorista = normalizeSearchText(item?.floristaAsignado).includes(search);
-          const matchesCliente = normalizeSearchText(item?.cliente).includes(search);
-          const matchesPedido = normalizeSearchText(item?.numeroPedido).includes(search);
-          return matchesFlorista || matchesCliente || matchesPedido;
-        })
+        ? nextItemsRaw.filter(item => productionItemMatchesSearch(item, busquedaGeneral))
         : nextItemsRaw.filter(item =>
           estadosFiltro.some(estadoItem => normalizeStatus(estadoItem) === normalizeStatus(item.estado))
         );
@@ -617,6 +1597,129 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
   useEffect(() => {
     void loadItems();
   }, [loadItems]);
+
+  useEffect(() => {
+    if (!canResolveProductionImages) return undefined;
+    let disposed = false;
+    api.buscarArreglosCatalogo({ empresaId, sucursalId, q: "" })
+      .then(payload => {
+        if (disposed) return;
+        const rows = extractCatalogRows(payload);
+        setCatalogProducts(dedupeCatalogItems(rows.map(item => normalizeCatalogItem(item)).filter(Boolean)));
+      })
+      .catch(catalogError => {
+        console.warn("No fue posible cargar imágenes del catálogo en producción:", catalogError);
+        if (!disposed) setCatalogProducts([]);
+      });
+
+    return () => { disposed = true; };
+  }, [api, canResolveProductionImages, empresaId, sucursalId]);
+
+  useEffect(() => {
+    if (!canResolveProductionImages) return undefined;
+    if (items.length === 0) return undefined;
+    let disposed = false;
+    const queries = catalogQueriesFromItems(items, shouldUseCatalogCodeForProduction() || isEmpresaCatalogCode(empresaId));
+    if (queries.length === 0) return undefined;
+
+    Promise.allSettled(
+      queries.map(query => api.buscarArreglosCatalogo({ empresaId, sucursalId, q: query }))
+    )
+      .then(results => {
+        if (disposed) return;
+        const nextCatalogItems = results
+          .filter(result => result.status === "fulfilled")
+          .flatMap(result => extractCatalogRows(result.value))
+          .map(item => normalizeCatalogItem(item))
+          .filter(Boolean);
+        if (nextCatalogItems.length === 0) return;
+        setCatalogProducts(current => dedupeCatalogItems([...current, ...nextCatalogItems]));
+      })
+      .catch(catalogError => {
+        console.warn("No fue posible buscar imágenes adicionales de producción:", catalogError);
+      });
+
+    return () => { disposed = true; };
+  }, [api, canResolveProductionImages, empresaId, sucursalId, items]);
+
+  useEffect(() => {
+    if (!canResolveProductionImages) return undefined;
+    const preferCatalogCode = shouldUseCatalogCodeForProduction() || isEmpresaCatalogCode(empresaId);
+    const missingItems = focusedVisibleItems
+      .filter(item => {
+        const key = productionItemKey(item);
+        return key && !catalogOrCachedProductionImageForItem(item, catalogProductIndex, productionProductImages, empresaId);
+      })
+      .slice(0, 20);
+
+    if (missingItems.length === 0) return undefined;
+
+    let disposed = false;
+    Promise.allSettled(missingItems.map(async item => {
+      let imageUrl = await resolveCatalogImageByProductionCode(api, empresaId, sucursalId, item, catalogProductIndex);
+      if (item?.numeroPedido) {
+        try {
+          imageUrl = imageUrl || await resolvePedidoListProductionImageUrl(api, empresaId, sucursalId, item, catalogProductIndex);
+        } catch (ordersError) {
+          console.warn("No fue posible resolver imagen desde pedidos:", ordersError);
+        }
+      }
+      const pedidoId = productionPedidoId(item);
+      if (!imageUrl && pedidoId != null) {
+        try {
+          const detail = await api.obtenerDetallePedido(pedidoId);
+          imageUrl = resolveDetailProductionImageUrl(detail, catalogProductIndex, item, empresaId);
+        } catch (detailError) {
+          console.warn("No fue posible resolver imagen desde detalle de pedido:", detailError);
+        }
+      }
+      if (!imageUrl && (canManageProductionActions || canViewPipeline) && item?.numeroPedido) {
+        try {
+          const pipelinePayload = await api.listarPipelinePedidos({
+            empresaId,
+            sucursalId,
+            numeroPedido: String(item.numeroPedido || "").trim(),
+            soloHoy: false,
+            soloAtrasados: false,
+            soloEnProduccion: false,
+          });
+          imageUrl = resolvePipelineProductionImageUrl(pipelinePayload, item, catalogProductIndex, empresaId);
+          const pipelineRealPedidoId = pipelinePedidoId(pipelinePayload, item);
+          if (!imageUrl && pipelineRealPedidoId != null) {
+            const detail = await api.obtenerDetallePedido(pipelineRealPedidoId);
+            imageUrl = resolveDetailProductionImageUrl(detail, catalogProductIndex, item, empresaId);
+          }
+        } catch (pipelineError) {
+          console.warn("No fue posible resolver imagen desde pipeline:", pipelineError);
+        }
+      }
+      if (!imageUrl) {
+        imageUrl = await resolveCatalogImageByProductionCode(api, empresaId, sucursalId, item, catalogProductIndex);
+      }
+      return {
+        key: productionItemKey(item),
+        cacheKeys: productionImageCacheKeys(item, { preferCatalogCode }),
+        imageUrl,
+      };
+    })).then(results => {
+      if (disposed) return;
+      setProductionProductImages(current => {
+        const next = { ...current };
+        let hasChanges = false;
+        for (const result of results) {
+          if (result.status !== "fulfilled" || !result.value?.key) continue;
+          if (!result.value.imageUrl) continue;
+          for (const cacheKey of result.value.cacheKeys || [`item:${result.value.key}`]) {
+            next[cacheKey] = result.value.imageUrl;
+          }
+          hasChanges = true;
+        }
+        return hasChanges ? next : current;
+      });
+    });
+
+    return () => { disposed = true; };
+  }, [api, canManageProductionActions, canResolveProductionImages, canViewPipeline, catalogProductIndex, empresaId, focusedVisibleItems, productionProductImages, sucursalId]);
 
   const loadFloristaData = useCallback(async () => {
     try {
@@ -736,6 +1839,8 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
       setFloristaGestionID(String(item.floristaID));
     }
     setDrawerOpen(true);
+    setAssignmentDrawerOpen(false);
+    setAssignmentItem(null);
     setMotivoAccion("");
   };
 
@@ -744,16 +1849,42 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
     setSelectedItem(null);
   };
 
+  const openAssignmentDrawer = item => {
+    if (!item) return;
+    const itemKey = productionSelectionKey(item);
+    setAssignmentItem(item);
+    setSelectedFloristaById(current => ({
+      ...current,
+      [itemKey]: current[itemKey] || (item.floristaID != null ? String(item.floristaID) : (!canManageProductionActions && currentFloristaId != null ? String(currentFloristaId) : "")),
+    }));
+    setAssignmentDrawerOpen(true);
+    setDrawerOpen(false);
+    setSelectedItem(null);
+  };
+
+  const closeAssignmentDrawer = () => {
+    setAssignmentDrawerOpen(false);
+    setAssignmentItem(null);
+  };
+
   const refreshAndKeepSelection = async item => {
     const nextItems = await loadItems();
     const nextVisible = buildVisibleProductionItems(nextItems, currentFloristaId, busquedaGeneral, soloMisAsignados);
     const nextSelected = nextVisible.find(candidate => Number(candidate.pedidoID) === Number(item?.pedidoID));
     if (nextSelected) {
-      setSelectedItem(nextSelected);
-      setDrawerOpen(true);
+      if (assignmentDrawerOpen) {
+        setAssignmentItem(nextSelected);
+        return;
+      }
+      if (drawerOpen) {
+        setSelectedItem(nextSelected);
+        setDrawerOpen(true);
+        return;
+      }
       return;
     }
     closeActionsDrawer();
+    closeAssignmentDrawer();
   };
 
   const asignar = async item => {
@@ -957,6 +2088,7 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
           pedidos: canViewPedidos,
           produccion: canViewProduccion,
           domicilios: canViewDomicilios,
+          barrios: canViewBarrios,
           inventario: canViewInventario,
           contabilidad: canViewContabilidad,
           trazabilidad: canViewTrazabilidad,
@@ -971,35 +2103,44 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
             setSubmenu("pedidos");
           },
           domicilios: onGoDomicilios,
+          barrios: onGoBarrios,
           inventario: onGoInventario,
           contabilidad: onGoContabilidad,
           trazabilidad: onGoTrazabilidad,
           clientes: onGoClientes,
           usuarios: onGoUsuarios,
         }}
+        sessionLabel={`Sesion activa: ${displayUserName}`}
       />
 
       <main className="orders-admin-view production-page-view">
         <header className="orders-admin-header orders-page-header production-page-header">
           <div className="orders-page-heading">
-            <div className="orders-page-breadcrumb" aria-label="Ruta">
-              <span>Operaciones</span>
-              <span>/</span>
-              <strong>Producción</strong>
-            </div>
             <div className="orders-page-title-row">
               <h1>Producción</h1>
             </div>
-            <p className="orders-admin-subtitle orders-page-description">
-              Organiza asignaciones, estados y entregas de producción diaria.
-            </p>
-            <span className="orders-user-pill">
-              <span aria-hidden="true" />
-              Sesion activa: {displayUserName}
-            </span>
+            <div className="production-header-meta" aria-label="Contexto de producción">
+              <span className="production-header-date">
+                <CalendarDays size={14} strokeWidth={2} aria-hidden="true" />
+                Hoy, {productionHeaderDateLabel()}
+              </span>
+            </div>
           </div>
           <div className="orders-header-side">
             <div className="header-actions">
+              <label className="production-header-search" aria-label="Buscar producción">
+                <Search size={17} strokeWidth={2} aria-hidden="true" />
+                <input
+                  type="search"
+                  value={busquedaGeneral}
+                  onChange={event => {
+                    setActiveMetricFilter(null);
+                    setBusquedaGeneral(event.target.value);
+                  }}
+                  placeholder="Buscar florista, cliente o pedido..."
+                  title="Buscar por florista, cliente o número de pedido"
+                />
+              </label>
               <div className="production-menu-dropdown" ref={productionMenuRef}>
                 <button
                   type="button"
@@ -1080,78 +2221,11 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
           </div>
         </header>
 
-        {activeMetricMeta ? (
-          <section className="production-alert-card production-ops-panel" ref={productionListRef} aria-label="Panel operativo de KPI seleccionado">
-            <div className="production-alert-card-copy">
-              <span className="production-alert-eyebrow">Centro operativo</span>
-              <strong>{activeMetricMeta.label}</strong>
-              <span>{focusedVisibleItems.length} pedido{focusedVisibleItems.length === 1 ? "" : "s"} afectado{focusedVisibleItems.length === 1 ? "" : "s"}</span>
-            </div>
-            <div className="production-alert-card-list">
-              {focusedVisibleItems.length === 0 ? (
-                <div className="production-alert-pill production-alert-pill-empty">
-                  <span className="production-alert-icon" aria-hidden="true" />
-                  <div className="production-alert-pill-copy">
-                    <strong>Sin pedidos visibles</strong>
-                    <span>No hay arreglos para este indicador.</span>
-                    <small>Revisa filtros o fecha seleccionada.</small>
-                  </div>
-                </div>
-              ) : focusedVisibleItems.slice(0, 8).map(item => (
-                <div key={`metric-focus-${item.idProduccion}`} className="production-alert-pill">
-                  <span className="production-alert-icon" aria-hidden="true" />
-                  <div className="production-alert-pill-copy">
-                    <strong>Pedido {item.numeroPedido}</strong>
-                    <span>{item.cliente || "Cliente"}</span>
-                    <small>{resolveProgrammedDate(item) || "-"}</small>
-                  </div>
-                  <span className={`order-badge production-alert-status ${productionStatusBadgeClass(item)}`}>{item.estado || "-"}</span>
-                </div>
-              ))}
-            </div>
-          </section>
-        ) : metrics.criticos.length > 0 ? (
-          <section className="production-alert-card production-ops-panel" ref={productionListRef} aria-label="Alertas de pedidos críticos">
-            <div className="production-alert-card-copy">
-              <span className="production-alert-eyebrow">Centro operativo</span>
-              <strong>Alertas de producción</strong>
-              <span>{metrics.sinAsignar} sin asignar · {metrics.atrasados} atrasado{metrics.atrasados === 1 ? "" : "s"}</span>
-            </div>
-            <div className="production-alert-card-list">
-              {metrics.criticos.map(item => (
-                <div key={`metric-${item.idProduccion}`} className="production-alert-pill">
-                  <span className="production-alert-icon" aria-hidden="true" />
-                  <div className="production-alert-pill-copy">
-                    <strong>Pedido {item.numeroPedido}</strong>
-                    <span>{item.cliente || "Cliente"}</span>
-                    <small>{resolveProgrammedDate(item) || "-"}</small>
-                  </div>
-                  <span className={`order-badge production-alert-status ${productionStatusBadgeClass(item)}`}>{item.estado || "-"}</span>
-                </div>
-              ))}
-            </div>
-          </section>
-        ) : <span ref={productionListRef} />}
+        <span ref={productionListRef} className="production-list-anchor" aria-hidden="true" />
 
         {submenu === "pedidos" && (
           <>
             <section className="orders-filters orders-filters--four-col production-filters-bar">
-              <label className="filter-field production-filter-field production-filter-field-search">
-                <span>Buscar</span>
-                <div className="production-filter-control">
-                  <Search size={17} strokeWidth={2} aria-hidden="true" />
-                  <input
-                    type="search"
-                    value={busquedaGeneral}
-                    onChange={event => {
-                      setActiveMetricFilter(null);
-                      setBusquedaGeneral(event.target.value);
-                    }}
-                    placeholder="Florista, cliente o pedido"
-                    title="Buscar por florista, cliente o número de pedido"
-                  />
-                </div>
-              </label>
               <div className="filter-field production-filter-field">
                 <span>Fecha Inicio</span>
                 <div className="production-filter-control">
@@ -1167,29 +2241,30 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
                   />
                 </div>
               </div>
-              <label className="filter-field production-filter-field">
+              <div className="filter-field production-filter-field production-status-filter">
                 <span>Estado</span>
-                <details className="estado-filtro-dropdown">
-                  <summary className="estado-filtro-summary">
-                    <Filter size={17} strokeWidth={2} aria-hidden="true" />
-                    Estados
-                  </summary>
-                  <div className="estado-filtro-panel">
-                    <div className="estado-filtro-list">
-                      {ESTADOS_UI.map(item => (
-                        <label key={item} className="estado-filtro-item">
-                          <input
-                            type="checkbox"
-                            checked={estadosFiltro.includes(item)}
-                            onChange={() => toggleEstadoFiltro(item)}
-                          />
-                          <span>{item}</span>
-                        </label>
-                      ))}
-                    </div>
-                  </div>
-                </details>
-              </label>
+                <div className="orders-status-chips production-status-chips" aria-label="Filtrar por estado de producción">
+                  <button
+                    type="button"
+                    className={`orders-status-chip production-status-chip is-all${selectedStatusKey === "todos" ? " is-active" : ""}`}
+                    onClick={selectAllProductionStatuses}
+                  >
+                    <span aria-hidden="true" />
+                    Todos
+                  </button>
+                  {ESTADOS_UI.map(item => (
+                    <button
+                      key={item}
+                      type="button"
+                      className={`orders-status-chip production-status-chip ${productionStatusChipClass(item)}${selectedStatusKey === normalizeStatus(item).replace(/_/g, "") ? " is-active" : ""}`}
+                      onClick={() => toggleEstadoFiltro(item)}
+                    >
+                      <span aria-hidden="true" />
+                      {item}
+                    </button>
+                  ))}
+                </div>
+              </div>
               {currentFloristaId != null ? (
                 <label className="filter-field">
                   <span>Asignación propia</span>
@@ -1202,6 +2277,21 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
                     <span>Solo mis pedidos asignados</span>
                   </div>
                 </label>
+              ) : null}
+              {canFloristaQuickState ? (
+                <div className="production-florista-inline" aria-label="Estado de florista">
+                  <span>Estado de florista</span>
+                  <button
+                    type="button"
+                    className={`production-florista-toggle ${isFloristaActivo(ownFloristaDisponibilidad) ? "is-active" : "is-inactive"}`}
+                    onClick={toggleEstadoFloristaPropio}
+                    aria-pressed={isFloristaActivo(ownFloristaDisponibilidad)}
+                    title="Cambiar disponibilidad del florista"
+                  >
+                    <span aria-hidden="true" />
+                    <strong>{isFloristaActivo(ownFloristaDisponibilidad) ? "Activo" : "Inactivo"}</strong>
+                  </button>
+                </div>
               ) : null}
             </section>
 
@@ -1218,15 +2308,18 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
                     <th>Fecha + Hora entrega</th>
                     <th>Florista Asignado</th>
                     <th>Estado</th>
-                    <th>Fecha Asignación</th>
                     <th>Estado tiempo</th>
-                    {canManageProductionActions ? <th>Acciones Domicilios</th> : null}
-                    {canFloristaQuickState ? <th>Acción</th> : null}
+                    <th>Acción</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {focusedVisibleItems.map(item => {
+                  {paginatedProductionItems.map(item => {
                     const timing = deliveryTimingStatus(item);
+                    const productPreview = resolveProductionProduct(item, catalogProductIndex, {
+                      preferCatalogCode: shouldUseCatalogCodeForProduction() || isEmpresaCatalogCode(empresaId),
+                      allowDirectImage: true,
+                    });
+                    const productImageSrc = resolveImageSrc(resolveProductionDisplayImageUrl(item, catalogProductIndex, productionProductImages, empresaId), tenantConfig.apiBaseUrl);
                     const programmedDate = resolveProgrammedDate(item);
                     const rowStateClasses = [
                       "production-row-card",
@@ -1241,9 +2334,18 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
                         <span className="production-order-badge">{item.numeroPedido ?? "-"}</span>
                       </td>
                       <td>
-                        <div className="production-product-customer">
-                          <strong>{item.producto || "-"}</strong>
-                          <span>{item.cliente || "-"}</span>
+                        <div className="production-product-preview">
+                          <span className="production-product-thumb" aria-hidden="true">
+                            {productImageSrc ? (
+                              <img src={productImageSrc} alt="" loading="lazy" />
+                            ) : (
+                              <span>{productInitials(productPreview.name || item.producto)}</span>
+                            )}
+                          </span>
+                          <div className="production-product-customer">
+                            <strong>{productPreview.name || item.producto || "-"}</strong>
+                            <span>{item.cliente || "-"}</span>
+                          </div>
                         </div>
                       </td>
                       <td>
@@ -1266,46 +2368,47 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
                         )}
                       </td>
                       <td><span className={`order-badge ${productionStatusBadgeClass(item)}`}>{item.estado || "-"}</span></td>
-                      <td>{formatDateTimeCompact(item.fechaAsignacion) || "-"}</td>
                       <td>
                         <div className="production-time-stack">
                           <span className={`production-timing-badge ${timing.className}`}>{timing.label}</span>
-                          <strong className={timing.className === "is-late" ? "is-overdue" : ""}>{timing.remainingLabel}</strong>
                         </div>
                       </td>
-                      {canManageProductionActions ? (
-                        <td>
-                          <div className="production-row-actions" aria-label="Acciones rápidas">
-                            <button type="button" className="production-icon-action" title="Ver detalle" aria-label="Ver detalle" onClick={() => openActionsDrawer(item)}>
-                              <Eye size={18} strokeWidth={2} aria-hidden="true" />
-                            </button>
-                          </div>
-                        </td>
-                      ) : null}
-                      {canFloristaQuickState ? (
-                        <td>
-                          <div className="production-inline-actions">
+                      <td>
+                        <div className="production-row-actions production-row-actions--florista" aria-label="Acciones de producción">
+                          {canFloristaQuickState && (canChangeOwnProductionState(item) || isProductionReadyForDelivery(item.estado)) && shouldShowFloristaStateAction(item.estado) ? (
                             <button
                               type="button"
-                              className="btn-outline"
-                              title="Ver detalle del arreglo"
-                              onClick={() => openActionsDrawer(item)}
+                              className={`production-icon-action production-icon-action--state ${productionStateActionClass(item.estado)}`}
+                              title={nextFloristaStatus(item.estado) ? "Actualizar estado de producción" : "Pedido listo para entrega"}
+                              aria-label={nextFloristaLabel(item.estado) || "Pedido listo para entrega"}
+                              onClick={nextFloristaStatus(item.estado) ? () => cambiarEstadoFloristaRapido(item) : undefined}
+                              disabled={!nextFloristaStatus(item.estado)}
                             >
-                              Ver detalle
+                              <CirclePlay size={18} strokeWidth={2} aria-hidden="true" />
                             </button>
-                            {canChangeOwnProductionState(item) && nextFloristaStatus(item.estado) ? (
-                              <button
-                                type="button"
-                                className="btn-outline"
-                                title="Actualizar estado de producción"
-                                onClick={() => cambiarEstadoFloristaRapido(item)}
-                              >
-                                {nextFloristaLabel(item.estado)}
-                              </button>
-                            ) : null}
-                          </div>
-                        </td>
-                      ) : null}
+                          ) : null}
+                          <button
+                            type="button"
+                            className="production-icon-action production-icon-action--detail"
+                            title="Ver detalle del arreglo"
+                            aria-label="Ver detalle del arreglo"
+                            onClick={() => openActionsDrawer(item)}
+                          >
+                            <Eye size={18} strokeWidth={2} aria-hidden="true" />
+                          </button>
+                          {canManageProductionActions || canFloristaQuickState ? (
+                            <button
+                              type="button"
+                              className="production-icon-action production-icon-action--assign"
+                              title="Asignar / reasignar florista"
+                              aria-label="Asignar / reasignar florista"
+                              onClick={() => openAssignmentDrawer(item)}
+                            >
+                              <User size={18} strokeWidth={2} aria-hidden="true" />
+                            </button>
+                          ) : null}
+                        </div>
+                      </td>
                     </tr>
                   );
                   })}
@@ -1313,8 +2416,67 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
               </table>
             </section>
 
+            <footer className="records-pager production-records-pager" aria-label="Paginación de producción">
+              <p>Mostrando {productionVisibleFrom} a {productionVisibleTo} de {productionTotal} pedidos</p>
+              <nav className="records-pager-pages" aria-label="Páginas de producción">
+                <button
+                  type="button"
+                  className="records-pager-arrow"
+                  title="Ir a la página anterior"
+                  onClick={() => setProductionPage(current => Math.max(1, current - 1))}
+                  disabled={productionPage <= 1}
+                >
+                  <ChevronLeft size={16} strokeWidth={2.4} aria-hidden="true" />
+                </button>
+                {productionPagerItems.map(item => (
+                  typeof item === "number" ? (
+                    <button
+                      key={item}
+                      type="button"
+                      className={`records-pager-page${item === productionPage ? " is-active" : ""}`}
+                      onClick={() => setProductionPage(item)}
+                      aria-current={item === productionPage ? "page" : undefined}
+                    >
+                      {item}
+                    </button>
+                  ) : (
+                    <span key={item} className="records-pager-ellipsis">...</span>
+                  )
+                ))}
+                <button
+                  type="button"
+                  className="records-pager-arrow"
+                  title="Ir a la página siguiente"
+                  onClick={() => setProductionPage(current => Math.min(productionPages, current + 1))}
+                  disabled={productionPage >= productionPages}
+                >
+                  <ChevronRight size={16} strokeWidth={2.4} aria-hidden="true" />
+                </button>
+              </nav>
+              <label className="records-pager-size">
+                <span>Mostrar</span>
+                <select
+                  value={productionPageSize}
+                  onChange={event => setProductionPageSize(Number(event.target.value))}
+                  title="Registros por página"
+                >
+                  {PAGE_SIZE_OPTIONS.map(option => (
+                    <option key={option} value={option}>{option}</option>
+                  ))}
+                </select>
+                <span>por página</span>
+              </label>
+            </footer>
+
             <section className="production-capsules" aria-label="Pedidos en cápsulas">
-              {focusedVisibleItems.map(item => (
+              {paginatedProductionItems.map(item => {
+                const productPreview = resolveProductionProduct(item, catalogProductIndex, {
+                  preferCatalogCode: shouldUseCatalogCodeForProduction() || isEmpresaCatalogCode(empresaId),
+                  allowDirectImage: true,
+                });
+                const productImageSrc = resolveImageSrc(resolveProductionDisplayImageUrl(item, catalogProductIndex, productionProductImages, empresaId), tenantConfig.apiBaseUrl);
+                const timing = deliveryTimingStatus(item);
+                return (
                 <article key={`cap-${item.idProduccion}`} className={`production-capsule ${!hasAssignedFlorista(item) ? "production-capsule-unassigned" : ""}`}>
                   <header className="production-capsule-head">
                     <strong>{item.numeroPedido ?? "-"}</strong>
@@ -1322,7 +2484,19 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
                   </header>
 
                   <div className="production-capsule-grid">
-                    <p><span>Producto</span><strong>{item.producto || "-"}</strong></p>
+                    <p className="production-capsule-product-row">
+                      <span>Producto</span>
+                      <strong className="production-product-preview">
+                        <span className="production-product-thumb" aria-hidden="true">
+                          {productImageSrc ? (
+                            <img src={productImageSrc} alt="" loading="lazy" />
+                          ) : (
+                            <span>{productInitials(productPreview.name || item.producto)}</span>
+                          )}
+                        </span>
+                        <span>{productPreview.name || item.producto || "-"}</span>
+                      </strong>
+                    </p>
                     <p><span>Cliente</span><strong>{item.cliente || "-"}</strong></p>
                     <p><span>Fecha entrega</span><strong>{formatDateOnly(item.fechaEntrega) || "-"}</strong></p>
                     <p><span>Hora entrega</span><strong>{item.horaEntrega || "-"}</strong></p>
@@ -1333,43 +2507,49 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
                         <span>{item.floristaAsignado || "Sin asignar"}</span>
                       </strong>
                     </p>
-                    <p><span>Asignación</span><strong>{formatDateTimeCompact(item.fechaAsignacion) || "-"}</strong></p>
-                    <p><span>Estado tiempo</span><strong>{deliveryTimingStatus(item).label}</strong></p>
+                    <p><span>Asignación</span><strong>{formatDateTimeBogotaFromUtc(item.fechaAsignacion) || "-"}</strong></p>
+                    <p><span>Estado tiempo</span><strong><span className={`production-timing-badge ${timing.className}`}>{timing.label}</span></strong></p>
                   </div>
 
                   <div className="production-capsule-actions">
-                      {canManageProductionActions ? (
-                      <div className="production-row-actions" aria-label="Acciones rápidas">
-                        <button type="button" className="production-icon-action" title="Ver detalle" aria-label="Ver detalle" onClick={() => openActionsDrawer(item)}>
-                          <Eye size={18} strokeWidth={2} aria-hidden="true" />
-                        </button>
-                      </div>
-                    ) : null}
-                    {canFloristaQuickState ? (
-                      <>
+                    <div className="production-row-actions production-row-actions--florista" aria-label="Acciones de producción">
+                      {canFloristaQuickState && (canChangeOwnProductionState(item) || isProductionReadyForDelivery(item.estado)) && shouldShowFloristaStateAction(item.estado) ? (
                         <button
                           type="button"
-                          className="btn-outline"
-                          title="Ver detalle del arreglo"
-                          onClick={() => openActionsDrawer(item)}
+                          className={`production-icon-action production-icon-action--state ${productionStateActionClass(item.estado)}`}
+                          title={nextFloristaStatus(item.estado) ? "Actualizar estado de producción" : "Pedido listo para entrega"}
+                          aria-label={nextFloristaLabel(item.estado) || "Pedido listo para entrega"}
+                          onClick={nextFloristaStatus(item.estado) ? () => cambiarEstadoFloristaRapido(item) : undefined}
+                          disabled={!nextFloristaStatus(item.estado)}
                         >
-                          Ver detalle
+                          <CirclePlay size={18} strokeWidth={2} aria-hidden="true" />
                         </button>
-                        {canChangeOwnProductionState(item) && nextFloristaStatus(item.estado) ? (
-                          <button
-                            type="button"
-                            className="btn-outline"
-                            title="Actualizar estado de producción"
-                            onClick={() => cambiarEstadoFloristaRapido(item)}
-                          >
-                            {nextFloristaLabel(item.estado)}
-                          </button>
-                        ) : null}
-                      </>
-                    ) : null}
+                      ) : null}
+                      <button
+                        type="button"
+                        className="production-icon-action production-icon-action--detail"
+                        title="Ver detalle del arreglo"
+                        aria-label="Ver detalle del arreglo"
+                        onClick={() => openActionsDrawer(item)}
+                      >
+                        <Eye size={18} strokeWidth={2} aria-hidden="true" />
+                      </button>
+                      {canManageProductionActions || canFloristaQuickState ? (
+                        <button
+                          type="button"
+                          className="production-icon-action production-icon-action--assign"
+                          title="Asignar / reasignar florista"
+                          aria-label="Asignar / reasignar florista"
+                          onClick={() => openAssignmentDrawer(item)}
+                        >
+                          <User size={18} strokeWidth={2} aria-hidden="true" />
+                        </button>
+                      ) : null}
+                    </div>
                   </div>
                 </article>
-              ))}
+              );
+              })}
             </section>
           </>
         )}
@@ -1517,7 +2697,7 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
         )}
       </main>
 
-      <div className={`production-drawer-backdrop ${drawerOpen && submenu === "pedidos" ? "open" : ""}`} aria-hidden="true" />
+      <div className={`production-drawer-backdrop ${(drawerOpen || assignmentDrawerOpen) && submenu === "pedidos" ? "open" : ""}`} aria-hidden="true" />
 
       <aside className={`orders-drawer production-actions-drawer ${drawerOpen && submenu === "pedidos" ? "open" : ""}`}>
         <div className="orders-drawer-head production-detail-head">
@@ -1545,6 +2725,30 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
             <p className="order-drawer-empty">Selecciona un pedido para ver acciones.</p>
           ) : (
             <>
+              {(() => {
+                const productPreview = resolveProductionProduct(selectedItem, catalogProductIndex, {
+                  preferCatalogCode: shouldUseCatalogCodeForProduction() || isEmpresaCatalogCode(empresaId),
+                  allowDirectImage: true,
+                });
+                const productImageSrc = resolveImageSrc(resolveProductionDisplayImageUrl(selectedItem, catalogProductIndex, productionProductImages, empresaId), tenantConfig.apiBaseUrl);
+                return (
+                  <section className="production-detail-product-hero" aria-label="Imagen del arreglo">
+                    <div className="production-detail-product-photo">
+                      {productImageSrc ? (
+                        <img src={productImageSrc} alt="" loading="lazy" />
+                      ) : (
+                        <span>{productInitials(productPreview.name || selectedItem.producto)}</span>
+                      )}
+                    </div>
+                    <div className="production-detail-product-hero-copy">
+                      <span>Arreglo</span>
+                      <strong>{productPreview.name || selectedItem.nombreArreglo || selectedItem.producto || "-"}</strong>
+                      <small>{arregloCodeLabel(selectedItem)}</small>
+                    </div>
+                  </section>
+                );
+              })()}
+
               <section className="production-detail-grid" aria-label="Detalle operativo del pedido">
                 <article className="production-detail-card">
                   <span className="production-detail-card-icon"><User size={18} strokeWidth={2} aria-hidden="true" /></span>
@@ -1626,60 +2830,6 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
               </section>
               ) : null}
 
-              {!canManageProductionActions ? (
-              <section className="order-block production-action-card production-assignment-card">
-                <div className="production-detail-section-title">
-                  <Flower2 size={17} strokeWidth={2} aria-hidden="true" />
-                  <strong>Asignar / reasignar florista</strong>
-                </div>
-                <div className="production-assignment-profile">
-                  <span className="production-florista-avatar" aria-hidden="true">{initialsFromName(selectedItem.floristaAsignado)}</span>
-                  <div>
-                    <strong>{selectedItem.floristaAsignado || "Sin asignar"}</strong>
-                    <span>{selectedItem.floristaAsignado ? "Asignado" : "Pendiente de asignación"}</span>
-                  </div>
-                </div>
-                <div className="order-actions production-drawer-actions">
-                  <select
-                    value={selectedFloristaById[productionSelectionKey(selectedItem)] || ""}
-                    onChange={event => setSelectedFloristaById(current => ({ ...current, [productionSelectionKey(selectedItem)]: event.target.value }))}
-                    title="Seleccionar florista"
-                  >
-                    <option value="">Selecciona florista</option>
-                    {floristas.map(florista => (
-                      <option
-                        key={florista.idFlorista}
-                        value={florista.idFlorista}
-                        disabled={!isFloristaActivo(florista)}
-                      >
-                        {florista.nombre}{isFloristaActivo(florista) ? "" : " (Inactivo)"}
-                      </option>
-                    ))}
-                  </select>
-                  <button type="button" className="btn-outline" title="Asignar o reasignar florista" onClick={() => reasignarAuditable(selectedItem)}>
-                    Asignar / reasignar
-                  </button>
-                </div>
-              </section>
-              ) : null}
-
-              {!canManageProductionActions ? (
-              <section className="order-block production-action-card">
-                <div className="production-detail-section-title">
-                  <User size={17} strokeWidth={2} aria-hidden="true" />
-                  <strong>Estado de florista</strong>
-                </div>
-                <div className="order-actions production-drawer-actions">
-                  <span className={`order-badge ${isFloristaActivo(ownFloristaDisponibilidad) ? "is-entregado" : "is-cancelado"}`}>
-                    {isFloristaActivo(ownFloristaDisponibilidad) ? "Activo" : "Inactivo"}
-                  </span>
-                  <button type="button" className="btn-outline" onClick={toggleEstadoFloristaPropio} title="Cambiar disponibilidad del florista">
-                    {isFloristaActivo(ownFloristaDisponibilidad) ? "Inactivar" : "Activar"}
-                  </button>
-                </div>
-              </section>
-              ) : null}
-
               {canManageStateAndRecalculate ? (
                 <>
                   <section className="order-block">
@@ -1708,6 +2858,66 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
                 </>
               ) : null}
             </>
+          )}
+        </div>
+      </aside>
+
+      <aside className={`orders-drawer production-actions-drawer production-assignment-drawer ${assignmentDrawerOpen && submenu === "pedidos" ? "open" : ""}`}>
+        <div className="orders-drawer-head production-detail-head">
+          <div className="production-detail-head-copy">
+            <span className="production-detail-eyebrow">Acción independiente</span>
+            <strong className="orders-drawer-title production-detail-title">Asignar / reasignar florista</strong>
+            {assignmentItem ? (
+              <p className="production-detail-product">
+                Pedido #{assignmentItem.numeroPedido ?? "-"} · {assignmentItem.nombreArreglo || assignmentItem.producto || "-"}
+              </p>
+            ) : null}
+          </div>
+          <div className="orders-drawer-head-actions">
+            <button type="button" className="icon-btn" onClick={closeAssignmentDrawer} title="Cerrar asignación">
+              <IconX size={18} stroke={2} />
+            </button>
+          </div>
+        </div>
+
+        <div className="orders-drawer-body">
+          {!assignmentDrawerOpen || !assignmentItem ? (
+            <p className="order-drawer-empty">Selecciona un pedido para asignar florista.</p>
+          ) : (
+            <section className="order-block production-action-card production-assignment-card">
+              <div className="production-detail-section-title">
+                <Flower2 size={17} strokeWidth={2} aria-hidden="true" />
+                <strong>Asignación de florista</strong>
+              </div>
+              <div className="production-assignment-profile">
+                <span className="production-florista-avatar" aria-hidden="true">{initialsFromName(assignmentItem.floristaAsignado)}</span>
+                <div>
+                  <strong>{assignmentItem.floristaAsignado || "Sin asignar"}</strong>
+                  <span>{assignmentItem.floristaAsignado ? "Asignado" : "Pendiente de asignación"}</span>
+                </div>
+              </div>
+              <div className="order-actions production-drawer-actions">
+                <select
+                  value={selectedFloristaById[productionSelectionKey(assignmentItem)] || ""}
+                  onChange={event => setSelectedFloristaById(current => ({ ...current, [productionSelectionKey(assignmentItem)]: event.target.value }))}
+                  title="Seleccionar florista"
+                >
+                  <option value="">Selecciona florista</option>
+                  {floristas.map(florista => (
+                    <option
+                      key={florista.idFlorista}
+                      value={florista.idFlorista}
+                      disabled={!isFloristaActivo(florista)}
+                    >
+                      {florista.nombre}{isFloristaActivo(florista) ? "" : " (Inactivo)"}
+                    </option>
+                  ))}
+                </select>
+                <button type="button" className="btn-outline" title="Asignar o reasignar florista" onClick={() => reasignarAuditable(assignmentItem)}>
+                  Asignar / reasignar
+                </button>
+              </div>
+            </section>
           )}
         </div>
       </aside>

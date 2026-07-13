@@ -85,6 +85,16 @@ export function LoginPage({ onSubmit, error, loading }) {
           </header>
 
           <form onSubmit={handleSubmit} className="auth-form">
+            {loading ? (
+              <div className="auth-loading-state" role="status" aria-live="polite">
+                <span className="auth-loading-spinner" aria-hidden="true" />
+                <div>
+                  <strong>Validando credenciales</strong>
+                  <small>Estamos verificando tu usuario y contraseña...</small>
+                </div>
+              </div>
+            ) : null}
+
             <label htmlFor="usuario">Usuario o correo electronico</label>
             <div className="auth-input-field">
               <IconUser size={22} stroke={1.8} aria-hidden="true" />
@@ -95,6 +105,7 @@ export function LoginPage({ onSubmit, error, loading }) {
                 onChange={event => setUsuario(event.target.value)}
                 placeholder="Ingresa tu usuario o correo"
                 required
+                disabled={loading}
               />
             </div>
 
@@ -108,6 +119,7 @@ export function LoginPage({ onSubmit, error, loading }) {
                 onChange={event => setPassword(event.target.value)}
                 placeholder="Ingresa tu contrasena"
                 required
+                disabled={loading}
               />
               <button
                 type="button"
@@ -115,6 +127,7 @@ export function LoginPage({ onSubmit, error, loading }) {
                 onClick={() => setShowPassword(current => !current)}
                 aria-label={showPassword ? "Ocultar contrasena" : "Mostrar contrasena"}
                 title={showPassword ? "Ocultar contrasena" : "Mostrar contrasena"}
+                disabled={loading}
               >
                 {showPassword ? <IconEyeOff size={20} stroke={1.8} /> : <IconEye size={20} stroke={1.8} />}
               </button>
@@ -122,10 +135,10 @@ export function LoginPage({ onSubmit, error, loading }) {
 
             <button type="button" className="auth-forgot-link">Olvidaste tu contrasena?</button>
 
-            {error ? <p className="auth-error">{error}</p> : null}
+            {error ? <p className="auth-error" role="alert">{error}</p> : null}
 
             <button type="submit" className="btn-primary" disabled={loading}>
-              <IconLock size={20} stroke={2} aria-hidden="true" />
+              {loading ? <span className="auth-button-spinner" aria-hidden="true" /> : <IconLock size={20} stroke={2} aria-hidden="true" />}
               {loading ? "Ingresando..." : "Ingresar a PetalOps"}
             </button>
 

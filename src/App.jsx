@@ -1,20 +1,23 @@
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, lazy, useEffect, useMemo, useState } from "react";
 
 import { LoginPage } from "./domain/auth/LoginPage.jsx";
-import { AccountingPage } from "./domain/accounting/AccountingPage.jsx";
-import { ClientsPage } from "./domain/clients/ClientsPage.jsx";
-import { DeliveryPage } from "./domain/delivery/DeliveryPage.jsx";
-import { InventoryPage } from "./domain/inventory/InventoryPage.jsx";
-import { OrdersAdminPage } from "./domain/orders-admin/OrdersAdminPage.jsx";
-import { PipelineOperativo } from "./domain/pipeline/PipelineOperativo.jsx";
-import { ProductionPage } from "./domain/production/ProductionPage.jsx";
-import { TraceabilityPage } from "./domain/traceability/TraceabilityPage.jsx";
-import { UsersManagementPage } from "./domain/users/UsersManagementPage.jsx";
 import { tenantConfig } from "./config/tenantConfig.js";
 import { createApiClient } from "./infrastructure/apiClient.js";
 
 const TOKEN_KEY = "petalops_access_token";
 const VIEW_KEY = "petalops_active_view";
+const DEFAULT_VIEW = "pipeline";
+
+const AccountingPage = lazy(() => import("./domain/accounting/AccountingPage.jsx").then(module => ({ default: module.AccountingPage })));
+const ClientsPage = lazy(() => import("./domain/clients/ClientsPage.jsx").then(module => ({ default: module.ClientsPage })));
+const DeliveryPage = lazy(() => import("./domain/delivery/DeliveryPage.jsx").then(module => ({ default: module.DeliveryPage })));
+const NeighborhoodsPage = lazy(() => import("./domain/neighborhoods/NeighborhoodsPage.jsx").then(module => ({ default: module.NeighborhoodsPage })));
+const InventoryPage = lazy(() => import("./domain/inventory/InventoryPage.jsx").then(module => ({ default: module.InventoryPage })));
+const OrdersAdminPage = lazy(() => import("./domain/orders-admin/OrdersAdminPage.jsx").then(module => ({ default: module.OrdersAdminPage })));
+const PipelineOperativo = lazy(() => import("./domain/pipeline/PipelineOperativo.jsx").then(module => ({ default: module.PipelineOperativo })));
+const ProductionPage = lazy(() => import("./domain/production/ProductionPage.jsx").then(module => ({ default: module.ProductionPage })));
+const TraceabilityPage = lazy(() => import("./domain/traceability/TraceabilityPage.jsx").then(module => ({ default: module.TraceabilityPage })));
+const UsersManagementPage = lazy(() => import("./domain/users/UsersManagementPage.jsx").then(module => ({ default: module.UsersManagementPage })));
 
 function hasModuleAccess(session, modulo) {
   const name = String(modulo || "").toLowerCase();
@@ -36,12 +39,28 @@ function canAccessPipeline(session) {
   return Boolean(session?.esGlobalJoin || isEmpresaAdminRole(session));
 }
 
+function canAccessView(session, view) {
+  if (!session) return false;
+  if (view === "pipeline") return canAccessPipeline(session);
+  if (view === "pedidos") return hasModuleAccess(session, "pedidos");
+  if (view === "produccion") return hasModuleAccess(session, "produccion");
+  if (view === "domicilios") return hasModuleAccess(session, "domicilios");
+  if (view === "barrios") return hasModuleAccess(session, "barrios") || hasModuleAccess(session, "domicilios");
+  if (view === "inventario") return hasModuleAccess(session, "inventario");
+  if (view === "contabilidad") return hasModuleAccess(session, "contabilidad");
+  if (view === "trazabilidad") return hasModuleAccess(session, "trazabilidad");
+  if (view === "clientes") return hasModuleAccess(session, "clientes");
+  if (view === "usuarios") return Boolean(session?.esGlobalJoin || isEmpresaAdminRole(session));
+  return false;
+}
+
 function resolveDefaultView(session) {
   if (!session) return "pipeline";
   if (canAccessPipeline(session)) return "pipeline";
   if (hasModuleAccess(session, "pedidos")) return "pedidos";
   if (hasModuleAccess(session, "produccion")) return "produccion";
   if (hasModuleAccess(session, "domicilios")) return "domicilios";
+  if (hasModuleAccess(session, "barrios") || hasModuleAccess(session, "domicilios")) return "barrios";
   if (hasModuleAccess(session, "inventario")) return "inventario";
   if (hasModuleAccess(session, "contabilidad")) return "contabilidad";
   if (hasModuleAccess(session, "trazabilidad")) return "trazabilidad";
@@ -50,12 +69,30 @@ function resolveDefaultView(session) {
   return "pedidos";
 }
 
+function resolveSessionView(session, preferredView) {
+  const fallbackView = resolveDefaultView(session);
+  const normalizedPreferredView = String(preferredView || "").trim() || fallbackView;
+  return canAccessView(session, normalizedPreferredView) ? normalizedPreferredView : fallbackView;
+}
+
 function readStoredView() {
   try {
-    return String(globalThis.localStorage?.getItem(VIEW_KEY) || "").trim() || "pipeline";
+    const requestedView = String(new URLSearchParams(globalThis.location?.search || "").get("view") || "").trim();
+    if (requestedView) return requestedView;
+    return String(globalThis.localStorage?.getItem(VIEW_KEY) || "").trim() || DEFAULT_VIEW;
   } catch {
-    return "pipeline";
+    return DEFAULT_VIEW;
   }
+}
+
+function ModuleLoadingFallback() {
+  return (
+    <main className="auth-view">
+      <section className="auth-card">
+        <p className="orders-message">Cargando modulo...</p>
+      </section>
+    </main>
+  );
 }
 
 export default function App() {
@@ -75,6 +112,7 @@ export default function App() {
 
       try {
         const me = await api.me();
+        setView(resolveSessionView(me, readStoredView()));
         setSession(me);
       } catch {
         globalThis.localStorage?.removeItem(TOKEN_KEY);
@@ -96,8 +134,10 @@ export default function App() {
   }, [session, view]);
 
   const canPedidos = hasModuleAccess(session, "pedidos");
+  const canCatalogo = hasModuleAccess(session, "catalogo");
   const canProduccion = hasModuleAccess(session, "produccion");
   const canDomicilios = hasModuleAccess(session, "domicilios");
+  const canBarrios = hasModuleAccess(session, "barrios") || canDomicilios;
   const canInventario = hasModuleAccess(session, "inventario");
   const canContabilidad = hasModuleAccess(session, "contabilidad");
   const canTrazabilidad = hasModuleAccess(session, "trazabilidad");
@@ -117,6 +157,7 @@ export default function App() {
     if (view === "pedidos" && !canPedidos) return redirectTo(fallbackView);
     if (view === "produccion" && !canProduccion) return redirectTo(fallbackView);
     if (view === "domicilios" && !canDomicilios) return redirectTo(fallbackView);
+    if (view === "barrios" && !canBarrios) return redirectTo(fallbackView);
     if (view === "inventario" && !canInventario) return redirectTo(fallbackView);
     if (view === "contabilidad" && !canContabilidad) return redirectTo(fallbackView);
     if (view === "trazabilidad" && !canTrazabilidad) return redirectTo(fallbackView);
@@ -129,6 +170,7 @@ export default function App() {
     canPedidos,
     canProduccion,
     canDomicilios,
+    canBarrios,
     canInventario,
     canContabilidad,
     canTrazabilidad,
@@ -141,14 +183,17 @@ export default function App() {
     setAuthLoading(true);
     try {
       const response = await api.login({ login, password });
+      const nextSession = response.user;
       globalThis.localStorage?.setItem(TOKEN_KEY, response.accessToken);
-      setSession(response.user);
-      const storedView = readStoredView();
-      setView(storedView || resolveDefaultView(response.user));
+      setView(resolveSessionView(nextSession, readStoredView()));
+      setSession(nextSession);
     } catch (error) {
       const message = error?.message;
+      const isInvalidCredentials = Number(error?.status) === 401 || Number(error?.status) === 403;
       setAuthError(
-        typeof message === "string" && message.trim()
+        isInvalidCredentials
+          ? "Usuario o contraseña incorrectos. Verifica tus datos e intenta nuevamente."
+          : typeof message === "string" && message.trim()
           ? message
           : "No fue posible iniciar sesión. Verifica usuario y contraseña."
       );
@@ -172,7 +217,7 @@ export default function App() {
     return <LoginPage onSubmit={handleLogin} loading={authLoading} error={authError} />;
   }
 
-  if (!canPedidos && !canProduccion && !canDomicilios && !canInventario && !canContabilidad && !canTrazabilidad && !canClientes && !canUsuariosPanel) {
+  if (!canPedidos && !canProduccion && !canDomicilios && !canBarrios && !canInventario && !canContabilidad && !canTrazabilidad && !canClientes && !canUsuariosPanel) {
     return (
       <main className="auth-view">
         <section className="auth-card">
@@ -188,8 +233,10 @@ export default function App() {
     session,
     canViewPipeline: canPipeline,
     canViewPedidos: canPedidos,
+    canViewCatalogo: canCatalogo,
     canViewProduccion: canProduccion,
     canViewDomicilios: canDomicilios,
+    canViewBarrios: canBarrios,
     canViewInventario: canInventario,
     canViewContabilidad: canContabilidad,
     canViewTrazabilidad: canTrazabilidad,
@@ -199,6 +246,7 @@ export default function App() {
     onGoPedidos: () => canPedidos && setView("pedidos"),
     onGoProduccion: () => canProduccion && setView("produccion"),
     onGoDomicilios: () => canDomicilios && setView("domicilios"),
+    onGoBarrios: () => canBarrios && setView("barrios"),
     onGoInventario: () => canInventario && setView("inventario"),
     onGoContabilidad: () => canContabilidad && setView("contabilidad"),
     onGoTrazabilidad: () => canTrazabilidad && setView("trazabilidad"),
@@ -207,19 +255,34 @@ export default function App() {
     onLogout: handleLogout,
   };
 
-  if (view === "pipeline") return <PipelineOperativo {...pageProps} />;
-  if (view === "pedidos") return <OrdersAdminPage {...pageProps} />;
-  if (view === "produccion") return <ProductionPage {...pageProps} />;
-  if (view === "domicilios") return <DeliveryPage {...pageProps} />;
-  if (view === "inventario") return <InventoryPage {...pageProps} />;
-  if (view === "contabilidad") return <AccountingPage {...pageProps} />;
-  if (view === "trazabilidad") return <TraceabilityPage {...pageProps} />;
-  if (view === "clientes") return <ClientsPage {...pageProps} />;
+  const activePage = (() => {
+    if (view === "pipeline") return <PipelineOperativo {...pageProps} />;
+    if (view === "pedidos") return <OrdersAdminPage {...pageProps} />;
+    if (view === "produccion") return <ProductionPage {...pageProps} />;
+    if (view === "domicilios") return <DeliveryPage {...pageProps} />;
+    if (view === "barrios") return <NeighborhoodsPage {...pageProps} />;
+    if (view === "inventario") return <InventoryPage {...pageProps} />;
+    if (view === "contabilidad") return <AccountingPage {...pageProps} />;
+    if (view === "trazabilidad") return <TraceabilityPage {...pageProps} />;
+    if (view === "clientes") return <ClientsPage {...pageProps} />;
+
+    return (
+      <UsersManagementPage
+        {...pageProps}
+        canViewUsuariosGlobal={canUsuariosGlobal}
+      />
+    );
+  })();
 
   return (
-    <UsersManagementPage
-      {...pageProps}
-      canViewUsuariosGlobal={canUsuariosGlobal}
-    />
+    <Suspense fallback={<ModuleLoadingFallback />}>
+      <div className="app-fullscreen-lock" role="alert" aria-live="assertive">
+        <div className="app-fullscreen-lock-panel">
+          <strong>Pantalla completa requerida</strong>
+          <span>Amplia la ventana para operar PetalOps.</span>
+        </div>
+      </div>
+      {activePage}
+    </Suspense>
   );
 }

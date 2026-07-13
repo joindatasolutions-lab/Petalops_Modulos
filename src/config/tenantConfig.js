@@ -1,10 +1,11 @@
 const cloudRunApiBaseUrl = "https://join-flower-708265049038.us-central1.run.app";
 const configuredApiBaseUrl = String(import.meta.env.VITE_API_BASE_URL || "").trim();
 
-// In dev we use Vite's proxy. In production, avoid leaking a local "/api"
-// value from .env.local because static hosting won't proxy it automatically.
+// Dev defaults to the same API used in production because this frontend repo
+// does not include a local backend. Set VITE_API_BASE_URL=/api only when a
+// local server is running behind Vite's proxy.
 const apiBaseUrl = import.meta.env.DEV
-  ? configuredApiBaseUrl || "/api"
+  ? configuredApiBaseUrl || cloudRunApiBaseUrl
   : configuredApiBaseUrl && configuredApiBaseUrl !== "/api"
     ? configuredApiBaseUrl
     : cloudRunApiBaseUrl;

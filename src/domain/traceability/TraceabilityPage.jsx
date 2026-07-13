@@ -17,6 +17,7 @@ export function TraceabilityPage({
   canViewPedidos,
   canViewProduccion,
   canViewDomicilios,
+  canViewBarrios,
   canViewInventario,
   canViewContabilidad,
   canViewTrazabilidad,
@@ -26,6 +27,7 @@ export function TraceabilityPage({
   onGoPedidos,
   onGoProduccion,
   onGoDomicilios,
+  onGoBarrios,
   onGoInventario,
   onGoContabilidad,
   onGoTrazabilidad,
@@ -133,6 +135,7 @@ export function TraceabilityPage({
           pedidos: canViewPedidos,
           produccion: canViewProduccion,
           domicilios: canViewDomicilios,
+          barrios: canViewBarrios,
           inventario: canViewInventario,
           contabilidad: canViewContabilidad,
           trazabilidad: canViewTrazabilidad,
@@ -144,6 +147,7 @@ export function TraceabilityPage({
           pedidos: onGoPedidos,
           produccion: onGoProduccion,
           domicilios: onGoDomicilios,
+          barrios: onGoBarrios,
           inventario: onGoInventario,
           contabilidad: onGoContabilidad,
           trazabilidad: onGoTrazabilidad,
@@ -355,7 +359,7 @@ function normalizeTraceabilityPayload(payload) {
   };
 }
 
-function filterByUserText(items, q) {
+export function filterByUserText(items, q) {
   const query = String(q || "").trim().toLowerCase();
   if (!query) return items;
   return items.filter(item => {

@@ -163,14 +163,22 @@ function isExpired(fechaVencimiento) {
   return new Date(fechaVencimiento).getTime() < Date.now();
 }
 
+export function filterInventoryItems(items, { stockFiltro = "", subcategoriaFiltro = "" } = {}) {
+  return (Array.isArray(items) ? items : []).filter(item => {
+    if (stockFiltro && stockLevel(item).key !== stockFiltro) return false;
+    if (subcategoriaFiltro && String(item.subcategoria || "").toLowerCase() !== subcategoriaFiltro.toLowerCase()) return false;
+    return true;
+  });
+}
+
 // ─── Componente principal ─────────────────────────────────────────────────────
 
 export function InventoryPage({
   session,
-  canViewPipeline, canViewPedidos, canViewProduccion, canViewDomicilios,
+  canViewPipeline, canViewPedidos, canViewProduccion, canViewDomicilios, canViewBarrios,
   canViewInventario, canViewContabilidad, canViewTrazabilidad,
   canViewClientesPanel, canViewUsuariosPanel,
-  onGoPipeline, onGoPedidos, onGoProduccion, onGoDomicilios, onGoInventario,
+  onGoPipeline, onGoPedidos, onGoProduccion, onGoDomicilios, onGoBarrios, onGoInventario,
   onGoContabilidad, onGoTrazabilidad, onGoClientes, onGoUsuarios, onLogout,
 }) {
   const api = useMemo(() => createApiClient(tenantConfig), []);
@@ -273,11 +281,7 @@ export function InventoryPage({
 
   // ── Items filtrados en vista ──
   const visibleItems = useMemo(() => {
-    return items.filter(item => {
-      if (stockFiltro && stockLevel(item).key !== stockFiltro) return false;
-      if (subcategoriaFiltro && String(item.subcategoria || "").toLowerCase() !== subcategoriaFiltro.toLowerCase()) return false;
-      return true;
-    });
+    return filterInventoryItems(items, { stockFiltro, subcategoriaFiltro });
   }, [items, stockFiltro, subcategoriaFiltro]);
 
   // ── Panel de categorías: muestra subcategorías del módulo activo ──
@@ -538,8 +542,8 @@ export function InventoryPage({
         toggleSidebar={toggleSidebar}
         closeSidebarMobile={() => setSidebarMobileOpen(false)}
         onLogout={onLogout}
-        permissions={{ pipeline: canViewPipeline, pedidos: canViewPedidos, produccion: canViewProduccion, domicilios: canViewDomicilios, inventario: canViewInventario, contabilidad: canViewContabilidad, trazabilidad: canViewTrazabilidad, clientes: canViewClientesPanel, usuarios: canViewUsuariosPanel }}
-        navigation={{ pipeline: onGoPipeline, pedidos: onGoPedidos, produccion: onGoProduccion, domicilios: onGoDomicilios, inventario: onGoInventario, contabilidad: onGoContabilidad, trazabilidad: onGoTrazabilidad, clientes: onGoClientes, usuarios: onGoUsuarios }}
+        permissions={{ pipeline: canViewPipeline, pedidos: canViewPedidos, produccion: canViewProduccion, domicilios: canViewDomicilios, barrios: canViewBarrios, inventario: canViewInventario, contabilidad: canViewContabilidad, trazabilidad: canViewTrazabilidad, clientes: canViewClientesPanel, usuarios: canViewUsuariosPanel }}
+        navigation={{ pipeline: onGoPipeline, pedidos: onGoPedidos, produccion: onGoProduccion, domicilios: onGoDomicilios, barrios: onGoBarrios, inventario: onGoInventario, contabilidad: onGoContabilidad, trazabilidad: onGoTrazabilidad, clientes: onGoClientes, usuarios: onGoUsuarios }}
       />
 
       <main className="orders-admin-view orders-page-view inventory-page-view">

@@ -2,6 +2,8 @@ import {
   ClipboardList,
   Flower2,
   LogOut,
+  MapPin,
+  Menu,
   Package2,
   PanelLeftClose,
   PanelLeftOpen,
@@ -27,6 +29,7 @@ const SIDEBAR_SECTIONS = [
     items: [
       { key: "produccion", label: "Producción", Icon: Flower2, canViewKey: "produccion", goKey: "produccion" },
       { key: "domicilios", label: "Domicilios", Icon: Truck, canViewKey: "domicilios", goKey: "domicilios" },
+      { key: "barrios", label: "Barrios", Icon: MapPin, canViewKey: "barrios", goKey: "barrios" },
       { key: "inventario", label: "Inventario", Icon: Package2, canViewKey: "inventario", goKey: "inventario" },
     ],
   },
@@ -52,6 +55,7 @@ export function AppSidebar({
   permissions,
   navigation,
   badges = {},
+  sessionLabel = "",
 }) {
   const renderNavItem = item => {
     if (!permissions?.[item.canViewKey]) return null;
@@ -89,6 +93,12 @@ export function AppSidebar({
             <strong>PetalOps</strong>
             <span>GESTION OPERATIVA</span>
           </div>
+          {sessionLabel ? (
+            <span className="sidebar-session-pill">
+              <span className="sidebar-session-dot" aria-hidden="true" />
+              <span className="sidebar-session-text">{sessionLabel}</span>
+            </span>
+          ) : null}
         </div>
 
         <nav className="sidebar-nav" aria-label="Módulos">
@@ -130,7 +140,7 @@ export function AppSidebar({
         aria-label={sidebarMobileOpen ? "Cerrar menú" : "Abrir menú"}
         onClick={toggleSidebar}
       >
-        {sidebarMobileOpen ? <PanelLeftClose size={21} strokeWidth={2} /> : <PanelLeftOpen size={21} strokeWidth={2} />}
+        {sidebarMobileOpen ? <PanelLeftClose size={21} strokeWidth={2} /> : <Menu size={21} strokeWidth={2} />}
       </button>
 
       <button

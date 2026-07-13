@@ -1,10 +1,11 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 
-const port = Number(process.env.PORT || 5500);
+const port = Number(process.env.PORT || 5173);
 const host = process.env.HOST || "0.0.0.0";
 
 export default defineConfig({
+  base: "./",
   plugins: [react()],
   server: {
     host,

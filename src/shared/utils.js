@@ -1,6 +1,9 @@
 export function formatearCOP(value) {
   const number = Number(value || 0);
-  return new Intl.NumberFormat("es-CO").format(number);
+  return new Intl.NumberFormat("es-CO", {
+    maximumFractionDigits: 0,
+    minimumFractionDigits: 0,
+  }).format(number);
 }
 
 export function normalizeStatus(status) {
@@ -24,6 +27,26 @@ export function splitDateTimeParts(value) {
   return { date: text, time: "" };
 }
 
+export const COLOMBIA_TIME_ZONE = "America/Bogota";
+
+export function todayIsoDateBogota() {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: COLOMBIA_TIME_ZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
+}
+
+export function shiftIsoDate(dateValue, days) {
+  const raw = String(dateValue || "").trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw;
+  const [year, month, day] = raw.split("-").map(Number);
+  const parsed = new Date(Date.UTC(year, month - 1, day + Number(days || 0), 12, 0, 0));
+  if (Number.isNaN(parsed.getTime())) return raw;
+  return parsed.toISOString().slice(0, 10);
+}
+
 export function formatDateOnly(value) {
   return splitDateTimeParts(value).date || "";
 }
@@ -40,11 +63,11 @@ export function formatDateTimeCompact(value) {
 export function toIsoDateStart(dateValue) {
   const value = String(dateValue || "").trim();
   if (!value) return "";
-  return `${value}T00:00:00`;
+  return `${value}T00:00:00-05:00`;
 }
 
 export function toIsoDateEnd(dateValue) {
   const value = String(dateValue || "").trim();
   if (!value) return "";
-  return `${value}T23:59:59`;
+  return `${value}T23:59:59-05:00`;
 }

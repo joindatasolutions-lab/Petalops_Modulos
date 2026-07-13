@@ -11,6 +11,7 @@ const MODULE_HELP = {
   pedidos: "Permite gestionar pedidos, aprobaciones y consulta operativa.",
   produccion: "Permite planificar y ejecutar la produccion de arreglos.",
   domicilios: "Permite asignar, enrutar y cerrar entregas con evidencia.",
+  barrios: "Permite administrar barrios, zonas y costos de domicilio.",
   contabilidad: "Permite revisar resumen de ventas y cierre operativo de caja.",
   trazabilidad: "Permite revisar aprobaciones y acciones operativas por usuario.",
   catalogo: "Permite consultar productos y referencias comerciales.",
@@ -35,6 +36,16 @@ function roleTypeLabel(roleName) {
   return found?.label || "Otro";
 }
 
+export function filterVisibleRoles(roles, canViewUsuariosGlobal = false) {
+  const rows = Array.isArray(roles) ? roles : [];
+  const structuralRoles = new Set(["super_admin", "superadmin", "join_admin", "empresa_admin", "admin", "owner"]);
+  if (canViewUsuariosGlobal) return rows;
+  return rows.filter(item => {
+    const normalized = String(item?.nombreRol || "").trim().toLowerCase().replace(/\s+/g, "_");
+    return !structuralRoles.has(normalized);
+  });
+}
+
 export function UsersManagementPage({
   session,
   canViewUsuariosGlobal,
@@ -42,6 +53,7 @@ export function UsersManagementPage({
   canViewPedidos,
   canViewProduccion,
   canViewDomicilios,
+  canViewBarrios,
   canViewInventario,
   canViewContabilidad,
   canViewTrazabilidad,
@@ -50,6 +62,7 @@ export function UsersManagementPage({
   onGoPedidos,
   onGoProduccion,
   onGoDomicilios,
+  onGoBarrios,
   onGoInventario,
   onGoContabilidad,
   onGoTrazabilidad,
@@ -109,12 +122,7 @@ export function UsersManagementPage({
   }, [empresas, empresaID]);
 
   const visibleRoles = useMemo(() => {
-    const structuralRoles = new Set(["super_admin", "superadmin", "join_admin", "empresa_admin", "admin", "owner"]);
-    if (canViewUsuariosGlobal) return roles;
-    return roles.filter(item => {
-      const normalized = String(item?.nombreRol || "").trim().toLowerCase().replace(/\s+/g, "_");
-      return !structuralRoles.has(normalized);
-    });
+    return filterVisibleRoles(roles, canViewUsuariosGlobal);
   }, [roles, canViewUsuariosGlobal]);
 
   const [form, setForm] = useState({
@@ -682,6 +690,7 @@ export function UsersManagementPage({
           pedidos: canViewPedidos,
           produccion: canViewProduccion,
           domicilios: canViewDomicilios,
+          barrios: canViewBarrios,
           inventario: canViewInventario,
           contabilidad: canViewContabilidad,
           trazabilidad: canViewTrazabilidad,
@@ -693,6 +702,7 @@ export function UsersManagementPage({
           pedidos: onGoPedidos,
           produccion: onGoProduccion,
           domicilios: onGoDomicilios,
+          barrios: onGoBarrios,
           inventario: onGoInventario,
           contabilidad: onGoContabilidad,
           trazabilidad: onGoTrazabilidad,

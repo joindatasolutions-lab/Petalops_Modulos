@@ -1,3 +1,18 @@
+const PEDIDOS_MAX_PAGE_SIZE = 300;
+const LOGIN_TIMEOUT_MS = 30000;
+
+function normalizePedidosDateParam(value) {
+  const text = String(value || "").trim();
+  if (!text) return "";
+  return text;
+}
+
+function normalizePedidosPageSize(value) {
+  const parsed = Number(value || 20);
+  if (!Number.isFinite(parsed) || parsed <= 0) return 20;
+  return Math.min(Math.floor(parsed), PEDIDOS_MAX_PAGE_SIZE);
+}
+
 export function createApiClient(config) {
   const baseUrl = config.apiBaseUrl;
 
@@ -44,13 +59,27 @@ export function createApiClient(config) {
 
   return {
     async login({ login, password }) {
-      const response = await fetch(`${baseUrl}/auth/login`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ login, password }),
-      });    
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), LOGIN_TIMEOUT_MS);
+      let response;
+
+      try {
+        response = await fetch(`${baseUrl}/auth/login`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ login, password }),
+          signal: controller.signal,
+        });
+      } catch (error) {
+        if (error?.name === "AbortError") {
+          throw new Error("No fue posible iniciar sesión. Verifica usuario y contraseña.");
+        }
+        throw error;
+      } finally {
+        clearTimeout(timeoutId);
+      }
 
       if (!response.ok) throw await toHttpError(response);     
 
@@ -410,12 +439,14 @@ export function createApiClient(config) {
       if (sucursalId != null) params.set("sucursalID", String(sucursalId));
       if (q) params.set("q", String(q));
       if (estado) params.set("estado", String(estado));
-      if (fechaDesde) params.set("fechaDesde", String(fechaDesde));
-      if (fechaHasta) params.set("fechaHasta", String(fechaHasta));
+      const normalizedFechaDesde = normalizePedidosDateParam(fechaDesde);
+      const normalizedFechaHasta = normalizePedidosDateParam(fechaHasta);
+      if (normalizedFechaDesde) params.set("fechaDesde", normalizedFechaDesde);
+      if (normalizedFechaHasta) params.set("fechaHasta", normalizedFechaHasta);
       params.set("sinImprimir", sinImprimir ? "true" : "false");
       if (soloTienda) params.set("soloTienda", "true");
       params.set("page", String(page || 1));
-      params.set("pageSize", String(pageSize || 20));
+      params.set("pageSize", String(normalizePedidosPageSize(pageSize)));
 
       return requestJson(`/pedidos?${params.toString()}`);
     },
@@ -424,6 +455,8 @@ export function createApiClient(config) {
       empresaId,
       sucursalId,
       fecha,
+      fechaDesde,
+      fechaHasta,
       domiciliarioId,
       floristaId,
       numeroPedido,
@@ -435,6 +468,8 @@ export function createApiClient(config) {
       params.set("empresaID", String(empresaId));
       if (sucursalId != null) params.set("sucursalID", String(sucursalId));
       if (fecha) params.set("fecha", String(fecha));
+      if (fechaDesde) params.set("fechaDesde", String(fechaDesde));
+      if (fechaHasta) params.set("fechaHasta", String(fechaHasta));
       if (domiciliarioId != null && String(domiciliarioId).trim()) params.set("domiciliarioID", String(domiciliarioId).trim());
       if (floristaId != null && String(floristaId).trim()) params.set("floristaID", String(floristaId).trim());
       if (numeroPedido) params.set("numeroPedido", String(numeroPedido));
@@ -647,10 +682,22 @@ export function createApiClient(config) {
     async descargarFacturaPedido(pedidoId) {
       const response = await authFetch(`/pedido/${pedidoId}/factura`);
       if (!response.ok) throw await toHttpError(response);
+      const contentType = String(response.headers.get("Content-Type") || "").toLowerCase();
+      if (contentType.includes("application/json")) {
+        throw await toHttpError(response);
+      }
       const disposition = response.headers.get("Content-Disposition") || "";
-      const match = disposition.match(/filename=([^;]+)/i);
-      const filename = match ? match[1].replace(/"/g, "").trim() : `factura_pedido_${pedidoId}.pdf`;
+      const encodedMatch = disposition.match(/filename\*=UTF-8''([^;]+)/i);
+      const plainMatch = disposition.match(/filename=([^;]+)/i);
+      const filename = encodedMatch
+        ? decodeURIComponent(encodedMatch[1].replace(/"/g, "").trim())
+        : plainMatch
+          ? plainMatch[1].replace(/"/g, "").trim()
+          : `factura_pedido_${pedidoId}.pdf`;
       const blob = await response.blob();
+      if (!blob || blob.size === 0) {
+        throw new Error("La factura no tiene contenido para descargar.");
+      }
       return { blob, filename };
     },
 
@@ -814,6 +861,45 @@ export function createApiClient(config) {
       return requestJson(`/contabilidad/resumen?${params.toString()}`);
     },
 
+    async listarCierresCaja({ empresaId, sucursalId, fechaDesde, fechaHasta }) {
+      const params = new URLSearchParams();
+      params.set("empresaID", String(empresaId));
+      if (sucursalId != null) params.set("sucursalID", String(sucursalId));
+      if (fechaDesde) params.set("fechaDesde", String(fechaDesde));
+      if (fechaHasta) params.set("fechaHasta", String(fechaHasta));
+      return requestJson(`/contabilidad/caja?${params.toString()}`);
+    },
+
+    async obtenerCierreCajaDia({ empresaId, sucursalId, fecha }) {
+      const params = new URLSearchParams();
+      params.set("empresaID", String(empresaId));
+      if (sucursalId != null) params.set("sucursalID", String(sucursalId));
+      params.set("fecha", String(fecha));
+      return requestJson(`/contabilidad/caja/efectivo?${params.toString()}`);
+    },
+
+    async guardarCierreCaja({ empresaId, sucursalId, fecha, base, efectivo, gasto, totalEfectivo, guardado, nuevaBase, observacion, usuarioId }) {
+      return requestJson("/contabilidad/caja/cierre", {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          empresaID: empresaId,
+          sucursalID: sucursalId,
+          fecha,
+          base,
+          efectivo,
+          gasto,
+          totalEfectivo,
+          guardado,
+          nuevaBase,
+          observacion: observacion || "",
+          usuarioID: usuarioId ?? null,
+        })
+      });
+    },
+
     async obtenerTrazabilidadProduccionUsuarios({ empresaId, sucursalId, fechaDesde, fechaHasta }) {
       const params = new URLSearchParams();
       params.set("empresaID", String(empresaId));
@@ -831,12 +917,38 @@ export function createApiClient(config) {
       return requestJson(`/domicilios/domiciliarios?${params.toString()}`);
     },
 
-    async listarDomiciliosAdmin({ empresaId, sucursalId, filtro = "hoy", fecha }) {
+    async crearDomiciliario({ empresaId, sucursalId, nombre, telefono, tipo, vehiculoTipo, vehiculoPlaca, vehiculoDetalle, activo = true }) {
+      return requestJson("/domicilios/domiciliarios", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          empresaID: empresaId,
+          sucursalID: sucursalId,
+          nombre,
+          telefono,
+          tipo,
+          tipoDomiciliario: tipo,
+          vehiculoTipo,
+          tipoVehiculo: vehiculoTipo,
+          vehiculoPlaca,
+          placa: vehiculoPlaca,
+          vehiculoDetalle,
+          modeloVehiculo: vehiculoDetalle,
+          activo: Boolean(activo)
+        })
+      });
+    },
+
+    async listarDomiciliosAdmin({ empresaId, sucursalId, filtro = "hoy", fecha, q, incluirCancelado = false }) {
       const params = new URLSearchParams();
       params.set("empresaID", String(empresaId));
       if (sucursalId != null) params.set("sucursalID", String(sucursalId));
       params.set("filtro", String(filtro));
       if (fecha) params.set("fecha", String(fecha));
+      if (q) params.set("q", String(q));
+      params.set("incluirCancelado", incluirCancelado ? "true" : "false");
       return requestJson(`/domicilios?${params.toString()}`);
     },
 
@@ -857,35 +969,76 @@ export function createApiClient(config) {
       return requestJson(`/domicilios/mis-pedidos?${params.toString()}`);
     },
 
-    async listarPedidosDisponibles({ empresaId, sucursalId, fecha, latitud, longitud }) {
+    async listarPedidosDisponibles({ empresaId, sucursalId, fecha, latitud, longitud, pageSize = 100, limit = 100 }) {
       const params = new URLSearchParams();
       params.set("empresaID", String(empresaId));
       if (sucursalId != null) params.set("sucursalID", String(sucursalId));
       if (fecha) params.set("fecha", String(fecha));
       if (latitud != null) params.set("latitud", String(latitud));
       if (longitud != null) params.set("longitud", String(longitud));
+      params.set("page", "1");
+      params.set("pageSize", String(pageSize));
+      params.set("limit", String(limit));
+      params.set("limite", String(limit));
+      params.set("soloSinAsignar", "true");
       return requestJson(`/domicilios/pedidos-disponibles?${params.toString()}`);
     },
 
-    async tomarEntrega({ entregaId, usuarioCambio }) {
-      return requestJson(`/domicilios/${entregaId}/tomar`, {
+    async tomarEntrega({ entregaId, usuarioCambio, limiteEntregasActivas = 15 }) {
+      const params = new URLSearchParams();
+      params.set("limiteEntregasActivas", String(limiteEntregasActivas));
+      params.set("maxEntregasActivas", String(limiteEntregasActivas));
+      params.set("limite_activas", String(limiteEntregasActivas));
+      params.set("limite", String(limiteEntregasActivas));
+      params.set("permitirMultiplesAsignaciones", "true");
+      params.set("permitirSobrecupo", "true");
+
+      return requestJson(`/domicilios/${entregaId}/tomar?${params.toString()}`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json"
         },
-        body: JSON.stringify({ usuarioCambio })
+        body: JSON.stringify({
+          usuarioCambio,
+          limiteEntregasActivas,
+          maxEntregasActivas: limiteEntregasActivas,
+          limite_activas: limiteEntregasActivas,
+          limite: limiteEntregasActivas,
+          max_activos: limiteEntregasActivas,
+          capacidadMaxima: limiteEntregasActivas,
+          permitirMultiplesAsignaciones: true,
+          permitirSobrecupo: true,
+          forzarSobrecupo: true
+        })
       });
     },
 
-    async asignarDomiciliarioEntrega({ entregaId, domiciliarioID, usuarioCambio }) {
-      return requestJson(`/domicilios/${entregaId}/asignar`, {
+    async asignarDomiciliarioEntrega({ entregaId, domiciliarioID, usuarioCambio, limiteEntregasActivas = 15 }) {
+      const params = new URLSearchParams();
+      params.set("limiteEntregasActivas", String(limiteEntregasActivas));
+      params.set("maxEntregasActivas", String(limiteEntregasActivas));
+      params.set("limite_activas", String(limiteEntregasActivas));
+      params.set("limite", String(limiteEntregasActivas));
+      params.set("permitirMultiplesAsignaciones", "true");
+      params.set("permitirSobrecupo", "true");
+
+      return requestJson(`/domicilios/${entregaId}/asignar?${params.toString()}`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json"
         },
         body: JSON.stringify({
           domiciliarioID,
-          usuarioCambio
+          usuarioCambio,
+          limiteEntregasActivas,
+          maxEntregasActivas: limiteEntregasActivas,
+          limite_activas: limiteEntregasActivas,
+          limite: limiteEntregasActivas,
+          max_activos: limiteEntregasActivas,
+          capacidadMaxima: limiteEntregasActivas,
+          permitirMultiplesAsignaciones: true,
+          permitirSobrecupo: true,
+          forzarSobrecupo: true
         })
       });
     },
