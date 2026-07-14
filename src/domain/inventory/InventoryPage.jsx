@@ -10,6 +10,8 @@ import {
   ArrowDownToLine,
   ArrowUpFromLine,
   Boxes,
+  Calculator,
+  CheckCircle2,
   ChevronDown,
   CircleX,
   ClipboardList,
@@ -17,6 +19,7 @@ import {
   EllipsisVertical,
   Eye,
   Flower2,
+  Gauge,
   Gift,
   Layers,
   ListChecks,
@@ -26,6 +29,7 @@ import {
   RotateCcw,
   Search,
   SlidersHorizontal,
+  TrendingUp,
   TriangleAlert,
   Truck,
   UtensilsCrossed,
@@ -199,6 +203,7 @@ export function InventoryPage({
 
   // ── Datos ──
   const [items, setItems] = useState([]);
+  const [allItems, setAllItems] = useState([]);
   const [proveedores, setProveedores] = useState([]);
   const [movimientos, setMovimientos] = useState([]);
   const [recetas, setRecetas] = useState([]);
@@ -237,6 +242,7 @@ export function InventoryPage({
   const [stockForm, setStockForm] = useState({ inventarioID: "", tipoMovimiento: "Entrada", cantidad: "1", stockObjetivo: "", motivo: "" });
   const [recetaForm, setRecetaForm] = useState({ nombre: "", descripcion: "" });
   const [ingredienteForm, setIngredienteForm] = useState({ inventarioID: "", cantidad: "1" });
+  const [simuladorCantidad, setSimuladorCantidad] = useState("1");
 
   const [creating, setCreating] = useState(false);
   const [savingStock, setSavingStock] = useState(false);
@@ -311,6 +317,22 @@ export function InventoryPage({
     [items]
   );
 
+  // ── Más vendidos: suma de "Salida" por item, dentro del módulo activo ──
+  const topSellers = useMemo(() => {
+    const salidasPorInventarioId = new Map();
+    movimientos.forEach(mov => {
+      if (normalizeStatus(mov?.tipoMovimiento) !== "SALIDA") return;
+      const id = mov?.inventarioID;
+      if (id == null) return;
+      salidasPorInventarioId.set(id, (salidasPorInventarioId.get(id) || 0) + Number(mov?.cantidad || 0));
+    });
+    return items
+      .map(item => ({ item, vendidos: salidasPorInventarioId.get(item.inventarioID) || 0 }))
+      .filter(entry => entry.vendidos > 0)
+      .sort((a, b) => b.vendidos - a.vendidos)
+      .slice(0, 5);
+  }, [items, movimientos]);
+
   const lastMovementByItem = useMemo(() => {
     const map = new Map();
     movimientos.forEach(movement => {
@@ -336,6 +358,49 @@ export function InventoryPage({
     if (!tipoMovimientoFiltro) return movimientos;
     return movimientos.filter(m => m.tipoMovimiento === tipoMovimientoFiltro);
   }, [movimientos, tipoMovimientoFiltro]);
+
+  // ── Arreglos: costo de producción, capacidad de fabricación y componente
+  // limitante, calculados en el navegador cruzando la receta con el stock
+  // actual (allItems). No depende de precio de venta (no existe esa columna
+  // todavía en el backend) ni de datos de Pedidos/ventas. ──
+  const recetaResumen = useMemo(() => {
+    const detalles = recetaDetalle?.detalles;
+    if (!Array.isArray(detalles) || detalles.length === 0) return null;
+    let costoTotal = 0;
+    let capacidad = Infinity;
+    let limitante = null;
+    const ingredientes = detalles.map(det => {
+      const item = allItems.find(i => i.inventarioID === det.inventarioID);
+      const stock = Number(item?.stockActual || 0);
+      const cantidadReq = Number(det.cantidad || 0);
+      const costoUnitario = Number(item?.valorUnitario || 0);
+      costoTotal += costoUnitario * cantidadReq;
+      const posibles = cantidadReq > 0 ? Math.floor(stock / cantidadReq) : Infinity;
+      if (posibles < capacidad) {
+        capacidad = posibles;
+        limitante = det;
+      }
+      return { det, stock, cantidadReq, posibles };
+    });
+    return {
+      costoTotal,
+      capacidad: Number.isFinite(capacidad) ? capacidad : 0,
+      limitante,
+      ingredientes,
+    };
+  }, [recetaDetalle, allItems]);
+
+  const simulacionPedido = useMemo(() => {
+    if (!recetaResumen) return null;
+    const cantidad = Number(simuladorCantidad || 0);
+    if (!cantidad || cantidad <= 0) return null;
+    const detalle = recetaResumen.ingredientes.map(({ det, stock }) => {
+      const necesario = Number(det.cantidad || 0) * cantidad;
+      const faltante = Math.max(0, necesario - stock);
+      return { nombre: det.nombre, codigo: det.codigo, necesario, disponible: stock, faltante, ok: faltante === 0 };
+    });
+    return { cantidad, permitido: detalle.every(d => d.ok), detalle };
+  }, [recetaResumen, simuladorCantidad]);
 
   // ── Loaders ──
   const loadProveedores = useCallback(async () => {
@@ -367,6 +432,15 @@ export function InventoryPage({
     }
   }, [api, empresaId, moduloActivo, estadoFiltro, proveedorFiltro, q]);
 
+  // Lista completa (todas las categorías) para el selector del registro
+  // rápido de movimientos desde la pestaña Movimientos.
+  const loadAllItems = useCallback(async () => {
+    try {
+      const data = await api.listarInventario({ empresaId });
+      setAllItems(Array.isArray(data.items) ? data.items : []);
+    } catch { setAllItems([]); }
+  }, [api, empresaId]);
+
   const loadMovimientos = useCallback(async () => {
     try {
       const data = await api.listarMovimientosInventario({ empresaId });
@@ -385,6 +459,7 @@ export function InventoryPage({
     try {
       const data = await api.obtenerReceta({ recetaId });
       setRecetaDetalle(data);
+      setSimuladorCantidad("1");
     } catch { setRecetaDetalle(null); }
   }, [api]);
 
@@ -392,15 +467,16 @@ export function InventoryPage({
   useEffect(() => { loadMovimientos().catch(() => {}); }, [loadMovimientos]);
 
   useEffect(() => {
-    if (moduloActivo === "arreglos") { loadRecetas().catch(() => {}); }
-    else if (moduloActivo === "movimientos") { /* ya cargados */ }
+    if (moduloActivo === "arreglos") { loadRecetas().catch(() => {}); loadAllItems().catch(() => {}); }
+    else if (moduloActivo === "movimientos") { loadAllItems().catch(() => {}); }
     else { loadInventario().catch(() => {}); }
-  }, [moduloActivo, loadInventario, loadRecetas]);
+  }, [moduloActivo, loadInventario, loadRecetas, loadAllItems]);
 
   const refreshAll = () => {
     loadInventario().catch(() => {});
     loadMovimientos().catch(() => {});
-    if (moduloActivo === "arreglos") loadRecetas().catch(() => {});
+    if (moduloActivo === "arreglos") { loadRecetas().catch(() => {}); loadAllItems().catch(() => {}); }
+    if (moduloActivo === "movimientos") loadAllItems().catch(() => {});
   };
 
   // ── Submit crear item ──
@@ -459,9 +535,13 @@ export function InventoryPage({
         },
       });
       setStockForm({ inventarioID: "", tipoMovimiento: "Entrada", cantidad: "1", stockObjetivo: "", motivo: "" });
-      await loadInventario();
+      if (moduloActivo === "movimientos") {
+        await loadAllItems();
+      } else {
+        await loadInventario();
+      }
       await loadMovimientos();
-      setInfo("Stock actualizado.");
+      setInfo("Movimiento registrado.");
       setVistaActiva("lista");
     } catch (nextError) {
       setError(nextError?.message || "No fue posible ajustar stock.");
@@ -503,8 +583,6 @@ export function InventoryPage({
     if (!ingredienteForm.inventarioID) { setError("Selecciona un insumo."); return; }
     setSavingIngrediente(true);
     try {
-      // Load all items for this empresa to pick from
-      const allItems = [...items];
       await api.agregarIngredienteReceta({ recetaId, inventarioID: Number(ingredienteForm.inventarioID), cantidad: Number(ingredienteForm.cantidad || 1) });
       setIngredienteForm({ inventarioID: "", cantidad: "1" });
       await loadRecetaDetalle(recetaId);
@@ -523,6 +601,16 @@ export function InventoryPage({
       setInfo("Ingrediente eliminado.");
     } catch (nextError) {
       setError(nextError?.message || "No fue posible eliminar ingrediente.");
+    }
+  };
+
+  const toggleRecetaActivo = async rec => {
+    try {
+      await api.actualizarReceta({ recetaId: rec.idReceta, nombre: rec.nombre, descripcion: rec.descripcion || "", activo: !rec.activo });
+      await loadRecetas();
+      setInfo(`${rec.nombre} ${rec.activo ? "desactivado" : "activado"}.`);
+    } catch (nextError) {
+      setError(nextError?.message || "No fue posible actualizar el estado del arreglo.");
     }
   };
 
@@ -548,163 +636,83 @@ export function InventoryPage({
 
       <main className="orders-admin-view orders-page-view inventory-page-view">
 
-        {/* ── HEADER ── */}
+        {/* ── HEADER (mismo sistema visual que Producción) ── */}
         <header className="orders-admin-header orders-page-header inventory-page-header">
-          <div>
-            <button type="button" className="sidebar-trigger" onClick={toggleSidebar}>☰ Menú</button>
-            <h1>Inventario</h1>
-            <p className="orders-admin-subtitle">Usuario: {displayUserName}</p>
+          <div className="orders-page-heading">
+            <div className="orders-page-title-row">
+              <button type="button" className="sidebar-trigger" onClick={toggleSidebar}>☰ Menú</button>
+              <h1>Inventario</h1>
+            </div>
+            <p className="orders-admin-subtitle orders-page-description">
+              Controla flores, bases, materiales, adicionales y arreglos por sucursal.
+            </p>
+            <span className="orders-user-pill">
+              <span aria-hidden="true" />
+              Usuario: {displayUserName}
+            </span>
           </div>
-          <div className="header-actions">
-            {moduloActivo !== "movimientos" && vistaActiva === "lista" ? (
-              <button type="button" className="btn-outline inventory-header-action" onClick={() => setVistaActiva("crear")}>
-                <PackagePlus size={18} strokeWidth={2} aria-hidden="true" />
-                <span>Nuevo {moduloLabel === "Arreglos" ? "Arreglo" : moduloLabel === "Flores" ? "Flor" : moduloLabel === "Bases" ? "Base" : moduloLabel === "Materiales" ? "Material" : moduloLabel === "Adicionales" ? "Adicional" : ""}</span>
+          <div className="orders-header-side">
+            <div className="header-actions">
+              <label className="inventory-header-search" aria-label="Buscar en inventario">
+                <Search size={17} strokeWidth={2} aria-hidden="true" />
+                <input
+                  type="search"
+                  value={q}
+                  onChange={e => setQ(e.target.value)}
+                  placeholder={`Buscar en ${moduloLabel.toLowerCase()}...`}
+                />
+              </label>
+              {moduloActivo !== "movimientos" && vistaActiva === "lista" ? (
+                <button type="button" className="btn-outline inventory-header-action" onClick={() => setVistaActiva("crear")}>
+                  <PackagePlus size={18} strokeWidth={2} aria-hidden="true" />
+                  <span>Nuevo {moduloLabel === "Arreglos" ? "Arreglo" : moduloLabel === "Flores" ? "Flor" : moduloLabel === "Bases" ? "Base" : moduloLabel === "Materiales" ? "Material" : moduloLabel === "Adicionales" ? "Adicional" : ""}</span>
+                </button>
+              ) : null}
+              {vistaActiva !== "lista" ? (
+                <button type="button" className="btn-outline inventory-header-action" onClick={() => { setVistaActiva("lista"); setError(""); }}>
+                  <X size={18} strokeWidth={2} aria-hidden="true" />
+                  <span>Cancelar</span>
+                </button>
+              ) : null}
+              <button type="button" className="btn-primary inventory-refresh-btn" onClick={refreshAll}>
+                <RefreshCw size={18} strokeWidth={2} aria-hidden="true" />
+                <span>Actualizar</span>
               </button>
-            ) : null}
-            {vistaActiva !== "lista" ? (
-              <button type="button" className="btn-outline inventory-header-action" onClick={() => { setVistaActiva("lista"); setError(""); }}>
-                <X size={18} strokeWidth={2} aria-hidden="true" />
-                <span>Cancelar</span>
-              </button>
-            ) : null}
-            <button type="button" className="btn-primary inventory-refresh-btn" onClick={refreshAll}>
-              <RefreshCw size={18} strokeWidth={2} aria-hidden="true" />
-              <span>Actualizar</span>
-            </button>
+            </div>
+          </div>
+          <div className="orders-header-metrics inventory-header-metrics" aria-label="Indicadores de inventario">
+            <article className="orders-header-metric-card is-primary">
+              <span className="orders-header-metric-icon" aria-hidden="true"><DollarSign size={18} strokeWidth={2} /></span>
+              <strong>${formatearCOP(inventoryMetrics.valorInventario)}</strong>
+              <span>Valor inventario</span>
+            </article>
+            <article className="orders-header-metric-card is-teal">
+              <span className="orders-header-metric-icon" aria-hidden="true"><Boxes size={18} strokeWidth={2} /></span>
+              <strong>{inventoryMetrics.stockTotal}</strong>
+              <span>Stock total</span>
+            </article>
+            <article className="orders-header-metric-card is-green">
+              <span className="orders-header-metric-icon" aria-hidden="true"><ArrowDownToLine size={18} strokeWidth={2} /></span>
+              <strong>{inventoryMetrics.entradasHoy}</strong>
+              <span>Entradas hoy</span>
+            </article>
+            <article className="orders-header-metric-card is-purple">
+              <span className="orders-header-metric-icon" aria-hidden="true"><ArrowUpFromLine size={18} strokeWidth={2} /></span>
+              <strong>{inventoryMetrics.salidasHoy}</strong>
+              <span>Salidas hoy</span>
+            </article>
+            <article className="orders-header-metric-card is-blue">
+              <span className="orders-header-metric-icon" aria-hidden="true"><TriangleAlert size={18} strokeWidth={2} /></span>
+              <strong>{inventoryMetrics.bajoStock}</strong>
+              <span>Bajo stock</span>
+            </article>
+            <article className="orders-header-metric-card is-orange">
+              <span className="orders-header-metric-icon" aria-hidden="true"><CircleX size={18} strokeWidth={2} /></span>
+              <strong>{inventoryMetrics.agotados}</strong>
+              <span>Agotados</span>
+            </article>
           </div>
         </header>
-
-        {/* ── KPIs ── */}
-        <section className="orders-metrics-grid inventory-metrics-grid" aria-label="Indicadores">
-          <article className="orders-metric-card inventory-metric-card">
-            <span className="orders-metric-icon"><DollarSign size={18} strokeWidth={2} /></span>
-            <span className="orders-metric-copy">
-              <span className="orders-metric-label">Valor inventario</span>
-              <strong className="orders-metric-value">${formatearCOP(inventoryMetrics.valorInventario)}</strong>
-            </span>
-          </article>
-          <article className="orders-metric-card inventory-metric-card">
-            <span className="orders-metric-icon"><Boxes size={18} strokeWidth={2} /></span>
-            <span className="orders-metric-copy">
-              <span className="orders-metric-label">Stock total</span>
-              <strong className="orders-metric-value">{inventoryMetrics.stockTotal}</strong>
-            </span>
-          </article>
-          <article className="orders-metric-card inventory-metric-card">
-            <span className="orders-metric-icon"><ArrowDownToLine size={18} strokeWidth={2} /></span>
-            <span className="orders-metric-copy">
-              <span className="orders-metric-label">Entradas hoy</span>
-              <strong className="orders-metric-value">{inventoryMetrics.entradasHoy}</strong>
-            </span>
-          </article>
-          <article className="orders-metric-card inventory-metric-card">
-            <span className="orders-metric-icon"><ArrowUpFromLine size={18} strokeWidth={2} /></span>
-            <span className="orders-metric-copy">
-              <span className="orders-metric-label">Salidas hoy</span>
-              <strong className="orders-metric-value">{inventoryMetrics.salidasHoy}</strong>
-            </span>
-          </article>
-          <article className="orders-metric-card inventory-metric-card">
-            <span className="orders-metric-icon"><TriangleAlert size={18} strokeWidth={2} /></span>
-            <span className="orders-metric-copy">
-              <span className="orders-metric-label">Bajo stock</span>
-              <strong className="orders-metric-value">{inventoryMetrics.bajoStock}</strong>
-            </span>
-          </article>
-          <article className="orders-metric-card inventory-metric-card">
-            <span className="orders-metric-icon"><CircleX size={18} strokeWidth={2} /></span>
-            <span className="orders-metric-copy">
-              <span className="orders-metric-label">Agotados</span>
-              <strong className="orders-metric-value">{inventoryMetrics.agotados}</strong>
-            </span>
-          </article>
-        </section>
-
-        {/* ── EXECUTIVE PANELS (solo en módulos con inventario) ── */}
-        {moduloConfig?.categoria && vistaActiva === "lista" ? (
-          <section className="inventory-executive-grid">
-            <article className="inventory-strategy-panel">
-              <div className="inventory-panel-heading">
-                <div className="inventory-panel-heading-left">
-                  <Archive size={15} strokeWidth={2.5} />
-                  <strong>{moduloLabel} por subcategoría</strong>
-                </div>
-                <span className="inventory-panel-count">{categorySummary.length}</span>
-              </div>
-              <div className="inventory-category-list">
-                {categorySummary.length === 0 ? (
-                  <p className="inventory-empty-note">Sin datos para los filtros actuales.</p>
-                ) : categorySummary.map(item => (
-                  <button
-                    key={item.label}
-                    type="button"
-                    className={`inventory-category-card${subcategoriaFiltro === item.label ? " is-active" : ""}`}
-                    onClick={() => setSubcategoriaFiltro(subcategoriaFiltro === item.label ? "" : item.label)}
-                  >
-                    <div className="inventory-category-card-info">
-                      <strong>{item.label}</strong>
-                      <span>{item.cantidad} und.</span>
-                    </div>
-                    <span className="inventory-category-card-pct">{item.percent}%</span>
-                    <span className="inventory-category-card-bar"><i style={{ "--category-percent": `${Math.max(item.percent, 4)}%` }} /></span>
-                  </button>
-                ))}
-              </div>
-            </article>
-            <article className="inventory-strategy-panel inventory-alert-panel">
-              <div className="inventory-panel-heading">
-                <div className="inventory-panel-heading-left">
-                  <TriangleAlert size={15} strokeWidth={2.5} />
-                  <strong>Alertas de reposición</strong>
-                </div>
-                <span className="inventory-panel-count">{criticalItems.length} críticos</span>
-              </div>
-              <div className="inventory-alert-list">
-                {criticalItems.length === 0 ? (
-                  <p className="inventory-empty-note">Sin productos críticos.</p>
-                ) : criticalItems.map(item => {
-                  const level = stockLevel(item);
-                  return (
-                    <div key={item.inventarioID} className={`inventory-alert-item ${level.className}`}>
-                      <div className="inventory-alert-item-info">
-                        <strong>{item.nombre}</strong>
-                        <span>{Number(item.stockActual || 0)} uds · {item.proveedor || "Sin proveedor"}</span>
-                      </div>
-                      <button
-                        type="button"
-                        className="btn-outline inventory-alert-restock-btn"
-                        onClick={() => { setStockForm(f => ({ ...f, inventarioID: String(item.inventarioID), tipoMovimiento: "Entrada" })); setVistaActiva("ajustar"); }}
-                      >
-                        Reabastecer
-                      </button>
-                    </div>
-                  );
-                })}
-              </div>
-            </article>
-          </section>
-        ) : null}
-
-        {/* ── Alertas de vencimiento ── */}
-        {(moduloActivo === "flores" || moduloActivo === "adicionales") && vistaActiva === "lista" && expiryAlerts.length > 0 ? (
-          <section className="inventory-expiry-alerts">
-            <div className="inventory-panel-heading">
-              <div className="inventory-panel-heading-left"><TriangleAlert size={15} strokeWidth={2.5} /><strong>Alertas de vencimiento</strong></div>
-              <span className="inventory-panel-count">{expiryAlerts.length}</span>
-            </div>
-            <div className="inventory-alert-list">
-              {expiryAlerts.map(item => (
-                <div key={item.inventarioID} className={`inventory-alert-item ${isExpired(item.fechaVencimiento) ? "is-critical" : "is-medium"}`}>
-                  <div className="inventory-alert-item-info">
-                    <strong>{item.nombre}</strong>
-                    <span>{isExpired(item.fechaVencimiento) ? "Vencido" : "Por vencer"} · {String(item.fechaVencimiento).slice(0, 10)}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </section>
-        ) : null}
 
         {/* ── MENSAJES ── */}
         {error ? <p className="orders-message orders-message--error">{error}</p> : null}
@@ -738,13 +746,6 @@ export function InventoryPage({
           <>
             {/* Filtros del módulo */}
             <section className="orders-filters inventory-filters">
-              <div className="filter-field">
-                <span>Búsqueda</span>
-                <div className="orders-filter-control inventory-filter-control">
-                  <Search size={17} strokeWidth={2} />
-                  <input type="text" placeholder={`Buscar en ${moduloLabel.toLowerCase()}...`} value={q} onChange={e => setQ(e.target.value)} />
-                </div>
-              </div>
               {subcategoriasModulo.length > 0 ? (
                 <div className="filter-field">
                   <span>Subcategoría</span>
@@ -913,6 +914,112 @@ export function InventoryPage({
                 </div>
               </article>
             </section>
+
+            {/* ── EXECUTIVE PANELS (debajo de la tabla, para no tapar los filtros) ── */}
+            <section className="inventory-executive-grid">
+              <article className="inventory-strategy-panel">
+                <div className="inventory-panel-heading">
+                  <div className="inventory-panel-heading-left">
+                    <Archive size={15} strokeWidth={2.5} />
+                    <strong>{moduloLabel} por subcategoría</strong>
+                  </div>
+                  <span className="inventory-panel-count">{categorySummary.length}</span>
+                </div>
+                <div className="inventory-category-list">
+                  {categorySummary.length === 0 ? (
+                    <p className="inventory-empty-note">Sin datos para los filtros actuales.</p>
+                  ) : categorySummary.map(item => (
+                    <button
+                      key={item.label}
+                      type="button"
+                      className={`inventory-category-card${subcategoriaFiltro === item.label ? " is-active" : ""}`}
+                      onClick={() => setSubcategoriaFiltro(subcategoriaFiltro === item.label ? "" : item.label)}
+                    >
+                      <div className="inventory-category-card-info">
+                        <strong>{item.label}</strong>
+                        <span>{item.cantidad} und.</span>
+                      </div>
+                      <span className="inventory-category-card-pct">{item.percent}%</span>
+                      <span className="inventory-category-card-bar"><i style={{ "--category-percent": `${Math.max(item.percent, 4)}%` }} /></span>
+                    </button>
+                  ))}
+                </div>
+              </article>
+              <article className="inventory-strategy-panel inventory-alert-panel">
+                <div className="inventory-panel-heading">
+                  <div className="inventory-panel-heading-left">
+                    <TriangleAlert size={15} strokeWidth={2.5} />
+                    <strong>Alertas de reposición</strong>
+                  </div>
+                  <span className="inventory-panel-count">{criticalItems.length} críticos</span>
+                </div>
+                <div className="inventory-alert-list">
+                  {criticalItems.length === 0 ? (
+                    <p className="inventory-empty-note">Sin productos críticos.</p>
+                  ) : criticalItems.map(item => {
+                    const level = stockLevel(item);
+                    return (
+                      <div key={item.inventarioID} className={`inventory-alert-item ${level.className}`}>
+                        <div className="inventory-alert-item-info">
+                          <strong>{item.nombre}</strong>
+                          <span>{Number(item.stockActual || 0)} uds · {item.proveedor || "Sin proveedor"}</span>
+                        </div>
+                        <button
+                          type="button"
+                          className="btn-outline inventory-alert-restock-btn"
+                          onClick={() => { setStockForm(f => ({ ...f, inventarioID: String(item.inventarioID), tipoMovimiento: "Entrada" })); setVistaActiva("ajustar"); }}
+                        >
+                          Reabastecer
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              </article>
+              <article className="inventory-strategy-panel inventory-top-sellers-panel">
+                <div className="inventory-panel-heading">
+                  <div className="inventory-panel-heading-left">
+                    <TrendingUp size={15} strokeWidth={2.5} />
+                    <strong>Más vendidos</strong>
+                  </div>
+                  <span className="inventory-panel-count">{topSellers.length}</span>
+                </div>
+                <div className="inventory-category-list">
+                  {topSellers.length === 0 ? (
+                    <p className="inventory-empty-note">Sin salidas registradas todavía.</p>
+                  ) : topSellers.map(({ item, vendidos }, index) => (
+                    <div key={item.inventarioID} className="inventory-top-seller-item">
+                      <span className="inventory-top-seller-rank">{index + 1}</span>
+                      <div className="inventory-top-seller-info">
+                        <strong>{item.nombre}</strong>
+                        <span>{item.codigo}</span>
+                      </div>
+                      <span className="inventory-top-seller-count">{vendidos} vendidos</span>
+                    </div>
+                  ))}
+                </div>
+              </article>
+            </section>
+
+            {/* ── Alertas de vencimiento ── */}
+            {(moduloActivo === "flores" || moduloActivo === "adicionales") && expiryAlerts.length > 0 ? (
+              <section className="inventory-expiry-alerts">
+                <div className="inventory-panel-heading">
+                  <div className="inventory-panel-heading-left"><TriangleAlert size={15} strokeWidth={2.5} /><strong>Alertas de vencimiento</strong></div>
+                  <span className="inventory-panel-count">{expiryAlerts.length}</span>
+                </div>
+                <div className="inventory-alert-list">
+                  {expiryAlerts.map(item => (
+                    <div key={item.inventarioID} className={`inventory-alert-item ${isExpired(item.fechaVencimiento) ? "is-critical" : "is-medium"}`}>
+                      <div className="inventory-alert-item-info">
+                        <strong>{item.nombre}</strong>
+                        <span>{isExpired(item.fechaVencimiento) ? "Vencido" : "Por vencer"} · {String(item.fechaVencimiento).slice(0, 10)}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            ) : null}
           </>
         ) : null}
 
@@ -1019,17 +1126,27 @@ export function InventoryPage({
           </section>
         ) : null}
 
-        {/* ════════ VISTA AJUSTAR STOCK ════════ */}
-        {moduloConfig?.categoria && vistaActiva === "ajustar" ? (
+        {/* ════════ VISTA AJUSTAR STOCK / REGISTRAR MOVIMIENTO ════════ */}
+        {(moduloConfig?.categoria || moduloActivo === "movimientos") && vistaActiva === "ajustar" ? (
           <section className="inventory-grid-layout inventory-single-layout">
             <article className="order-block inventory-panel inventory-form-panel">
-              <h4>Ajustar stock — {moduloLabel}</h4>
+              <h4>{moduloActivo === "movimientos" ? "Registrar movimiento" : `Ajustar stock — ${moduloLabel}`}</h4>
               <form className="users-create-form" onSubmit={submitStock}>
                 <label className="inventory-field">
                   <span>Insumo</span>
                   <select value={stockForm.inventarioID} onChange={e => setStockForm(f => ({ ...f, inventarioID: e.target.value }))} required>
                     <option value="">Selecciona item</option>
-                    {items.map(item => <option key={item.inventarioID} value={item.inventarioID}>{item.codigo} — {item.nombre}</option>)}
+                    {moduloActivo === "movimientos" ? (
+                      MODULES.filter(mod => mod.categoria).map(mod => (
+                        <optgroup key={mod.key} label={mod.label}>
+                          {allItems
+                            .filter(item => String(item.categoria || "").toLowerCase() === mod.categoria.toLowerCase())
+                            .map(item => <option key={item.inventarioID} value={item.inventarioID}>{item.codigo} — {item.nombre}</option>)}
+                        </optgroup>
+                      ))
+                    ) : (
+                      items.map(item => <option key={item.inventarioID} value={item.inventarioID}>{item.codigo} — {item.nombre}</option>)
+                    )}
                   </select>
                 </label>
                 <label className="inventory-field">
@@ -1076,14 +1193,18 @@ export function InventoryPage({
                 {recetas.length === 0 ? (
                   <p className="inventory-empty-note">Sin arreglos. Crea el primero.</p>
                 ) : recetas.map(rec => (
-                  <div key={rec.idReceta} className="inventory-receta-card">
+                  <div key={rec.idReceta} className={`inventory-receta-card${rec.activo ? "" : " is-inactive"}`}>
                     <div className="inventory-receta-header">
                       <div>
                         <strong>{rec.nombre}</strong>
                         {rec.descripcion ? <p>{rec.descripcion}</p> : null}
                       </div>
                       <div className="inventory-receta-meta">
+                        <span className={`order-badge ${rec.activo ? "is-entregado" : "is-cancelado"}`}>{rec.activo ? "Activo" : "Inactivo"}</span>
                         <span className="inventory-receta-badge">{rec.totalIngredientes} ing.</span>
+                        <button type="button" className="btn-outline inventory-receta-toggle" onClick={() => toggleRecetaActivo(rec)}>
+                          {rec.activo ? "Desactivar" : "Activar"}
+                        </button>
                         <button
                           type="button"
                           className="btn-outline inventory-receta-toggle"
@@ -1102,10 +1223,10 @@ export function InventoryPage({
                           <tbody>
                             {recetaDetalle.detalles.map(det => (
                               <tr key={det.idRecetaDetalle}>
-                                <td><div className="inventory-product-cell"><strong>{det.nombre}</strong><span>{det.codigo}</span></div></td>
-                                <td>{det.categoria || "-"}</td>
-                                <td>{Number(det.cantidad)}</td>
-                                <td><button type="button" className="btn-outline inventory-ingredient-remove" onClick={() => eliminarIngrediente(rec.idReceta, det.idRecetaDetalle)}><CircleX size={13} strokeWidth={2} /></button></td>
+                                <td data-label="Insumo"><div className="inventory-product-cell"><strong>{det.nombre}</strong><span>{det.codigo}</span></div></td>
+                                <td data-label="Categoría">{det.categoria || "-"}</td>
+                                <td data-label="Cant.">{Number(det.cantidad)}</td>
+                                <td data-label="Acción"><button type="button" className="btn-outline inventory-ingredient-remove" onClick={() => eliminarIngrediente(rec.idReceta, det.idRecetaDetalle)}><CircleX size={13} strokeWidth={2} /></button></td>
                               </tr>
                             ))}
                             {recetaDetalle.detalles.length === 0 ? <tr><td colSpan="4" className="inventory-empty-note">Sin ingredientes aún.</td></tr> : null}
@@ -1118,8 +1239,7 @@ export function InventoryPage({
                               const catLabel = MODULES.find(m => m.key === cat)?.label;
                               return (
                                 <optgroup key={cat} label={catLabel}>
-                                  {/* These items won't be loaded unless we fetch all — show items state as fallback */}
-                                  {items.filter(i => i.categoria?.toLowerCase() === cat).map(i => (
+                                  {allItems.filter(i => i.categoria?.toLowerCase() === cat).map(i => (
                                     <option key={i.inventarioID} value={i.inventarioID}>{i.codigo} — {i.nombre}</option>
                                   ))}
                                 </optgroup>
@@ -1129,6 +1249,77 @@ export function InventoryPage({
                           <input type="number" min="0.01" step="0.01" placeholder="Cant." value={ingredienteForm.cantidad} onChange={e => setIngredienteForm(f => ({ ...f, cantidad: e.target.value }))} required />
                           <button type="submit" className="btn-primary" disabled={savingIngrediente}>{savingIngrediente ? "..." : "+ Agregar"}</button>
                         </form>
+
+                        {recetaResumen && recetaDetalle.detalles.length > 0 ? (
+                          <div className="inventory-receta-summary">
+                            <div className="inventory-receta-summary-item">
+                              <span className="inventory-receta-summary-icon"><DollarSign size={16} strokeWidth={2} /></span>
+                              <div>
+                                <strong>${formatearCOP(recetaResumen.costoTotal)}</strong>
+                                <span>Costo de producción</span>
+                              </div>
+                            </div>
+                            <div className="inventory-receta-summary-item">
+                              <span className="inventory-receta-summary-icon"><Gauge size={16} strokeWidth={2} /></span>
+                              <div>
+                                <strong>{recetaResumen.capacidad}</strong>
+                                <span>Capacidad de fabricación</span>
+                              </div>
+                            </div>
+                            <div className="inventory-receta-summary-item">
+                              <span className="inventory-receta-summary-icon"><TriangleAlert size={16} strokeWidth={2} /></span>
+                              <div>
+                                <strong>{recetaResumen.limitante?.nombre || "-"}</strong>
+                                <span>Componente limitante</span>
+                              </div>
+                            </div>
+                          </div>
+                        ) : null}
+
+                        {recetaResumen && recetaDetalle.detalles.length > 0 ? (
+                          <div className="inventory-simulator">
+                            <div className="inventory-simulator-heading">
+                              <Calculator size={15} strokeWidth={2.5} />
+                              <strong>Simulador de pedido</strong>
+                            </div>
+                            <p className="inventory-form-help">Verifica si hay inventario suficiente antes de confirmar la venta de varias unidades de este arreglo.</p>
+                            <div className="inventory-simulator-form">
+                              <label className="inventory-field">
+                                <span>Cantidad a fabricar</span>
+                                <input
+                                  type="number"
+                                  min="1"
+                                  step="1"
+                                  value={simuladorCantidad}
+                                  onChange={e => setSimuladorCantidad(e.target.value)}
+                                />
+                              </label>
+                            </div>
+                            {simulacionPedido ? (
+                              <div className={`inventory-simulator-result ${simulacionPedido.permitido ? "is-ok" : "is-blocked"}`}>
+                                <div className="inventory-simulator-verdict">
+                                  {simulacionPedido.permitido ? <CheckCircle2 size={16} strokeWidth={2} /> : <CircleX size={16} strokeWidth={2} />}
+                                  <strong>{simulacionPedido.permitido ? "Pedido permitido" : "Inventario insuficiente"}</strong>
+                                </div>
+                                <table className="orders-table users-table inventory-table inventory-simulator-table">
+                                  <thead>
+                                    <tr><th>Insumo</th><th>Necesario</th><th>Disponible</th><th>Faltante</th></tr>
+                                  </thead>
+                                  <tbody>
+                                    {simulacionPedido.detalle.map(d => (
+                                      <tr key={d.codigo} className={d.ok ? "" : "inventory-simulator-row-short"}>
+                                        <td data-label="Insumo"><div className="inventory-product-cell"><strong>{d.nombre}</strong><span>{d.codigo}</span></div></td>
+                                        <td data-label="Necesario">{d.necesario}</td>
+                                        <td data-label="Disponible">{d.disponible}</td>
+                                        <td data-label="Faltante">{d.faltante > 0 ? `-${d.faltante}` : "-"}</td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              </div>
+                            ) : null}
+                          </div>
+                        ) : null}
                       </div>
                     ) : null}
                   </div>
@@ -1165,13 +1356,39 @@ export function InventoryPage({
         {/* ════════════════════════════
             MÓDULO: MOVIMIENTOS
         ════════════════════════════ */}
-        {moduloActivo === "movimientos" ? (
+        {moduloActivo === "movimientos" && vistaActiva === "lista" ? (
           <section className="inventory-grid-layout">
             <article className="orders-table-wrap users-table-wrap users-table-panel inventory-movements-drawer">
               <div className="inventory-movements-head">
                 <div>
                   <strong>Movimientos de inventario</strong>
                   <span>{movimientosFiltrados.length} registros</span>
+                </div>
+                <div className="inventory-movements-actions">
+                  <button
+                    type="button"
+                    className="btn-outline inventory-movement-quick-btn is-entrada"
+                    onClick={() => { setStockForm(f => ({ ...f, inventarioID: "", tipoMovimiento: "Entrada", cantidad: "1", stockObjetivo: "", motivo: "" })); setVistaActiva("ajustar"); }}
+                  >
+                    <ArrowDownToLine size={15} strokeWidth={2} aria-hidden="true" />
+                    <span>Registrar entrada</span>
+                  </button>
+                  <button
+                    type="button"
+                    className="btn-outline inventory-movement-quick-btn is-salida"
+                    onClick={() => { setStockForm(f => ({ ...f, inventarioID: "", tipoMovimiento: "Salida", cantidad: "1", stockObjetivo: "", motivo: "" })); setVistaActiva("ajustar"); }}
+                  >
+                    <ArrowUpFromLine size={15} strokeWidth={2} aria-hidden="true" />
+                    <span>Registrar salida</span>
+                  </button>
+                  <button
+                    type="button"
+                    className="btn-outline inventory-movement-quick-btn is-ajuste"
+                    onClick={() => { setStockForm(f => ({ ...f, inventarioID: "", tipoMovimiento: "Ajuste", cantidad: "1", stockObjetivo: "", motivo: "" })); setVistaActiva("ajustar"); }}
+                  >
+                    <RotateCcw size={15} strokeWidth={2} aria-hidden="true" />
+                    <span>Registrar ajuste</span>
+                  </button>
                 </div>
                 <div className="inventory-movements-filters">
                   <select value={tipoMovimientoFiltro} onChange={e => setTipoMovimientoFiltro(e.target.value)} className="inventory-movement-type-select">
