@@ -818,11 +818,21 @@ Materiales usados en producción (flores, cintas, papel, etc.). Definidos por em
 | empresa_id | bigint | NO | FK → empresa |
 | nombre_insumo | varchar(200) | NO | UNIQUE por empresa |
 | codigo_barra | varchar(100) | SÍ | UNIQUE por empresa |
-| unidad_medida | varchar(50) | NO | 'unidad', 'tallo', 'metro', 'kg', etc. |
+| unidad_medida | varchar(50) | NO | 'unidad', 'tallo', 'metro', 'kg', etc. Legacy: en registros viejos también guardaba la categoría |
+| categoria | varchar(80) | SÍ | 'Flores', 'Bases', 'Materiales', 'Adicionales'. En filas migradas se hace backfill desde `unidad_medida` |
+| subcategoria | varchar(80) | SÍ | Ej: 'Rosas', 'Follaje' para Flores; 'Cintas', 'Oasis' para Materiales |
+| color | varchar(80) | SÍ | |
+| descripcion | text | SÍ | |
+| tamano | varchar(50) | SÍ | |
+| fecha_vencimiento | date | SÍ | Uso principal: módulo Flores/Adicionales |
+| marca | varchar(100) | SÍ | Uso principal: módulo Adicionales |
+| precio_venta | numeric(12,2) | SÍ | Uso principal: módulo Adicionales — permite calcular utilidad vs `inventario.valor_unitario` |
 | proveedor_id | integer | SÍ | FK → proveedor. Proveedor principal |
 | activo | boolean | NO | DEFAULT true |
 | created_at | timestamp | NO | |
 | updated_at | timestamp | SÍ | |
+
+Índice: `idx_insumo_empresa_categoria` sobre `(empresa_id, categoria)` para filtros del módulo Inventario.
 
 ---
 
@@ -854,10 +864,10 @@ Catálogo de tipos de movimiento de inventario.
 | columna | tipo | null | descripción |
 |---|---|---|---|
 | id_tipo_movimiento | integer | NO | PK |
-| codigo | varchar(20) | SÍ | UNIQUE. Ej: 'COMPRA', 'CONSUMO', 'AJUSTE', 'DEVOLUCION' |
-| nombre | varchar(50) | SÍ | |
+| codigo | varchar(20) | SÍ | UNIQUE. Valores actuales: 'entrada', 'salida', 'ajuste', 'PERDIDA' |
+| nombre | varchar(50) | SÍ | 'Entrada', 'Salida', 'Ajuste', 'Pérdida' |
 | afecta_stock | boolean | NO | Si modifica stock_actual |
-| signo | smallint | NO | +1 (entrada) o -1 (salida) |
+| signo | smallint | NO | +1 (entrada, ajuste) o -1 (salida, pérdida) |
 
 ---
 
@@ -895,6 +905,38 @@ proveedores globales (`empresa_id = NULL`) o asociados a una empresa específica
 **Uso actual en UI:** El formulario de proveedores del módulo Inventario solo debe persistir
 `nombre_proveedor`, `codigo_proveedor` y `activo`. `empresa_id` se define desde el contexto
 autenticado o puede quedar `NULL` para proveedores globales.
+
+---
+
+### receta
+Cabecera de un arreglo floral (módulo Inventario → pestaña "Arreglos"). Define qué insumos
+(vía `receta_detalle`) componen un arreglo, para poder calcular costo y disponibilidad.
+
+| columna | tipo | null | descripción |
+|---|---|---|---|
+| id_receta | bigint | NO | PK |
+| empresa_id | bigint | NO | FK → empresa |
+| nombre | varchar(200) | NO | UNIQUE por empresa |
+| descripcion | text | SÍ | |
+| activo | boolean | NO | DEFAULT true |
+| created_at | timestamp | NO | |
+| updated_at | timestamp | SÍ | |
+
+---
+
+### receta_detalle
+Ingredientes (insumos) que componen una `receta`, con la cantidad requerida de cada uno.
+
+| columna | tipo | null | descripción |
+|---|---|---|---|
+| id_receta_detalle | bigint | NO | PK |
+| empresa_id | bigint | NO | FK → empresa |
+| receta_id | bigint | NO | FK → receta. `ON DELETE CASCADE` |
+| inventario_id | bigint | NO | FK → inventario (no a `insumo` directamente — referencia el stock por sucursal) |
+| cantidad | numeric(12,4) | NO | DEFAULT 1. Cantidad del insumo requerida por unidad de arreglo |
+| created_at | timestamp | NO | |
+
+UNIQUE por `(receta_id, inventario_id)` — un insumo no puede repetirse como ingrediente de la misma receta.
 
 ---
 

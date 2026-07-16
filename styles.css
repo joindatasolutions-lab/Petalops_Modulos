@@ -1219,7 +1219,7 @@ select:focus {
   color: #8a3252;
 }
 
-.orders-page-table-wrap .orders-table td[data-label="N�mero"] {
+.orders-page-table-wrap .orders-table td[data-label="N�mero"] {
   font-size: 13px;
   font-weight: 700;
   color: #8a3252;
@@ -1962,7 +1962,7 @@ select:focus {
   padding: 0 10px;
 }
 
-/* Combobox con b�squeda integrada */
+/* Combobox con b�squeda integrada */
 .order-combobox {
   position: relative;
 }
@@ -6806,8 +6806,8 @@ select:focus {
 
 /* Pipeline Operativo */
 /* -------------------------------------------------------
-   PIPELINE � Centro de operaciones en tiempo real
-   Inspiraci�n: Monday.com / Linear / ClickUp
+   PIPELINE � Centro de operaciones en tiempo real
+   Inspiraci�n: Monday.com / Linear / ClickUp
    ------------------------------------------------------- */
 
 .pipeline-view {
@@ -6819,27 +6819,27 @@ select:focus {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  /* Cubre el gradiente rosa del app-shell � fondo neutro como otros m�dulos */
+  /* Cubre el gradiente rosa del app-shell � fondo neutro como otros m�dulos */
   background: #f4f5f7;
   font-family: "Manrope", "Segoe UI", sans-serif;
 }
 
-/* -- Header � el pipeline usa orders-admin-header orders-page-header
-   (mismas clases que Pedidos � no se necesita CSS adicional) -- */
+/* -- Header � el pipeline usa orders-admin-header orders-page-header
+   (mismas clases que Pedidos � no se necesita CSS adicional) -- */
 
-/* -- KPI Cards � misma estructura que producci�n/inventario -- */
+/* -- KPI Cards � misma estructura que producci�n/inventario -- */
 
 .pipeline-metrics-grid {
   grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
 }
 
-/* Colores por m�trica */
+/* Colores por m�trica */
 .pipeline-metric-card:nth-child(1) { --metric-bg: #f0f0ff; --metric-accent: #4f46e5; }
 .pipeline-metric-card:nth-child(2) { --metric-bg: #eff6ff; --metric-accent: #2563eb; }
 .pipeline-metric-card:nth-child(3) { --metric-bg: #fffbeb; --metric-accent: #d97706; }
 .pipeline-metric-card:nth-child(4) { --metric-bg: #f0fdf4; --metric-accent: #15803d; }
 
-/* Mini m�tricas del header (si se usan en otro contexto) */
+/* Mini m�tricas del header (si se usan en otro contexto) */
 .pipeline-header-metrics {
   display: flex;
   align-items: center;
@@ -6883,7 +6883,7 @@ select:focus {
 .pipeline-header-metric--green { background: rgba(21, 128, 61, 0.06); border-color: rgba(21, 128, 61, 0.12); }
 .pipeline-header-metric--green strong { color: #15803d; }
 
-/* Mini m�tricas del header */
+/* Mini m�tricas del header */
 .pipeline-header-metrics {
   display: flex;
   align-items: center;
@@ -6935,9 +6935,9 @@ select:focus {
   min-width: 116px;
 }
 
-/* -- Filtros pipeline � reutiliza production-filters-bar exacto ------- */
+/* -- Filtros pipeline � reutiliza production-filters-bar exacto ------- */
 
-/* Grid de 6 columnas � pipeline tiene 6 filtros vs 4 de producci�n */
+/* Grid de 6 columnas � pipeline tiene 6 filtros vs 4 de producci�n */
 .orders-filters.pipeline-filters-bar {
   grid-template-columns: minmax(200px, 1.5fr) repeat(5, minmax(130px, 1fr)) !important;
   margin-top: 0 !important;
@@ -7019,7 +7019,7 @@ select:focus {
   gap: 8px;
 }
 
-/* Cabecera de columna � fondo neutro, color solo en badge */
+/* Cabecera de columna � fondo neutro, color solo en badge */
 .pipeline-column-head {
   display: flex;
   justify-content: space-between;
@@ -7077,7 +7077,7 @@ select:focus {
   align-items: center;
 }
 
-/* Estado vac�o mejorado */
+/* Estado vac�o mejorado */
 .pipeline-empty-state {
   display: flex;
   flex-direction: column;
@@ -7112,7 +7112,7 @@ select:focus {
   line-height: 1.5;
 }
 
-/* -- Cards � misma est�tica que filas de Pedidos/Producci�n -- */
+/* -- Cards � misma est�tica que filas de Pedidos/Producci�n -- */
 
 .pipeline-card {
   background: #ffffff;
@@ -7125,7 +7125,7 @@ select:focus {
   gap: 6px;
   font-family: "Manrope", "Segoe UI", sans-serif;
   font-size: 13.5px;
-  /* Borde izquierdo de color igual que en tabla-card de pedidos/producci�n */
+  /* Borde izquierdo de color igual que en tabla-card de pedidos/producci�n */
   box-shadow:
     inset 3px 0 0 var(--column-accent, #8a3252),
     0 3px 10px rgba(17, 24, 39, 0.05);
@@ -7157,7 +7157,7 @@ select:focus {
   letter-spacing: 0.02em;
 }
 
-/* Prioridad � colores sem�nticos */
+/* Prioridad � colores sem�nticos */
 .pipeline-priority {
   display: inline-flex;
   align-items: center;
@@ -7175,7 +7175,7 @@ select:focus {
 .pipeline-priority.is-high   { background: #fee2e2; color: #b91c1c; }
 .pipeline-priority.is-urgent { background: #b91c1c; color: #ffffff; }
 
-/* Cliente � peso visual principal (igual que nombre en producci�n: 14px) */
+/* Cliente � peso visual principal (igual que nombre en producci�n: 14px) */
 .pipeline-card-client {
   margin: 0;
   font-size: 14px;
@@ -7215,7 +7215,7 @@ select:focus {
 
 .pipeline-card-product svg { flex-shrink: 0; margin-top: 1px; color: #9ca3af; }
 
-/* Valor + asignaci�n */
+/* Valor + asignaci�n */
 .pipeline-card-info-row {
   display: flex;
   align-items: center;
@@ -7267,7 +7267,7 @@ select:focus {
   flex-shrink: 0;
 }
 
-/* Estado tiempo � indicador visual fuerte */
+/* Estado tiempo � indicador visual fuerte */
 .pipeline-time-status {
   display: inline-flex;
   align-items: center;
@@ -11313,7 +11313,7 @@ select:focus {
 }
 
 .orders-detail-head-meta > span:not(.order-badge)::before {
-  content: "�";
+  content: "�";
   margin-right: 7px;
   color: #cbd5e1;
 }
@@ -15219,7 +15219,7 @@ select:focus {
   margin-bottom: 10px;
 }
 
-/* ---- Panels: Inventario por categor�a + Alertas de reposici�n ---- */
+/* ---- Panels: Inventario por categor�a + Alertas de reposici�n ---- */
 
 .inventory-strategy-panel {
   padding: 0;
@@ -15290,7 +15290,7 @@ select:focus {
   padding: 6px;
 }
 
-/* Category card � clickable to filter */
+/* Category card � clickable to filter */
 .inventory-category-card {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 36px;
@@ -15648,7 +15648,7 @@ select:focus {
   padding-top: 6px;
 }
 
-/* -- Pesta�as de m�dulo (Flores / Bases / Materiales / Adicionales / Arreglos / Movimientos) -- */
+/* -- Pesta�as de m�dulo (Flores / Bases / Materiales / Adicionales / Arreglos / Movimientos) -- */
 .inventory-module-tabs {
   display: flex;
   gap: 2px;
@@ -16031,7 +16031,7 @@ select:focus {
   }
 }
 
-/* INVENTORY: ajustes de layout � sin reducci�n de tama�os (iguala a Producci�n) */
+/* INVENTORY: ajustes de layout � sin reducci�n de tama�os (iguala a Producci�n) */
 .inventory-page-view {
   gap: 12px !important;
 }
@@ -16073,11 +16073,11 @@ select:focus {
   overflow: hidden !important;
 }
 
-/* Tabla � sin reducci�n de fuentes ni padding */
+/* Tabla � sin reducci�n de fuentes ni padding */
 .inventory-table tbody tr td:first-child { border-radius: 14px 0 0 14px !important; }
 .inventory-table tbody tr td:last-child  { border-radius: 0 14px 14px 0 !important; }
 
-/* Botones del formulario de creaci�n: tama�o auto, no estirados */
+/* Botones del formulario de creaci�n: tama�o auto, no estirados */
 .inventory-form-panel .order-actions {
   justify-content: flex-start !important;
 }
@@ -25133,7 +25133,7 @@ select:focus {
   .orders-page-view .orders-page-table-wrap .orders-table.orders-list-table .orders-client-destination-cell,
   .orders-page-view .orders-page-table-wrap .orders-table.orders-list-table .orders-products-inline,
   .orders-page-view .orders-page-table-wrap .orders-table.orders-list-table .orders-total-value,
-  .orders-page-view .orders-page-table-wrap .orders-table.orders-list-table td[data-label="M�todo pago"],
+  .orders-page-view .orders-page-table-wrap .orders-table.orders-list-table td[data-label="M�todo pago"],
   .orders-page-view .orders-page-table-wrap .orders-table.orders-list-table .order-badge {
     min-width: 0 !important;
     max-width: 100% !important;
@@ -25142,7 +25142,7 @@ select:focus {
   .orders-page-view .orders-page-table-wrap .orders-table.orders-list-table .orders-cell-stack strong,
   .orders-page-view .orders-page-table-wrap .orders-table.orders-list-table .orders-cell-stack small,
   .orders-page-view .orders-page-table-wrap .orders-table.orders-list-table .orders-products-inline,
-  .orders-page-view .orders-page-table-wrap .orders-table.orders-list-table td[data-label="M�todo pago"] {
+  .orders-page-view .orders-page-table-wrap .orders-table.orders-list-table td[data-label="M�todo pago"] {
     overflow: hidden !important;
     text-overflow: ellipsis !important;
     white-space: nowrap !important;
@@ -27700,7 +27700,7 @@ select:focus {
   }
 }
 
-/* ORDERS LIST FINAL LAYOUT: columnas proporcionadas y acciones en una l�nea. */
+/* ORDERS LIST FINAL LAYOUT: columnas proporcionadas y acciones en una l�nea. */
 .orders-page-table-wrap .orders-table.orders-list-table {
   table-layout: fixed !important;
   width: 100% !important;
@@ -27797,7 +27797,7 @@ select:focus {
   width: 15% !important;
 }
 
-.orders-page-table-wrap .orders-table.orders-list-table td[data-label="Cliente � Destinatario"] small {
+.orders-page-table-wrap .orders-table.orders-list-table td[data-label="Cliente � Destinatario"] small {
   color: #64748b !important;
   font-size: 11px !important;
   font-weight: 700 !important;
@@ -30161,7 +30161,7 @@ select:focus {
   .orders-page-view .orders-page-table-wrap .orders-table.orders-list-table .orders-client-destination-cell,
   .orders-page-view .orders-page-table-wrap .orders-table.orders-list-table .orders-products-inline,
   .orders-page-view .orders-page-table-wrap .orders-table.orders-list-table .orders-total-value,
-  .orders-page-view .orders-page-table-wrap .orders-table.orders-list-table td[data-label="M�todo pago"],
+  .orders-page-view .orders-page-table-wrap .orders-table.orders-list-table td[data-label="M�todo pago"],
   .orders-page-view .orders-page-table-wrap .orders-table.orders-list-table .order-badge {
     min-width: 0 !important;
     max-width: 100% !important;
@@ -30170,7 +30170,7 @@ select:focus {
   .orders-page-view .orders-page-table-wrap .orders-table.orders-list-table .orders-cell-stack strong,
   .orders-page-view .orders-page-table-wrap .orders-table.orders-list-table .orders-cell-stack small,
   .orders-page-view .orders-page-table-wrap .orders-table.orders-list-table .orders-products-inline,
-  .orders-page-view .orders-page-table-wrap .orders-table.orders-list-table td[data-label="M�todo pago"] {
+  .orders-page-view .orders-page-table-wrap .orders-table.orders-list-table td[data-label="M�todo pago"] {
     overflow: hidden !important;
     text-overflow: ellipsis !important;
     white-space: nowrap !important;
@@ -32515,7 +32515,7 @@ body,
 .orders-page-view .orders-page-table-wrap .orders-cell-stack strong,
 .orders-page-view .orders-page-table-wrap .orders-products-inline,
 .orders-page-view .orders-page-table-wrap .orders-total-value,
-.orders-page-view .orders-page-table-wrap td[data-label="M�todo pago"] {
+.orders-page-view .orders-page-table-wrap td[data-label="M�todo pago"] {
   font-size: 11px !important;
   line-height: 1.2 !important;
 }
@@ -32939,7 +32939,7 @@ body,
 .orders-page-view .orders-page-table-wrap .orders-cell-stack strong,
 .orders-page-view .orders-page-table-wrap .orders-products-inline,
 .orders-page-view .orders-page-table-wrap .orders-total-value,
-.orders-page-view .orders-page-table-wrap td[data-label="M�todo pago"] {
+.orders-page-view .orders-page-table-wrap td[data-label="M�todo pago"] {
   font-size: 13px !important;
 }
 
@@ -33289,7 +33289,7 @@ body,
     font-size: 12px !important;
   }
 
-  .orders-page-view .orders-page-table-wrap .orders-table.orders-list-table tbody tr.orders-row-card td[data-label="N�mero"] {
+  .orders-page-view .orders-page-table-wrap .orders-table.orders-list-table tbody tr.orders-row-card td[data-label="N�mero"] {
     grid-column: 1 !important;
     order: 1 !important;
     grid-template-columns: minmax(0, 1fr) !important;
@@ -33299,7 +33299,7 @@ body,
     border-bottom: 0 !important;
   }
 
-  .orders-page-view .orders-page-table-wrap .orders-table.orders-list-table tbody tr.orders-row-card td[data-label="N�mero"]::before {
+  .orders-page-view .orders-page-table-wrap .orders-table.orders-list-table tbody tr.orders-row-card td[data-label="N�mero"]::before {
     display: none !important;
   }
 
@@ -33322,7 +33322,7 @@ body,
     display: none !important;
   }
 
-  .orders-page-view .orders-page-table-wrap .orders-table.orders-list-table tbody tr.orders-row-card td[data-label="Cliente � Destinatario"] {
+  .orders-page-view .orders-page-table-wrap .orders-table.orders-list-table tbody tr.orders-row-card td[data-label="Cliente � Destinatario"] {
     grid-column: 1 / -1 !important;
     order: 3 !important;
     grid-template-columns: minmax(0, 1fr) !important;
@@ -33331,7 +33331,7 @@ body,
     border-bottom: 1px solid #edf1f6 !important;
   }
 
-  .orders-page-view .orders-page-table-wrap .orders-table.orders-list-table tbody tr.orders-row-card td[data-label="Cliente � Destinatario"]::before {
+  .orders-page-view .orders-page-table-wrap .orders-table.orders-list-table tbody tr.orders-row-card td[data-label="Cliente � Destinatario"]::before {
     display: none !important;
   }
 
@@ -33350,7 +33350,7 @@ body,
     order: 6 !important;
   }
 
-  .orders-page-view .orders-page-table-wrap .orders-table.orders-list-table tbody tr.orders-row-card td[data-label="M�todo pago"] {
+  .orders-page-view .orders-page-table-wrap .orders-table.orders-list-table tbody tr.orders-row-card td[data-label="M�todo pago"] {
     display: none !important;
     order: 7 !important;
   }
@@ -33440,7 +33440,7 @@ body,
 
   .orders-page-view .orders-page-table-wrap .orders-products-inline,
   .orders-page-view .orders-page-table-wrap .orders-total-value,
-  .orders-page-view .orders-page-table-wrap td[data-label="M�todo pago"] {
+  .orders-page-view .orders-page-table-wrap td[data-label="M�todo pago"] {
     min-width: 0 !important;
     overflow: hidden !important;
     text-overflow: ellipsis !important;
@@ -34245,7 +34245,7 @@ body,
     text-transform: uppercase !important;
   }
 
-  .orders-page-view .orders-page-table-wrap .orders-table.orders-list-table tbody tr.orders-row-card td[data-label="N�mero"] {
+  .orders-page-view .orders-page-table-wrap .orders-table.orders-list-table tbody tr.orders-row-card td[data-label="N�mero"] {
     grid-column: 1 !important;
     order: 1 !important;
     justify-items: start !important;
@@ -34265,21 +34265,21 @@ body,
     border-bottom: 0 !important;
   }
 
-  .orders-page-view .orders-page-table-wrap .orders-table.orders-list-table tbody tr.orders-row-card td[data-label="N�mero"]::before,
+  .orders-page-view .orders-page-table-wrap .orders-table.orders-list-table tbody tr.orders-row-card td[data-label="N�mero"]::before,
   .orders-page-view .orders-page-table-wrap .orders-table.orders-list-table tbody tr.orders-row-card td[data-label="Estado"]::before,
-  .orders-page-view .orders-page-table-wrap .orders-table.orders-list-table tbody tr.orders-row-card td[data-label="Cliente � Destinatario"]::before,
+  .orders-page-view .orders-page-table-wrap .orders-table.orders-list-table tbody tr.orders-row-card td[data-label="Cliente � Destinatario"]::before,
   .orders-page-view .orders-page-table-wrap .orders-table.orders-list-table tbody tr.orders-row-card td[data-label="Acciones"]::before {
     display: none !important;
   }
 
   .orders-page-view .orders-page-table-wrap .orders-table.orders-list-table tbody tr.orders-row-card td[data-label="Fecha/Hora"],
-  .orders-page-view .orders-page-table-wrap .orders-table.orders-list-table tbody tr.orders-row-card td[data-label="M�todo pago"],
+  .orders-page-view .orders-page-table-wrap .orders-table.orders-list-table tbody tr.orders-row-card td[data-label="M�todo pago"],
   .orders-page-view .orders-page-table-wrap .orders-table.orders-list-table tbody tr.orders-row-card td:nth-child(2),
   .orders-page-view .orders-page-table-wrap .orders-table.orders-list-table tbody tr.orders-row-card td:nth-child(7) {
     display: none !important;
   }
 
-  .orders-page-view .orders-page-table-wrap .orders-table.orders-list-table tbody tr.orders-row-card td[data-label="Cliente � Destinatario"] {
+  .orders-page-view .orders-page-table-wrap .orders-table.orders-list-table tbody tr.orders-row-card td[data-label="Cliente � Destinatario"] {
     order: 2 !important;
     grid-template-columns: minmax(0, 1fr) !important;
     min-height: 42px !important;
@@ -34381,7 +34381,7 @@ body,
     overflow: visible !important;
   }
 
-  .orders-page-view .orders-page-table-wrap .orders-table.orders-list-table tbody tr.orders-row-card > td[data-label="N�mero"] {
+  .orders-page-view .orders-page-table-wrap .orders-table.orders-list-table tbody tr.orders-row-card > td[data-label="N�mero"] {
     grid-column: 1 !important;
     grid-row: 1 !important;
     order: 1 !important;
@@ -34405,7 +34405,7 @@ body,
     border-bottom: 0 !important;
   }
 
-  .orders-page-view .orders-page-table-wrap .orders-table.orders-list-table tbody tr.orders-row-card > td[data-label="Cliente � Destinatario"] {
+  .orders-page-view .orders-page-table-wrap .orders-table.orders-list-table tbody tr.orders-row-card > td[data-label="Cliente � Destinatario"] {
     grid-column: 1 / -1 !important;
     grid-row: 2 !important;
     order: 3 !important;
@@ -34499,7 +34499,7 @@ body,
     box-sizing: border-box !important;
   }
 
-  .orders-page-view .orders-page-table-wrap .orders-table.orders-list-table tbody tr.orders-row-card > td[data-label="N�mero"] {
+  .orders-page-view .orders-page-table-wrap .orders-table.orders-list-table tbody tr.orders-row-card > td[data-label="N�mero"] {
     grid-area: number !important;
     display: flex !important;
     align-items: center !important;
@@ -34517,7 +34517,7 @@ body,
     border-bottom: 0 !important;
   }
 
-  .orders-page-view .orders-page-table-wrap .orders-table.orders-list-table tbody tr.orders-row-card > td[data-label="Cliente � Destinatario"] {
+  .orders-page-view .orders-page-table-wrap .orders-table.orders-list-table tbody tr.orders-row-card > td[data-label="Cliente � Destinatario"] {
     grid-area: client !important;
     display: block !important;
     padding: 10px 0 12px !important;
@@ -34557,9 +34557,9 @@ body,
     border-bottom: 1px solid #edf1f6 !important;
   }
 
-  .orders-page-view .orders-page-table-wrap .orders-table.orders-list-table tbody tr.orders-row-card > td[data-label="N�mero"]::before,
+  .orders-page-view .orders-page-table-wrap .orders-table.orders-list-table tbody tr.orders-row-card > td[data-label="N�mero"]::before,
   .orders-page-view .orders-page-table-wrap .orders-table.orders-list-table tbody tr.orders-row-card > td[data-label="Estado"]::before,
-  .orders-page-view .orders-page-table-wrap .orders-table.orders-list-table tbody tr.orders-row-card > td[data-label="Cliente � Destinatario"]::before,
+  .orders-page-view .orders-page-table-wrap .orders-table.orders-list-table tbody tr.orders-row-card > td[data-label="Cliente � Destinatario"]::before,
   .orders-page-view .orders-page-table-wrap .orders-table.orders-list-table tbody tr.orders-row-card > td[data-label="Acciones"]::before {
     content: none !important;
     display: none !important;
@@ -36768,5 +36768,652 @@ main.orders-admin-view.orders-page-view.delivery-page-view,
   .delivery-page-view .delivery-header-metrics.delivery-status-filters {
     grid-template-columns: repeat(4, minmax(90px, 1fr)) !important;
     max-height: none !important;
+  }
+}
+
+/* ════════════════════════════════════════════════════════════════════════
+   INVENTARIO — paridad visual con Producción
+   Reglas solo para .inventory-page-view: encabezado, buscador, indicadores,
+   filtros y tabla siguiendo el mismo lenguaje visual que Producción
+   (orders-page-header / orders-page-heading / orders-user-pill /
+   orders-header-metrics ya usados por Producción, Pedidos, Entregas, etc.).
+   No se modifica ni elimina ninguna regla existente de otros módulos.
+   ════════════════════════════════════════════════════════════════════════ */
+
+/* Buscador embebido en el encabezado (igual que production-header-search) */
+.inventory-page-view .inventory-header-search {
+  display: flex !important;
+  align-items: center !important;
+  gap: 10px !important;
+  min-width: 0 !important;
+  flex: 1 1 260px !important;
+  height: 44px !important;
+  padding: 0 14px !important;
+  border: 1px solid #e2e8f0 !important;
+  border-radius: 10px !important;
+  background: #ffffff !important;
+  color: #64748b !important;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.04) !important;
+}
+
+.inventory-page-view .inventory-header-search svg {
+  flex: 0 0 auto !important;
+  color: #64748b !important;
+}
+
+.inventory-page-view .inventory-header-search input {
+  width: 100% !important;
+  min-width: 0 !important;
+  border: 0 !important;
+  outline: 0 !important;
+  background: transparent !important;
+  color: #172033 !important;
+  font-size: 0.9rem !important;
+  font-weight: 750 !important;
+  font-family: "Manrope", "Segoe UI", sans-serif !important;
+}
+
+.inventory-page-view .inventory-header-search input::placeholder {
+  color: #8a94a6 !important;
+  font-weight: 700 !important;
+}
+
+/* Indicadores tipo pastilla en el encabezado (mismo componente que Producción) */
+.inventory-page-view .orders-header-metrics.inventory-header-metrics {
+  grid-template-columns: minmax(190px, 1.5fr) repeat(5, minmax(96px, 1fr)) !important;
+}
+
+.inventory-page-view .inventory-header-metrics .orders-header-metric-card.is-teal {
+  --orders-bi-color: #0d9488 !important;
+}
+
+/* Filtros: mismo lenguaje visual (fondo blanco, borde suave, foco en marca) */
+.inventory-page-view .orders-filters.inventory-filters {
+  padding: 14px 16px !important;
+  margin: 0 0 16px !important;
+  border: 1px solid #eaeaea !important;
+  border-radius: 18px !important;
+  background: linear-gradient(180deg, #ffffff 0%, #fbfbfc 100%) !important;
+  box-shadow: 0 16px 38px rgba(17, 24, 39, 0.05) !important;
+}
+
+.inventory-page-view .orders-filters.inventory-filters .filter-field > span {
+  display: block !important;
+  margin-bottom: 6px !important;
+  color: #6b7280 !important;
+  font-family: "Manrope", "Segoe UI", sans-serif !important;
+  font-size: 11px !important;
+  font-weight: 800 !important;
+  letter-spacing: 0.06em !important;
+  text-transform: uppercase !important;
+}
+
+.inventory-page-view .orders-filters.inventory-filters .orders-filter-control.inventory-filter-control {
+  height: 46px !important;
+  min-height: 46px !important;
+  padding: 0 14px !important;
+  border: 1px solid #eaeaea !important;
+  border-radius: 14px !important;
+  background: #ffffff !important;
+  color: #94a3b8 !important;
+  box-shadow: inset 0 1px 0 rgba(17, 24, 39, 0.02) !important;
+  transition: border-color 200ms ease-out, box-shadow 200ms ease-out !important;
+}
+
+.inventory-page-view .orders-filters.inventory-filters .orders-filter-control.inventory-filter-control:focus-within {
+  border-color: rgba(138, 50, 82, 0.42) !important;
+  box-shadow: 0 0 0 4px rgba(138, 50, 82, 0.08) !important;
+}
+
+.inventory-page-view .orders-filters.inventory-filters .inventory-filter-control select,
+.inventory-page-view .orders-filters.inventory-filters .inventory-filter-control input {
+  color: #111827 !important;
+  font-family: "Manrope", "Segoe UI", sans-serif !important;
+  font-weight: 600 !important;
+}
+
+/* Tabla: mismo lenguaje plano y limpio que la tabla de Producción */
+.inventory-page-view .inventory-table {
+  border-collapse: collapse !important;
+  border-spacing: 0 !important;
+  font-family: "Manrope", "Segoe UI", sans-serif !important;
+}
+
+.inventory-page-view .inventory-table th {
+  height: 48px !important;
+  padding: 0 16px !important;
+  border-bottom: 1px solid #edf1f6 !important;
+  background: #fbfcfe !important;
+  color: #667085 !important;
+  font-size: 10px !important;
+  font-weight: 850 !important;
+  letter-spacing: 0.08em !important;
+  text-transform: uppercase !important;
+}
+
+.inventory-page-view .inventory-table td {
+  padding: 13px 16px !important;
+  border-bottom: 1px solid #edf1f6 !important;
+  background: #ffffff !important;
+  box-shadow: none !important;
+  font-size: 13px !important;
+  font-weight: 500 !important;
+}
+
+.inventory-page-view .inventory-table tbody tr:hover td {
+  background: #fff8fb !important;
+  box-shadow: none !important;
+}
+
+.inventory-page-view .inventory-table tbody tr td:first-child,
+.inventory-page-view .inventory-table tbody tr td:last-child {
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+
+.inventory-page-view .inventory-table tbody tr:last-child td {
+  border-bottom: 0 !important;
+}
+
+.inventory-page-view .inventory-table-outer.orders-table-wrap {
+  border-radius: 16px !important;
+  border: 1px solid #e8edf4 !important;
+  box-shadow: 0 20px 55px rgba(15, 23, 42, 0.07) !important;
+  overflow: hidden !important;
+}
+
+/* Paneles de categoría / alertas: ahora van debajo de la tabla, nunca encima
+   de los filtros. Solo se ajusta el espaciado para que respiren. */
+.inventory-page-view .inventory-executive-grid {
+  margin-top: 16px !important;
+  margin-bottom: 0 !important;
+}
+
+.inventory-page-view .inventory-expiry-alerts {
+  margin-top: 16px !important;
+}
+
+@media (max-width: 1180px) {
+  .inventory-page-view .orders-header-metrics.inventory-header-metrics {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  }
+}
+
+@media (max-width: 640px) {
+  .inventory-page-view .orders-header-metrics.inventory-header-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+
+  .inventory-page-view .inventory-header-search {
+    flex-basis: 100% !important;
+  }
+}
+
+/* ════════════════════════════════════════════════════════════════════════
+   INVENTARIO — corrección de responsive (título cortado, buscador/botones
+   descuadrados, tarjetas superpuestas).
+
+   Causa: reglas genéricas ".orders-page-view ..." pensadas para el header
+   simple de Pedidos convierten el header en "display:contents" y reubican
+   secciones con grid-row fijo en pantallas angostas. Inventario comparte
+   esas mismas clases, así que queda arrastrado a esa cuadrícula ajena
+   (pensada para menos elementos). Aquí neutralizamos eso solo dentro de
+   .inventory-page-view, con mayor especificidad, y le damos a Inventario
+   su propio layout explícito con flexbox que sí sabe acomodar buscador +
+   botones + 6 indicadores en cualquier ancho.
+   ════════════════════════════════════════════════════════════════════════ */
+
+.orders-admin-view.orders-page-view.inventory-page-view {
+  display: grid !important;
+  grid-template-columns: none !important;
+  grid-template-rows: none !important;
+  grid-template-areas: none !important;
+  grid-auto-flow: row !important;
+  align-content: start !important;
+  height: auto !important;
+  min-height: 0 !important;
+  max-height: none !important;
+  overflow: visible !important;
+}
+
+.orders-admin-view.orders-page-view.inventory-page-view > * {
+  grid-row: auto !important;
+  grid-column: auto !important;
+}
+
+.inventory-page-view .orders-page-header.inventory-page-header {
+  display: flex !important;
+  flex-direction: row !important;
+  flex-wrap: wrap !important;
+  align-items: flex-start !important;
+  align-content: flex-start !important;
+  justify-content: space-between !important;
+  gap: 16px 20px !important;
+  height: auto !important;
+  min-height: 0 !important;
+  max-height: none !important;
+  overflow: visible !important;
+}
+
+.inventory-page-view .orders-page-header.inventory-page-header .orders-page-heading {
+  display: flex !important;
+  flex-direction: column !important;
+  flex: 1 1 220px !important;
+  min-width: 200px !important;
+  width: auto !important;
+  grid-column: auto !important;
+  grid-row: auto !important;
+}
+
+.inventory-page-view .orders-page-header.inventory-page-header .orders-header-side {
+  display: flex !important;
+  flex-direction: column !important;
+  flex: 2 1 520px !important;
+  min-width: 280px !important;
+  width: auto !important;
+  max-width: 100% !important;
+  align-items: stretch !important;
+  justify-content: flex-start !important;
+  gap: 0 !important;
+  grid-column: auto !important;
+  grid-row: auto !important;
+}
+
+.inventory-page-view .orders-page-header.inventory-page-header .header-actions {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  justify-content: flex-end !important;
+  align-items: center !important;
+  width: 100% !important;
+  height: auto !important;
+  gap: 10px !important;
+  grid-area: auto !important;
+}
+
+.inventory-page-view .inventory-header-search {
+  flex: 1 1 220px !important;
+  min-width: 180px !important;
+  grid-area: auto !important;
+}
+
+.inventory-page-view .inventory-header-action,
+.inventory-page-view .inventory-refresh-btn {
+  flex: 0 0 auto !important;
+  width: auto !important;
+}
+
+.inventory-page-view .orders-header-metrics.inventory-header-metrics {
+  display: grid !important;
+  flex: 1 1 100% !important;
+  width: 100% !important;
+  grid-template-columns: repeat(6, minmax(110px, 1fr)) !important;
+  grid-auto-rows: min-content !important;
+  align-content: start !important;
+  height: auto !important;
+  max-height: none !important;
+  margin-top: 4px !important;
+}
+
+.inventory-page-view .orders-header-metrics.inventory-header-metrics .orders-header-metric-card {
+  min-height: 0 !important;
+  height: auto !important;
+  align-self: start !important;
+}
+
+/* Reserva espacio para el botón flotante de menú (hamburguesa fija arriba
+   a la izquierda) también entre 761–980px, no solo debajo de 760px. */
+@media (max-width: 980px) {
+  .orders-admin-view.orders-page-view.inventory-page-view {
+    padding-top: 56px !important;
+  }
+}
+
+@media (max-width: 1400px) {
+  .inventory-page-view .orders-header-metrics.inventory-header-metrics {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  }
+}
+
+@media (max-width: 560px) {
+  .inventory-page-view .orders-header-metrics.inventory-header-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+
+  .inventory-page-view .orders-page-header.inventory-page-header .orders-header-side {
+    min-width: 0 !important;
+    flex-basis: 100% !important;
+  }
+
+  .inventory-page-view .inventory-header-search {
+    flex-basis: 100% !important;
+  }
+
+  .inventory-page-view .inventory-header-action,
+  .inventory-page-view .inventory-refresh-btn {
+    flex: 1 1 auto !important;
+  }
+}
+
+/* ════════════════════════════════════════════════════════════════════════
+   INVENTARIO — nuevas piezas de la propuesta (inventario.md):
+   panel "Más vendidos" y registro rápido de movimientos desde la pestaña
+   Movimientos. Todo escopado a .inventory-page-view, responsive, sin
+   solapar entre sí.
+   ════════════════════════════════════════════════════════════════════════ */
+
+/* Grid ejecutivo: ahora 3 paneles (categoría / alertas / más vendidos) */
+.inventory-page-view .inventory-executive-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+}
+
+@media (max-width: 1300px) {
+  .inventory-page-view .inventory-executive-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+}
+
+@media (max-width: 1024px) {
+  .inventory-page-view .inventory-executive-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* Panel "Más vendidos" — mismo lenguaje visual que el panel de alertas */
+.inventory-page-view .inventory-top-seller-item {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 1.5px solid transparent;
+  border-radius: 10px;
+  background: transparent;
+  transition: background 0.13s;
+}
+
+.inventory-page-view .inventory-top-seller-item:hover {
+  background: rgba(159, 47, 95, 0.05);
+}
+
+.inventory-page-view .inventory-top-seller-rank {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 999px;
+  background: rgba(159, 47, 95, 0.1);
+  color: #9f2f5f;
+  font-size: 10.5px;
+  font-weight: 800;
+}
+
+.inventory-page-view .inventory-top-seller-info {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.inventory-page-view .inventory-top-seller-info strong {
+  color: #111827;
+  font-size: 12.5px;
+  font-weight: 750;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.inventory-page-view .inventory-top-seller-info span {
+  color: #9ca3af;
+  font-size: 11px;
+  font-weight: 550;
+}
+
+.inventory-page-view .inventory-top-seller-count {
+  flex-shrink: 0;
+  color: #15803d;
+  font-size: 11.5px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+/* Encabezado de Movimientos: título + acciones rápidas + filtro, sin
+   encimarse en ningún ancho. */
+.inventory-page-view .inventory-movements-head {
+  flex-wrap: wrap !important;
+  row-gap: 10px !important;
+}
+
+.inventory-page-view .inventory-movements-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  flex: 1 1 auto;
+}
+
+.inventory-page-view .inventory-movement-quick-btn {
+  display: inline-flex !important;
+  align-items: center;
+  gap: 6px;
+  min-height: 36px !important;
+  padding: 0 12px !important;
+  border-radius: 10px !important;
+  font-size: 12.5px !important;
+  font-weight: 700 !important;
+  white-space: nowrap;
+}
+
+.inventory-page-view .inventory-movement-quick-btn.is-entrada {
+  border-color: rgba(22, 163, 74, 0.35) !important;
+  color: #15803d !important;
+}
+
+.inventory-page-view .inventory-movement-quick-btn.is-entrada:hover {
+  background: #ecfdf5 !important;
+}
+
+.inventory-page-view .inventory-movement-quick-btn.is-salida {
+  border-color: rgba(202, 138, 4, 0.35) !important;
+  color: #a06106 !important;
+}
+
+.inventory-page-view .inventory-movement-quick-btn.is-salida:hover {
+  background: #fff7d6 !important;
+}
+
+.inventory-page-view .inventory-movement-quick-btn.is-ajuste {
+  border-color: rgba(159, 47, 95, 0.35) !important;
+  color: #9f2f5f !important;
+}
+
+.inventory-page-view .inventory-movement-quick-btn.is-ajuste:hover {
+  background: #f7edf2 !important;
+}
+
+@media (max-width: 760px) {
+  .inventory-page-view .inventory-movements-head {
+    align-items: stretch !important;
+  }
+
+  .inventory-page-view .inventory-movements-actions {
+    width: 100% !important;
+  }
+
+  .inventory-page-view .inventory-movement-quick-btn {
+    flex: 1 1 auto !important;
+    justify-content: center;
+  }
+
+  .inventory-page-view .inventory-movements-filters {
+    width: 100% !important;
+  }
+
+  .inventory-page-view .inventory-movement-type-select {
+    width: 100% !important;
+  }
+}
+
+/* ════════════════════════════════════════════════════════════════════════
+   INVENTARIO — Arreglos: estado activo/inactivo, resumen de fabricación
+   (costo, capacidad, componente limitante) y simulador de pedido.
+   Todo calculado en el navegador; solo estilos nuevos, nada se solapa.
+   ════════════════════════════════════════════════════════════════════════ */
+
+.inventory-page-view .inventory-receta-card.is-inactive {
+  opacity: 0.65;
+}
+
+.inventory-page-view .inventory-receta-meta {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  row-gap: 6px;
+}
+
+.inventory-page-view .inventory-add-ingredient-form {
+  flex-wrap: wrap;
+}
+
+.inventory-page-view .inventory-add-ingredient-form select {
+  min-width: 200px;
+}
+
+/* Resumen de fabricación */
+.inventory-page-view .inventory-receta-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.inventory-page-view .inventory-receta-summary-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1.5px solid rgba(159, 47, 95, 0.14);
+  border-radius: 12px;
+  background: #ffffff;
+}
+
+.inventory-page-view .inventory-receta-summary-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  flex-shrink: 0;
+  border-radius: 10px;
+  background: rgba(159, 47, 95, 0.08);
+  color: #9f2f5f;
+}
+
+.inventory-page-view .inventory-receta-summary-item div {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.inventory-page-view .inventory-receta-summary-item strong {
+  color: #111827;
+  font-size: 14px;
+  font-weight: 800;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.inventory-page-view .inventory-receta-summary-item span {
+  color: #6b7280;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+@media (max-width: 640px) {
+  .inventory-page-view .inventory-receta-summary {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Simulador de pedido */
+.inventory-page-view .inventory-simulator {
+  margin-top: 14px;
+  padding: 12px 14px;
+  border: 1.5px solid rgba(159, 47, 95, 0.14);
+  border-radius: 12px;
+  background: #ffffff;
+}
+
+.inventory-page-view .inventory-simulator-heading {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: #1f0d17;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.inventory-page-view .inventory-simulator-heading svg {
+  color: #9f2f5f;
+  flex-shrink: 0;
+}
+
+.inventory-page-view .inventory-simulator .inventory-form-help {
+  margin: 4px 0 10px;
+}
+
+.inventory-page-view .inventory-simulator-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  max-width: 220px;
+}
+
+.inventory-page-view .inventory-simulator-result {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(159, 47, 95, 0.12);
+}
+
+.inventory-page-view .inventory-simulator-verdict {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-bottom: 8px;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.inventory-page-view .inventory-simulator-result.is-ok .inventory-simulator-verdict {
+  color: #15803d;
+}
+
+.inventory-page-view .inventory-simulator-result.is-ok .inventory-simulator-verdict svg {
+  color: #15803d;
+}
+
+.inventory-page-view .inventory-simulator-result.is-blocked .inventory-simulator-verdict {
+  color: #dc2626;
+}
+
+.inventory-page-view .inventory-simulator-result.is-blocked .inventory-simulator-verdict svg {
+  color: #dc2626;
+}
+
+.inventory-page-view .inventory-simulator-table {
+  margin-bottom: 0;
+}
+
+.inventory-page-view .inventory-simulator-row-short td {
+  background: rgba(220, 38, 38, 0.05) !important;
+}
+
+@media (max-width: 640px) {
+  .inventory-page-view .inventory-simulator-form {
+    max-width: 100%;
   }
 }
