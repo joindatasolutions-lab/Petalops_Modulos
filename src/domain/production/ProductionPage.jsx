@@ -1990,7 +1990,7 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
 
   const recalcularPedido = async item => {
     try {
-      await api.recalcularProduccinPedido({
+      await api.recalcularProduccionPedido({
         pedidoId: item.pedidoID,
         usuarioCambio,
         motivo: motivoAccion || "Recalculo desde front",

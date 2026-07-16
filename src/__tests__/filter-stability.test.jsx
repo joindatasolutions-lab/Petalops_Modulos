@@ -4,7 +4,7 @@ import { filterAccountingDetailRows } from "../domain/accounting/AccountingPage.
 import { buildDeliveryAdminQueryPlan, deliveryMatchesSearch } from "../domain/delivery/DeliveryPage.jsx";
 import { filterInventoryItems } from "../domain/inventory/InventoryPage.jsx";
 import { filterNeighborhoodItems, sortNeighborhoods } from "../domain/neighborhoods/NeighborhoodsPage.jsx";
-import { buildOrdersMetrics, extractOrdersPayloadItems, filterOrdersBySearch, filterOrdersByStatus, isStorePickupOrder, resolveOrdersPayloadTotal } from "../domain/orders-admin/OrdersAdminPage.jsx";
+import { buildOrdersMetrics, extractOrdersPayloadItems, filterOrdersBySearch, filterOrdersByStatus, isStorePickupOrder, resolveOrdersPayloadTotal, shouldShowPendingInvoiceAlert } from "../domain/orders-admin/OrdersAdminPage.jsx";
 import {
   buildVisibleProductionItems,
   catalogCodeCandidates,
@@ -52,6 +52,8 @@ describe("estabilidad de filtros por vista", () => {
     ];
 
     expect(buildOrdersMetrics(rows, 99, "2026-06-25").facturasNoImpresas).toBe(1);
+    expect(shouldShowPendingInvoiceAlert(rows[0])).toBe(false);
+    expect(shouldShowPendingInvoiceAlert(rows[1])).toBe(true);
   });
 
   it("Pedidos: detecta pedidos para recoger en tienda", () => {

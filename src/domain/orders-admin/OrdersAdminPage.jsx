@@ -438,7 +438,7 @@ function resolveFloristaName(item) {
 
 export function buildOrdersMetrics(items, facturasPendientesImpresion = 0, targetDate = todayIsoDate()) {
   const rows = Array.isArray(items) ? items : [];
-  const facturasNoImpresasVisibles = rows.filter(item => canInvoiceStatus(item.estado) && !item.facturaImpresa).length;
+  const facturasNoImpresasVisibles = rows.filter(shouldShowPendingInvoiceAlert).length;
   const facturasNoImpresas = rows.length > 0
     ? facturasNoImpresasVisibles
     : Number(facturasPendientesImpresion || 0);
@@ -454,6 +454,10 @@ export function buildOrdersMetrics(items, facturasPendientesImpresion = 0, targe
     cancelados: rows.filter(item => ["CANCELADO", "RECHAZADO"].includes(normalizeStatus(item.estado))).length,
     facturasNoImpresas,
   };
+}
+
+export function shouldShowPendingInvoiceAlert(item) {
+  return Boolean(item) && canInvoiceStatus(item.estado) && !item.facturaImpresa;
 }
 
 export function filterOrdersByStatus(items, estado) {
@@ -2864,7 +2868,7 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
                             <span className="orders-status-icon" aria-hidden="true" />
                             {item.estado || "-"}
                           </span>
-                          {canDownloadInvoice && !item.facturaImpresa ? (
+                          {shouldShowPendingInvoiceAlert(item) ? (
                             <span className="orders-inline-alert">Factura pendiente</span>
                           ) : null}
                           {["CANCELADO", "RECHAZADO"].includes(normalizeStatus(item.estado)) && item.motivoRechazo ? (
