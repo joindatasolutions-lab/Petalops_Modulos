@@ -3,7 +3,9 @@ import { describe, expect, it } from "vitest";
 import {
   deliveryArrangementName,
   deliveryMatchesSearch,
+  deliveryOrderCodeLabel,
   isStorePickupDelivery,
+  resolveDetailArrangementName,
 } from "../domain/delivery/DeliveryPage.jsx";
 
 describe("filtros de domicilios", () => {
@@ -35,9 +37,27 @@ describe("filtros de domicilios", () => {
     expect(deliveryMatchesSearch(order, "primavera")).toBe(true);
   });
 
+  it("muestra el numero de pedido sin prefijo FLR", () => {
+    expect(deliveryOrderCodeLabel({ numeroPedido: "FLR-54678" })).toBe("54678");
+    expect(deliveryOrderCodeLabel({ numero_pedido: "54679" })).toBe("54679");
+  });
+
+  it("resuelve el nombre del producto desde el detalle del pedido", () => {
+    const detail = {
+      data: {
+        productos: [
+          { nombreProducto: "Personalizado 0096" },
+        ],
+      },
+    };
+
+    expect(resolveDetailArrangementName(detail)).toBe("Personalizado 0096");
+  });
+
   it("detecta entregas que son para tienda", () => {
     expect(isStorePickupDelivery({ tipo_entrega: "recogida_en_tienda" })).toBe(true);
     expect(isStorePickupDelivery({ tipoEntrega: "Entrega en tiendas" })).toBe(true);
+    expect(isStorePickupDelivery({ direccion: "Recoger En Tienda" })).toBe(true);
     expect(isStorePickupDelivery({ tipoEntrega: "domicilio" })).toBe(false);
   });
 });

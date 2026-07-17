@@ -18,10 +18,16 @@ export function createApiClient(config) {
 
   const toHttpError = async response => {
     let detail = "";
+    let code = "";
+    let module = "";
+    let requestId = "";
     try {
       const payload = await response.json();
       if (payload?.error?.message) {
         detail = String(payload.error.message || "").trim();
+        code = String(payload.error.code || "").trim();
+        module = String(payload.error.module || "").trim();
+        requestId = String(payload.error.request_id || payload.error.requestId || "").trim();
       } else {
         detail = String(payload?.detail || "").trim();
       }
@@ -29,9 +35,16 @@ export function createApiClient(config) {
       detail = "";
     }
 
-    const error = new Error(detail || `HTTP ${response.status}`);
+    const contextParts = [code, module ? `modulo ${module}` : "", requestId ? `request_id ${requestId}` : ""].filter(Boolean);
+    const message = contextParts.length
+      ? `${detail || `HTTP ${response.status}`} (${contextParts.join(" · ")})`
+      : detail || `HTTP ${response.status}`;
+    const error = new Error(message);
     error.status = response.status;
     error.detail = detail;
+    error.code = code;
+    error.module = module;
+    error.requestId = requestId;
     return error;
   };
 

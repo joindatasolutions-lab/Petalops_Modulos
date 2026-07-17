@@ -200,6 +200,7 @@ export function InventoryPage({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [info, setInfo] = useState("");
+  const [openInventoryMenuId, setOpenInventoryMenuId] = useState(null);
 
   // ── Datos ──
   const [items, setItems] = useState([]);
@@ -261,6 +262,7 @@ export function InventoryPage({
     setTipoMovimientoFiltro("");
     setError("");
     setInfo("");
+    setOpenInventoryMenuId(null);
     setRecetaDetalle(null);
   }, []);
 
@@ -886,20 +888,29 @@ export function InventoryPage({
                             )}
                             <td data-label="Proveedor">{item.proveedor || "-"}</td>
                             <td data-label="Acción">
-                              <details className="inventory-row-menu">
-                                <summary aria-label="Más acciones"><EllipsisVertical size={18} strokeWidth={2} /></summary>
+                              <details className="inventory-row-menu" open={openInventoryMenuId === item.inventarioID}>
+                                <summary
+                                  aria-label="Más acciones"
+                                  onClick={event => {
+                                    event.preventDefault();
+                                    setOpenInventoryMenuId(current => current === item.inventarioID ? null : item.inventarioID);
+                                  }}
+                                >
+                                  <EllipsisVertical size={18} strokeWidth={2} />
+                                </summary>
                                 <div className="inventory-row-menu-panel">
-                                  <button type="button" onClick={() => setInfo(`${item.nombre} | Código: ${item.codigo} | Cat: ${item.categoria}${item.subcategoria ? ` / ${item.subcategoria}` : ""}`)}><Eye size={15} strokeWidth={2} /> Ver detalle</button>
-                                  <button type="button" onClick={() => setInfo(`Edición próximamente: ${item.nombre}`)}><Pencil size={15} strokeWidth={2} /> Editar</button>
+                                  <button type="button" onClick={() => { setOpenInventoryMenuId(null); setInfo(`${item.nombre} | Código: ${item.codigo} | Cat: ${item.categoria}${item.subcategoria ? ` / ${item.subcategoria}` : ""}`); }}><Eye size={15} strokeWidth={2} /> Ver detalle</button>
+                                  <button type="button" onClick={() => { setOpenInventoryMenuId(null); setInfo(`Edición próximamente: ${item.nombre}`); }}><Pencil size={15} strokeWidth={2} /> Editar</button>
                                   <button
                                     type="button"
                                     onClick={() => {
+                                      setOpenInventoryMenuId(null);
                                       setStockForm(f => ({ ...f, inventarioID: String(item.inventarioID) }));
                                       setVistaActiva("ajustar");
                                     }}
                                   ><RotateCcw size={15} strokeWidth={2} /> Ajustar stock</button>
-                                  <button type="button" onClick={() => cambiarModulo("movimientos")}><Archive size={15} strokeWidth={2} /> Ver movimientos</button>
-                                  <button type="button" onClick={() => toggleActivo(item)}><CircleX size={15} strokeWidth={2} /> {item.activo ? "Desactivar" : "Activar"}</button>
+                                  <button type="button" onClick={() => { setOpenInventoryMenuId(null); cambiarModulo("movimientos"); }}><Archive size={15} strokeWidth={2} /> Ver movimientos</button>
+                                  <button type="button" onClick={() => { setOpenInventoryMenuId(null); toggleActivo(item); }}><CircleX size={15} strokeWidth={2} /> {item.activo ? "Desactivar" : "Activar"}</button>
                                 </div>
                               </details>
                             </td>

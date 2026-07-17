@@ -2225,6 +2225,147 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
 
         {submenu === "pedidos" && (
           <>
+            <section className="production-mobile-workspace" aria-label="Producción móvil">
+              <div className="production-mobile-hero">
+                <div className="production-mobile-title-block">
+                  <h1>Producción</h1>
+                  <span>
+                    <CalendarDays size={14} strokeWidth={2} aria-hidden="true" />
+                    Hoy, {productionHeaderDateLabel()}
+                  </span>
+                </div>
+                <button type="button" className="production-mobile-refresh" title="Recargar vista" onClick={refreshAll}>
+                  <RotateCw size={20} strokeWidth={2.2} aria-hidden="true" />
+                </button>
+              </div>
+
+              <label className="production-mobile-search" aria-label="Buscar producción">
+                <Search size={19} strokeWidth={2} aria-hidden="true" />
+                <input
+                  type="search"
+                  value={busquedaGeneral}
+                  onChange={event => {
+                    setActiveMetricFilter(null);
+                    setBusquedaGeneral(event.target.value);
+                  }}
+                  placeholder="Buscar pedido, cliente..."
+                  title="Buscar por florista, cliente o número de pedido"
+                />
+              </label>
+
+              <div className="production-mobile-kpis" aria-label="Indicadores de producción">
+                <button type="button" className={`production-mobile-kpi${activeMetricFilter == null ? " is-active" : ""}`} onClick={() => focusMetric(null)}>
+                  <strong>{metrics.total}</strong>
+                  <span>Visibles</span>
+                </button>
+                <button type="button" className={`production-mobile-kpi${activeMetricFilter === "pendientesHoy" ? " is-active" : ""}`} onClick={() => focusMetric("pendientesHoy")}>
+                  <strong>{metrics.pendientesHoy}</strong>
+                  <span>Pendientes</span>
+                </button>
+                <button type="button" className={`production-mobile-kpi${activeMetricFilter === "sinAsignar" ? " is-active" : ""}`} onClick={() => focusMetric("sinAsignar")}>
+                  <strong>{metrics.sinAsignar}</strong>
+                  <span>Sin asignar</span>
+                </button>
+              </div>
+
+              <div className="production-mobile-status-tabs" aria-label="Filtrar por estado de producción">
+                <button
+                  type="button"
+                  className={`production-mobile-status is-all${selectedStatusKey === "todos" ? " is-active" : ""}`}
+                  onClick={selectAllProductionStatuses}
+                >
+                  Todos
+                </button>
+                {ESTADOS_UI.map(item => (
+                  <button
+                    key={item}
+                    type="button"
+                    className={`production-mobile-status ${productionStatusChipClass(item)}${selectedStatusKey === normalizeStatus(item).replace(/_/g, "") ? " is-active" : ""}`}
+                    onClick={() => toggleEstadoFiltro(item)}
+                  >
+                    {item}
+                  </button>
+                ))}
+              </div>
+
+              <div className="production-mobile-counts" aria-live="polite">
+                <span><strong>{productionTotal}</strong> visibles</span>
+                <span><strong>{metrics.pendientesHoy}</strong> pendientes</span>
+                <span><strong>{metrics.sinAsignar}</strong> sin asignar</span>
+              </div>
+
+              {error ? <p className="production-mobile-message">{error}</p> : null}
+              {loading ? <p className="production-mobile-message">Cargando producción...</p> : null}
+              {!loading && !error && focusedVisibleItems.length === 0 ? (
+                <p className="production-mobile-message">No hay arreglos que coincidan con los filtros seleccionados.</p>
+              ) : null}
+
+              {!loading && !error && paginatedProductionItems.length > 0 ? (
+                <div className="production-mobile-list" aria-label="Pedidos de producción">
+                  {paginatedProductionItems.map(item => {
+                    const timing = deliveryTimingStatus(item);
+                    const productPreview = resolveProductionProduct(item, catalogProductIndex, {
+                      preferCatalogCode: shouldUseCatalogCodeForProduction() || isEmpresaCatalogCode(empresaId),
+                      allowDirectImage: true,
+                    });
+                    const productImageSrc = resolveImageSrc(resolveProductionDisplayImageUrl(item, catalogProductIndex, productionProductImages, empresaId), tenantConfig.apiBaseUrl);
+                    return (
+                      <article key={`mobile-${item.idProduccion}`} className={`production-mobile-card ${!hasAssignedFlorista(item) ? "is-unassigned" : ""}`}>
+                        <div className="production-mobile-card-top">
+                          <strong>Pedido #{item.numeroPedido ?? "-"}</strong>
+                          <span>{item.horaEntrega || "-"}</span>
+                        </div>
+                        <div className="production-mobile-card-body">
+                          {productImageSrc ? (
+                            <img src={productImageSrc} alt="" loading="lazy" />
+                          ) : (
+                            <span className="production-mobile-product-fallback">{productInitials(productPreview.name || item.producto)}</span>
+                          )}
+                          <div>
+                            <strong>{item.cliente || "-"}</strong>
+                            <span>{productPreview.name || item.producto || "-"} x {item.cantidadProducciones || 1}</span>
+                            <small>{item.floristaAsignado || "Sin asignar"}</small>
+                          </div>
+                        </div>
+                        <div className="production-mobile-card-meta">
+                          <span className={`order-badge ${productionStatusBadgeClass(item)}`}>{item.estado || "-"}</span>
+                          <span className={`production-timing-badge ${timing.className}`}>{timing.label}</span>
+                        </div>
+                        <div className="production-mobile-card-actions">
+                          {canManageProductionActions || canFloristaQuickState ? (
+                            <button type="button" onClick={() => openAssignmentDrawer(item)}>Asignar</button>
+                          ) : null}
+                          <button type="button" onClick={() => openActionsDrawer(item)}>Ver detalle</button>
+                          {canFloristaQuickState && (canChangeOwnProductionState(item) || isProductionReadyForDelivery(item.estado)) && shouldShowFloristaStateAction(item.estado) ? (
+                            <button
+                              type="button"
+                              onClick={nextFloristaStatus(item.estado) ? () => cambiarEstadoFloristaRapido(item) : undefined}
+                              disabled={!nextFloristaStatus(item.estado)}
+                            >
+                              {nextFloristaLabel(item.estado) || "Listo"}
+                            </button>
+                          ) : null}
+                        </div>
+                      </article>
+                    );
+                  })}
+                </div>
+              ) : null}
+
+              <footer className="production-mobile-pager" aria-label="Paginación móvil de producción">
+                <span>Mostrando {productionVisibleFrom} a {productionVisibleTo} de {productionTotal}</span>
+                <div>
+                  <button type="button" onClick={() => setProductionPage(current => Math.max(1, current - 1))} disabled={productionPage <= 1}>
+                    <ChevronLeft size={17} strokeWidth={2.4} aria-hidden="true" />
+                  </button>
+                  <strong>{productionPage}</strong>
+                  <button type="button" onClick={() => setProductionPage(current => Math.min(productionPages, current + 1))} disabled={productionPage >= productionPages}>
+                    <ChevronRight size={17} strokeWidth={2.4} aria-hidden="true" />
+                  </button>
+                </div>
+              </footer>
+            </section>
+
             <section className="orders-filters orders-filters--four-col production-filters-bar">
               <div className="filter-field production-filter-field">
                 <span>Fecha Inicio</span>
@@ -2331,7 +2472,7 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
                     return (
                     <tr key={item.idProduccion} className={rowStateClasses}>
                       <td>
-                        <span className="production-order-badge">{item.numeroPedido ?? "-"}</span>
+                        <span className="production-order-badge">#{item.numeroPedido ?? "-"}</span>
                       </td>
                       <td>
                         <div className="production-product-preview">
@@ -2343,7 +2484,10 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
                             )}
                           </span>
                           <div className="production-product-customer">
-                            <strong>{productPreview.name || item.producto || "-"}</strong>
+                            <strong>
+                              {productPreview.name || item.producto || "-"}
+                              <span className="production-product-qty"> x {item.cantidadProducciones || 1}</span>
+                            </strong>
                             <span>{item.cliente || "-"}</span>
                           </div>
                         </div>
@@ -2385,6 +2529,7 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
                               disabled={!nextFloristaStatus(item.estado)}
                             >
                               <CirclePlay size={18} strokeWidth={2} aria-hidden="true" />
+                              <span className="production-action-label">{nextFloristaLabel(item.estado) || "Listo"}</span>
                             </button>
                           ) : null}
                           <button
@@ -2395,6 +2540,7 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
                             onClick={() => openActionsDrawer(item)}
                           >
                             <Eye size={18} strokeWidth={2} aria-hidden="true" />
+                            <span className="production-action-label">Ver detalle</span>
                           </button>
                           {canManageProductionActions || canFloristaQuickState ? (
                             <button
@@ -2405,6 +2551,7 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
                               onClick={() => openAssignmentDrawer(item)}
                             >
                               <User size={18} strokeWidth={2} aria-hidden="true" />
+                              <span className="production-action-label">Asignar</span>
                             </button>
                           ) : null}
                         </div>

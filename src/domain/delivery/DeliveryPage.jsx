@@ -57,7 +57,6 @@ const DELIVERY_VIEWS = [
   { value: "admin", label: "Pedidos" },
   { value: "disponibles", label: "Disponibles" },
   { value: "domiciliarios", label: "Domiciliarios" },
-  { value: "mis-pedidos", label: "Mis pedidos" },
 ];
 
 const DELIVERY_STATUS_FILTERS = [
@@ -274,6 +273,14 @@ export function isStorePickupDelivery(item) {
     item.metodo_entrega,
     item.entrega?.tipoEntrega,
     item.entrega?.tipo_entrega,
+    item.direccion,
+    item.direccionDestino,
+    item.direccion_destino,
+    item.direccionEntrega,
+    item.direccion_entrega,
+    item.entrega?.direccion,
+    item.entrega?.direccionDestino,
+    item.entrega?.direccion_destino,
   ].map(normalizeSearchText).filter(Boolean).join(" ");
 
   if (!deliveryTypeText) return false;
@@ -554,6 +561,19 @@ function deliverySearchValues(item) {
   ];
 }
 
+export function deliveryOrderCodeLabel(itemOrValue) {
+  const raw = itemOrValue && typeof itemOrValue === "object"
+    ? itemOrValue.numeroPedido
+      ?? itemOrValue.numero_pedido
+      ?? itemOrValue.codigoPedido
+      ?? itemOrValue.codigo_pedido
+      ?? ""
+    : itemOrValue;
+  const text = String(raw || "").trim();
+  if (!text) return "-";
+  return text.replace(/^[A-Za-z]+[-_\s]*(?=\d)/, "") || text;
+}
+
 export function deliveryMatchesSearch(item, search) {
   const query = normalizeDeliverySearchValue(search);
   if (!query) return true;
@@ -575,7 +595,7 @@ function deliveryPedidoId(item) {
   const candidates = [item?.pedidoID, item?.pedidoId, item?.pedido_id, item?.idPedido, item?.id_pedido, item?.numeroPedido, item?.numero_pedido];
   for (const value of candidates) {
     if (value == null || value === "") continue;
-    const parsed = Number(value);
+    const parsed = Number(deliveryOrderCodeLabel(value));
     if (Number.isFinite(parsed) && parsed > 0) return parsed;
   }
   return null;
@@ -590,6 +610,20 @@ function resolveDetailProductImageUrl(detail, catalogIndex = new Map()) {
   return "";
 }
 
+export function resolveDetailArrangementName(detail) {
+  const products = Array.isArray(detail?.productos)
+    ? detail.productos
+    : Array.isArray(detail?.data?.productos)
+      ? detail.data.productos
+      : Array.isArray(detail?.items)
+        ? detail.items
+        : [];
+  const names = products
+    .map(product => deliveryArrangementName(product))
+    .filter(Boolean);
+  return names.join(" + ");
+}
+
 function orderValue(item) {
   const value = Number(item?.total || item?.valor || item?.valorPedido || 0);
   if (!Number.isFinite(value) || value <= 0) return "-";
@@ -598,6 +632,22 @@ function orderValue(item) {
 
 function deliveryTimeLabel(item) {
   return item?.horaEntrega || formatTimeOnly(item?.fechaEntregaProgramada) || "-";
+}
+
+function deliveryDateLabel(item) {
+  const value = item?.fechaEntrega
+    || item?.fecha_entrega
+    || item?.fechaEntregaProgramada
+    || item?.fecha_entrega_programada
+    || item?.fechaProgramada
+    || item?.fecha_programada;
+  return formatDateOnly(value) || "";
+}
+
+function deliveryDateTimeLabel(item) {
+  const date = deliveryDateLabel(item);
+  const time = deliveryTimeLabel(item);
+  return [date, time && time !== "-" ? time : ""].filter(Boolean).join(" · ") || "-";
 }
 
 function courierName(item) {
@@ -800,11 +850,13 @@ export function DeliveryPage({
   const [selectedDomiciliarioByEntrega, setSelectedDomiciliarioByEntrega] = useState({});
   const [catalogProducts, setCatalogProducts] = useState([]);
   const [deliveryProductImages, setDeliveryProductImages] = useState({});
+  const [deliveryProductNames, setDeliveryProductNames] = useState({});
   const [filtro, setFiltro] = useState("hoy");
   const [statusFilter, setStatusFilter] = useState("todos");
   const [fechaFiltro, setFechaFiltro] = useState(todayIso());
   const [deliverySearch, setDeliverySearch] = useState("");
   const [courierSearch, setCourierSearch] = useState("");
+  const [openDeliveryActionsKey, setOpenDeliveryActionsKey] = useState("");
 
   const [modo, setModo] = useState("admin");
   const [domiciliarioId, setDomiciliarioId] = useState("");
@@ -853,6 +905,11 @@ export function DeliveryPage({
     return adminItems.filter(item => deliveryCourierIdValue(item) === Number(currentDomiciliarioId));
   }, [adminItems, soloMisAsignados, currentDomiciliarioId]);
   const visibleDeliveryViews = useMemo(() => DELIVERY_VIEWS, []);
+
+  useEffect(() => {
+    setOpenDeliveryActionsKey("");
+  }, [deliverySearch, filtro, modo, statusFilter]);
+
   const filteredBarriosItems = useMemo(() => {
     const term = normalizeSearchText(barriosSearch);
     if (!term) return barriosItems;
@@ -1440,10 +1497,12 @@ export function DeliveryPage({
 
   useEffect(() => {
     const missingItems = filteredDispatchItems
-      .filter(item => !resolveDeliveryImageUrl(item, catalogProductIndex))
       .filter(item => {
         const key = deliveryItemKey(item);
-        return key && deliveryProductImages[key] == null && deliveryPedidoId(item) != null;
+        if (!key || deliveryPedidoId(item) == null) return false;
+        const missingImage = !resolveDeliveryImageUrl(item, catalogProductIndex) && deliveryProductImages[key] == null;
+        const missingName = !deliveryArrangementName(item) && deliveryProductNames[key] == null;
+        return missingImage || missingName;
       })
       .slice(0, 20);
 
@@ -1455,6 +1514,7 @@ export function DeliveryPage({
       return {
         key: deliveryItemKey(item),
         imageUrl: resolveDetailProductImageUrl(detail, catalogProductIndex),
+        productName: resolveDetailArrangementName(detail),
       };
     })).then(results => {
       if (disposed) return;
@@ -1466,10 +1526,18 @@ export function DeliveryPage({
         }
         return next;
       });
+      setDeliveryProductNames(current => {
+        const next = { ...current };
+        for (const result of results) {
+          if (result.status !== "fulfilled" || !result.value?.key) continue;
+          next[result.value.key] = result.value.productName || "";
+        }
+        return next;
+      });
     });
 
     return () => { disposed = true; };
-  }, [api, catalogProductIndex, deliveryProductImages, filteredDispatchItems]);
+  }, [api, catalogProductIndex, deliveryProductImages, deliveryProductNames, filteredDispatchItems]);
 
   const selectedDispatchItem = selectedDeliveryItem || filteredDispatchItems[0] || null;
   const courierSearchTerm = normalizeSearchText(courierSearch);
@@ -1593,6 +1661,10 @@ export function DeliveryPage({
             {error ? <p className="orders-message delivery-error">{error}</p> : null}
             {loading ? <p className="orders-message">Cargando domicilios...</p> : null}
 
+            <section className="delivery-current-panel-title" aria-label="Panel actual">
+              <h2>Mis pedidos</h2>
+            </section>
+
             <section className="delivery-dispatch-controls">
               <label className="filter-field delivery-dispatch-search">
                 <span>Buscar</span>
@@ -1681,8 +1753,9 @@ export function DeliveryPage({
                     const selected = selectedDispatchItem?.idEntrega === item.idEntrega;
                     const address = deliveryAddressParts(item);
                     const payment = deliveryPaymentMeta(item);
-                    const imageUrl = resolveDeliveryImageUrl(item, catalogProductIndex) || deliveryProductImages[deliveryItemKey(item)] || "";
-                    const arrangementName = deliveryArrangementName(item);
+                    const itemKey = deliveryItemKey(item);
+                    const imageUrl = resolveDeliveryImageUrl(item, catalogProductIndex) || deliveryProductImages[itemKey] || "";
+                    const arrangementName = deliveryArrangementName(item) || deliveryProductNames[itemKey] || "";
                     return (
                       <article
                         key={item.idEntrega || item.numeroPedido}
@@ -1691,11 +1764,11 @@ export function DeliveryPage({
                       >
                         <div className="delivery-card-order">
                           <div className="delivery-card-topline">
-                            <strong>#{item.numeroPedido || "-"}</strong>
+                            <strong>#{deliveryOrderCodeLabel(item)}</strong>
                             {isSurpriseDelivery(item) ? <span className="delivery-urgent-pill">Es sorpresa</span> : null}
                           </div>
                           <strong className="delivery-card-product-name">{arrangementName || "Producto sin nombre"}</strong>
-                          <span className="delivery-card-time"><Clock3 size={14} /> {deliveryTimeLabel(item)}</span>
+                          <span className="delivery-card-time"><Clock3 size={14} /> {deliveryDateTimeLabel(item)}</span>
                           <div className="delivery-product-thumb" aria-hidden="true">
                             {imageUrl ? <img src={imageUrl} alt="" loading="lazy" /> : <span />}
                           </div>
@@ -1766,9 +1839,31 @@ export function DeliveryPage({
                               );
                             })}
                           </select>
-                          <button type="button" className="delivery-icon-btn" title="Abrir ruta" aria-label="Abrir ruta" onClick={() => openMaps(item)}><Route size={16} /></button>
-                          <button type="button" className="delivery-icon-btn" title="WhatsApp cliente" aria-label="WhatsApp cliente" onClick={() => openWhatsApp(item)}><MessageCircle size={16} /></button>
-                          <button type="button" className="delivery-icon-btn" title="Mas opciones" aria-label="Mas opciones" onClick={() => openDeliveryDetail(item)}><MoreVertical size={17} /></button>
+                          <div className="delivery-actions-menu">
+                            <button
+                              type="button"
+                              className="delivery-actions-menu-trigger"
+                              title="Mas opciones"
+                              aria-label="Mas opciones"
+                              aria-expanded={openDeliveryActionsKey === itemKey}
+                              onClick={() => setOpenDeliveryActionsKey(current => current === itemKey ? "" : itemKey)}
+                            >
+                              <MoreVertical size={17} />
+                            </button>
+                            {openDeliveryActionsKey === itemKey ? (
+                              <div className="orders-row-menu-panel delivery-actions-menu-panel">
+                                <button type="button" className="orders-row-menu-item" onClick={() => { setOpenDeliveryActionsKey(""); openMaps(item); }}>
+                                  <Route size={15} /> Abrir ruta
+                                </button>
+                                <button type="button" className="orders-row-menu-item" onClick={() => { setOpenDeliveryActionsKey(""); openWhatsApp(item); }}>
+                                  <MessageCircle size={15} /> WhatsApp cliente
+                                </button>
+                                <button type="button" className="orders-row-menu-item" onClick={() => { setOpenDeliveryActionsKey(""); openDeliveryDetail(item); }}>
+                                  <MoreVertical size={15} /> Ver detalle
+                                </button>
+                              </div>
+                            ) : null}
+                          </div>
                         </div>
                       </article>
                     );
@@ -2023,7 +2118,7 @@ export function DeliveryPage({
               <tbody>
                 {visibleAdminItems.map(item => (
                   <tr key={item.idEntrega}>
-                    <td data-label="Pedido">{item.numeroPedido}</td>
+                    <td data-label="Pedido">{deliveryOrderCodeLabel(item)}</td>
                     <td data-label="Cliente">{item.cliente || "-"}</td>
                     <td data-label="Dirección">{item.direccion || "-"}</td>
                     <td data-label="Barrio">{item.barrio || "-"}</td>
@@ -2081,7 +2176,7 @@ export function DeliveryPage({
               ) : availableItems.map(item => (
                 <article key={item.idEntrega || item.numeroPedido} className="delivery-courier-card">
                   <div className="delivery-courier-head">
-                    <strong>Pedido #{item.numeroPedido || "-"}</strong>
+                    <strong>Pedido #{deliveryOrderCodeLabel(item)}</strong>
                     <span className={`order-badge ${priorityTone(item.prioridad)}`}>{item.prioridad || "MEDIA"}</span>
                   </div>
                   <p className="delivery-address">{deliveryArrangementName(item) || "Arreglo sin nombre"}</p>
@@ -2125,7 +2220,7 @@ export function DeliveryPage({
                 ) : myOrdersGrouped.asignados.map(item => (
                   <article key={item.idEntrega} className="delivery-courier-card">
                     <div className="delivery-courier-head">
-                      <strong>Pedido #{item.numeroPedido || "-"}</strong>
+                      <strong>Pedido #{deliveryOrderCodeLabel(item)}</strong>
                       <span className={`order-badge ${stateBadgeClass(item.estado)}`}>{item.estado || "Asignado"}</span>
                     </div>
                     <p className="delivery-address">{deliveryArrangementName(item) || "Arreglo sin nombre"}</p>
@@ -2159,7 +2254,7 @@ export function DeliveryPage({
                 ) : myOrdersGrouped.enRuta.map(item => (
                   <article key={item.idEntrega} className="delivery-courier-card">
                     <div className="delivery-courier-head">
-                      <strong>Pedido #{item.numeroPedido || "-"}</strong>
+                      <strong>Pedido #{deliveryOrderCodeLabel(item)}</strong>
                       <span className={`order-badge ${stateBadgeClass(item.estado)}`}>{item.estado || "EnRuta"}</span>
                     </div>
                     <p className="delivery-address">{deliveryArrangementName(item) || "Arreglo sin nombre"}</p>
@@ -2355,7 +2450,7 @@ export function DeliveryPage({
               <section className="order-block">
                 <h4>Detalle del pedido</h4>
                 <div className="delivery-detail-list">
-                  <p><span>NÃºmero del pedido</span><strong>{selectedDeliveryItem.numeroPedido || "-"}</strong></p>
+                  <p><span>NÃºmero del pedido</span><strong>{deliveryOrderCodeLabel(selectedDeliveryItem)}</strong></p>
                   <p><span>Arreglo</span><strong>{deliveryArrangementName(selectedDeliveryItem) || "-"}</strong></p>
                   <p><span>Cliente</span><strong>{selectedDeliveryItem.cliente || selectedDeliveryItem.destinatario || "-"}</strong></p>
                   <p><span>Destinatario</span><strong>{selectedDeliveryItem.destinatario || "-"}</strong></p>

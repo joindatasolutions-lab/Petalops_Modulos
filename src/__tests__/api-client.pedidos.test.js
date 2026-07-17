@@ -37,4 +37,35 @@ describe("apiClient.listarPedidos", () => {
     expect(parsed.searchParams.get("pageSize")).toBe("300");
     expect(parsed.searchParams.get("sinImprimir")).toBe("false");
   });
+
+  it("preserva codigo, modulo y request_id en errores estructurados del API", async () => {
+    const fetchMock = vi.fn(async () => ({
+      ok: false,
+      status: 500,
+      json: async () => ({
+        success: false,
+        error: {
+          code: "PIPELINE_INTERNAL_ERROR",
+          message: "Error interno del servidor",
+          module: "pipeline",
+          request_id: "b84befc7-3ecc-4878-b0bd-646dbbaf05f3",
+        },
+      }),
+    }));
+    vi.stubGlobal("fetch", fetchMock);
+    vi.stubGlobal("localStorage", {
+      getItem: () => "token-test",
+    });
+
+    const api = createApiClient({ apiBaseUrl: "https://api.test" });
+
+    await expect(api.listarPipelinePedidos({ empresaId: 1 })).rejects.toMatchObject({
+      message: "Error interno del servidor (PIPELINE_INTERNAL_ERROR · modulo pipeline · request_id b84befc7-3ecc-4878-b0bd-646dbbaf05f3)",
+      detail: "Error interno del servidor",
+      code: "PIPELINE_INTERNAL_ERROR",
+      module: "pipeline",
+      requestId: "b84befc7-3ecc-4878-b0bd-646dbbaf05f3",
+      status: 500,
+    });
+  });
 });

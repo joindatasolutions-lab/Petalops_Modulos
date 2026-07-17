@@ -4,7 +4,7 @@ import { useRef } from "react";
 import { createApiClient } from "../../infrastructure/apiClient.js";
 import { AppSidebar } from "../../shared/AppSidebar.jsx";
 import { useSidebarState } from "../../shared/useSidebarState.js";
-import { formatearCOP, normalizeStatus, shiftIsoDate, splitDateTimeParts, todayIsoDateBogota, toIsoDateEnd, toIsoDateStart } from "../../shared/utils.js";
+import { formatearCOP, normalizeStatus, shiftIsoDate, splitDateTimeParts, todayIsoDateBogota } from "../../shared/utils.js";
 import { useDebouncedValue } from "../../shared/useDebouncedValue.js";
 import {
   IconCheck,
@@ -56,8 +56,25 @@ function todayIsoDate() {
   return todayIsoDateBogota();
 }
 
+function formatIsoDateFromLocalDate(date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+export function localDateStartParam(dateValue) {
+  const value = String(dateValue || "").trim().slice(0, 10);
+  return value ? `${value} 00:00:00` : "";
+}
+
+export function localDateEndParam(dateValue) {
+  const value = String(dateValue || "").trim().slice(0, 10);
+  return value ? `${value} 23:59:59` : "";
+}
+
 function isoDateFromParts(year, month, day) {
-  return new Date(Date.UTC(year, month, day, 12, 0, 0)).toISOString().slice(0, 10);
+  return formatIsoDateFromLocalDate(new Date(year, month, day));
 }
 
 function currentBogotaDateParts() {
@@ -67,15 +84,15 @@ function currentBogotaDateParts() {
 
 function thisWeekRangeIso() {
   const { year, month, day } = currentBogotaDateParts();
-  const current = new Date(Date.UTC(year, month, day, 12, 0, 0));
-  const dayOfWeek = current.getUTCDay() || 7;
+  const current = new Date(year, month, day);
+  const dayOfWeek = current.getDay() || 7;
   const start = new Date(current);
-  start.setUTCDate(current.getUTCDate() - dayOfWeek + 1);
+  start.setDate(current.getDate() - dayOfWeek + 1);
   const end = new Date(start);
-  end.setUTCDate(start.getUTCDate() + 6);
+  end.setDate(start.getDate() + 6);
   return {
-    fechaDesde: start.toISOString().slice(0, 10),
-    fechaHasta: end.toISOString().slice(0, 10),
+    fechaDesde: formatIsoDateFromLocalDate(start),
+    fechaHasta: formatIsoDateFromLocalDate(end),
   };
 }
 
@@ -471,6 +488,21 @@ export function filterOrdersByStatus(items, estado) {
     if (normalizedFilter === "CREADO") return status === "CREADO" || isPendingStatus(status);
     if (normalizedFilter === "CANCELADO") return status === "CANCELADO" || status === "RECHAZADO";
     return status === normalizedFilter;
+  });
+}
+
+export function filterOrdersByCreatedDateRange(items, fechaDesde, fechaHasta) {
+  const rows = Array.isArray(items) ? items : [];
+  const from = String(fechaDesde || "").slice(0, 10);
+  const to = String(fechaHasta || fechaDesde || "").slice(0, 10);
+  if (!from && !to) return rows;
+
+  return rows.filter(item => {
+    const createdDate = orderCreatedDate(item);
+    if (!createdDate) return true;
+    if (from && createdDate < from) return false;
+    if (to && createdDate > to) return false;
+    return true;
   });
 }
 
@@ -1290,10 +1322,13 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
     const cached = !silent ? ordersFilterCache.get(cacheKey) : null;
 
     if (cached) {
-      setItems(cached.items);
-      setTotal(cached.total);
+      const cachedItems = filterOrdersByCreatedDateRange(cached.items, requestFilters.fechaDesde, requestFilters.fechaHasta);
+      const cachedMetricItems = filterOrdersByCreatedDateRange(cached.metricItems, requestFilters.fechaDesde, requestFilters.fechaHasta);
+      const cachedHadOutOfRangeItems = cachedItems.length !== (Array.isArray(cached.items) ? cached.items.length : 0);
+      setItems(cachedItems);
+      setTotal(cachedHadOutOfRangeItems ? cachedItems.length : cached.total);
       setFacturasPendientesImpresion(cached.facturasPendientesImpresion);
-      setMetricItems(cached.metricItems);
+      setMetricItems(cachedMetricItems);
       setMetricFacturasPendientesImpresion(cached.metricFacturasPendientesImpresion);
       setError("");
       if (!silent) {
@@ -1316,8 +1351,8 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
         estado: requestFilters.estado,
         sinImprimir: requestFilters.sinImprimir,
         soloTienda: false,
-        fechaDesde: toIsoDateStart(requestFilters.fechaDesde),
-        fechaHasta: toIsoDateEnd(requestFilters.fechaHasta),
+        fechaDesde: localDateStartParam(requestFilters.fechaDesde),
+        fechaHasta: localDateEndParam(requestFilters.fechaHasta),
         page: requestFilters.soloTienda ? 1 : requestFilters.page,
         pageSize: requestFilters.soloTienda ? 300 : requestFilters.pageSize
       });
@@ -1326,11 +1361,15 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
       if (silent && (requestId !== ordersRequestTracker.current || visibleOrdersLoadingRequest.current)) return;
 
       const loadedItems = extractOrdersPayloadItems(data);
-      const storeItems = requestFilters.soloTienda ? filterStorePickupOrders(loadedItems) : loadedItems;
+      const dateItems = filterOrdersByCreatedDateRange(loadedItems, requestFilters.fechaDesde, requestFilters.fechaHasta);
+      const storeItems = requestFilters.soloTienda ? filterStorePickupOrders(dateItems) : dateItems;
       const statusItems = filterOrdersByStatus(storeItems, requestFilters.estado);
       const paymentItems = filterOrdersByPaymentMethod(statusItems, requestFilters.metodoPago);
       const visibleItems = filterOrdersBySearch(paymentItems, requestFilters.q, requestFilters.empresaId);
-      const nextTotal = requestFilters.soloTienda || requestFilters.estado ? visibleItems.length : resolveOrdersPayloadTotal(data, visibleItems);
+      const backendReturnedOutOfRangeItems = dateItems.length !== loadedItems.length;
+      const nextTotal = requestFilters.soloTienda || requestFilters.estado || backendReturnedOutOfRangeItems
+        ? visibleItems.length
+        : resolveOrdersPayloadTotal(data, visibleItems);
       const nextFacturasPendientesImpresion = Number(data.facturasPendientesImpresion || 0);
       const nextCacheValue = {
         items: visibleItems,
@@ -1379,8 +1418,8 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
         estado: "",
         sinImprimir: false,
         soloTienda: filters.soloTienda,
-        fechaDesde: toIsoDateStart(yesterday),
-        fechaHasta: toIsoDateEnd(yesterday),
+        fechaDesde: localDateStartParam(yesterday),
+        fechaHasta: localDateEndParam(yesterday),
         page: 1,
         pageSize: 50,
       });
@@ -1398,8 +1437,7 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
     const today = todayIsoDate();
     const pageSize = 300;
     const dateRequestVariants = [
-      { fechaDesde: today, fechaHasta: today, stopOnPreviousDays: false },
-      { fechaDesde: toIsoDateStart(today), fechaHasta: toIsoDateEnd(today), stopOnPreviousDays: false },
+      { fechaDesde: localDateStartParam(today), fechaHasta: localDateEndParam(today), stopOnPreviousDays: false },
       { fechaDesde: "", fechaHasta: "", stopOnPreviousDays: true },
     ];
 

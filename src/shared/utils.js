@@ -42,9 +42,12 @@ export function shiftIsoDate(dateValue, days) {
   const raw = String(dateValue || "").trim();
   if (!/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw;
   const [year, month, day] = raw.split("-").map(Number);
-  const parsed = new Date(Date.UTC(year, month - 1, day + Number(days || 0), 12, 0, 0));
+  const parsed = new Date(year, month - 1, day + Number(days || 0));
   if (Number.isNaN(parsed.getTime())) return raw;
-  return parsed.toISOString().slice(0, 10);
+  const nextYear = parsed.getFullYear();
+  const nextMonth = String(parsed.getMonth() + 1).padStart(2, "0");
+  const nextDay = String(parsed.getDate()).padStart(2, "0");
+  return `${nextYear}-${nextMonth}-${nextDay}`;
 }
 
 export function formatDateOnly(value) {

@@ -1,0 +1,255 @@
+/* Accounting header canonical layout. Loaded last to neutralize old cross-module overrides. */
+.accounting-page-view {
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+  overflow-x: hidden !important;
+}
+
+.accounting-page-view .orders-page-header.accounting-page-header {
+  position: relative !important;
+  z-index: 900 !important;
+  display: grid !important;
+  grid-template-columns: minmax(320px, 1fr) auto !important;
+  grid-template-areas:
+    "heading actions"
+    "metrics metrics" !important;
+  align-items: start !important;
+  gap: 16px 18px !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  height: auto !important;
+  margin: 0 0 14px !important;
+  padding: 16px 18px !important;
+  overflow: visible !important;
+}
+
+.accounting-page-view .orders-page-header.accounting-page-header .orders-page-heading {
+  grid-area: heading !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: flex-start !important;
+  gap: 8px !important;
+  width: 100% !important;
+  max-width: 680px !important;
+  min-width: 0 !important;
+}
+
+.accounting-page-view .orders-page-header.accounting-page-header .orders-page-breadcrumb {
+  margin: 0 !important;
+}
+
+.accounting-page-view .orders-page-header.accounting-page-header .orders-page-title-row {
+  width: 100% !important;
+  min-width: 0 !important;
+}
+
+.accounting-page-view .orders-page-header.accounting-page-header h1 {
+  margin: 0 !important;
+  font-size: 34px !important;
+  line-height: 1.05 !important;
+  letter-spacing: 0 !important;
+}
+
+.accounting-page-view .orders-page-header.accounting-page-header .orders-page-description {
+  display: block !important;
+  width: 100% !important;
+  max-width: 560px !important;
+  min-height: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  color: #64748b !important;
+  font-size: 14px !important;
+  font-weight: 600 !important;
+  line-height: 1.35 !important;
+  white-space: normal !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+}
+
+.accounting-page-view .orders-page-header.accounting-page-header .orders-user-pill {
+  margin: 4px 0 0 !important;
+  max-width: 100% !important;
+}
+
+.accounting-page-view .orders-page-header.accounting-page-header .orders-header-side {
+  grid-area: actions !important;
+  display: contents !important;
+  width: auto !important;
+  max-width: none !important;
+  min-width: 0 !important;
+  overflow: visible !important;
+}
+
+.accounting-page-view .orders-page-header.accounting-page-header .header-actions {
+  position: relative !important;
+  z-index: 920 !important;
+  grid-area: actions !important;
+  display: flex !important;
+  flex-wrap: wrap !important;
+  align-items: center !important;
+  justify-content: flex-end !important;
+  gap: 10px !important;
+  width: auto !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+  margin: 0 !important;
+}
+
+.accounting-page-view .orders-page-header.accounting-page-header .accounting-menu-dropdown {
+  position: relative !important;
+  display: inline-flex !important;
+  width: auto !important;
+  min-width: 0 !important;
+  z-index: 1000 !important;
+}
+
+.accounting-page-view .orders-page-header.accounting-page-header .accounting-menu-trigger,
+.accounting-page-view .orders-page-header.accounting-page-header .orders-header-refresh {
+  width: auto !important;
+  min-width: 150px !important;
+  max-width: 100% !important;
+  min-height: 46px !important;
+  height: 46px !important;
+  padding: 0 18px !important;
+  white-space: nowrap !important;
+}
+
+.accounting-page-view .orders-page-header.accounting-page-header .accounting-menu-panel {
+  top: calc(100% + 8px) !important;
+  right: 0 !important;
+  z-index: 1100 !important;
+}
+
+.accounting-page-view .orders-filters.accounting-filters,
+.accounting-page-view .accounting-filters,
+.accounting-page-view .accounting-table-actions {
+  position: relative !important;
+  z-index: 1 !important;
+}
+
+.accounting-page-view .orders-page-header.accounting-page-header .accounting-header-metrics,
+.accounting-page-view .orders-page-header.accounting-page-header .orders-header-metrics.accounting-header-metrics {
+  grid-area: metrics !important;
+  display: grid !important;
+  grid-template-columns: repeat(5, minmax(150px, 1fr)) !important;
+  align-items: stretch !important;
+  gap: 10px !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  overflow: visible !important;
+}
+
+.accounting-page-view .orders-page-header.accounting-page-header .orders-header-metric-card {
+  display: grid !important;
+  grid-template-columns: 42px minmax(0, 1fr) !important;
+  grid-template-rows: auto auto !important;
+  align-items: center !important;
+  column-gap: 10px !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+  min-height: 58px !important;
+  height: auto !important;
+  padding: 10px 12px !important;
+  overflow: hidden !important;
+}
+
+.accounting-page-view .orders-page-header.accounting-page-header .orders-header-metric-icon {
+  grid-column: 1 !important;
+  grid-row: 1 / span 2 !important;
+  width: 38px !important;
+  height: 38px !important;
+}
+
+.accounting-page-view .orders-page-header.accounting-page-header .orders-header-metric-card strong {
+  grid-column: 2 !important;
+  grid-row: 1 !important;
+  max-width: 100% !important;
+  font-size: 20px !important;
+  line-height: 1.05 !important;
+  letter-spacing: 0 !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+
+.accounting-page-view .orders-page-header.accounting-page-header .orders-header-metric-card > span:not(.orders-header-metric-icon) {
+  grid-column: 2 !important;
+  grid-row: 2 !important;
+  max-width: 100% !important;
+  font-size: 10px !important;
+  line-height: 1.15 !important;
+  letter-spacing: 0 !important;
+  text-transform: uppercase !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+
+@media (max-width: 1280px) {
+  .accounting-page-view .orders-page-header.accounting-page-header {
+    grid-template-columns: minmax(0, 1fr) !important;
+    grid-template-areas:
+      "heading"
+      "actions"
+      "metrics" !important;
+  }
+
+  .accounting-page-view .orders-page-header.accounting-page-header .orders-page-heading {
+    max-width: 100% !important;
+  }
+
+  .accounting-page-view .orders-page-header.accounting-page-header .header-actions {
+    justify-content: flex-start !important;
+  }
+
+  .accounting-page-view .orders-page-header.accounting-page-header .accounting-header-metrics,
+  .accounting-page-view .orders-page-header.accounting-page-header .orders-header-metrics.accounting-header-metrics {
+    grid-template-columns: repeat(3, minmax(150px, 1fr)) !important;
+  }
+}
+
+@media (max-width: 768px) {
+  .accounting-page-view .orders-page-header.accounting-page-header {
+    padding: 14px !important;
+  }
+
+  .accounting-page-view .orders-page-header.accounting-page-header .header-actions {
+    width: 100% !important;
+  }
+
+  .accounting-page-view .orders-page-header.accounting-page-header .accounting-menu-dropdown,
+  .accounting-page-view .orders-page-header.accounting-page-header .accounting-menu-trigger,
+  .accounting-page-view .orders-page-header.accounting-page-header .orders-header-refresh {
+    width: 100% !important;
+  }
+
+  .accounting-page-view .orders-page-header.accounting-page-header .accounting-header-metrics,
+  .accounting-page-view .orders-page-header.accounting-page-header .orders-header-metrics.accounting-header-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+}
+
+@media (max-width: 480px) {
+  .accounting-page-view .orders-page-header.accounting-page-header {
+    padding: 12px !important;
+  }
+
+  .accounting-page-view .orders-page-header.accounting-page-header h1 {
+    font-size: 28px !important;
+  }
+
+  .accounting-page-view .orders-page-header.accounting-page-header .accounting-header-metrics,
+  .accounting-page-view .orders-page-header.accounting-page-header .orders-header-metrics.accounting-header-metrics {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+}

@@ -4,7 +4,7 @@ import { filterAccountingDetailRows } from "../domain/accounting/AccountingPage.
 import { buildDeliveryAdminQueryPlan, deliveryMatchesSearch } from "../domain/delivery/DeliveryPage.jsx";
 import { filterInventoryItems } from "../domain/inventory/InventoryPage.jsx";
 import { filterNeighborhoodItems, sortNeighborhoods } from "../domain/neighborhoods/NeighborhoodsPage.jsx";
-import { buildOrdersMetrics, extractOrdersPayloadItems, filterOrdersBySearch, filterOrdersByStatus, isStorePickupOrder, resolveOrdersPayloadTotal, shouldShowPendingInvoiceAlert } from "../domain/orders-admin/OrdersAdminPage.jsx";
+import { buildOrdersMetrics, extractOrdersPayloadItems, filterOrdersByCreatedDateRange, filterOrdersBySearch, filterOrdersByStatus, isStorePickupOrder, localDateEndParam, localDateStartParam, resolveOrdersPayloadTotal, shouldShowPendingInvoiceAlert } from "../domain/orders-admin/OrdersAdminPage.jsx";
 import {
   buildVisibleProductionItems,
   catalogCodeCandidates,
@@ -116,6 +116,22 @@ describe("estabilidad de filtros por vista", () => {
     expect(filterOrdersBySearch(rows, "efectivo", 3)).toEqual([rows[0]]);
     expect(filterOrdersBySearch(rows, "link", 3)).toEqual([rows[1]]);
     expect(filterOrdersBySearch(rows, "nequi", 3)).toEqual([rows[2]]);
+  });
+
+  it("Pedidos: respeta localmente el rango visible de fecha de pedido", () => {
+    const rows = [
+      { numeroPedido: 1, fecha_pedido: "2026-07-15 23:59:59" },
+      { numeroPedido: 2, fecha_pedido: "2026-07-16 00:09:19", fechaEntrega: "2026-07-16" },
+    ];
+
+    expect(filterOrdersByCreatedDateRange(rows, "2026-07-15", "2026-07-15")).toEqual([rows[0]]);
+    expect(filterOrdersByCreatedDateRange(rows, "2026-07-16", "2026-07-16")).toEqual([rows[1]]);
+  });
+
+  it("Pedidos: envia rangos locales al backend sin UTC ni zona horaria", () => {
+    expect(localDateStartParam("2026-07-16")).toBe("2026-07-16 00:00:00");
+    expect(localDateEndParam("2026-07-16")).toBe("2026-07-16 23:59:59");
+    expect(localDateStartParam("2026-07-16T12:30:00Z")).toBe("2026-07-16 00:00:00");
   });
 
   it("Pedidos: acepta payloads anidados del backend", () => {
