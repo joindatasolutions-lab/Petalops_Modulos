@@ -531,14 +531,27 @@ export function isStorePickupOrder(item) {
     item?.barrio,
     item?.barrioNombre,
     item?.barrio_nombre,
+    item?.direccion,
+    item?.direccionEntrega,
+    item?.direccion_entrega,
+    item?.direccionDestino,
+    item?.direccion_destino,
     item?.destinatario?.tipoEntrega,
     item?.destinatario?.tipo_entrega,
     item?.destinatario?.barrio,
     item?.destinatario?.barrioNombre,
+    item?.destinatario?.direccion,
+    item?.destinatario?.direccionEntrega,
+    item?.destinatario?.direccion_entrega,
     item?.entrega?.tipoEntrega,
     item?.entrega?.tipo_entrega,
     item?.entrega?.barrio,
     item?.entrega?.barrioNombre,
+    item?.entrega?.direccion,
+    item?.entrega?.direccionEntrega,
+    item?.entrega?.direccion_entrega,
+    item?.entrega?.direccionDestino,
+    item?.entrega?.direccion_destino,
   ].map(normalizeOrderSearchText).filter(Boolean).join(" ");
 
   const compact = text.replace(/[^a-z0-9]+/g, "");
@@ -652,6 +665,11 @@ function orderNumberSearchValues(item) {
 
 function orderMatchesNumberSearch(item, search) {
   return orderNumberSearchValues(item).some(value => normalizeOrderSearchText(value).includes(search));
+}
+
+function isOrderNumberSearchTerm(value) {
+  const text = String(value || "").trim();
+  return /^#?\d{1,8}$/.test(text);
 }
 
 export function filterOrdersBySearch(items, searchValue, empresaId = null) {
@@ -941,6 +959,51 @@ const initialFilters = {
   pageSize: 10
 };
 
+const DEFAULT_ORDERS_KPIS = {
+  ventaHoy: 0,
+  pedidosHoy: 0,
+  aprobados: 0,
+  pendientes: 0,
+  cancelados: 0,
+  sinImprimir: 0,
+};
+
+const DEFAULT_NEW_ORDER_FORM = {
+  productoID: "",
+  productoCodigo: "",
+  productoNombre: "",
+  cantidad: 1,
+  precio: "",
+  clienteNombre: "",
+  clienteTelefono: "",
+  clienteEmail: "",
+  clienteTipoIdent: "",
+  clienteIdentificacion: "",
+  destinatarioNombre: "",
+  telefonoDestino: "",
+  direccion: "",
+  barrioNombre: "",
+  fechaEntrega: todayIsoDateBogota(),
+  horaEntrega: "08:00",
+  mensajeTarjeta: "",
+  firma: "",
+  observacionGeneral: "",
+  metodoPago: "",
+  canalFlora: "",
+};
+
+function normalizeOrdersKpis(value, fallbackFacturasPendientesImpresion = 0) {
+  const source = value && typeof value === "object" ? value : {};
+  return {
+    ventaHoy: Number(source.ventaHoy || 0),
+    pedidosHoy: Number(source.pedidosHoy || 0),
+    aprobados: Number(source.aprobados || 0),
+    pendientes: Number(source.pendientes || 0),
+    cancelados: Number(source.cancelados || 0),
+    sinImprimir: Number(source.sinImprimir ?? fallbackFacturasPendientesImpresion ?? 0),
+  };
+}
+
 function buildOrdersCacheKey({ empresaId, sucursalId, q, estado, sinImprimir, soloTienda, metodoPago, fechaDesde, fechaHasta, page, pageSize }) {
   return [
     empresaId,
@@ -983,6 +1046,7 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
   const [items, setItems] = useState([]);
   const [total, setTotal] = useState(0);
   const [facturasPendientesImpresion, setFacturasPendientesImpresion] = useState(0);
+  const [ordersKpis, setOrdersKpis] = useState(DEFAULT_ORDERS_KPIS);
   const [metricItems, setMetricItems] = useState([]);
   const [metricFacturasPendientesImpresion, setMetricFacturasPendientesImpresion] = useState(0);
   const [yesterdayMetrics, setYesterdayMetrics] = useState(() => buildOrdersMetrics([], 0, shiftIsoDate(todayIsoDate(), -1)));
@@ -1059,6 +1123,17 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
   const [openOrderActionsId, setOpenOrderActionsId] = useState(null);
   const [catalogProducts, setCatalogProducts] = useState([]);
   const [orderNotification, setOrderNotification] = useState(null);
+  const [newOrderOpen, setNewOrderOpen] = useState(false);
+  const [newOrderForm, setNewOrderForm] = useState(DEFAULT_NEW_ORDER_FORM);
+  const [newOrderProductQuery, setNewOrderProductQuery] = useState("");
+  const [newOrderProducts, setNewOrderProducts] = useState([]);
+  const [newOrderProductsLoading, setNewOrderProductsLoading] = useState(false);
+  const [newOrderProductDropdownOpen, setNewOrderProductDropdownOpen] = useState(false);
+  const [newOrderBarrioQuery, setNewOrderBarrioQuery] = useState("");
+  const [newOrderBarrios, setNewOrderBarrios] = useState([]);
+  const [newOrderBarrioDropdownOpen, setNewOrderBarrioDropdownOpen] = useState(false);
+  const [newOrderSaving, setNewOrderSaving] = useState(false);
+  const [newOrderError, setNewOrderError] = useState("");
 
   const api = useMemo(() => createApiClient(tenantConfig), []);
   const ordersRequestTracker = useMemo(() => ({ current: 0 }), []);
@@ -1318,16 +1393,28 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
       page: filters.page,
       pageSize: filters.pageSize,
     };
-    const cacheKey = buildOrdersCacheKey(requestFilters);
+    const searchByOrderNumber = !requestFilters.soloTienda && isOrderNumberSearchTerm(requestFilters.q);
+    const requestFechaDesde = searchByOrderNumber ? "" : requestFilters.fechaDesde;
+    const requestFechaHasta = searchByOrderNumber ? "" : requestFilters.fechaHasta;
+    const cacheKey = buildOrdersCacheKey({
+      ...requestFilters,
+      fechaDesde: requestFechaDesde,
+      fechaHasta: requestFechaHasta,
+    });
     const cached = !silent ? ordersFilterCache.get(cacheKey) : null;
 
     if (cached) {
-      const cachedItems = filterOrdersByCreatedDateRange(cached.items, requestFilters.fechaDesde, requestFilters.fechaHasta);
-      const cachedMetricItems = filterOrdersByCreatedDateRange(cached.metricItems, requestFilters.fechaDesde, requestFilters.fechaHasta);
+      const cachedItems = requestFilters.soloTienda
+        ? cached.items
+        : filterOrdersByCreatedDateRange(cached.items, requestFechaDesde, requestFechaHasta);
+      const cachedMetricItems = requestFilters.soloTienda
+        ? cached.metricItems
+        : filterOrdersByCreatedDateRange(cached.metricItems, requestFechaDesde, requestFechaHasta);
       const cachedHadOutOfRangeItems = cachedItems.length !== (Array.isArray(cached.items) ? cached.items.length : 0);
       setItems(cachedItems);
       setTotal(cachedHadOutOfRangeItems ? cachedItems.length : cached.total);
       setFacturasPendientesImpresion(cached.facturasPendientesImpresion);
+      setOrdersKpis(cached.kpis || DEFAULT_ORDERS_KPIS);
       setMetricItems(cachedMetricItems);
       setMetricFacturasPendientesImpresion(cached.metricFacturasPendientesImpresion);
       setError("");
@@ -1350,31 +1437,35 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
         q: requestFilters.backendQ,
         estado: requestFilters.estado,
         sinImprimir: requestFilters.sinImprimir,
-        soloTienda: false,
-        fechaDesde: localDateStartParam(requestFilters.fechaDesde),
-        fechaHasta: localDateEndParam(requestFilters.fechaHasta),
-        page: requestFilters.soloTienda ? 1 : requestFilters.page,
-        pageSize: requestFilters.soloTienda ? 300 : requestFilters.pageSize
+        soloTienda: requestFilters.soloTienda,
+        fechaDesde: localDateStartParam(requestFechaDesde),
+        fechaHasta: localDateEndParam(requestFechaHasta),
+        page: requestFilters.page,
+        pageSize: requestFilters.pageSize
       });
 
       if (!silent && requestId !== ordersRequestTracker.current) return;
       if (silent && (requestId !== ordersRequestTracker.current || visibleOrdersLoadingRequest.current)) return;
 
       const loadedItems = extractOrdersPayloadItems(data);
-      const dateItems = filterOrdersByCreatedDateRange(loadedItems, requestFilters.fechaDesde, requestFilters.fechaHasta);
-      const storeItems = requestFilters.soloTienda ? filterStorePickupOrders(dateItems) : dateItems;
+      const dateItems = requestFilters.soloTienda
+        ? loadedItems
+        : filterOrdersByCreatedDateRange(loadedItems, requestFechaDesde, requestFechaHasta);
+      const storeItems = dateItems;
       const statusItems = filterOrdersByStatus(storeItems, requestFilters.estado);
       const paymentItems = filterOrdersByPaymentMethod(statusItems, requestFilters.metodoPago);
       const visibleItems = filterOrdersBySearch(paymentItems, requestFilters.q, requestFilters.empresaId);
       const backendReturnedOutOfRangeItems = dateItems.length !== loadedItems.length;
-      const nextTotal = requestFilters.soloTienda || requestFilters.estado || backendReturnedOutOfRangeItems
+      const nextTotal = requestFilters.estado || backendReturnedOutOfRangeItems
         ? visibleItems.length
         : resolveOrdersPayloadTotal(data, visibleItems);
       const nextFacturasPendientesImpresion = Number(data.facturasPendientesImpresion || 0);
+      const nextKpis = normalizeOrdersKpis(data?.kpis, nextFacturasPendientesImpresion);
       const nextCacheValue = {
         items: visibleItems,
         total: nextTotal,
         facturasPendientesImpresion: nextFacturasPendientesImpresion,
+        kpis: nextKpis,
         metricItems: visibleItems,
         metricFacturasPendientesImpresion: nextFacturasPendientesImpresion,
       };
@@ -1382,6 +1473,7 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
       setItems(visibleItems);
       setTotal(nextTotal);
       setFacturasPendientesImpresion(nextFacturasPendientesImpresion);
+      setOrdersKpis(nextKpis);
       setMetricItems(visibleItems);
       setMetricFacturasPendientesImpresion(nextFacturasPendientesImpresion);
       setError("");
@@ -1397,6 +1489,7 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
       setItems([]);
       setTotal(0);
       setFacturasPendientesImpresion(0);
+      setOrdersKpis(DEFAULT_ORDERS_KPIS);
       setMetricItems([]);
       setMetricFacturasPendientesImpresion(0);
       setError("No fue posible cargar pedidos.");
@@ -1409,6 +1502,9 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
   }, [api, debouncedQuery, filters.estado, filters.sinImprimir, filters.soloTienda, filters.metodoPago, filters.fechaDesde, filters.fechaHasta, filters.page, filters.pageSize, empresaId, ordersFilterCache, ordersRequestTracker, sucursalId]);
 
   const loadYesterdayMetrics = useCallback(async () => {
+    setYesterdayMetrics(buildOrdersMetrics([], 0, shiftIsoDate(todayIsoDate(), -1)));
+    return;
+
     const yesterday = shiftIsoDate(todayIsoDate(), -1);
     try {
       const data = await api.listarPedidos({
@@ -1434,6 +1530,9 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
   }, [api, empresaId, filters.soloTienda, sucursalId]);
 
   const loadTodaySalesSummary = useCallback(async () => {
+    setTodaySalesTotal(0);
+    return;
+
     const today = todayIsoDate();
     const pageSize = 300;
     const dateRequestVariants = [
@@ -1679,6 +1778,15 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
   }, [orderNotification]);
 
   useEffect(() => {
+    if (!newOrderOpen) return;
+    setNewOrderBarrios(current => dedupeBarrioItems([
+      normalizeBarrioItem({ nombreBarrio: "Recoger en tienda" }),
+      ...current,
+      ...detailEditBarrios,
+    ].filter(Boolean)));
+  }, [detailEditBarrios, newOrderOpen]);
+
+  useEffect(() => {
     if (!isEditingDetail) return;
     // Carga el catálogo completo al abrir modo edición.
     let disposed = false;
@@ -1718,6 +1826,7 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
   };
 
   const openDetail = async pedidoId => {
+    setOpenOrderActionsId(null);
     setDrawerOpen(true);
     setSelectedPedidoId(pedidoId);
     setDetalle(null);
@@ -1961,12 +2070,29 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
       return codigo.includes(q) || codigoProducto.includes(q) || codigoCatalogo.includes(q) || nombre.includes(q);
     });
   }, [detailAddFilterText, detailEditCatalog]);
+  const filteredNewOrderProducts = useMemo(() => {
+    const q = String(newOrderProductQuery || "").trim().toLowerCase();
+    const source = newOrderProducts.length > 0 ? newOrderProducts : detailEditCatalog;
+    if (!q) return source;
+    return source.filter(item => {
+      const codigo = String(item.codigo || "").toLowerCase();
+      const codigoProducto = String(item.codigoProducto || "").toLowerCase();
+      const codigoCatalogo = String(item.codigoCatalogo || "").toLowerCase();
+      const nombre = String(item.nombre || "").toLowerCase();
+      return codigo.includes(q) || codigoProducto.includes(q) || codigoCatalogo.includes(q) || nombre.includes(q);
+    });
+  }, [detailEditCatalog, newOrderProductQuery, newOrderProducts]);
 
   const filteredBarrioOptions = useMemo(() => {
     const q = String(detailEditBarrioQuery || "").trim().toLowerCase();
     if (!q) return detailEditBarrios;
     return detailEditBarrios.filter(item => String(item?.nombre || "").toLowerCase().includes(q));
   }, [detailEditBarrioQuery, detailEditBarrios]);
+  const filteredNewOrderBarrios = useMemo(() => {
+    const q = String(newOrderBarrioQuery || "").trim().toLowerCase();
+    if (!q) return newOrderBarrios;
+    return newOrderBarrios.filter(item => String(item?.nombre || "").toLowerCase().includes(q));
+  }, [newOrderBarrioQuery, newOrderBarrios]);
 
   const onSearchCatalog = async searchText => {
     const q = String((searchText ?? detailEditFilterText) || "").trim();
@@ -1985,6 +2111,147 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
       // Silencioso.
     } finally {
       setDetailEditCatalogLoading(false);
+    }
+  };
+
+  const onSearchNewOrderProducts = async searchText => {
+    const q = String((searchText ?? newOrderProductQuery) || "").trim();
+    if (!q) return;
+    setNewOrderProductsLoading(true);
+    try {
+      const payload = await api.buscarArreglosCatalogo({ empresaId, sucursalId, q });
+      const rows = Array.isArray(payload?.items)
+        ? payload.items
+        : Array.isArray(payload)
+          ? payload
+          : [];
+      const loaded = rows.map(item => normalizeCatalogItem(item)).filter(Boolean);
+      setNewOrderProducts(current => dedupeCatalogItems([...current, ...loaded]));
+      setDetailEditCatalog(current => dedupeCatalogItems([...current, ...loaded]));
+    } catch {
+      setNewOrderError("No fue posible buscar arreglos.");
+    } finally {
+      setNewOrderProductsLoading(false);
+    }
+  };
+
+  const openNewOrderModal = () => {
+    setNewOrderForm({ ...DEFAULT_NEW_ORDER_FORM, fechaEntrega: todayIsoDate() });
+    setNewOrderError("");
+    setNewOrderProductQuery("");
+    setNewOrderBarrioQuery("");
+    setNewOrderProductDropdownOpen(false);
+    setNewOrderBarrioDropdownOpen(false);
+    setNewOrderOpen(true);
+    if (detailEditCatalog.length === 0) {
+      setNewOrderProductsLoading(true);
+      api.buscarArreglosCatalogo({ empresaId, sucursalId, q: "" })
+        .then(payload => {
+          const rows = Array.isArray(payload?.items)
+            ? payload.items
+            : Array.isArray(payload)
+              ? payload
+              : [];
+          const loaded = rows.map(item => normalizeCatalogItem(item)).filter(Boolean);
+          setNewOrderProducts(loaded);
+          setDetailEditCatalog(current => dedupeCatalogItems([...current, ...loaded]));
+        })
+        .catch(() => {})
+        .finally(() => setNewOrderProductsLoading(false));
+    }
+    if (newOrderBarrios.length === 0) {
+      loadBarrioOptions("").then(() => {
+        setNewOrderBarrios(current => current.length > 0 ? current : detailEditBarrios);
+      }).catch(() => {});
+      setNewOrderBarrios(current => dedupeBarrioItems([
+        normalizeBarrioItem({ nombreBarrio: "Recoger en tienda" }),
+        ...current,
+        ...detailEditBarrios,
+      ].filter(Boolean)));
+    }
+  };
+
+  const closeNewOrderModal = () => {
+    if (newOrderSaving) return;
+    setNewOrderOpen(false);
+    setNewOrderError("");
+  };
+
+  const updateNewOrderForm = (name, value) => {
+    setNewOrderForm(current => ({ ...current, [name]: value }));
+  };
+
+  const buildNewOrderCheckoutPayload = () => {
+    const productoID = Number(newOrderForm.productoID || 0);
+    if (!productoID) throw new Error("Selecciona un arreglo para el pedido.");
+    if (!String(newOrderForm.clienteNombre || "").trim()) throw new Error("Ingresa el nombre del cliente.");
+    if (!String(newOrderForm.destinatarioNombre || "").trim()) throw new Error("Ingresa el destinatario.");
+    if (!newOrderForm.fechaEntrega) throw new Error("Selecciona la fecha de entrega.");
+
+    const barrioSeleccionado = String(newOrderForm.barrioNombre || "").trim() || null;
+    const tipoEntrega = normalizeDeliveryType(barrioSeleccionado);
+    if (tipoEntrega !== "recogida_en_tienda" && !String(newOrderForm.direccion || "").trim()) {
+      throw new Error("Ingresa la direccion de entrega o selecciona Recoger en tienda.");
+    }
+
+    const horaEntrega = normalizeTime(newOrderForm.horaEntrega) || "08:00";
+    const producto = {
+      productoID,
+      cantidad: Number(newOrderForm.cantidad || 1),
+    };
+    const precio = normalizeWholePeso(newOrderForm.precio);
+    if (Number.isFinite(precio) && precio > 0) {
+      producto.productoPrecio = precio;
+    }
+
+    return {
+      empresaID: empresaId,
+      sucursalID: sucursalId,
+      productos: [producto],
+      cliente: {
+        tipoIdent: newOrderForm.clienteTipoIdent || null,
+        identificacion: newOrderForm.clienteIdentificacion || null,
+        nombreCompleto: String(newOrderForm.clienteNombre || "").trim(),
+        telefono: String(newOrderForm.clienteTelefono || "").trim(),
+        email: newOrderForm.clienteEmail || null,
+      },
+      entrega: {
+        tipoEntrega,
+        destinatario: String(newOrderForm.destinatarioNombre || "").trim(),
+        telefonoDestino: String(newOrderForm.telefonoDestino || "").trim() || String(newOrderForm.clienteTelefono || "").trim() || null,
+        direccion: tipoEntrega === "recogida_en_tienda" ? "Recoger En Tienda" : String(newOrderForm.direccion || "").trim(),
+        barrioNombre: barrioSeleccionado,
+        fechaEntrega: `${newOrderForm.fechaEntrega}T${horaEntrega}:00`,
+        rangoHora: horaEntrega,
+        mensaje: newOrderForm.mensajeTarjeta || null,
+        firma: newOrderForm.firma || null,
+        observacionGeneral: newOrderForm.observacionGeneral || null,
+      },
+      financiero: {
+        metodosPago: newOrderForm.metodoPago ? [newOrderForm.metodoPago] : null,
+        canalFlora: newOrderForm.canalFlora || null,
+      },
+    };
+  };
+
+  const onSaveNewOrder = async () => {
+    if (newOrderSaving) return;
+    setNewOrderError("");
+    setNewOrderSaving(true);
+    try {
+      const created = await api.crearPedidoCheckout(buildNewOrderCheckoutPayload());
+      setNewOrderOpen(false);
+      setOrderNotification({
+        type: "success",
+        title: "Pedido creado",
+        message: `Pedido #${created?.numeroPedido || created?.pedidoID || ""} registrado correctamente.`,
+      });
+      await loadOrders(false);
+      if (created?.pedidoID) await openDetail(created.pedidoID);
+    } catch (nextError) {
+      setNewOrderError(nextError?.detail || nextError?.message || "No fue posible crear el pedido.");
+    } finally {
+      setNewOrderSaving(false);
     }
   };
 
@@ -2433,35 +2700,15 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
     if (filters.fechaDesde === month.fechaDesde && filters.fechaHasta === month.fechaHasta) return "mes";
     return "";
   }, [filters.fechaDesde, filters.fechaHasta]);
-  const ordersMetrics = useMemo(() => {
-    const today = todayIsoDate();
-    const sourceItems = metricItems.length > 0 ? metricItems : items;
-    const sourceFacturas = metricItems.length > 0 ? metricFacturasPendientesImpresion : facturasPendientesImpresion;
-    return buildOrdersMetrics(sourceItems, sourceFacturas, today);
-  }, [facturasPendientesImpresion, items, metricFacturasPendientesImpresion, metricItems]);
-  const visibleTodaySalesSummary = useMemo(() => {
-    const rowsByKey = new Map();
-    [...items, ...metricItems].forEach((item, index) => {
-      const displayNumber = String(resolveDisplayOrderNumber(item) || "").trim();
-      const key = item?.pedidoID != null
-        ? `pedido:${item.pedidoID}`
-        : item?.id != null
-          ? `id:${item.id}`
-          : displayNumber && displayNumber !== "-"
-            ? `numero:${displayNumber}`
-            : `row:${index}`;
-      rowsByKey.set(key, item);
-    });
-    return calculateTodaySalesTotal(Array.from(rowsByKey.values()), todayIsoDate());
-  }, [items, metricItems]);
-  const headerSalesSummary = todaySalesTotal > 0 ? todaySalesTotal : visibleTodaySalesSummary;
+  const ordersMetrics = ordersKpis;
+  const headerSalesSummary = Number(ordersKpis.ventaHoy || 0);
   const orderMetricCards = useMemo(() => {
     const baseCards = [
-      { key: "hoy", label: "Pedidos hoy", shortLabel: "Pedidos hoy", value: Number(ordersMetrics.hoy || 0), tone: "is-primary", Icon: CalendarCheck2, helperText: "Operacion diaria" },
+      { key: "hoy", label: "Pedidos hoy", shortLabel: "Pedidos hoy", value: Number(ordersMetrics.pedidosHoy || 0), tone: "is-primary", Icon: CalendarCheck2, helperText: "Operacion diaria" },
       { key: "aprobados", label: "Aprobados", shortLabel: "Aprobados", value: Number(ordersMetrics.aprobados || 0), tone: "is-green", Icon: CheckCircle2, helperText: "Ultimos 7 dias" },
       { key: "pendientes", label: "Pendientes", shortLabel: "Pendientes", value: Number(ordersMetrics.pendientes || 0), tone: "is-blue", Icon: Clock3, helperText: "Requieren atencion" },
       { key: "cancelados", label: "Cancelados", shortLabel: "Cancelados", value: Number(ordersMetrics.cancelados || 0), tone: "is-orange", Icon: XCircle, helperText: "Ultimos 7 dias" },
-      { key: "facturas", label: "Facturas no impresas", shortLabel: "Sin imprimir", value: Number(ordersMetrics.facturasNoImpresas || 0), tone: "is-purple", Icon: Receipt, helperText: "Por imprimir" },
+      { key: "facturas", label: "Facturas no impresas", shortLabel: "Sin imprimir", value: Number(ordersMetrics.sinImprimir || 0), tone: "is-purple", Icon: Receipt, helperText: "Por imprimir" },
     ];
     const maxValue = Math.max(...baseCards.map(card => card.value), 1);
     return baseCards.map(card => {
@@ -2600,7 +2847,7 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
                   <RotateCw size={18} strokeWidth={2} />
                   <span>Actualizar</span>
                 </button>
-                <button type="button" className="btn-primary orders-new-order-btn" onClick={() => window.alert("El flujo de nuevo pedido se configura desde checkout.")} title="Nuevo pedido">
+                <button type="button" className="btn-primary orders-new-order-btn" onClick={openNewOrderModal} title="Nuevo pedido">
                   <Plus size={18} strokeWidth={2.2} />
                   <span>Nuevo pedido</span>
                   <ChevronDown size={15} strokeWidth={2.2} />
@@ -3024,6 +3271,237 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
           </footer>
         </main>
       </div>
+
+      {newOrderOpen ? (
+        <div className="orders-modal-backdrop" role="presentation">
+          <section className="orders-new-order-modal" role="dialog" aria-modal="true" aria-labelledby="new-order-title">
+            <header className="orders-new-order-head">
+              <div>
+                <span>Atencion directa</span>
+                <h2 id="new-order-title">Nuevo pedido</h2>
+              </div>
+              <button type="button" className="icon-btn" onClick={closeNewOrderModal} title="Cerrar">
+                <IconX size={18} stroke={2} />
+              </button>
+            </header>
+
+            <div className="orders-new-order-body">
+              <section className="orders-new-order-section">
+                <h3>Producto</h3>
+                <label className="order-detail-edit-label">
+                  Arreglo
+                  <div className="order-combobox">
+                    <button
+                      type="button"
+                      className="order-combobox-trigger"
+                      onClick={() => setNewOrderProductDropdownOpen(open => !open)}
+                    >
+                      <span>{newOrderForm.productoNombre || "Seleccionar arreglo"}</span>
+                      <span className="order-combobox-arrow">{newOrderProductDropdownOpen ? "▲" : "▼"}</span>
+                    </button>
+                    {newOrderProductDropdownOpen ? (
+                      <div className="order-combobox-panel">
+                        <div className="order-combobox-search-row">
+                          <input
+                            autoFocus
+                            type="text"
+                            value={newOrderProductQuery}
+                            onChange={event => setNewOrderProductQuery(event.target.value)}
+                            onKeyDown={event => { if (event.key === "Enter") onSearchNewOrderProducts(newOrderProductQuery); }}
+                            placeholder="Buscar por codigo o nombre..."
+                            className="order-combobox-search"
+                          />
+                          <button
+                            type="button"
+                            className="btn-outline order-detail-search-btn"
+                            onClick={() => onSearchNewOrderProducts(newOrderProductQuery)}
+                            disabled={newOrderProductsLoading}
+                          >
+                            {newOrderProductsLoading ? "..." : "Buscar"}
+                          </button>
+                        </div>
+                        <ul className="order-combobox-list">
+                          {filteredNewOrderProducts.length === 0 ? (
+                            <li className="order-combobox-empty">Sin resultados</li>
+                          ) : filteredNewOrderProducts.map(item => (
+                            <li
+                              key={`new-${item.id}`}
+                              className={`order-combobox-option${String(item.id) === String(newOrderForm.productoID) ? " is-selected" : ""}`}
+                              onClick={() => {
+                                setNewOrderForm(current => ({
+                                  ...current,
+                                  productoID: String(item.id),
+                                  productoCodigo: displayProductCode(item, empresaId),
+                                  productoNombre: buildProductoLabel(item, empresaId),
+                                  precio: item.precio != null ? String(item.precio) : current.precio,
+                                }));
+                                setNewOrderProductDropdownOpen(false);
+                              }}
+                            >
+                              {buildProductoLabel(item, empresaId)}
+                              {item.precio != null ? <span className="order-combobox-price">${formatearCOP(Number(item.precio))}</span> : null}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    ) : null}
+                  </div>
+                </label>
+                <div className="order-detail-edit-grid">
+                  <label className="order-detail-edit-label">
+                    Cantidad
+                    <input type="number" min="1" step="1" value={newOrderForm.cantidad} onChange={event => updateNewOrderForm("cantidad", Math.max(1, Number(event.target.value || 1)))} />
+                  </label>
+                  <label className="order-detail-edit-label">
+                    Precio manual
+                    <input type="text" inputMode="numeric" value={newOrderForm.precio} onChange={event => updateNewOrderForm("precio", sanitizeWholePesoInput(event.target.value) ?? "")} placeholder="Opcional" />
+                  </label>
+                </div>
+              </section>
+
+              <section className="orders-new-order-section">
+                <h3>Cliente</h3>
+                <div className="order-detail-edit-grid">
+                  <label className="order-detail-edit-label">
+                    Nombre cliente
+                    <input type="text" value={newOrderForm.clienteNombre} onChange={event => updateNewOrderForm("clienteNombre", event.target.value)} />
+                  </label>
+                  <label className="order-detail-edit-label">
+                    Telefono
+                    <input type="tel" value={newOrderForm.clienteTelefono} onChange={event => updateNewOrderForm("clienteTelefono", event.target.value)} />
+                  </label>
+                  <label className="order-detail-edit-label">
+                    Email
+                    <input type="email" value={newOrderForm.clienteEmail} onChange={event => updateNewOrderForm("clienteEmail", event.target.value)} placeholder="Opcional" />
+                  </label>
+                  <label className="order-detail-edit-label">
+                    Documento
+                    <input type="text" value={newOrderForm.clienteIdentificacion} onChange={event => updateNewOrderForm("clienteIdentificacion", event.target.value)} placeholder="Opcional" />
+                  </label>
+                </div>
+              </section>
+
+              <section className="orders-new-order-section">
+                <h3>Entrega</h3>
+                <div className="order-detail-edit-grid">
+                  <label className="order-detail-edit-label">
+                    Destinatario
+                    <input type="text" value={newOrderForm.destinatarioNombre} onChange={event => updateNewOrderForm("destinatarioNombre", event.target.value)} />
+                  </label>
+                  <label className="order-detail-edit-label">
+                    Telefono destinatario
+                    <input type="tel" value={newOrderForm.telefonoDestino} onChange={event => updateNewOrderForm("telefonoDestino", event.target.value)} placeholder="Si es diferente" />
+                  </label>
+                  <label className="order-detail-edit-label">
+                    Fecha
+                    <input type="date" value={newOrderForm.fechaEntrega} onChange={event => updateNewOrderForm("fechaEntrega", event.target.value)} />
+                  </label>
+                  <label className="order-detail-edit-label">
+                    Hora
+                    <input type="time" value={newOrderForm.horaEntrega} onChange={event => updateNewOrderForm("horaEntrega", event.target.value)} />
+                  </label>
+                </div>
+                <label className="order-detail-edit-label">
+                  Direccion
+                  <input type="text" value={newOrderForm.direccion} onChange={event => updateNewOrderForm("direccion", event.target.value)} placeholder="Direccion o referencia" />
+                </label>
+                <label className="order-detail-edit-label">
+                  Barrio / tipo entrega
+                  <div className="order-combobox">
+                    <button type="button" className="order-combobox-trigger" onClick={() => setNewOrderBarrioDropdownOpen(open => !open)}>
+                      <span>{newOrderForm.barrioNombre || "Seleccionar barrio"}</span>
+                      <span className="order-combobox-arrow">{newOrderBarrioDropdownOpen ? "▲" : "▼"}</span>
+                    </button>
+                    {newOrderBarrioDropdownOpen ? (
+                      <div className="order-combobox-panel">
+                        <div className="order-combobox-search-row">
+                          <input
+                            autoFocus
+                            type="text"
+                            value={newOrderBarrioQuery}
+                            onChange={event => setNewOrderBarrioQuery(event.target.value)}
+                            onKeyDown={event => { if (event.key === "Enter") loadBarrioOptions(newOrderBarrioQuery); }}
+                            placeholder="Buscar barrio..."
+                            className="order-combobox-search"
+                          />
+                          <button type="button" className="btn-outline order-detail-search-btn" onClick={() => loadBarrioOptions(newOrderBarrioQuery)}>
+                            Buscar
+                          </button>
+                        </div>
+                        <ul className="order-combobox-list">
+                          {filteredNewOrderBarrios.length === 0 ? (
+                            <li className="order-combobox-empty">Sin barrios disponibles</li>
+                          ) : filteredNewOrderBarrios.map(item => (
+                            <li
+                              key={`new-barrio-${item.nombre}`}
+                              className={`order-combobox-option${item.nombre === newOrderForm.barrioNombre ? " is-selected" : ""}`}
+                              onClick={() => {
+                                updateNewOrderForm("barrioNombre", item.nombre);
+                                if (normalizeDeliveryType(item.nombre) === "recogida_en_tienda") {
+                                  updateNewOrderForm("direccion", "Recoger En Tienda");
+                                }
+                                setNewOrderBarrioDropdownOpen(false);
+                              }}
+                            >
+                              {item.nombre}
+                              {item.costoDomicilio != null ? <span className="order-combobox-price">${formatearCOP(item.costoDomicilio)}</span> : null}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    ) : null}
+                  </div>
+                </label>
+              </section>
+
+              <section className="orders-new-order-section">
+                <h3>Mensaje y pago</h3>
+                <div className="order-detail-edit-grid">
+                  <label className="order-detail-edit-label">
+                    Firma
+                    <input type="text" value={newOrderForm.firma} onChange={event => updateNewOrderForm("firma", event.target.value)} placeholder="De parte de..." />
+                  </label>
+                  {paymentFieldConfig ? (
+                    <label className="order-detail-edit-label">
+                      {paymentFieldConfig.titulo || "Metodo de pago"}
+                      <select value={newOrderForm.metodoPago} onChange={event => updateNewOrderForm("metodoPago", event.target.value)}>
+                        <option value="">Seleccionar</option>
+                        {paymentFieldOptions.map(option => <option key={option} value={option}>{option}</option>)}
+                      </select>
+                    </label>
+                  ) : null}
+                  {salesChannelFieldConfig ? (
+                    <label className="order-detail-edit-label">
+                      {salesChannelFieldConfig.titulo || "Canal"}
+                      <select value={newOrderForm.canalFlora} onChange={event => updateNewOrderForm("canalFlora", event.target.value)}>
+                        <option value="">Seleccionar</option>
+                        {(Array.isArray(salesChannelFieldConfig.opciones) ? salesChannelFieldConfig.opciones : []).map(option => <option key={option} value={option}>{option}</option>)}
+                      </select>
+                    </label>
+                  ) : null}
+                </div>
+                <label className="order-detail-edit-label">
+                  Mensaje tarjeta
+                  <textarea value={newOrderForm.mensajeTarjeta} onChange={event => updateNewOrderForm("mensajeTarjeta", event.target.value)} rows={3} />
+                </label>
+                <label className="order-detail-edit-label">
+                  Observacion interna
+                  <textarea value={newOrderForm.observacionGeneral} onChange={event => updateNewOrderForm("observacionGeneral", event.target.value)} rows={2} />
+                </label>
+              </section>
+
+              {newOrderError ? <p className="orders-message">{newOrderError}</p> : null}
+            </div>
+
+            <footer className="orders-new-order-actions">
+              <button type="button" className="btn-outline" onClick={closeNewOrderModal} disabled={newOrderSaving}>Cancelar</button>
+              <button type="button" className="btn-primary" onClick={onSaveNewOrder} disabled={newOrderSaving}>
+                {newOrderSaving ? "Guardando..." : "Guardar pedido"}
+              </button>
+            </footer>
+          </section>
+        </div>
+      ) : null}
 
       <div className={`orders-drawer-backdrop${drawerOpen ? " open" : ""}`} aria-hidden="true" />
 
