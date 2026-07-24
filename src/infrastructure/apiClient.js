@@ -922,35 +922,62 @@ export function createApiClient(config) {
       return requestJson(`/produccion/trazabilidad/usuarios?${params.toString()}`);
     },
 
-    async listarDomiciliarios({ empresaId, sucursalId, soloActivos = true }) {
+    async listarDomiciliarios({ empresaId, sucursalId, soloActivos = true, estado, q }) {
       const params = new URLSearchParams();
       params.set("empresaID", String(empresaId));
       if (sucursalId != null) params.set("sucursalID", String(sucursalId));
       params.set("soloActivos", soloActivos ? "true" : "false");
+      if (estado) params.set("estado", String(estado));
+      if (q) params.set("q", String(q));
       return requestJson(`/domicilios/domiciliarios?${params.toString()}`);
     },
 
-    async crearDomiciliario({ empresaId, sucursalId, nombre, telefono, tipo, vehiculoTipo, vehiculoPlaca, vehiculoDetalle, activo = true }) {
-      return requestJson("/domicilios/domiciliarios", {
+    async crearDomiciliario({ empresaId, nombre, telefono, tipo, vehiculo, placa, detalleVehiculo, activo = true }) {
+      const params = new URLSearchParams();
+      params.set("empresaID", String(empresaId));
+      return requestJson(`/domicilios/domiciliarios?${params.toString()}`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json"
         },
         body: JSON.stringify({
-          empresaID: empresaId,
-          sucursalID: sucursalId,
           nombre,
           telefono,
           tipo,
-          tipoDomiciliario: tipo,
-          vehiculoTipo,
-          tipoVehiculo: vehiculoTipo,
-          vehiculoPlaca,
-          placa: vehiculoPlaca,
-          vehiculoDetalle,
-          modeloVehiculo: vehiculoDetalle,
+          vehiculo,
+          placa,
+          detalleVehiculo,
           activo: Boolean(activo)
         })
+      });
+    },
+
+    async actualizarDomiciliario({ idDomiciliario, empresaId, nombre, sucursalID, telefono, tipo, estado, vehiculo, activo }) {
+      const params = new URLSearchParams();
+      params.set("empresaID", String(empresaId));
+      const payload = {};
+      if (nombre !== undefined) payload.nombre = nombre;
+      if (sucursalID !== undefined) payload.sucursalID = sucursalID;
+      if (telefono !== undefined) payload.telefono = telefono;
+      if (tipo !== undefined) payload.tipo = tipo;
+      if (estado !== undefined) payload.estado = estado;
+      if (vehiculo !== undefined) payload.vehiculo = vehiculo;
+      if (activo !== undefined) payload.activo = activo;
+
+      return requestJson(`/domicilios/domiciliarios/${idDomiciliario}?${params.toString()}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(payload)
+      });
+    },
+
+    async eliminarDomiciliario({ idDomiciliario, empresaId }) {
+      const params = new URLSearchParams();
+      params.set("empresaID", String(empresaId));
+      return requestJson(`/domicilios/domiciliarios/${idDomiciliario}?${params.toString()}`, {
+        method: "DELETE",
       });
     },
 
@@ -963,6 +990,20 @@ export function createApiClient(config) {
       if (q) params.set("q", String(q));
       params.set("incluirCancelado", incluirCancelado ? "true" : "false");
       return requestJson(`/domicilios?${params.toString()}`);
+    },
+
+    async obtenerMetricasDomicilios({ empresaId, sucursalId, fechaDesde, fechaHasta, anio, mes, dia, domiciliarioID, agruparPor = "dia" }) {
+      const params = new URLSearchParams();
+      params.set("empresaID", String(empresaId));
+      if (sucursalId != null) params.set("sucursalID", String(sucursalId));
+      if (fechaDesde) params.set("fechaDesde", String(fechaDesde));
+      if (fechaHasta) params.set("fechaHasta", String(fechaHasta));
+      if (anio != null) params.set("anio", String(anio));
+      if (mes != null) params.set("mes", String(mes));
+      if (dia != null) params.set("dia", String(dia));
+      if (domiciliarioID != null && String(domiciliarioID).trim()) params.set("domiciliarioID", String(domiciliarioID));
+      if (agruparPor) params.set("agruparPor", String(agruparPor));
+      return requestJson(`/domicilios/metricas?${params.toString()}`);
     },
 
     async listarMisEntregasDomiciliario({ empresaId, sucursalId, domiciliarioId, fecha }) {
@@ -1098,6 +1139,37 @@ export function createApiClient(config) {
       form.append("observaciones", observaciones || "");
 
       return requestJson(`/domicilios/${entregaId}/entregado`, {
+        method: "PUT",
+        body: form,
+      });
+    },
+
+    async resolverNovedadEntrega({
+      entregaId,
+      usuarioCambio,
+      observaciones,
+      evidenciaFotoUrl,
+      latitudEntrega,
+      longitudEntrega,
+      firmaNombre,
+      firmaDocumento,
+      firmaImagenUrl,
+      firmaImagenFile,
+      evidenciaFotoFile,
+    }) {
+      const form = new FormData();
+      form.append("usuarioCambio", usuarioCambio);
+      form.append("observaciones", observaciones || "");
+      if (evidenciaFotoUrl) form.append("evidenciaFotoUrl", evidenciaFotoUrl);
+      if (latitudEntrega != null) form.append("latitudEntrega", String(latitudEntrega));
+      if (longitudEntrega != null) form.append("longitudEntrega", String(longitudEntrega));
+      if (firmaNombre) form.append("firmaNombre", firmaNombre);
+      if (firmaDocumento) form.append("firmaDocumento", firmaDocumento);
+      if (firmaImagenUrl) form.append("firmaImagenUrl", firmaImagenUrl);
+      if (firmaImagenFile) form.append("firmaImagen", firmaImagenFile);
+      if (evidenciaFotoFile) form.append("evidenciaFoto", evidenciaFotoFile);
+
+      return requestJson(`/domicilios/${entregaId}/resolver-novedad`, {
         method: "PUT",
         body: form,
       });
