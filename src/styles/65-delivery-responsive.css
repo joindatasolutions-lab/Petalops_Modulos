@@ -2504,11 +2504,11 @@ main.orders-admin-view.orders-page-view.delivery-page-view,
 
 .delivery-page-view .delivery-novelty-summary-card {
   display: grid !important;
-  grid-template-columns: 42px minmax(0, 1fr) !important;
+  grid-template-columns: 36px minmax(0, 1fr) !important;
   align-items: center !important;
-  gap: 12px !important;
-  min-height: 76px !important;
-  padding: 13px 14px !important;
+  gap: 10px !important;
+  min-height: 64px !important;
+  padding: 10px 12px !important;
   border: 1px solid #edf0f5 !important;
   border-radius: 9px !important;
   background: #ffffff !important;
@@ -2518,8 +2518,8 @@ main.orders-admin-view.orders-page-view.delivery-page-view,
 .delivery-page-view .delivery-novelty-summary-icon {
   display: inline-grid !important;
   place-items: center !important;
-  width: 38px !important;
-  height: 38px !important;
+  width: 34px !important;
+  height: 34px !important;
   border-radius: 999px !important;
   background: #fff1f7 !important;
   color: #e91e72 !important;
@@ -2550,9 +2550,9 @@ main.orders-admin-view.orders-page-view.delivery-page-view,
 
 .delivery-page-view .delivery-novelty-summary-card strong {
   display: block !important;
-  margin: 3px 0 !important;
+  margin: 2px 0 0 !important;
   color: #111827 !important;
-  font-size: 23px !important;
+  font-size: 22px !important;
   font-weight: 950 !important;
   line-height: 1 !important;
 }

@@ -271,6 +271,10 @@ function priorityTone(priority) {
   return "is-pendiente";
 }
 
+function compactStatusValue(value) {
+  return normalizeStatus(value).replace(/[^A-Z0-9]+/g, "");
+}
+
 function deliveryRawStatus(item) {
   const code = item?.estadoEntregaCodigo
     || item?.estado_entrega_codigo
@@ -295,7 +299,7 @@ function deliveryRawStatus(item) {
 
 function deliveryStatusMeta(item) {
   const { code, name } = deliveryRawStatus(item);
-  const status = normalizeStatus(code || name).replace(/_/g, "");
+  const status = compactStatusValue(code || name);
   const label = String(name || code || "Pendiente").trim();
 
   if (status === "ENTREGADO") return { key: "entregado", label: label || "Entregado", tone: "done" };
@@ -306,9 +310,15 @@ function deliveryStatusMeta(item) {
   return { key: "pendiente", label: label || "Pendiente", tone: "pending" };
 }
 
+function hasExplicitDeliveryStatus(item) {
+  const { code, name } = deliveryRawStatus(item);
+  const status = compactStatusValue(code || name);
+  return ["ENTREGADO", "ENRUTA", "ENCAMINO", "ASIGNADO", "PARAENTREGA", "NOENTREGADO", "REPROGRAMADO", "CANCELADO", "RECHAZADO"].includes(status);
+}
+
 function isCanceledDeliveryStatus(item) {
   const { code, name } = deliveryRawStatus(item);
-  const status = normalizeStatus(code || name).replace(/_/g, "");
+  const status = compactStatusValue(code || name);
   return status === "CANCELADO" || status === "RECHAZADO";
 }
 
@@ -555,12 +565,8 @@ function deliveryNoveltyStatusMeta(item) {
 }
 
 function isOpenDeliveryNovelty(item) {
-  const raw = item?.estadoEntrega
-    || item?.estado_entrega
-    || item?.estadoEntregaNombre
-    || item?.estado_entrega_nombre
-    || item?.estado;
-  return normalizeStatus(raw) === "NO_ENTREGADO";
+  if (!hasExplicitDeliveryStatus(item)) return true;
+  return deliveryStatusMeta(item).key === "no-entregado";
 }
 
 function deliveryNoveltyLabelForItem(item, index = 0) {
@@ -1447,6 +1453,15 @@ export function DeliveryPage({
     });
   }, [api, empresaId, sucursalId, metricsFechaDesde, metricsFechaHasta, metricsDomiciliarioId, metricsGroupBy, modo]);
 
+  const loadNoveltyDeliveries = useCallback(async () => {
+    const data = await api.listarDomiciliosAdmin({
+      empresaId,
+      sucursalId,
+      filtro: "noentregado",
+    });
+    setAdminItems(filterDomicilioItems(normalizeDeliveryItemsPayload(data)).filter(item => !isCanceledDeliveryStatus(item)));
+  }, [api, empresaId, sucursalId]);
+
   const loadAdmin = useCallback(async () => {
     const queryPlan = buildDeliveryAdminQueryPlan({ filtro, statusFilter, fechaFiltro, deliverySearch });
     const baseParams = {
@@ -1599,7 +1614,11 @@ export function DeliveryPage({
     }
     if (modo === "metricas" || modo === "novedades") {
       runLoad(async () => {
-        await Promise.all([loadDomiciliarios(), loadDeliveryMetrics()]);
+        await Promise.all([
+          loadDomiciliarios(),
+          loadDeliveryMetrics(),
+          ...(modo === "novedades" ? [loadNoveltyDeliveries()] : []),
+        ]);
       }).catch(() => {});
       return;
     }
@@ -1608,7 +1627,7 @@ export function DeliveryPage({
       return;
     }
     runLoad(loadMyOrders).catch(() => {});
-  }, [modo, runLoad, loadAdmin, loadBarrios, loadAvailableOrders, loadMyOrders, loadDomiciliarios, loadCourierDirectory, loadDeliveryMetrics, availableCoords]);
+  }, [modo, runLoad, loadAdmin, loadBarrios, loadAvailableOrders, loadMyOrders, loadDomiciliarios, loadCourierDirectory, loadDeliveryMetrics, loadNoveltyDeliveries, availableCoords]);
 
   const withCoords = async actionLabel => {
     if (isOffline) {
@@ -1689,7 +1708,11 @@ export function DeliveryPage({
       if (modo === "admin") {
         await loadAdmin();
       } else if (modo === "metricas" || modo === "novedades") {
-        await Promise.all([loadDomiciliarios(), loadDeliveryMetrics()]);
+        await Promise.all([
+          loadDomiciliarios(),
+          loadDeliveryMetrics(),
+          ...(modo === "novedades" ? [loadNoveltyDeliveries()] : []),
+        ]);
       } else if (modo === "domiciliarios") {
         await loadCourierDirectory();
       } else if (modo === "barrios" || modo === "crear-barrio") {
@@ -2369,7 +2392,8 @@ export function DeliveryPage({
       metricsPayload?.pedidosNovedades,
       metricsPayload?.novedadesPedidos,
       metricsPayload?.novedadesPorPedido,
-    ].find(Array.isArray) || [];
+      adminItems,
+    ].find(source => Array.isArray(source) && source.length > 0) || [];
     const allRows = detailSource
       .map((raw, index) => {
         const label = formatDeliveryNoveltyLabel(
@@ -2478,7 +2502,8 @@ export function DeliveryPage({
       return true;
     });
 
-    const statusCounts = allRows.length > 0 ? allRows.reduce(
+    const hasPedidoDetail = detailSource.length > 0;
+    const statusCounts = hasPedidoDetail ? allRows.reduce(
       (acc, row) => {
         acc[row.status.tone] = (acc[row.status.tone] || 0) + row.total;
         return acc;
@@ -2489,11 +2514,27 @@ export function DeliveryPage({
       tracking: 0,
       resolved: Math.max(deliveryNoveltyInsights.totalNovedades - deliveryNoveltyInsights.totalNoEntregados, 0),
     };
-    const typeCounts = deliveryNoveltyInsights.rows.map(row => ({
-      ...deliveryNoveltyTypeMeta(row.label),
-      key: normalizeSearchText(row.label),
-      label: row.label,
-      count: row.total,
+    const typeCounts = hasPedidoDetail
+      ? Array.from(allRows.reduce((map, row) => {
+        const current = map.get(row.typeKey) || {
+          ...row.type,
+          key: row.typeKey,
+          label: row.label,
+          count: 0,
+        };
+        current.count += row.total;
+        map.set(row.typeKey, current);
+        return map;
+      }, new Map()).values()).sort((a, b) => b.count - a.count || a.label.localeCompare(b.label))
+      : deliveryNoveltyInsights.rows.map(row => ({
+        ...deliveryNoveltyTypeMeta(row.label),
+        key: normalizeSearchText(row.label),
+        label: row.label,
+        count: row.total,
+      }));
+    const criticalSource = hasPedidoDetail ? allRows : deliveryNoveltyInsights.rows.map(row => ({
+      ...row,
+      type: deliveryNoveltyTypeMeta(row.label),
     }));
 
     return {
@@ -2501,16 +2542,13 @@ export function DeliveryPage({
       allRows,
       statusCounts,
       typeCounts,
-      hasPedidoDetail: detailSource.length > 0,
-      total: allRows.length || deliveryNoveltyInsights.totalNovedades,
-      critical: (allRows.length > 0 ? allRows : deliveryNoveltyInsights.rows.map(row => ({
-        ...row,
-        type: deliveryNoveltyTypeMeta(row.label),
-      })))
+      hasPedidoDetail,
+      total: hasPedidoDetail ? allRows.length : deliveryNoveltyInsights.totalNovedades,
+      critical: criticalSource
         .filter(row => ["cliente-no-responde", "direccion-incorrecta", "rechazo"].includes(row.type?.key))
         .reduce((acc, row) => acc + (row.total || 1), 0),
     };
-  }, [deliveryNoveltyInsights, metricsPayload, noveltySearch, noveltyStatusFilter, noveltyTypeFilter, resolvedNoveltyKeys, resolvedNoveltyObservations]);
+  }, [adminItems, deliveryNoveltyInsights, metricsPayload, noveltySearch, noveltyStatusFilter, noveltyTypeFilter, resolvedNoveltyKeys, resolvedNoveltyObservations]);
   const deliveryMetricStates = useMemo(() => {
     const deliveryRows = [
       { key: "entregados", label: "Entregados", value: metricNumber(deliveryMetrics.resumen.entregados), tone: "is-success", Icon: CheckCircle2 },
@@ -3543,9 +3581,8 @@ export function DeliveryPage({
               <article className="delivery-novelty-summary-card is-total">
                 <span className="delivery-novelty-summary-icon"><AlertTriangle size={21} /></span>
                 <div>
-                  <span>Novedades</span>
-                  <strong>{deliveryNoveltyBoard.total || deliveryNoveltyInsights.totalNovedades}</strong>
-                  <small>Hoy</small>
+                  <span>Abiertas</span>
+                  <strong>{deliveryNoveltyBoard.total}</strong>
                 </div>
               </article>
               <article className="delivery-novelty-summary-card is-warning">
@@ -3553,7 +3590,6 @@ export function DeliveryPage({
                 <div>
                   <span>Sin resolver</span>
                   <strong>{deliveryNoveltyBoard.statusCounts.pending}</strong>
-                  <small>Pendientes</small>
                 </div>
               </article>
               <article className="delivery-novelty-summary-card is-resolved">
@@ -3561,7 +3597,6 @@ export function DeliveryPage({
                 <div>
                   <span>Resueltas</span>
                   <strong>{deliveryNoveltyBoard.statusCounts.resolved}</strong>
-                  <small>Hoy</small>
                 </div>
               </article>
               <article className="delivery-novelty-summary-card is-critical">
@@ -3569,7 +3604,6 @@ export function DeliveryPage({
                 <div>
                   <span>Criticas</span>
                   <strong>{deliveryNoveltyBoard.critical}</strong>
-                  <small>Requieren atencion</small>
                 </div>
               </article>
             </section>
