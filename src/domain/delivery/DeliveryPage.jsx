@@ -555,12 +555,7 @@ function deliveryNoveltyStatusMeta(item) {
 }
 
 function isOpenDeliveryNovelty(item) {
-  const raw = item?.estadoEntrega
-    || item?.estado_entrega
-    || item?.estadoEntregaNombre
-    || item?.estado_entrega_nombre
-    || item?.estado;
-  return normalizeStatus(raw) === "NO_ENTREGADO";
+  return deliveryStatusMeta(item).key === "no-entregado";
 }
 
 function deliveryNoveltyLabelForItem(item, index = 0) {
@@ -2478,7 +2473,8 @@ export function DeliveryPage({
       return true;
     });
 
-    const statusCounts = allRows.length > 0 ? allRows.reduce(
+    const hasPedidoDetail = detailSource.length > 0;
+    const statusCounts = hasPedidoDetail ? allRows.reduce(
       (acc, row) => {
         acc[row.status.tone] = (acc[row.status.tone] || 0) + row.total;
         return acc;
@@ -2489,11 +2485,27 @@ export function DeliveryPage({
       tracking: 0,
       resolved: Math.max(deliveryNoveltyInsights.totalNovedades - deliveryNoveltyInsights.totalNoEntregados, 0),
     };
-    const typeCounts = deliveryNoveltyInsights.rows.map(row => ({
-      ...deliveryNoveltyTypeMeta(row.label),
-      key: normalizeSearchText(row.label),
-      label: row.label,
-      count: row.total,
+    const typeCounts = hasPedidoDetail
+      ? Array.from(allRows.reduce((map, row) => {
+        const current = map.get(row.typeKey) || {
+          ...row.type,
+          key: row.typeKey,
+          label: row.label,
+          count: 0,
+        };
+        current.count += row.total;
+        map.set(row.typeKey, current);
+        return map;
+      }, new Map()).values()).sort((a, b) => b.count - a.count || a.label.localeCompare(b.label))
+      : deliveryNoveltyInsights.rows.map(row => ({
+        ...deliveryNoveltyTypeMeta(row.label),
+        key: normalizeSearchText(row.label),
+        label: row.label,
+        count: row.total,
+      }));
+    const criticalSource = hasPedidoDetail ? allRows : deliveryNoveltyInsights.rows.map(row => ({
+      ...row,
+      type: deliveryNoveltyTypeMeta(row.label),
     }));
 
     return {
@@ -2501,12 +2513,9 @@ export function DeliveryPage({
       allRows,
       statusCounts,
       typeCounts,
-      hasPedidoDetail: detailSource.length > 0,
-      total: allRows.length || deliveryNoveltyInsights.totalNovedades,
-      critical: (allRows.length > 0 ? allRows : deliveryNoveltyInsights.rows.map(row => ({
-        ...row,
-        type: deliveryNoveltyTypeMeta(row.label),
-      })))
+      hasPedidoDetail,
+      total: hasPedidoDetail ? allRows.length : deliveryNoveltyInsights.totalNovedades,
+      critical: criticalSource
         .filter(row => ["cliente-no-responde", "direccion-incorrecta", "rechazo"].includes(row.type?.key))
         .reduce((acc, row) => acc + (row.total || 1), 0),
     };
@@ -3543,9 +3552,8 @@ export function DeliveryPage({
               <article className="delivery-novelty-summary-card is-total">
                 <span className="delivery-novelty-summary-icon"><AlertTriangle size={21} /></span>
                 <div>
-                  <span>Novedades</span>
-                  <strong>{deliveryNoveltyBoard.total || deliveryNoveltyInsights.totalNovedades}</strong>
-                  <small>Hoy</small>
+                  <span>Abiertas</span>
+                  <strong>{deliveryNoveltyBoard.total}</strong>
                 </div>
               </article>
               <article className="delivery-novelty-summary-card is-warning">
@@ -3553,7 +3561,6 @@ export function DeliveryPage({
                 <div>
                   <span>Sin resolver</span>
                   <strong>{deliveryNoveltyBoard.statusCounts.pending}</strong>
-                  <small>Pendientes</small>
                 </div>
               </article>
               <article className="delivery-novelty-summary-card is-resolved">
@@ -3561,7 +3568,6 @@ export function DeliveryPage({
                 <div>
                   <span>Resueltas</span>
                   <strong>{deliveryNoveltyBoard.statusCounts.resolved}</strong>
-                  <small>Hoy</small>
                 </div>
               </article>
               <article className="delivery-novelty-summary-card is-critical">
@@ -3569,7 +3575,6 @@ export function DeliveryPage({
                 <div>
                   <span>Criticas</span>
                   <strong>{deliveryNoveltyBoard.critical}</strong>
-                  <small>Requieren atencion</small>
                 </div>
               </article>
             </section>
