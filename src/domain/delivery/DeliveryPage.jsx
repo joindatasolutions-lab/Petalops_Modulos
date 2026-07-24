@@ -20,7 +20,17 @@ import {
   Search,
   Truck,
   UserRound,
+  X,
 } from "lucide-react";
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
 
 const FILTROS = [
   { value: "hoy", label: "Hoy" },
@@ -55,7 +65,8 @@ export function buildDeliveryAdminQueryPlan({ filtro = "hoy", statusFilter = "to
 
 const DELIVERY_VIEWS = [
   { value: "admin", label: "Pedidos" },
-  { value: "disponibles", label: "Disponibles" },
+  { value: "novedades", label: "Novedades" },
+  { value: "metricas", label: "Métricas" },
   { value: "domiciliarios", label: "Domiciliarios" },
 ];
 
@@ -68,8 +79,73 @@ const DELIVERY_STATUS_FILTERS = [
   { key: "no-entregado", label: "No entregados", icon: AlertTriangle },
   { key: "reprogramado", label: "Reprogramados", icon: Clock3 },
 ];
+const DELIVERY_METRIC_GROUPS = [
+  { value: "dia", label: "Día" },
+  { value: "mes", label: "Mes" },
+  { value: "anio", label: "Año" },
+  { value: "domiciliario", label: "Domiciliario" },
+  { value: "estadoEntrega", label: "Estado entrega" },
+  { value: "estadoPedido", label: "Estado pedido" },
+  { value: "novedad", label: "Novedad" },
+  { value: "barrio", label: "Barrio" },
+  { value: "zona", label: "Zona" },
+];
+const DELIVERY_METRIC_RANGE_PRESETS = [
+  { value: "hoy", label: "Hoy" },
+  { value: "7dias", label: "Últimos 7 días" },
+  { value: "mes", label: "Mes actual" },
+  { value: "anio", label: "Año actual" },
+  { value: "personalizado", label: "Personalizado" },
+];
+const DELIVERY_NOVELTY_TYPES = [
+  { key: "cliente-no-responde", label: "Cliente no responde", tone: "pink", Icon: Phone },
+  { key: "direccion-incorrecta", label: "Direccion incorrecta", tone: "orange", Icon: MapPin },
+  { key: "entregado-porteria", label: "Entregado a porteria", tone: "green", Icon: CheckCircle2 },
+  { key: "retraso", label: "Retraso", tone: "blue", Icon: Clock3 },
+  { key: "rechazo", label: "Rechazo de entrega", tone: "red", Icon: AlertTriangle },
+  { key: "destinatario-ausente", label: "Destinatario ausente", tone: "purple", Icon: UserRound },
+  { key: "cambio-direccion", label: "Cambio de direccion", tone: "teal", Icon: Route },
+  { key: "otra", label: "Otra novedad", tone: "slate", Icon: MessageCircle },
+];
+const DELIVERY_PERFORMANCE_SORTS = [
+  { value: "tasaEntrega", label: "Tasa de entrega" },
+  { value: "entregados", label: "Entregas completadas" },
+  { value: "tiempoPromedio", label: "Tiempo promedio" },
+  { value: "menosNovedades", label: "Menos novedades" },
+  { value: "menosReasignaciones", label: "Menos reasignaciones" },
+];
 const MAX_ENTREGAS_ACTIVAS_DOMICILIARIO = 15;
 const DELIVERY_SYNC_PAGE_SIZE = 100;
+const DEFAULT_DELIVERY_METRICS_SUMMARY = {
+  total: 0,
+  pendientes: 0,
+  asignados: 0,
+  enRuta: 0,
+  entregados: 0,
+  noEntregados: 0,
+  cancelados: 0,
+  novedades: 0,
+  tasaEntrega: 0,
+  tiempoPromedioEntregaMin: null,
+  costoDomicilioTotal: 0,
+  costoDomicilioPromedio: 0,
+};
+const DEFAULT_DELIVERY_METRICS_RESPONSE = {
+  empresaID: null,
+  sucursalID: null,
+  fechaDesde: "",
+  fechaHasta: "",
+  agruparPor: "dia",
+  resumen: DEFAULT_DELIVERY_METRICS_SUMMARY,
+  items: [],
+  porDomiciliario: [],
+  porEstadoEntrega: [],
+  porEstadoPedido: [],
+  porBarrio: [],
+  porZona: [],
+  novedades: [],
+};
+const DELIVERY_METRIC_MONTHS = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
 
 const DEFAULT_DELIVERY_FORM = {
   firmaNombre: "",
@@ -84,10 +160,19 @@ const DEFAULT_DELIVERY_FORM = {
 const DEFAULT_COURIER_FORM = {
   nombre: "",
   telefono: "",
-  tipo: "interno",
-  vehiculoTipo: "moto",
+  tipo: "Interno",
+  vehiculoTipo: "Moto",
   vehiculoPlaca: "",
   vehiculoDetalle: "",
+  activo: true,
+};
+
+const DEFAULT_COURIER_EDIT_FORM = {
+  nombre: "",
+  telefono: "",
+  tipo: "Interno",
+  estado: "Activo",
+  vehiculo: "",
   activo: true,
 };
 
@@ -98,6 +183,20 @@ function isPedidosRole(session) {
 
 function todayIso() {
   return new Date().toISOString().slice(0, 10);
+}
+
+function monthStartIso() {
+  return todayIso().slice(0, 8) + "01";
+}
+
+function yearStartIso() {
+  return `${todayIso().slice(0, 4)}-01-01`;
+}
+
+function daysAgoIso(days) {
+  const date = new Date();
+  date.setDate(date.getDate() - Number(days || 0));
+  return date.toISOString().slice(0, 10);
 }
 
 function normalizeSearchText(value) {
@@ -177,6 +276,8 @@ function deliveryRawStatus(item) {
     || item?.estado_entrega_codigo
     || item?.codigoEstadoEntrega
     || item?.codigo_estado_entrega
+    || item?.estadoEntrega
+    || item?.estado_entrega
     || item?.estadoCodigo
     || item?.estado_codigo
     || item?.estado;
@@ -184,6 +285,8 @@ function deliveryRawStatus(item) {
     || item?.estado_entrega_nombre
     || item?.nombreEstadoEntrega
     || item?.nombre_estado_entrega
+    || item?.estadoEntrega
+    || item?.estado_entrega
     || item?.estadoNombre
     || item?.estado_nombre
     || item?.estado;
@@ -207,6 +310,18 @@ function isCanceledDeliveryStatus(item) {
   const { code, name } = deliveryRawStatus(item);
   const status = normalizeStatus(code || name).replace(/_/g, "");
   return status === "CANCELADO" || status === "RECHAZADO";
+}
+
+function isDeliveryAllowedPedidoStatus(item) {
+  const raw = item?.estadoPedido
+    || item?.estado_pedido
+    || item?.estadoPedidoNombre
+    || item?.estado_pedido_nombre
+    || item?.nombreEstadoPedido
+    || item?.nombre_estado_pedido;
+  const status = normalizeStatus(raw).replace(/_/g, "");
+  if (!status) return true;
+  return status !== "CREADO";
 }
 
 function isDeliveryTimeLate(item) {
@@ -247,6 +362,279 @@ function deliveryRemainingLabel(item) {
     ? `${h} h${m > 0 ? ` ${m} m` : ""}`
     : `${m} m`;
   return hours < 0 ? `Retraso ${value}` : `${value} restantes`;
+}
+
+function formatMetricPercent(value, total) {
+  const numerator = Number(value);
+  const denominator = Number(total);
+  if (!Number.isFinite(numerator) || !Number.isFinite(denominator) || denominator <= 0) return "0%";
+  return `${Math.round((numerator / denominator) * 100)}%`;
+}
+
+function formatMetricRate(value) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return "0%";
+  return `${number.toFixed(number % 1 === 0 ? 0 : 1)}%`;
+}
+
+function formatMetricOneDecimal(value) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return "0%";
+  return `${number.toFixed(number % 1 === 0 ? 0 : 1)}%`;
+}
+
+function formatMetricMoney(value) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return "$0";
+  return `$${number.toLocaleString("es-CO", { maximumFractionDigits: 0 })}`;
+}
+
+function formatMetricMinutes(value) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return "-";
+  if (number < 60) return `${Math.round(number)} min`;
+  const hours = Math.floor(number / 60);
+  const minutes = Math.round(number % 60);
+  return `${hours} h${minutes ? ` ${minutes} min` : ""}`;
+}
+
+function metricGroupLabel(item) {
+  return String(
+    item?.grupo
+    || item?.periodo
+    || item?.domiciliario
+    || item?.estadoEntrega
+    || item?.estadoPedido
+    || item?.novedad
+    || item?.barrio
+    || item?.zona
+    || "-"
+  );
+}
+
+function metricNumber(value) {
+  const number = Number(value);
+  return Number.isFinite(number) ? number : 0;
+}
+
+function parseMetricDate(value) {
+  const text = String(value || "").trim();
+  if (!text) return null;
+  const isoMatch = text.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (isoMatch) {
+    const date = new Date(Number(isoMatch[1]), Number(isoMatch[2]) - 1, Number(isoMatch[3]));
+    return Number.isNaN(date.getTime()) ? null : date;
+  }
+  const slashMatch = text.match(/^(\d{1,2})\/(\d{1,2})(?:\/(\d{4}))?$/);
+  if (slashMatch) {
+    const year = Number(slashMatch[3] || todayIso().slice(0, 4));
+    const date = new Date(year, Number(slashMatch[2]) - 1, Number(slashMatch[1]));
+    return Number.isNaN(date.getTime()) ? null : date;
+  }
+  return null;
+}
+
+function formatMetricDay(date, withYear = false) {
+  if (!(date instanceof Date) || Number.isNaN(date.getTime())) return "";
+  const day = String(date.getDate()).padStart(2, "0");
+  const month = DELIVERY_METRIC_MONTHS[date.getMonth()] || "";
+  return withYear ? `${day} ${month} ${date.getFullYear()}` : `${day} ${month}`;
+}
+
+function formatMetricMonth(date) {
+  if (!(date instanceof Date) || Number.isNaN(date.getTime())) return "";
+  return `${DELIVERY_METRIC_MONTHS[date.getMonth()] || ""} ${date.getFullYear()}`;
+}
+
+function formatMetricPeriodLabel(item, groupBy, { tooltip = false } = {}) {
+  const raw = String(item?.periodo || item?.grupo || "").trim();
+  const normalizedGroup = normalizeSearchText(groupBy);
+  const date = parseMetricDate(raw);
+  if (normalizedGroup === "mes" && date) return formatMetricMonth(date);
+  if (normalizedGroup === "semana") {
+    const endDate = parseMetricDate(item?.fechaHasta || item?.periodoHasta || item?.hasta);
+    if (date && endDate) {
+      if (date.getMonth() === endDate.getMonth() && date.getFullYear() === endDate.getFullYear()) {
+        return `${String(date.getDate()).padStart(2, "0")}\u2013${formatMetricDay(endDate)}`;
+      }
+      return `${formatMetricDay(date)}\u2013${formatMetricDay(endDate)}`;
+    }
+    if (raw.includes("-") || raw.includes("–")) return raw.replace(/\s+/g, " ");
+  }
+  if (date) return formatMetricDay(date, tooltip);
+  return raw || metricGroupLabel(item);
+}
+
+function metricGroupBadgeLabel(groupBy) {
+  const normalizedGroup = normalizeSearchText(groupBy);
+  if (normalizedGroup === "mes") return "Agrupado por mes";
+  if (normalizedGroup === "semana") return "Agrupado por semana";
+  return "Agrupado por día";
+}
+
+function DeliveryHistoryTooltip({ active, payload, label }) {
+  if (!active || !Array.isArray(payload) || payload.length === 0) return null;
+  const value = metricNumber(payload[0]?.value);
+  const tooltipLabel = payload[0]?.payload?.tooltipLabel || label;
+  return (
+    <div className="delivery-history-tooltip">
+      <strong>{tooltipLabel}</strong>
+      <span>{value} pedidos</span>
+    </div>
+  );
+}
+
+function deliveryAdminStateDescription(label) {
+  const normalized = normalizeSearchText(label);
+  if (normalized.includes("aprob")) return "Pedido validado y listo para gestion.";
+  if (normalized.includes("cread")) return "Pedido creado, pendiente de validacion.";
+  if (normalized.includes("cancel")) return "Pedido cancelado antes de la entrega.";
+  return "Estado administrativo registrado en el flujo.";
+}
+
+function metricRatio(value, total) {
+  const numerator = metricNumber(value);
+  const denominator = metricNumber(total);
+  return denominator > 0 ? (numerator / denominator) * 100 : 0;
+}
+
+function formatDeliveryNoveltyLabel(value) {
+  const text = String(value || "").trim();
+  const normalized = normalizeSearchText(text);
+  if (normalized === "arreglo danado") return "Arreglo dañado";
+  return text;
+}
+
+function deliveryNoveltyTypeMeta(value) {
+  const normalized = normalizeSearchText(value);
+  const found = DELIVERY_NOVELTY_TYPES.find(item => {
+    const itemLabel = normalizeSearchText(item.label);
+    return normalized === item.key || normalized === itemLabel || itemLabel.includes(normalized) || normalized.includes(itemLabel);
+  });
+  if (found) return found;
+  if (normalized.includes("direccion")) return DELIVERY_NOVELTY_TYPES[1];
+  if (normalized.includes("porteria")) return DELIVERY_NOVELTY_TYPES[2];
+  if (normalized.includes("retras")) return DELIVERY_NOVELTY_TYPES[3];
+  if (normalized.includes("rechaz")) return DELIVERY_NOVELTY_TYPES[4];
+  if (normalized.includes("ausente")) return DELIVERY_NOVELTY_TYPES[5];
+  if (normalized.includes("cambio")) return DELIVERY_NOVELTY_TYPES[6];
+  if (normalized.includes("no responde") || normalized.includes("llamada")) return DELIVERY_NOVELTY_TYPES[0];
+  return DELIVERY_NOVELTY_TYPES[7];
+}
+
+function deliveryNoveltyRawLabel(item) {
+  return String(
+    item?.novedad
+    || item?.tipoNovedad
+    || item?.tipo_novedad
+    || item?.motivoNoEntregado
+    || item?.noEntregadoMotivo
+    || item?.motivo_no_entregado
+    || item?.motivo
+    || ""
+  ).trim();
+}
+
+function deliveryNoveltyObservation(item) {
+  return String(
+    item?.observacionNovedad
+    || item?.observacion_novedad
+    || item?.observacion
+    || item?.observaciones
+    || item?.notas
+    || item?.mensaje
+    || "Sin observacion registrada."
+  ).trim();
+}
+
+function deliveryNoveltyStatusMeta(item) {
+  const status = deliveryStatusMeta(item);
+  if (status.key === "entregado") return { label: "Resuelta", tone: "resolved" };
+  if (status.key === "en-camino" || status.key === "asignado") return { label: "En seguimiento", tone: "tracking" };
+  return { label: "Pendiente", tone: "pending" };
+}
+
+function isOpenDeliveryNovelty(item) {
+  const raw = item?.estadoEntrega
+    || item?.estado_entrega
+    || item?.estadoEntregaNombre
+    || item?.estado_entrega_nombre
+    || item?.estado;
+  return normalizeStatus(raw) === "NO_ENTREGADO";
+}
+
+function deliveryNoveltyLabelForItem(item, index = 0) {
+  const raw = deliveryNoveltyRawLabel(item);
+  if (raw) return formatDeliveryNoveltyLabel(raw);
+  if (isDeliveryTimeLate(item)) return "Retraso";
+  if (deliveryStatusMeta(item).key === "no-entregado") {
+    const fallbacks = ["Cliente no responde", "Direccion incorrecta", "Destinatario ausente", "Rechazo de entrega"];
+    return fallbacks[index % fallbacks.length];
+  }
+  return "";
+}
+
+function courierInitials(name) {
+  const parts = String(name || "D").trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "D";
+  return parts.slice(0, 2).map(part => part.slice(0, 1).toUpperCase()).join("");
+}
+
+function normalizeCourierPhotoUrl(value) {
+  const text = String(value || "").trim();
+  if (!text) return "";
+  if (/^(https?:)?\/\//i.test(text) || text.startsWith("data:") || text.startsWith("blob:")) return text;
+  const base = String(tenantConfig.apiBaseUrl || "").replace(/\/+$/, "");
+  const path = text.startsWith("/") ? text : `/${text}`;
+  return base ? `${base}${path}` : path;
+}
+
+function courierPhotoUrl(item) {
+  const value = item?.fotoUrl
+    || item?.domiciliarioImagenUrl
+    || item?.domiciliario_imagen_url
+    || item?.fotoURL
+    || item?.foto_url
+    || item?.urlFoto
+    || item?.url_foto
+    || item?.avatarUrl
+    || item?.avatar_url
+    || item?.imagenUrl
+    || item?.imagen_url
+    || item?.imageUrl
+    || item?.image_url
+    || item?.foto
+    || item?.avatar
+    || item?.imagen
+    || item?.usuario?.fotoUrl
+    || item?.usuario?.foto_url
+    || item?.usuario?.avatarUrl
+    || item?.usuario?.avatar_url;
+  return normalizeCourierPhotoUrl(value);
+}
+
+function performanceDurationLabel(minutes) {
+  if (minutes == null) return "Sin datos";
+  const number = Number(minutes);
+  if (!Number.isFinite(number) || number < 0) return "Sin datos";
+  return formatMetricMinutes(number);
+}
+
+function deliveryPerformanceStatus({ courier, row }) {
+  if (courier?.activo === false || normalizeStatus(courierBackendStatus(courier)) === "INACTIVO") {
+    return { label: "Inactivo", tone: "is-inactive" };
+  }
+  if (metricNumber(row?.enRuta) > 0) return { label: "En ruta", tone: "is-route" };
+  if (metricNumber(row?.total) <= 0) return { label: "Sin pedidos", tone: "is-idle" };
+  return { label: "Disponible", tone: "is-available" };
+}
+
+function deliveryMetricRangeForPreset(preset) {
+  const today = todayIso();
+  if (preset === "hoy") return { fechaDesde: today, fechaHasta: today, agruparPor: "dia" };
+  if (preset === "7dias") return { fechaDesde: daysAgoIso(6), fechaHasta: today, agruparPor: "dia" };
+  if (preset === "anio") return { fechaDesde: yearStartIso(), fechaHasta: today, agruparPor: "mes" };
+  return { fechaDesde: monthStartIso(), fechaHasta: today, agruparPor: "dia" };
 }
 
 function isSurpriseDelivery(item) {
@@ -297,7 +685,7 @@ export function isStorePickupDelivery(item) {
 }
 
 function filterDomicilioItems(items) {
-  return (Array.isArray(items) ? items : []).filter(item => !isStorePickupDelivery(item));
+  return (Array.isArray(items) ? items : []).filter(item => !isStorePickupDelivery(item) && isDeliveryAllowedPedidoStatus(item));
 }
 
 export function deliveryArrangementName(item) {
@@ -669,11 +1057,35 @@ function courierIdLabel(item, index) {
 function courierVehicle(item) {
   const type = item?.vehiculoTipo || item?.tipoVehiculo || item?.vehiculo || item?.vehicleType || "";
   const plate = item?.vehiculoPlaca || item?.placa || item?.plate || "";
-  const detail = item?.vehiculoDetalle || item?.modeloVehiculo || item?.modelo || item?.vehicleModel || "";
+  const detail = item?.detalleVehiculo || item?.detalle_vehiculo || item?.vehiculoDetalle || item?.modeloVehiculo || item?.modelo || item?.vehicleModel || "";
   return {
     type: String(type || "Sin vehiculo").trim(),
     plate: String(plate || "-").trim(),
     detail: String(detail || "").trim(),
+  };
+}
+
+function courierBackendStatus(item) {
+  const raw = String(item?.estado || "").trim();
+  if (raw) return raw;
+  return item?.activo === false ? "Inactivo" : "Activo";
+}
+
+function isDeletedCourier(item) {
+  return normalizeStatus(courierBackendStatus(item)) === "ELIMINADO";
+}
+
+function courierEditFormFromItem(item) {
+  const vehicle = courierVehicle(item);
+  const vehiculo = String(item?.vehiculo || [vehicle.type, vehicle.plate !== "-" ? vehicle.plate : "", vehicle.detail].filter(Boolean).join(" ")).trim();
+  const estado = courierBackendStatus(item);
+  return {
+    nombre: String(item?.nombre || item?.nombreDomiciliario || "").trim(),
+    telefono: String(item?.telefono || item?.celular || item?.phone || "").trim(),
+    tipo: courierType(item),
+    estado,
+    vehiculo,
+    activo: estado === "Activo" && item?.activo !== false,
   };
 }
 
@@ -742,7 +1154,7 @@ function buildActionErrorMessage(error, fallback) {
     return "Este pedido ya fue tomado por otro domiciliario.";
   }
   if (/location|ubicaci|gps/i.test(detail)) {
-    return "No fue posible validar la ubicaciÃ³n actual.";
+    return "No fue posible validar la ubicación actual.";
   }
   return detail;
 }
@@ -753,7 +1165,7 @@ function clearBrowserTextSelection() {
 
 async function requestCurrentCoords() {
   if (!globalThis.navigator?.geolocation) {
-    throw new Error("Este dispositivo no soporta geolocalizaciÃ³n.");
+    throw new Error("Este dispositivo no soporta geolocalización.");
   }
 
   return new Promise((resolve, reject) => {
@@ -766,14 +1178,14 @@ async function requestCurrentCoords() {
       },
       error => {
         if (error?.code === 1) {
-          reject(new Error("Debes permitir la ubicaciÃ³n para continuar."));
+          reject(new Error("Debes permitir la ubicación para continuar."));
           return;
         }
         if (error?.code === 2) {
-          reject(new Error("No fue posible obtener tu ubicaciÃ³n actual."));
+          reject(new Error("No fue posible obtener tu ubicación actual."));
           return;
         }
-        reject(new Error("La ubicaciÃ³n tardÃ³ demasiado. Intenta de nuevo."));
+        reject(new Error("La ubicación tardó demasiado. Intenta de nuevo."));
       },
       { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
     );
@@ -847,6 +1259,7 @@ export function DeliveryPage({
 
   const [adminItems, setAdminItems] = useState([]);
   const [domiciliarios, setDomiciliarios] = useState([]);
+  const [courierDirectoryItems, setCourierDirectoryItems] = useState([]);
   const [selectedDomiciliarioByEntrega, setSelectedDomiciliarioByEntrega] = useState({});
   const [catalogProducts, setCatalogProducts] = useState([]);
   const [deliveryProductImages, setDeliveryProductImages] = useState({});
@@ -854,7 +1267,29 @@ export function DeliveryPage({
   const [filtro, setFiltro] = useState("hoy");
   const [statusFilter, setStatusFilter] = useState("todos");
   const [fechaFiltro, setFechaFiltro] = useState(todayIso());
+  const [metricsRangePreset, setMetricsRangePreset] = useState("mes");
+  const [metricsFechaDesde, setMetricsFechaDesde] = useState(monthStartIso());
+  const [metricsFechaHasta, setMetricsFechaHasta] = useState(todayIso());
+  const [metricsGroupBy, setMetricsGroupBy] = useState("dia");
+  const [metricsDomiciliarioId, setMetricsDomiciliarioId] = useState("");
+  const [metricsPayload, setMetricsPayload] = useState(DEFAULT_DELIVERY_METRICS_RESPONSE);
+  const [performanceSort, setPerformanceSort] = useState("tasaEntrega");
+  const [selectedPerformanceCourier, setSelectedPerformanceCourier] = useState(null);
   const [deliverySearch, setDeliverySearch] = useState("");
+  const [noveltySearch, setNoveltySearch] = useState("");
+  const [noveltyStatusFilter, setNoveltyStatusFilter] = useState("novedades");
+  const [noveltyTypeFilter, setNoveltyTypeFilter] = useState("todas");
+  const [noveltyDraft, setNoveltyDraft] = useState({ pedidoId: "", tipo: "", observacion: "" });
+  const [resolvedNoveltyKeys, setResolvedNoveltyKeys] = useState([]);
+  const [resolvedNoveltyObservations, setResolvedNoveltyObservations] = useState({});
+  const [resolvingNoveltyRow, setResolvingNoveltyRow] = useState(null);
+  const [noveltyResolveForm, setNoveltyResolveForm] = useState({
+    accion: "entregar",
+    recibidoNombre: "",
+    recibidoDocumento: "",
+    observacion: "",
+  });
+  const [noveltyResolveError, setNoveltyResolveError] = useState("");
   const [courierSearch, setCourierSearch] = useState("");
   const [openDeliveryActionsKey, setOpenDeliveryActionsKey] = useState("");
 
@@ -869,6 +1304,9 @@ export function DeliveryPage({
   const [deliveryDrawerOpen, setDeliveryDrawerOpen] = useState(false);
   const [deliveryForm, setDeliveryForm] = useState(DEFAULT_DELIVERY_FORM);
   const [courierForm, setCourierForm] = useState(DEFAULT_COURIER_FORM);
+  const [courierEditForm, setCourierEditForm] = useState(DEFAULT_COURIER_EDIT_FORM);
+  const [editingCourierId, setEditingCourierId] = useState(null);
+  const [viewingCourierItem, setViewingCourierItem] = useState(null);
   const [courierSaving, setCourierSaving] = useState(false);
   const [courierCreateOpen, setCourierCreateOpen] = useState(false);
   const [courierStatusFilter, setCourierStatusFilter] = useState("todos");
@@ -946,7 +1384,11 @@ export function DeliveryPage({
     };
   }, []);
 
-
+  useEffect(() => {
+    if (!feedback) return undefined;
+    const timer = globalThis.setTimeout(() => setFeedback(""), 4500);
+    return () => globalThis.clearTimeout(timer);
+  }, [feedback]);
 
   const setBusy = key => {
     setActionKey(key);
@@ -960,13 +1402,50 @@ export function DeliveryPage({
 
   const loadDomiciliarios = useCallback(async () => {
     const data = await api.listarDomiciliarios({ empresaId, sucursalId, soloActivos: false });
-    const rows = Array.isArray(data.items) ? data.items : [];
+    const rows = (Array.isArray(data.items) ? data.items : []).filter(item => !isDeletedCourier(item));
     setDomiciliarios(rows);
     if (!domiciliarioId && rows.length > 0) {
       const firstId = courierIdValue(rows[0]);
       if (firstId != null) setDomiciliarioId(String(firstId));
     }
   }, [api, empresaId, sucursalId, domiciliarioId]);
+
+  const loadCourierDirectory = useCallback(async () => {
+    const data = await api.listarDomiciliarios({
+      empresaId,
+      sucursalId,
+      soloActivos: false,
+      estado: courierStatusFilter,
+      q: courierSearch.trim(),
+    });
+    setCourierDirectoryItems((Array.isArray(data.items) ? data.items : []).filter(item => !isDeletedCourier(item)));
+  }, [api, empresaId, sucursalId, courierSearch, courierStatusFilter]);
+
+  const loadDeliveryMetrics = useCallback(async () => {
+    const data = await api.obtenerMetricasDomicilios({
+      empresaId,
+      sucursalId,
+      fechaDesde: metricsFechaDesde,
+      fechaHasta: metricsFechaHasta,
+      domiciliarioID: metricsDomiciliarioId ? Number(metricsDomiciliarioId) : null,
+      agruparPor: modo === "novedades" ? "novedad" : metricsGroupBy,
+    });
+    setMetricsPayload({
+      ...DEFAULT_DELIVERY_METRICS_RESPONSE,
+      ...(data || {}),
+      resumen: {
+        ...DEFAULT_DELIVERY_METRICS_SUMMARY,
+        ...(data?.resumen || {}),
+      },
+      items: Array.isArray(data?.items) ? data.items : [],
+      porDomiciliario: Array.isArray(data?.porDomiciliario) ? data.porDomiciliario : [],
+      porEstadoEntrega: Array.isArray(data?.porEstadoEntrega) ? data.porEstadoEntrega : [],
+      porEstadoPedido: Array.isArray(data?.porEstadoPedido) ? data.porEstadoPedido : [],
+      porBarrio: Array.isArray(data?.porBarrio) ? data.porBarrio : [],
+      porZona: Array.isArray(data?.porZona) ? data.porZona : [],
+      novedades: Array.isArray(data?.novedades) ? data.novedades : [],
+    });
+  }, [api, empresaId, sucursalId, metricsFechaDesde, metricsFechaHasta, metricsDomiciliarioId, metricsGroupBy, modo]);
 
   const loadAdmin = useCallback(async () => {
     const queryPlan = buildDeliveryAdminQueryPlan({ filtro, statusFilter, fechaFiltro, deliverySearch });
@@ -1092,7 +1571,7 @@ export function DeliveryPage({
     try {
       await loader();
     } catch (nextError) {
-      console.error("Error en mÃ³dulo de domicilios:", nextError);
+      console.error("Error en módulo de domicilios:", nextError);
       setError(nextError?.detail || nextError?.message || "No fue posible cargar domicilios.");
     } finally {
       setLoading(false);
@@ -1113,7 +1592,15 @@ export function DeliveryPage({
       return;
     }
     if (modo === "domiciliarios") {
-      runLoad(loadDomiciliarios).catch(() => {});
+      runLoad(async () => {
+        await Promise.all([loadDomiciliarios(), loadCourierDirectory()]);
+      }).catch(() => {});
+      return;
+    }
+    if (modo === "metricas" || modo === "novedades") {
+      runLoad(async () => {
+        await Promise.all([loadDomiciliarios(), loadDeliveryMetrics()]);
+      }).catch(() => {});
       return;
     }
     if (modo === "disponibles") {
@@ -1121,16 +1608,16 @@ export function DeliveryPage({
       return;
     }
     runLoad(loadMyOrders).catch(() => {});
-  }, [modo, runLoad, loadAdmin, loadBarrios, loadAvailableOrders, loadMyOrders, availableCoords]);
+  }, [modo, runLoad, loadAdmin, loadBarrios, loadAvailableOrders, loadMyOrders, loadDomiciliarios, loadCourierDirectory, loadDeliveryMetrics, availableCoords]);
 
   const withCoords = async actionLabel => {
     if (isOffline) {
-      throw new Error("Sin conexiÃ³n. Revisa internet antes de continuar.");
+      throw new Error("Sin conexión. Revisa internet antes de continuar.");
     }
 
     const coords = await requestCurrentCoords();
     setAvailableCoords(coords);
-    setFeedback(`UbicaciÃ³n confirmada para ${actionLabel}.`);
+    setFeedback(`Ubicación confirmada para ${actionLabel}.`);
     return coords;
   };
 
@@ -1151,10 +1638,35 @@ export function DeliveryPage({
     } catch (nextError) {
       setModo(nextMode);
       setAvailableCoords(null);
-      setError(nextError?.message || "No fue posible obtener tu ubicaciÃ³n.");
+      setError(nextError?.message || "No fue posible obtener tu ubicación.");
     } finally {
       setLoading(false);
     }
+  };
+
+  const onChangeMetricsRangePreset = value => {
+    setMetricsRangePreset(value);
+    if (value === "personalizado") return;
+    const nextRange = deliveryMetricRangeForPreset(value);
+    setMetricsFechaDesde(nextRange.fechaDesde);
+    setMetricsFechaHasta(nextRange.fechaHasta);
+    setMetricsGroupBy(nextRange.agruparPor);
+  };
+
+  const onClearMetricsFilters = () => {
+    const nextRange = deliveryMetricRangeForPreset("mes");
+    setMetricsRangePreset("mes");
+    setMetricsFechaDesde(nextRange.fechaDesde);
+    setMetricsFechaHasta(nextRange.fechaHasta);
+    setMetricsGroupBy(nextRange.agruparPor);
+    setMetricsDomiciliarioId("");
+  };
+
+  const onViewPendingDeliveries = () => {
+    setModo("admin");
+    setStatusFilter("pendiente");
+    setFiltro("pendientes");
+    setDeliverySearch("");
   };
 
   const refreshAll = async () => {
@@ -1176,8 +1688,10 @@ export function DeliveryPage({
       await loadDomiciliarios();
       if (modo === "admin") {
         await loadAdmin();
+      } else if (modo === "metricas" || modo === "novedades") {
+        await Promise.all([loadDomiciliarios(), loadDeliveryMetrics()]);
       } else if (modo === "domiciliarios") {
-        await loadDomiciliarios();
+        await loadCourierDirectory();
       } else if (modo === "barrios" || modo === "crear-barrio") {
         await loadBarrios();
       } else {
@@ -1202,21 +1716,26 @@ export function DeliveryPage({
     setError("");
     setFeedback("");
     try {
-      await api.crearDomiciliario({
+      const createdCourier = await api.crearDomiciliario({
         empresaId,
-        sucursalId,
         nombre,
         telefono: courierForm.telefono.trim(),
         tipo: courierForm.tipo,
-        vehiculoTipo: courierForm.vehiculoTipo,
-        vehiculoPlaca: courierForm.vehiculoPlaca.trim(),
-        vehiculoDetalle: courierForm.vehiculoDetalle.trim(),
+        vehiculo: courierForm.vehiculoTipo,
+        placa: courierForm.vehiculoPlaca.trim(),
+        detalleVehiculo: courierForm.vehiculoDetalle.trim(),
         activo: courierForm.activo,
       });
-      setFeedback("Domiciliario creado correctamente.");
+      const credentialParts = [
+        createdCourier?.login ? `Usuario: ${createdCourier.login}` : "",
+        createdCourier?.passwordTemporal ? `Clave temporal: ${createdCourier.passwordTemporal}` : "",
+      ].filter(Boolean);
+      setFeedback(credentialParts.length
+        ? `Domiciliario creado correctamente. ${credentialParts.join(" - ")}`
+        : "Domiciliario creado correctamente.");
       setCourierForm(DEFAULT_COURIER_FORM);
       setCourierCreateOpen(false);
-      await loadDomiciliarios();
+      await Promise.all([loadDomiciliarios(), loadCourierDirectory()]);
     } catch (nextError) {
       console.error("Error creando domiciliario:", nextError);
       setError(nextError?.detail || nextError?.message || "No fue posible crear el domiciliario.");
@@ -1225,10 +1744,103 @@ export function DeliveryPage({
     }
   };
 
+  const onStartEditCourier = item => {
+    const domId = courierIdValue(item);
+    if (domId == null) return;
+    setViewingCourierItem(null);
+    setEditingCourierId(domId);
+    setCourierEditForm(courierEditFormFromItem(item));
+    setError("");
+    setFeedback("");
+  };
+
+  const onViewCourier = item => {
+    if (!item) return;
+    setEditingCourierId(null);
+    setViewingCourierItem(item);
+    setError("");
+    setFeedback("");
+  };
+
+  const onCancelEditCourier = () => {
+    setEditingCourierId(null);
+    setCourierEditForm(DEFAULT_COURIER_EDIT_FORM);
+  };
+
+  const onSaveEditCourier = async idDomiciliario => {
+    if (courierSaving) return;
+    const nombre = courierEditForm.nombre.trim();
+    const telefono = courierEditForm.telefono.trim();
+    const tipo = courierEditForm.tipo.trim();
+    const vehiculo = courierEditForm.vehiculo.trim();
+    if (nombre.length < 3) {
+      setError("El nombre del domiciliario debe tener al menos 3 caracteres.");
+      return;
+    }
+    if (telefono.length > 40) {
+      setError("El telefono no puede superar 40 caracteres.");
+      return;
+    }
+    if (tipo.length > 80 || vehiculo.length > 80) {
+      setError("Tipo y vehiculo no pueden superar 80 caracteres.");
+      return;
+    }
+
+    setCourierSaving(true);
+    setError("");
+    setFeedback("");
+    try {
+      await api.actualizarDomiciliario({
+        idDomiciliario,
+        empresaId,
+        nombre,
+        telefono,
+        tipo,
+        estado: courierEditForm.estado,
+        vehiculo,
+        activo: courierEditForm.estado === "Activo",
+      });
+      setFeedback("Domiciliario actualizado correctamente.");
+      onCancelEditCourier();
+      await Promise.all([loadDomiciliarios(), loadCourierDirectory()]);
+    } catch (nextError) {
+      console.error("Error actualizando domiciliario:", nextError);
+      setError(nextError?.detail || nextError?.message || "No fue posible actualizar el domiciliario.");
+    } finally {
+      setCourierSaving(false);
+    }
+  };
+
+  const onDeleteCourier = async item => {
+    if (courierSaving) return;
+    const idDomiciliario = courierIdValue(item);
+    if (idDomiciliario == null) return;
+    const confirmed = globalThis.confirm("Seguro que deseas eliminar este domiciliario?");
+    if (!confirmed) return;
+
+    setCourierSaving(true);
+    setError("");
+    setFeedback("");
+    try {
+      await api.eliminarDomiciliario({ idDomiciliario, empresaId });
+      setFeedback("Domiciliario eliminado correctamente.");
+      if (editingCourierId === idDomiciliario) onCancelEditCourier();
+      await Promise.all([loadDomiciliarios(), loadCourierDirectory()]);
+    } catch (nextError) {
+      console.error("Error eliminando domiciliario:", nextError);
+      const message = nextError?.status === 409
+        ? "No se puede eliminar un domiciliario con pedidos activos."
+        : nextError?.detail || nextError?.message || "No fue posible eliminar el domiciliario.";
+      setError(message);
+    } finally {
+      setCourierSaving(false);
+    }
+  };
+
   const openDeliveryDetail = item => {
     if (!item) return;
     setSelectedDeliveryItem(item);
-    setDeliveryDrawerOpen(false);
+    setDeliveryDrawerOpen(true);
   };
 
   const closeDeliveryDetail = () => {
@@ -1244,11 +1856,112 @@ export function DeliveryPage({
   const openWhatsApp = item => {
     const phone = String(item?.telefonoDestino || "").replace(/\+/g, "").trim();
     if (!phone) {
-      setError("Este pedido no tiene telÃ©fono registrado.");
+      setError("Este pedido no tiene teléfono registrado.");
       return;
     }
     const msg = encodeURIComponent(item?.mensaje || "Hola, vamos en camino con tu pedido.");
     globalThis.open(`https://wa.me/${phone}?text=${msg}`, "_blank", "noreferrer");
+  };
+
+  const onSaveNoveltyDraft = () => {
+    if (!noveltyDraft.pedidoId || !noveltyDraft.tipo || !noveltyDraft.observacion.trim()) {
+      setError("Completa pedido, tipo y observacion para registrar la novedad.");
+      return;
+    }
+    setError("");
+    setFeedback("Novedad lista para registrar cuando se conecte el endpoint.");
+  };
+
+  const onOpenResolveNovelty = row => {
+    setError("");
+    setNoveltyResolveError("");
+    setResolvingNoveltyRow(row);
+    setNoveltyResolveForm({
+      accion: "entregar",
+      recibidoNombre: "",
+      recibidoDocumento: "",
+      observacion: "",
+    });
+  };
+
+  const onCloseResolveNovelty = () => {
+    setResolvingNoveltyRow(null);
+    setNoveltyResolveError("");
+    setNoveltyResolveForm({
+      accion: "entregar",
+      recibidoNombre: "",
+      recibidoDocumento: "",
+      observacion: "",
+    });
+  };
+
+  const removeNoveltyFromMetrics = useCallback(entregaId => {
+    const targetId = String(entregaId || "").trim();
+    if (!targetId) return;
+    const detailKeys = [
+      "novedadesDetalle",
+      "detalleNovedades",
+      "pedidosConNovedad",
+      "pedidosNovedades",
+      "novedadesPedidos",
+      "novedadesPorPedido",
+    ];
+
+    setMetricsPayload(current => detailKeys.reduce((nextPayload, key) => {
+      if (!Array.isArray(nextPayload?.[key])) return nextPayload;
+      return {
+        ...nextPayload,
+        [key]: nextPayload[key].filter(item => String(item?.idEntrega || item?.id_entrega || "").trim() !== targetId),
+      };
+    }, current));
+  }, []);
+
+  const onSaveResolveNovelty = async () => {
+    if (!resolvingNoveltyRow) return;
+    const entregaId = resolvingNoveltyRow.item?.idEntrega || resolvingNoveltyRow.raw?.idEntrega;
+    if (!entregaId) {
+      setNoveltyResolveError("No fue posible identificar la entrega para resolver la novedad.");
+      return;
+    }
+    if (!noveltyResolveForm.observacion.trim()) {
+      setNoveltyResolveError("Debes diligenciar la observacion para resolver la novedad.");
+      return;
+    }
+
+    setNoveltyResolveError("");
+    setBusy(`resolver-novedad-${entregaId}`);
+    try {
+      await api.resolverNovedadEntrega({
+        entregaId,
+        usuarioCambio,
+        observaciones: noveltyResolveForm.observacion.trim(),
+        firmaNombre: noveltyResolveForm.recibidoNombre.trim(),
+        firmaDocumento: noveltyResolveForm.recibidoDocumento.trim(),
+      });
+      const nextResolvedKeys = [
+        entregaId,
+        resolvingNoveltyRow.raw?.idNovedad,
+        resolvingNoveltyRow.raw?.id_novedad,
+        resolvingNoveltyRow.raw?.idPedido,
+        resolvingNoveltyRow.raw?.id_pedido,
+        resolvingNoveltyRow.orderCode,
+      ].filter(value => value != null && String(value).trim()).map(value => String(value).trim());
+      const resolutionObservation = noveltyResolveForm.observacion.trim();
+      setResolvedNoveltyKeys(prev => Array.from(new Set([...prev, ...nextResolvedKeys])));
+      setResolvedNoveltyObservations(prev => nextResolvedKeys.reduce((acc, key) => ({
+        ...acc,
+        [key]: resolutionObservation,
+      }), prev));
+      setFeedback(`Novedad resuelta para el pedido ${resolvingNoveltyRow.orderCode}.`);
+      onCloseResolveNovelty();
+      removeNoveltyFromMetrics(entregaId);
+      await refreshAll();
+    } catch (nextError) {
+      console.error("Error resolviendo novedad:", nextError);
+      setNoveltyResolveError(buildActionErrorMessage(nextError, "No fue posible resolver la novedad."));
+    } finally {
+      clearBusy();
+    }
   };
 
   const onAsignar = async (item, nextDomiciliarioId) => {
@@ -1455,7 +2168,7 @@ export function DeliveryPage({
 
   const onDeleteBarrio = async barrioId => {
     if (barrioSaving) return;
-    const confirmed = globalThis.confirm("Â¿Seguro que deseas borrar este barrio?");
+    const confirmed = globalThis.confirm("¿Seguro que deseas borrar este barrio?");
     if (!confirmed) return;
     setBarrioSaving(true);
     setError("");
@@ -1545,29 +2258,7 @@ export function DeliveryPage({
     if (!courierSearchTerm) return domiciliarios;
     return domiciliarios.filter(item => normalizeSearchText(item?.nombre || item?.nombreDomiciliario || item?.login).includes(courierSearchTerm));
   }, [domiciliarios, courierSearchTerm]);
-  const courierDirectoryRows = useMemo(() => (
-    domiciliarios.filter(item => {
-      const statusMatches = courierStatusFilter === "todos"
-        || (courierStatusFilter === "activo" && item.activo !== false)
-        || (courierStatusFilter === "inactivo" && item.activo === false);
-      if (!statusMatches) return false;
-      if (!courierSearchTerm) return true;
-      const vehicle = courierVehicle(item);
-      const haystack = [
-        item?.nombre,
-        item?.nombreDomiciliario,
-        item?.login,
-        item?.usuario,
-        item?.telefono,
-        item?.celular,
-        courierType(item),
-        vehicle.type,
-        vehicle.plate,
-        vehicle.detail,
-      ].join(" ");
-      return normalizeSearchText(haystack).includes(courierSearchTerm);
-    })
-  ), [domiciliarios, courierSearchTerm, courierStatusFilter]);
+  const courierDirectoryRows = courierDirectoryItems;
   const dispatchKpis = useMemo(() => {
     const base = { pendiente: 0, asignado: 0, "en-camino": 0, entregado: 0, "no-entregado": 0, reprogramado: 0 };
     dispatchItems.forEach(item => {
@@ -1576,6 +2267,481 @@ export function DeliveryPage({
     });
     return base;
   }, [dispatchItems]);
+  const deliveryMetrics = useMemo(() => {
+    const resumen = {
+      ...DEFAULT_DELIVERY_METRICS_SUMMARY,
+      ...(metricsPayload?.resumen || {}),
+    };
+    return {
+      resumen,
+      items: Array.isArray(metricsPayload?.items) ? metricsPayload.items : [],
+      porDomiciliario: Array.isArray(metricsPayload?.porDomiciliario) ? metricsPayload.porDomiciliario : [],
+      porEstadoEntrega: Array.isArray(metricsPayload?.porEstadoEntrega) ? metricsPayload.porEstadoEntrega : [],
+      porEstadoPedido: Array.isArray(metricsPayload?.porEstadoPedido) ? metricsPayload.porEstadoPedido : [],
+      porBarrio: Array.isArray(metricsPayload?.porBarrio) ? metricsPayload.porBarrio : [],
+      porZona: Array.isArray(metricsPayload?.porZona) ? metricsPayload.porZona : [],
+      novedades: Array.isArray(metricsPayload?.novedades) ? metricsPayload.novedades : [],
+      fechaDesde: metricsPayload?.fechaDesde || metricsFechaDesde,
+      fechaHasta: metricsPayload?.fechaHasta || metricsFechaHasta,
+      agruparPor: metricsPayload?.agruparPor || metricsGroupBy,
+    };
+  }, [metricsPayload, metricsFechaDesde, metricsFechaHasta, metricsGroupBy]);
+  const deliveryMetricsChart = useMemo(() => {
+    const historicalItems = deliveryMetrics.items
+      .map((item, index) => {
+        const total = metricNumber(item?.total);
+        const label = formatMetricPeriodLabel(item, deliveryMetrics.agruparPor);
+        const tooltipLabel = formatMetricPeriodLabel(item, deliveryMetrics.agruparPor, { tooltip: true });
+        if (!label || total < 0) return null;
+        return {
+          ...item,
+          chartKey: `${label}-${index}`,
+          label,
+          tooltipLabel,
+          total,
+        };
+      })
+      .filter(Boolean);
+    const historicalTotal = historicalItems.reduce((acc, item) => acc + item.total, 0);
+    const historicalAverage = historicalItems.length > 0 ? historicalTotal / historicalItems.length : 0;
+    const historicalMax = historicalItems.reduce((acc, item) => Math.max(acc, item.total), 0);
+    return {
+      historicalItems,
+      historicalTotal,
+      historicalAverage,
+      historicalMax,
+      historicalMinWidth: Math.max(700, historicalItems.length * 58),
+      historicalXAxisInterval: historicalItems.length > 12 ? Math.ceil(historicalItems.length / 12) - 1 : 0,
+      topCouriers: deliveryMetrics.porDomiciliario.slice(0, 5),
+      topBarrios: deliveryMetrics.porBarrio.slice(0, 5),
+      topZonas: deliveryMetrics.porZona.slice(0, 5),
+      topNovedades: deliveryMetrics.novedades.slice(0, 5),
+    };
+  }, [deliveryMetrics]);
+  const deliveryNoveltyInsights = useMemo(() => {
+    const rows = deliveryMetrics.novedades
+      .map((item, index) => {
+        const rawLabel = String(item?.novedad || item?.grupo || "").trim();
+        const label = formatDeliveryNoveltyLabel(rawLabel) || "Sin novedad";
+        const total = metricNumber(item?.total ?? item?.novedades);
+        const noEntregados = metricNumber(item?.noEntregados ?? item?.no_entregados);
+        const entregados = metricNumber(item?.entregados);
+        return {
+          key: `${label}-${index}`,
+          label,
+          rawLabel,
+          total,
+          noEntregados,
+          entregados,
+          rate: metricRatio(noEntregados, total),
+          raw: item,
+        };
+      })
+      .filter(item => {
+        const normalizedLabel = normalizeSearchText(item.rawLabel);
+        const hasRealNovelty = normalizedLabel && normalizedLabel !== "sin novedad" && normalizedLabel !== "sin novedades";
+        return hasRealNovelty && (item.total > 0 || item.noEntregados > 0);
+      })
+      .sort((a, b) => b.total - a.total || b.noEntregados - a.noEntregados || a.label.localeCompare(b.label));
+
+    const totalNovedades = rows.reduce((acc, item) => acc + item.total, 0);
+    const totalNoEntregados = rows.reduce((acc, item) => acc + item.noEntregados, 0);
+    const totalPedidos = metricNumber(deliveryMetrics.resumen.total);
+    const top = rows[0] || null;
+
+    return {
+      rows,
+      totalNovedades,
+      totalNoEntregados,
+      totalPedidos,
+      tipos: rows.length,
+      top,
+      novedadesPercent: metricRatio(totalNovedades, totalPedidos),
+      noEntregadosPercent: metricRatio(totalNoEntregados, totalNovedades),
+    };
+  }, [deliveryMetrics]);
+  const deliveryNoveltyBoard = useMemo(() => {
+    const searchTerm = normalizeSearchText(noveltySearch);
+    const detailSource = [
+      metricsPayload?.novedadesDetalle,
+      metricsPayload?.detalleNovedades,
+      metricsPayload?.pedidosConNovedad,
+      metricsPayload?.pedidosNovedades,
+      metricsPayload?.novedadesPedidos,
+      metricsPayload?.novedadesPorPedido,
+    ].find(Array.isArray) || [];
+    const allRows = detailSource
+      .map((raw, index) => {
+        const label = formatDeliveryNoveltyLabel(
+          raw?.novedad
+          || raw?.tipoNovedad
+          || raw?.tipo_novedad
+          || raw?.motivo
+          || raw?.grupo
+          || "Otra novedad"
+        );
+        const type = deliveryNoveltyTypeMeta(label);
+        const noveltyStatusText = normalizeSearchText(
+          raw?.estadoNovedad
+          || raw?.estado_novedad
+          || raw?.estado_novedad_nombre
+          || raw?.estadoNovedadNombre
+          || raw?.estadoResolucion
+          || raw?.estado_resolucion
+          || ""
+        );
+        const orderCode = String(raw?.pedido || raw?.numeroPedido || raw?.numero_pedido || raw?.pedidoNumero || raw?.codigoPedido || raw?.idPedido || raw?.idEntrega || "-").trim();
+        const localResolutionKeys = [
+          raw?.idNovedad,
+          raw?.id_novedad,
+          raw?.idEntrega,
+          raw?.id_entrega,
+          raw?.idPedido,
+          raw?.id_pedido,
+          orderCode,
+        ].filter(value => value != null && String(value).trim()).map(value => String(value).trim());
+        const noveltyResolved = raw?.novedadResuelta === true
+          || raw?.resuelta === true
+          || raw?.resuelto === true
+          || raw?.fechaResolucion
+          || raw?.fecha_resolucion
+          || localResolutionKeys.some(key => resolvedNoveltyKeys.includes(key));
+        const localResolutionObservation = localResolutionKeys
+          .map(key => resolvedNoveltyObservations[key])
+          .find(Boolean);
+        const status = noveltyResolved || noveltyStatusText.includes("resuelt") || noveltyStatusText.includes("cerrad") || noveltyStatusText.includes("solucion")
+          ? { label: "Resuelta", tone: "resolved" }
+          : noveltyStatusText.includes("seguimiento")
+            ? { label: "En seguimiento", tone: "tracking" }
+            : { label: "Abierta", tone: "pending" };
+        const client = String(raw?.cliente || raw?.nombreCliente || raw?.destinatario || raw?.nombreDestinatario || "Cliente sin nombre").trim();
+        const phone = String(raw?.telefono || raw?.telefonoCliente || raw?.telefonoDestino || raw?.celular || "").trim();
+        const courier = String(raw?.domiciliario || raw?.nombreDomiciliario || raw?.repartidor || "Sin asignar").trim();
+        const observation = String(
+          localResolutionObservation
+          || raw?.observacionResolucion
+          || raw?.observacion_resolucion
+          || raw?.observacionesResolucion
+          || raw?.observaciones_resolucion
+          || raw?.observacionCierre
+          || raw?.observacion_cierre
+          || raw?.observacion
+          || raw?.observaciones
+          || raw?.detalle
+          || raw?.nota
+          || raw?.mensaje
+          || "Sin observacion registrada."
+        ).trim();
+        const eventDate = raw?.fecha || raw?.fechaEntrega || raw?.fechaNovedad || raw?.fecha_novedad;
+        const eventTime = raw?.hora || raw?.horaEntrega || formatTimeOnly(eventDate);
+        const time = [formatDateOnly(eventDate), eventTime].filter(Boolean).join(" · ") || "-";
+        const searchable = normalizeSearchText(`${orderCode} ${client} ${phone} ${courier} ${label} ${observation} ${status.label}`);
+        const item = {
+          ...raw,
+          estado: raw?.estado || raw?.estadoEntrega || raw?.estado_entrega || raw?.estadoPedido || raw?.estado_pedido || status.label,
+          estadoEntrega: raw?.estadoEntrega || raw?.estado_entrega || raw?.estado || status.label,
+          estadoEntregaNombre: raw?.estadoEntregaNombre || raw?.estadoEntrega || raw?.estado_entrega || raw?.estado || status.label,
+          cliente: raw?.cliente || raw?.nombreCliente || client,
+          destinatario: raw?.destinatario || raw?.nombreDestinatario || client,
+          telefonoDestino: raw?.telefonoDestino || raw?.telefono || raw?.telefonoCliente || phone,
+          domiciliario: raw?.domiciliario || raw?.nombreDomiciliario || courier,
+          fechaEntregaProgramada: raw?.fechaEntregaProgramada || raw?.fechaEntrega || raw?.fecha || raw?.fechaNovedad,
+          horaEntrega: raw?.horaEntrega || raw?.hora || formatTimeOnly(eventDate),
+        };
+        return {
+          key: raw?.idNovedad || raw?.idEntrega || raw?.idPedido || `${orderCode}-${label}-${index}`,
+          item,
+          raw,
+          orderCode,
+          client,
+          phone,
+          courier,
+          label,
+          typeKey: normalizeSearchText(label),
+          type,
+          status,
+          observation,
+          time,
+          total: 1,
+          noEntregados: status.tone === "resolved" ? 0 : 1,
+          entregados: status.tone === "resolved" ? 1 : 0,
+          rate: status.tone === "resolved" ? 0 : 100,
+          searchable,
+        };
+      })
+      .filter(item => (item.orderCode !== "-" || item.label) && isOpenDeliveryNovelty(item.raw) && item.status.tone !== "resolved");
+
+    const filteredRows = allRows.filter(row => {
+      if (searchTerm && !row.searchable.includes(searchTerm)) return false;
+      if (noveltyTypeFilter !== "todas" && row.typeKey !== noveltyTypeFilter) return false;
+      if (noveltyStatusFilter !== "todos" && noveltyStatusFilter !== "novedades" && row.status.tone !== noveltyStatusFilter) return false;
+      return true;
+    });
+
+    const statusCounts = allRows.length > 0 ? allRows.reduce(
+      (acc, row) => {
+        acc[row.status.tone] = (acc[row.status.tone] || 0) + row.total;
+        return acc;
+      },
+      { pending: 0, tracking: 0, resolved: 0 }
+    ) : {
+      pending: deliveryNoveltyInsights.totalNoEntregados,
+      tracking: 0,
+      resolved: Math.max(deliveryNoveltyInsights.totalNovedades - deliveryNoveltyInsights.totalNoEntregados, 0),
+    };
+    const typeCounts = deliveryNoveltyInsights.rows.map(row => ({
+      ...deliveryNoveltyTypeMeta(row.label),
+      key: normalizeSearchText(row.label),
+      label: row.label,
+      count: row.total,
+    }));
+
+    return {
+      rows: filteredRows,
+      allRows,
+      statusCounts,
+      typeCounts,
+      hasPedidoDetail: detailSource.length > 0,
+      total: allRows.length || deliveryNoveltyInsights.totalNovedades,
+      critical: (allRows.length > 0 ? allRows : deliveryNoveltyInsights.rows.map(row => ({
+        ...row,
+        type: deliveryNoveltyTypeMeta(row.label),
+      })))
+        .filter(row => ["cliente-no-responde", "direccion-incorrecta", "rechazo"].includes(row.type?.key))
+        .reduce((acc, row) => acc + (row.total || 1), 0),
+    };
+  }, [deliveryNoveltyInsights, metricsPayload, noveltySearch, noveltyStatusFilter, noveltyTypeFilter, resolvedNoveltyKeys, resolvedNoveltyObservations]);
+  const deliveryMetricStates = useMemo(() => {
+    const deliveryRows = [
+      { key: "entregados", label: "Entregados", value: metricNumber(deliveryMetrics.resumen.entregados), tone: "is-success", Icon: CheckCircle2 },
+      { key: "pendientes", label: "Pendientes", value: metricNumber(deliveryMetrics.resumen.pendientes), tone: "is-warning", Icon: Clock3 },
+      { key: "en-ruta", label: "En ruta", value: metricNumber(deliveryMetrics.resumen.enRuta), tone: "is-info", Icon: Route },
+      { key: "cancelados", label: "Cancelados", value: metricNumber(deliveryMetrics.resumen.cancelados), tone: "is-danger", Icon: AlertTriangle },
+    ];
+    const totalPedidos = deliveryRows.reduce((acc, item) => acc + item.value, 0);
+    const rowsWithPercent = deliveryRows.map(item => {
+      const percent = totalPedidos > 0 ? (item.value / totalPedidos) * 100 : 0;
+      return {
+        ...item,
+        percent,
+        percentLabel: formatMetricOneDecimal(percent),
+      };
+    });
+    const adminRows = deliveryMetrics.porEstadoPedido
+      .map((item, index) => {
+        const label = String(item?.estadoPedido || item?.grupo || "Sin estado").trim();
+        const normalized = normalizeSearchText(label);
+        const value = metricNumber(item?.total);
+        const priority = normalized.includes("aprob")
+          ? 1
+          : normalized.includes("cread")
+            ? 2
+            : normalized.includes("cancel")
+              ? 3
+              : 10 + index;
+        const tone = normalized.includes("aprob")
+          ? "is-success"
+          : normalized.includes("cread")
+            ? "is-info"
+            : normalized.includes("cancel")
+              ? "is-danger"
+              : "is-neutral";
+        const Icon = normalized.includes("aprob")
+          ? CheckCircle2
+          : normalized.includes("cread")
+            ? Plus
+            : normalized.includes("cancel")
+              ? AlertTriangle
+              : Truck;
+        return {
+          key: `${label}-${index}`,
+          label,
+          value,
+          description: deliveryAdminStateDescription(label),
+          tone,
+          Icon,
+          priority,
+        };
+      })
+      .filter(item => item.label);
+    adminRows.sort((a, b) => a.priority - b.priority || a.label.localeCompare(b.label));
+    return {
+      deliveryRows: rowsWithPercent,
+      totalPedidos,
+      pedidosPorAtender: metricNumber(deliveryMetrics.resumen.pendientes) + metricNumber(deliveryMetrics.resumen.enRuta),
+      adminRows,
+    };
+  }, [deliveryMetrics]);
+  const deliveryPerformance = useMemo(() => {
+    const courierById = new Map();
+    domiciliarios.forEach(item => {
+      const id = courierIdValue(item);
+      if (id != null) courierById.set(Number(id), item);
+    });
+    const detailSources = [
+      metricsPayload?.items,
+      metricsPayload?.entregasDetalle,
+      metricsPayload?.detalleEntregas,
+      metricsPayload?.pedidosDetalle,
+      metricsPayload?.detallePedidos,
+      metricsPayload?.pedidos,
+      metricsPayload?.entregas,
+      metricsPayload?.domicilios,
+      metricsPayload?.pedidosEntregados,
+      metricsPayload?.entregasEntregadas,
+    ].filter(Array.isArray);
+    const detailRows = detailSources.flat();
+    const deliveredDetailRows = detailRows
+      .filter(item => {
+        const status = normalizeStatus(
+          item?.estadoEntrega
+          || item?.estado_entrega
+          || item?.estadoEntregaNombre
+          || item?.estado_entrega_nombre
+          || item?.estado
+          || item?.estadoPedido
+          || item?.estado_pedido
+        );
+        return status === "ENTREGADO" || item?.entregado === true || item?.entregada === true;
+      })
+      .map((item, index) => {
+        const courierId = item?.domiciliarioID
+          ?? item?.domiciliarioId
+          ?? item?.idDomiciliario
+          ?? item?.id_domiciliario
+          ?? item?.repartidorID
+          ?? item?.repartidorId
+          ?? null;
+        const courierName = String(item?.domiciliario || item?.nombreDomiciliario || item?.repartidor || "").trim();
+        const orderCode = String(item?.pedido || item?.numeroPedido || item?.numero_pedido || item?.pedidoNumero || item?.codigoPedido || item?.idPedido || item?.idEntrega || "-").trim();
+        const deliveredAt = item?.fechaEntregaReal
+          || item?.fecha_entrega_real
+          || item?.fechaEntrega
+          || item?.fecha_entrega
+          || item?.fecha
+          || item?.fechaEntregaProgramada;
+        return {
+          key: item?.idEntrega || item?.id_entrega || item?.idPedido || `${orderCode}-${index}`,
+          raw: item,
+          courierId: courierId != null ? String(courierId) : "",
+          courierName,
+          orderCode,
+          client: String(item?.cliente || item?.nombreCliente || item?.destinatario || item?.nombreDestinatario || "Cliente sin nombre").trim(),
+          phone: String(item?.telefono || item?.telefonoCliente || item?.telefonoDestino || item?.celular || "").trim(),
+          address: String(item?.direccion || item?.direccionEntrega || item?.direccion_entrega || item?.barrio || "").trim(),
+          date: formatDateOnly(deliveredAt),
+          time: item?.horaEntrega || item?.hora_entrega || item?.hora || formatTimeOnly(deliveredAt),
+          observation: String(item?.observaciones || item?.observacion || item?.nota || "").trim(),
+        };
+      });
+    const performanceEntries = deliveryMetrics.porDomiciliario
+      .map((item, index) => {
+        const id = item?.domiciliarioID ?? item?.idDomiciliario ?? null;
+        const courier = id != null ? courierById.get(Number(id)) : null;
+        const nombre = String(item?.domiciliario || item?.grupo || courier?.nombre || courier?.nombreDomiciliario || "Sin domiciliario").trim();
+        const photoUrl = courierPhotoUrl(courier) || courierPhotoUrl(item);
+        const entregados = metricNumber(item?.entregados);
+        const cancelados = metricNumber(item?.cancelados);
+        const noEntregados = metricNumber(item?.noEntregados);
+        const asignados = Math.max(metricNumber(item?.total || item?.asignados) - cancelados, 0);
+        const finalizados = entregados + noEntregados;
+        const tasaEntrega = finalizados > 0 ? (entregados / finalizados) * 100 : metricNumber(item?.tasaEntrega);
+        const novedades = metricNumber(item?.novedades);
+        const reasignados = metricNumber(item?.reasignados ?? item?.reasignaciones ?? item?.pedidosReasignados);
+        const tiempoPromedio = Number(item?.tiempoPromedioEntregaMin);
+        const safeTiempoPromedio = Number.isFinite(tiempoPromedio) && tiempoPromedio >= 0 ? tiempoPromedio : null;
+        const pedidosGestionados = asignados > 0 ? asignados : finalizados;
+        const tasaNovedades = metricRatio(novedades, pedidosGestionados);
+        const tasaReasignacion = metricRatio(reasignados, asignados);
+        const status = deliveryPerformanceStatus({ courier, row: item });
+        const deliveredOrders = deliveredDetailRows.filter(order => {
+          if (id != null && order.courierId) return order.courierId === String(id);
+          if (id == null && !order.courierId) return normalizeSearchText(order.courierName || "Sin domiciliario") === normalizeSearchText(nombre);
+          return normalizeSearchText(order.courierName) === normalizeSearchText(nombre);
+        });
+        return {
+          key: `${id ?? nombre}-${index}`,
+          id,
+          internalId: id != null ? `DM-${id}` : courier ? courierIdLabel(courier, index) : "",
+          nombre,
+          initials: courierInitials(nombre),
+          photoUrl,
+          entregados,
+          cancelados,
+          noEntregados,
+          asignados,
+          finalizados,
+          tasaEntrega,
+          tasaEntregaLabel: formatMetricOneDecimal(tasaEntrega),
+          novedades,
+          tasaNovedades,
+          tasaNovedadesLabel: formatMetricOneDecimal(tasaNovedades),
+          reasignados,
+          tasaReasignacion,
+          tasaReasignacionLabel: formatMetricOneDecimal(tasaReasignacion),
+          tiempoPromedio: safeTiempoPromedio,
+          tiempoPromedioLabel: performanceDurationLabel(safeTiempoPromedio),
+          pedidosActivos: metricNumber(courier?.pedidosActivos),
+          deliveredOrders,
+          status,
+          raw: item,
+        };
+      })
+      .filter(item => item.asignados > 0 || item.entregados > 0 || item.noEntregados > 0 || item.novedades > 0 || item.reasignados > 0);
+    const isUnassignedPerformanceRow = item => item.id == null && normalizeSearchText(item.nombre).includes("sin domiciliario");
+    const unassignedRows = performanceEntries.filter(isUnassignedPerformanceRow);
+    const rows = performanceEntries.filter(item => !isUnassignedPerformanceRow(item));
+
+    const sortedRows = [...rows].sort((a, b) => {
+      if (performanceSort === "entregados") return b.entregados - a.entregados || b.tasaEntrega - a.tasaEntrega;
+      if (performanceSort === "tiempoPromedio") {
+        const aTime = Number.isFinite(a.tiempoPromedio) ? a.tiempoPromedio : Number.POSITIVE_INFINITY;
+        const bTime = Number.isFinite(b.tiempoPromedio) ? b.tiempoPromedio : Number.POSITIVE_INFINITY;
+        return aTime - bTime || b.tasaEntrega - a.tasaEntrega;
+      }
+      if (performanceSort === "menosNovedades") return a.tasaNovedades - b.tasaNovedades || b.entregados - a.entregados;
+      if (performanceSort === "menosReasignaciones") return a.tasaReasignacion - b.tasaReasignacion || b.entregados - a.entregados;
+      return b.tasaEntrega - a.tasaEntrega || b.entregados - a.entregados;
+    });
+
+    const totalAsignados = rows.reduce((acc, item) => acc + item.asignados, 0);
+    const totalEntregados = rows.reduce((acc, item) => acc + item.entregados, 0);
+    const totalNovedades = rows.reduce((acc, item) => acc + item.novedades, 0);
+    const totalReasignados = rows.reduce((acc, item) => acc + item.reasignados, 0);
+    const unassignedSummary = unassignedRows.reduce((acc, item) => ({
+      asignados: acc.asignados + item.asignados,
+      entregados: acc.entregados + item.entregados,
+      noEntregados: acc.noEntregados + item.noEntregados,
+      novedades: acc.novedades + item.novedades,
+      reasignados: acc.reasignados + item.reasignados,
+    }), {
+      asignados: 0,
+      entregados: 0,
+      noEntregados: 0,
+      novedades: 0,
+      reasignados: 0,
+    });
+    const validTimes = rows.map(item => item.tiempoPromedio).filter(value => Number.isFinite(value));
+    const averageTime = validTimes.length > 0
+      ? validTimes.reduce((acc, value) => acc + value, 0) / validTimes.length
+      : null;
+
+    return {
+      rows: sortedRows,
+      unassignedSummary,
+      summary: {
+        activos: rows.filter(item => item.asignados > 0 || item.entregados > 0).length,
+        totalAsignados,
+        totalEntregados,
+        totalNovedades,
+        totalReasignados,
+        averageTime,
+        entregaPercent: metricRatio(totalEntregados, totalAsignados),
+        novedadesPercent: metricRatio(totalNovedades, totalAsignados),
+        reasignadosPercent: metricRatio(totalReasignados, totalAsignados),
+      },
+    };
+  }, [deliveryMetrics, domiciliarios, metricsPayload, performanceSort]);
   const activeModeLabel = visibleDeliveryViews.find(item => item.value === modo)?.label || "Dispatch";
 
   return (
@@ -1615,6 +2781,15 @@ export function DeliveryPage({
       />
 
       <main className="orders-admin-view orders-page-view delivery-page-view">
+        {feedback ? (
+          <div className="delivery-feedback-modal-backdrop" role="presentation">
+            <article className="delivery-feedback-modal" role="status" aria-live="polite">
+              <CheckCircle2 size={34} strokeWidth={2.4} />
+              <strong>{feedback}</strong>
+            </article>
+          </div>
+        ) : null}
+
         <header className="orders-admin-header orders-page-header delivery-page-header">
           <div className="orders-page-heading">
             <button type="button" className="sidebar-trigger" onClick={toggleSidebar}>{"\u2630 Men\u00fa"}</button>
@@ -1657,7 +2832,6 @@ export function DeliveryPage({
 
         {modo === "admin" ? (
           <>
-            {feedback ? <p className="orders-message delivery-feedback">{feedback}</p> : null}
             {error ? <p className="orders-message delivery-error">{error}</p> : null}
             {loading ? <p className="orders-message">Cargando domicilios...</p> : null}
 
@@ -1900,7 +3074,7 @@ export function DeliveryPage({
             </div>
             {modo === "admin" && currentDomiciliarioId != null ? (
               <div className="filter-field">
-                <span>AsignaciÃ³n propia</span>
+                <span>Asignación propia</span>
                 <div className="filter-checkbox">
                   <input
                     type="checkbox"
@@ -1917,9 +3091,10 @@ export function DeliveryPage({
           </section>
         ) : null}
 
-        {(modo === "barrios" || modo === "crear-barrio") && feedback ? <p className="orders-message delivery-feedback">{feedback}</p> : null}
         {(modo === "barrios" || modo === "crear-barrio") && error ? <p className="orders-message delivery-error">{error}</p> : null}
         {(modo === "barrios" || modo === "crear-barrio") && loading ? <p className="orders-message">Cargando domicilios...</p> : null}
+        {modo === "domiciliarios" && error ? <p className="orders-message delivery-error">{error}</p> : null}
+        {modo === "domiciliarios" && loading ? <p className="orders-message">Cargando domiciliarios...</p> : null}
 
         {modo === "domiciliarios" ? (
           <section className="delivery-couriers-view">
@@ -1942,90 +3117,255 @@ export function DeliveryPage({
                 <option value="activo">Activos</option>
                 <option value="inactivo">Inactivos</option>
               </select>
-              <button type="button" className="btn-primary delivery-new-courier-btn" onClick={() => setCourierCreateOpen(current => !current)}>
+              <button type="button" className="btn-primary delivery-new-courier-btn" onClick={() => setCourierCreateOpen(true)}>
                 <Plus size={18} strokeWidth={2.2} aria-hidden="true" />
                 Nuevo domiciliario
               </button>
             </div>
 
             {courierCreateOpen ? (
-              <article className="order-block delivery-courier-create">
-                <div className="delivery-section-head">
-                  <h4>Nuevo domiciliario</h4>
-                  <span>{domiciliarios.length} registrados</span>
+              <div className="delivery-modal-backdrop" role="presentation" onMouseDown={() => setCourierCreateOpen(false)}>
+                <article
+                  className="order-block delivery-courier-create delivery-courier-create-modal"
+                  role="dialog"
+                  aria-modal="true"
+                  aria-labelledby="delivery-create-courier-title"
+                  onMouseDown={event => event.stopPropagation()}
+                >
+                  <div className="delivery-section-head">
+                    <h4 id="delivery-create-courier-title">Nuevo domiciliario</h4>
+                    <div className="delivery-modal-head-actions">
+                      <span>{courierDirectoryItems.length} registrados</span>
+                      <button
+                        type="button"
+                        className="delivery-modal-close"
+                        onClick={() => setCourierCreateOpen(false)}
+                        aria-label="Cerrar formulario"
+                      >
+                        <X size={18} strokeWidth={2.4} />
+                      </button>
+                    </div>
+                  </div>
+                  <div className="delivery-courier-form">
+                    <label className="order-detail-edit-label">
+                      Nombre
+                      <input
+                        type="text"
+                        value={courierForm.nombre}
+                        onChange={event => setCourierForm(current => ({ ...current, nombre: event.target.value }))}
+                        placeholder="Nombre del domiciliario"
+                      />
+                    </label>
+                    <label className="order-detail-edit-label">
+                      Telefono
+                      <input
+                        type="tel"
+                        value={courierForm.telefono}
+                        onChange={event => setCourierForm(current => ({ ...current, telefono: event.target.value }))}
+                        placeholder="Telefono"
+                      />
+                    </label>
+                    <label className="order-detail-edit-label">
+                      Tipo
+                      <select
+                        value={courierForm.tipo}
+                        onChange={event => setCourierForm(current => ({ ...current, tipo: event.target.value }))}
+                      >
+                        <option value="Interno">Interno</option>
+                        <option value="Externo">Externo</option>
+                      </select>
+                    </label>
+                    <label className="order-detail-edit-label">
+                      Vehiculo
+                      <select
+                        value={courierForm.vehiculoTipo}
+                        onChange={event => setCourierForm(current => ({ ...current, vehiculoTipo: event.target.value }))}
+                      >
+                        <option value="Moto">Moto</option>
+                        <option value="Carro">Carro</option>
+                        <option value="Bicicleta">Bicicleta</option>
+                        <option value="Otro">Otro</option>
+                      </select>
+                    </label>
+                    <label className="order-detail-edit-label">
+                      Placa
+                      <input
+                        type="text"
+                        value={courierForm.vehiculoPlaca}
+                        onChange={event => setCourierForm(current => ({ ...current, vehiculoPlaca: event.target.value }))}
+                        placeholder="ABC123"
+                      />
+                    </label>
+                    <label className="order-detail-edit-label">
+                      Detalle vehiculo
+                      <input
+                        type="text"
+                        value={courierForm.vehiculoDetalle}
+                        onChange={event => setCourierForm(current => ({ ...current, vehiculoDetalle: event.target.value }))}
+                        placeholder="Yamaha 2022"
+                      />
+                    </label>
+                    <label className="delivery-dispatch-toggle">
+                      <input
+                        type="checkbox"
+                        checked={courierForm.activo}
+                        onChange={event => setCourierForm(current => ({ ...current, activo: event.target.checked }))}
+                      />
+                      <span>Activo</span>
+                    </label>
+                    <button type="button" className="btn-primary" onClick={onCrearDomiciliario} disabled={courierSaving}>
+                      {courierSaving ? "Creando..." : "Crear domiciliario"}
+                    </button>
+                  </div>
+                </article>
+              </div>
+            ) : null}
+
+            {viewingCourierItem ? (() => {
+              const vehicle = courierVehicle(viewingCourierItem);
+              const activeCount = Number.isFinite(Number(viewingCourierItem?.pedidosActivos))
+                ? Number(viewingCourierItem.pedidosActivos)
+                : courierActiveOrders(viewingCourierItem, adminItems);
+              return (
+                <div className="delivery-modal-backdrop" role="presentation" onMouseDown={() => setViewingCourierItem(null)}>
+                  <article
+                    className="order-block delivery-courier-create delivery-courier-view-modal"
+                    role="dialog"
+                    aria-modal="true"
+                    aria-labelledby="delivery-view-courier-title"
+                    onMouseDown={event => event.stopPropagation()}
+                  >
+                    <div className="delivery-section-head">
+                      <h4 id="delivery-view-courier-title">Detalle domiciliario</h4>
+                      <div className="delivery-modal-head-actions">
+                        <span>{courierIdLabel(viewingCourierItem, 0)}</span>
+                        <button
+                          type="button"
+                          className="delivery-modal-close"
+                          onClick={() => setViewingCourierItem(null)}
+                          aria-label="Cerrar detalle"
+                        >
+                          <X size={18} strokeWidth={2.4} />
+                        </button>
+                      </div>
+                    </div>
+                    <div className="delivery-courier-profile">
+                      <span className="delivery-courier-avatar delivery-courier-profile-avatar">
+                        {String(viewingCourierItem.nombre || viewingCourierItem.nombreDomiciliario || "D").slice(0, 1).toUpperCase()}
+                      </span>
+                      <div>
+                        <strong>{viewingCourierItem.nombre || viewingCourierItem.nombreDomiciliario || "Domiciliario"}</strong>
+                        <span>{courierLogin(viewingCourierItem)}</span>
+                      </div>
+                    </div>
+                    <div className="delivery-courier-detail-grid">
+                      <p><span>Telefono</span><strong>{viewingCourierItem.telefono || viewingCourierItem.celular || viewingCourierItem.phone || "-"}</strong></p>
+                      <p><span>Tipo</span><strong>{courierType(viewingCourierItem)}</strong></p>
+                      <p><span>Estado</span><strong>{courierBackendStatus(viewingCourierItem)}</strong></p>
+                      <p><span>Vehiculo</span><strong>{vehicle.type}</strong></p>
+                      <p><span>Placa</span><strong>{vehicle.plate}</strong></p>
+                      <p><span>Detalle</span><strong>{vehicle.detail || "-"}</strong></p>
+                      <p><span>Pedidos activos</span><strong>{activeCount}</strong></p>
+                      <p><span>Usuario ID</span><strong>{viewingCourierItem.usuarioID ?? "-"}</strong></p>
+                    </div>
+                    <div className="delivery-courier-modal-actions">
+                      <button type="button" className="btn-outline" onClick={() => setViewingCourierItem(null)}>
+                        Cerrar
+                      </button>
+                      <button type="button" className="btn-primary" onClick={() => onStartEditCourier(viewingCourierItem)}>
+                        Editar domiciliario
+                      </button>
+                    </div>
+                  </article>
                 </div>
-                <div className="delivery-courier-form">
-                  <label className="order-detail-edit-label">
-                    Nombre
-                    <input
-                      type="text"
-                      value={courierForm.nombre}
-                      onChange={event => setCourierForm(current => ({ ...current, nombre: event.target.value }))}
-                      placeholder="Nombre del domiciliario"
-                    />
-                  </label>
-                  <label className="order-detail-edit-label">
-                    Telefono
-                    <input
-                      type="tel"
-                      value={courierForm.telefono}
-                      onChange={event => setCourierForm(current => ({ ...current, telefono: event.target.value }))}
-                      placeholder="Telefono"
-                    />
-                  </label>
-                  <label className="order-detail-edit-label">
-                    Tipo
-                    <select
-                      value={courierForm.tipo}
-                      onChange={event => setCourierForm(current => ({ ...current, tipo: event.target.value }))}
-                    >
-                      <option value="interno">Interno</option>
-                      <option value="externo">Externo</option>
-                    </select>
-                  </label>
-                  <label className="order-detail-edit-label">
-                    Vehiculo
-                    <select
-                      value={courierForm.vehiculoTipo}
-                      onChange={event => setCourierForm(current => ({ ...current, vehiculoTipo: event.target.value }))}
-                    >
-                      <option value="moto">Moto</option>
-                      <option value="carro">Carro</option>
-                      <option value="bicicleta">Bicicleta</option>
-                      <option value="otro">Otro</option>
-                    </select>
-                  </label>
-                  <label className="order-detail-edit-label">
-                    Placa
-                    <input
-                      type="text"
-                      value={courierForm.vehiculoPlaca}
-                      onChange={event => setCourierForm(current => ({ ...current, vehiculoPlaca: event.target.value }))}
-                      placeholder="ABC123"
-                    />
-                  </label>
-                  <label className="order-detail-edit-label">
-                    Detalle vehiculo
-                    <input
-                      type="text"
-                      value={courierForm.vehiculoDetalle}
-                      onChange={event => setCourierForm(current => ({ ...current, vehiculoDetalle: event.target.value }))}
-                      placeholder="Yamaha 2022"
-                    />
-                  </label>
-                  <label className="delivery-dispatch-toggle">
-                    <input
-                      type="checkbox"
-                      checked={courierForm.activo}
-                      onChange={event => setCourierForm(current => ({ ...current, activo: event.target.checked }))}
-                    />
-                    <span>Activo</span>
-                  </label>
-                  <button type="button" className="btn-primary" onClick={onCrearDomiciliario} disabled={courierSaving}>
-                    {courierSaving ? "Creando..." : "Crear domiciliario"}
-                  </button>
-                </div>
-              </article>
+              );
+            })() : null}
+
+            {editingCourierId != null ? (
+              <div className="delivery-modal-backdrop" role="presentation" onMouseDown={onCancelEditCourier}>
+                <article
+                  className="order-block delivery-courier-create delivery-courier-create-modal"
+                  role="dialog"
+                  aria-modal="true"
+                  aria-labelledby="delivery-edit-courier-title"
+                  onMouseDown={event => event.stopPropagation()}
+                >
+                  <div className="delivery-section-head">
+                    <h4 id="delivery-edit-courier-title">Editar domiciliario</h4>
+                    <div className="delivery-modal-head-actions">
+                      <span>DM-{String(editingCourierId).padStart(3, "0")}</span>
+                      <button
+                        type="button"
+                        className="delivery-modal-close"
+                        onClick={onCancelEditCourier}
+                        aria-label="Cerrar formulario"
+                      >
+                        <X size={18} strokeWidth={2.4} />
+                      </button>
+                    </div>
+                  </div>
+                  <div className="delivery-courier-form">
+                    <label className="order-detail-edit-label">
+                      Nombre
+                      <input
+                        type="text"
+                        value={courierEditForm.nombre}
+                        onChange={event => setCourierEditForm(current => ({ ...current, nombre: event.target.value }))}
+                        placeholder="Nombre del domiciliario"
+                      />
+                    </label>
+                    <label className="order-detail-edit-label">
+                      Telefono
+                      <input
+                        type="tel"
+                        value={courierEditForm.telefono}
+                        onChange={event => setCourierEditForm(current => ({ ...current, telefono: event.target.value }))}
+                        placeholder="Telefono"
+                      />
+                    </label>
+                    <label className="order-detail-edit-label">
+                      Tipo
+                      <select
+                        value={courierEditForm.tipo}
+                        onChange={event => setCourierEditForm(current => ({ ...current, tipo: event.target.value }))}
+                      >
+                        <option value="Interno">Interno</option>
+                        <option value="Externo">Externo</option>
+                      </select>
+                    </label>
+                    <label className="order-detail-edit-label">
+                      Vehiculo
+                      <input
+                        type="text"
+                        value={courierEditForm.vehiculo}
+                        onChange={event => setCourierEditForm(current => ({ ...current, vehiculo: event.target.value }))}
+                        placeholder="Moto ABC123"
+                      />
+                    </label>
+                    <label className="order-detail-edit-label">
+                      Estado
+                      <select
+                        value={courierEditForm.estado}
+                        onChange={event => setCourierEditForm(current => ({
+                          ...current,
+                          estado: event.target.value,
+                          activo: event.target.value === "Activo",
+                        }))}
+                      >
+                        <option value="Activo">Activo</option>
+                        <option value="Inactivo">Inactivo</option>
+                        <option value="Eliminado">Eliminado</option>
+                      </select>
+                    </label>
+                    <button type="button" className="btn-primary" onClick={() => onSaveEditCourier(editingCourierId)} disabled={courierSaving}>
+                      {courierSaving ? "Guardando..." : "Guardar cambios"}
+                    </button>
+                    <button type="button" className="btn-outline" onClick={onCancelEditCourier} disabled={courierSaving}>
+                      Cancelar
+                    </button>
+                  </div>
+                </article>
+              </div>
             ) : null}
 
             <article className="delivery-couriers-directory">
@@ -2050,7 +3390,9 @@ export function DeliveryPage({
                     ) : courierDirectoryRows.map((item, index) => {
                       const vehicle = courierVehicle(item);
                       const domId = courierIdValue(item) ?? index;
-                      const activeCount = courierActiveOrders(item, adminItems);
+                      const activeCount = Number.isFinite(Number(item?.pedidosActivos))
+                        ? Number(item.pedidosActivos)
+                        : courierActiveOrders(item, adminItems);
                       return (
                         <tr key={domId}>
                           <td data-label="ID">
@@ -2080,14 +3422,39 @@ export function DeliveryPage({
                           </td>
                           <td data-label="Estado">
                             <span className={`delivery-courier-status ${item.activo === false ? "is-inactive" : "is-active"}`}>
-                              {item.activo === false ? "Inactivo" : "Activo"}
+                              {courierBackendStatus(item)}
                             </span>
                           </td>
                           <td data-label="Acciones">
                             <div className="delivery-courier-action-buttons">
-                              <button type="button" title="Ver" aria-label="Ver domiciliario"><Eye size={16} /></button>
-                              <button type="button" title="Editar" aria-label="Editar domiciliario"><Pencil size={16} /></button>
-                              <button type="button" title="Mas acciones" aria-label="Mas acciones"><MoreVertical size={17} /></button>
+                              <button
+                                type="button"
+                                className="delivery-courier-action-button is-view"
+                                title="Ver detalle"
+                                aria-label="Ver detalle del domiciliario"
+                                onClick={() => onViewCourier(item)}
+                              >
+                                <Eye size={16} />
+                              </button>
+                              <button
+                                type="button"
+                                className="delivery-courier-action-button is-edit"
+                                title="Editar"
+                                aria-label="Editar domiciliario"
+                                onClick={() => onStartEditCourier(item)}
+                              >
+                                <Pencil size={16} />
+                              </button>
+                              <button
+                                type="button"
+                                className="delivery-courier-action-button is-delete"
+                                title="Eliminar"
+                                aria-label="Eliminar domiciliario"
+                                onClick={() => onDeleteCourier(item)}
+                                disabled={courierSaving}
+                              >
+                                <AlertTriangle size={17} />
+                              </button>
                             </div>
                           </td>
                         </tr>
@@ -2098,7 +3465,7 @@ export function DeliveryPage({
               </div>
             </article>
           </section>
-        ) : modo === "admin" ? null : modo === "disponibles" ? null : modo === "mis-pedidos" ? null : false ? (
+        ) : false ? (
           <section className="orders-table-wrap">
             <table className="orders-table delivery-admin-table">
               <thead>
@@ -2149,7 +3516,7 @@ export function DeliveryPage({
                           {actionKey === `enruta-${item.idEntrega}` ? "En proceso..." : "En camino"}
                         </button>
                         <button type="button" className="btn-outline" onClick={() => openDeliveryDetail(item)}>Ver detalle</button>
-                        <button type="button" className="btn-outline" onClick={() => openMaps(item)}>Ver ubicaciÃ³n</button>
+                        <button type="button" className="btn-outline" onClick={() => openMaps(item)}>Ver ubicación</button>
                       </div>
                     </td>
                   </tr>
@@ -2157,16 +3524,646 @@ export function DeliveryPage({
               </tbody>
             </table>
           </section>
+        ) : modo === "novedades" ? (
+          <section className="delivery-metrics-view delivery-novelties-view">
+            {error ? <p className="orders-message delivery-error">{error}</p> : null}
+            {loading ? <p className="orders-message">Cargando novedades...</p> : null}
+
+            <section className="delivery-novelties-topbar" aria-label="Acciones de novedades">
+              <div>
+                <h2>Novedades de domicilios</h2>
+                <span>Gestion por pedido, cliente y domiciliario</span>
+              </div>
+              <button type="button" className="btn-primary delivery-novelty-register-top">
+                <Plus size={16} /> Registrar novedad
+              </button>
+            </section>
+
+            <section className="delivery-novelties-summary" aria-label="Resumen de novedades">
+              <article className="delivery-novelty-summary-card is-total">
+                <span className="delivery-novelty-summary-icon"><AlertTriangle size={21} /></span>
+                <div>
+                  <span>Novedades</span>
+                  <strong>{deliveryNoveltyBoard.total || deliveryNoveltyInsights.totalNovedades}</strong>
+                  <small>Hoy</small>
+                </div>
+              </article>
+              <article className="delivery-novelty-summary-card is-warning">
+                <span className="delivery-novelty-summary-icon"><Clock3 size={21} /></span>
+                <div>
+                  <span>Sin resolver</span>
+                  <strong>{deliveryNoveltyBoard.statusCounts.pending}</strong>
+                  <small>Pendientes</small>
+                </div>
+              </article>
+              <article className="delivery-novelty-summary-card is-resolved">
+                <span className="delivery-novelty-summary-icon"><CheckCircle2 size={21} /></span>
+                <div>
+                  <span>Resueltas</span>
+                  <strong>{deliveryNoveltyBoard.statusCounts.resolved}</strong>
+                  <small>Hoy</small>
+                </div>
+              </article>
+              <article className="delivery-novelty-summary-card is-critical">
+                <span className="delivery-novelty-summary-icon"><AlertTriangle size={21} /></span>
+                <div>
+                  <span>Criticas</span>
+                  <strong>{deliveryNoveltyBoard.critical}</strong>
+                  <small>Requieren atencion</small>
+                </div>
+              </article>
+            </section>
+
+            <section className="delivery-novelties-shell">
+              <article className="delivery-novelties-main">
+                <div className="delivery-novelties-tabs" role="tablist" aria-label="Estados de novedades">
+                  {[
+                    { key: "todos", label: "Todos" },
+                    { key: "pending", label: "Sin resolver" },
+                    { key: "tracking", label: "En seguimiento" },
+                    { key: "resolved", label: "Resueltas" },
+                    { key: "novedades", label: "Novedades" },
+                  ].map(item => (
+                    <button
+                      type="button"
+                      key={item.key}
+                      className={noveltyStatusFilter === item.key ? "is-active" : ""}
+                      onClick={() => setNoveltyStatusFilter(item.key)}
+                    >
+                      {item.label}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="delivery-novelties-filters">
+                  <label className="delivery-novelties-search">
+                    <Search size={16} />
+                    <input
+                      type="search"
+                      value={noveltySearch}
+                      onChange={event => setNoveltySearch(event.target.value)}
+                      placeholder="Buscar pedido, cliente o novedad..."
+                    />
+                  </label>
+                  <label>
+                    <Clock3 size={15} />
+                    <select
+                      value={metricsRangePreset}
+                      onChange={event => onChangeMetricsRangePreset(event.target.value)}
+                    >
+                      {DELIVERY_METRIC_RANGE_PRESETS.map(item => <option key={item.value} value={item.value}>{item.label}</option>)}
+                    </select>
+                  </label>
+                  <label>
+                    <MessageCircle size={15} />
+                    <select value={noveltyTypeFilter} onChange={event => setNoveltyTypeFilter(event.target.value)}>
+                      <option value="todas">Todas las novedades</option>
+                      {deliveryNoveltyBoard.typeCounts.map(item => <option key={item.key} value={item.key}>{item.label}</option>)}
+                    </select>
+                  </label>
+                  <label>
+                    <UserRound size={15} />
+                    <select value={metricsDomiciliarioId} onChange={event => setMetricsDomiciliarioId(event.target.value)}>
+                      <option value="">Todos los domiciliarios</option>
+                      {domiciliarios.map(item => {
+                        const domId = courierIdValue(item);
+                        if (domId == null) return null;
+                        return <option key={domId} value={domId}>{item.nombre || item.nombreDomiciliario || "Domiciliario"}</option>;
+                      })}
+                    </select>
+                  </label>
+                  <label>
+                    <CheckCircle2 size={15} />
+                    <select value={noveltyStatusFilter} onChange={event => setNoveltyStatusFilter(event.target.value)}>
+                      <option value="todos">Todos</option>
+                      <option value="pending">Pendientes</option>
+                      <option value="tracking">En seguimiento</option>
+                      <option value="resolved">Resueltas</option>
+                    </select>
+                  </label>
+                </div>
+
+                <div className="delivery-novelties-list">
+                  {deliveryNoveltyBoard.rows.length === 0 ? (
+                    <p className="orders-message delivery-performance-empty">
+                      {deliveryNoveltyBoard.hasPedidoDetail
+                        ? "No hay novedades por pedido para los filtros seleccionados."
+                        : "El endpoint de metricas no envio detalle por pedido para novedades."}
+                    </p>
+                  ) : deliveryNoveltyBoard.rows.map(row => {
+                    const Icon = row.type.Icon;
+                    return (
+                      <article key={row.key} className={`delivery-novelty-row is-${row.status.tone === "resolved" ? "resolved" : row.type.tone}`}>
+                        <div className="delivery-novelty-icon"><Icon size={19} /></div>
+                        <div className="delivery-novelty-order">
+                          <strong>{row.label}</strong>
+                          <span>Pedido <b>{row.orderCode}</b></span>
+                          <small><Clock3 size={12} /> {row.time}</small>
+                        </div>
+                        <div className="delivery-novelty-cell">
+                          <span>Cliente</span>
+                          <strong>{row.client}</strong>
+                          <small><Phone size={12} /> {row.phone || "-"}</small>
+                        </div>
+                        <div className="delivery-novelty-cell">
+                          <span>Domiciliario</span>
+                          <strong>{row.courier}</strong>
+                        </div>
+                        <div className="delivery-novelty-cell delivery-novelty-observation">
+                          <span>Observacion</span>
+                          <strong>{row.observation}</strong>
+                        </div>
+                        <div className="delivery-novelty-actions">
+                          <button type="button" className="btn-outline" onClick={() => openDeliveryDetail(row.item)}>
+                            <Eye size={14} /> Ver detalle
+                          </button>
+                          {row.status.tone === "resolved" ? (
+                            <button type="button" className="btn-primary is-resolved">
+                              <CheckCircle2 size={14} /> Resuelta
+                            </button>
+                          ) : (
+                            <button type="button" className="btn-primary" onClick={() => onOpenResolveNovelty(row)}>
+                              <CheckCircle2 size={14} /> Resolver
+                            </button>
+                          )}
+                        </div>
+                        <button type="button" className="delivery-novelty-more" aria-label="Mas acciones">
+                          <MoreVertical size={17} />
+                        </button>
+                      </article>
+                    );
+                  })}
+                </div>
+
+                <div className="delivery-novelties-footer">
+                  <span>Mostrando {deliveryNoveltyBoard.rows.length === 0 ? 0 : 1} a {deliveryNoveltyBoard.rows.length} de {deliveryNoveltyBoard.allRows.length} novedades</span>
+                  <div className="delivery-novelties-pagination">
+                    <button type="button" className="btn-outline">{"<"}</button>
+                    <button type="button" className="is-active">1</button>
+                    <button type="button">2</button>
+                    <button type="button">3</button>
+                    <button type="button">{">"}</button>
+                  </div>
+                  <select aria-label="Novedades por pagina" defaultValue="5">
+                    <option value="5">5 por pagina</option>
+                    <option value="10">10 por pagina</option>
+                  </select>
+                </div>
+              </article>
+
+              <aside className="delivery-novelties-side">
+                <article className="delivery-novelty-side-card">
+                  <h4>Tipos de novedades</h4>
+                  <div className="delivery-novelty-type-list">
+                    {deliveryNoveltyBoard.typeCounts.map(item => {
+                      const Icon = item.Icon;
+                      return (
+                        <button type="button" key={item.key} onClick={() => setNoveltyTypeFilter(item.key)}>
+                          <span className={`is-${item.tone}`}><Icon size={14} /></span>
+                          <strong>{item.label}</strong>
+                          <b>{item.count}</b>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </article>
+
+                <article className="delivery-novelty-side-card">
+                  <h4>Registrar novedad</h4>
+                  <label>
+                    <span>Pedido *</span>
+                    <select
+                      value={noveltyDraft.pedidoId}
+                      onChange={event => setNoveltyDraft(current => ({ ...current, pedidoId: event.target.value }))}
+                    >
+                      <option value="">Seleccionar pedido</option>
+                      {adminItems.slice(0, 40).map(item => <option key={item.idEntrega} value={item.idEntrega}>{deliveryOrderCodeLabel(item)}</option>)}
+                    </select>
+                  </label>
+                  <label>
+                    <span>Tipo de novedad *</span>
+                    <select
+                      value={noveltyDraft.tipo}
+                      onChange={event => setNoveltyDraft(current => ({ ...current, tipo: event.target.value }))}
+                    >
+                      <option value="">Seleccionar tipo</option>
+                      {DELIVERY_NOVELTY_TYPES.map(item => <option key={item.key} value={item.key}>{item.label}</option>)}
+                    </select>
+                  </label>
+                  <label>
+                    <span>Observacion *</span>
+                    <textarea
+                      rows="4"
+                      value={noveltyDraft.observacion}
+                      onChange={event => setNoveltyDraft(current => ({ ...current, observacion: event.target.value }))}
+                      placeholder="Describe la novedad..."
+                    />
+                  </label>
+                  <label>
+                    <span>Foto (opcional)</span>
+                    <button type="button" className="delivery-novelty-upload">
+                      <Plus size={16} /> Subir foto
+                      <small>JPG, PNG max. 5MB</small>
+                    </button>
+                  </label>
+                  <div className="delivery-novelty-form-actions">
+                    <button type="button" className="btn-outline" onClick={() => setNoveltyDraft({ pedidoId: "", tipo: "", observacion: "" })}>Cancelar</button>
+                    <button type="button" className="btn-primary" onClick={onSaveNoveltyDraft}>Guardar</button>
+                  </div>
+                </article>
+              </aside>
+            </section>
+          </section>
+        ) : modo === "metricas" ? (
+          <section className="delivery-metrics-view">
+            {error ? <p className="orders-message delivery-error">{error}</p> : null}
+            {loading ? <p className="orders-message">Cargando métricas...</p> : null}
+
+            <section className="delivery-current-panel-title" aria-label="Panel actual">
+              <h2>Métricas de domicilios</h2>
+            </section>
+
+            <section className="delivery-metrics-toolbar">
+              <label className="filter-field">
+                <span>Rango de fechas</span>
+                <select
+                  value={metricsRangePreset}
+                  onChange={event => onChangeMetricsRangePreset(event.target.value)}
+                >
+                  {DELIVERY_METRIC_RANGE_PRESETS.map(item => <option key={item.value} value={item.value}>{item.label}</option>)}
+                </select>
+              </label>
+              <label className="filter-field">
+                <span>Desde</span>
+                <input
+                  type="date"
+                  value={metricsFechaDesde}
+                  onChange={event => {
+                    setMetricsRangePreset("personalizado");
+                    setMetricsFechaDesde(event.target.value);
+                  }}
+                />
+              </label>
+              <label className="filter-field">
+                <span>Hasta</span>
+                <input
+                  type="date"
+                  value={metricsFechaHasta}
+                  onChange={event => {
+                    setMetricsRangePreset("personalizado");
+                    setMetricsFechaHasta(event.target.value);
+                  }}
+                />
+              </label>
+              <label className="filter-field">
+                <span>Domiciliario</span>
+                <select
+                  value={metricsDomiciliarioId}
+                  onChange={event => setMetricsDomiciliarioId(event.target.value)}
+                >
+                  <option value="">Todos</option>
+                  {domiciliarios.map(item => {
+                    const domId = courierIdValue(item);
+                    if (domId == null) return null;
+                    return <option key={domId} value={domId}>{item.nombre || item.nombreDomiciliario || "Domiciliario"}</option>;
+                  })}
+                </select>
+              </label>
+              <label className="filter-field">
+                <span>Agrupar</span>
+                <select
+                  value={metricsGroupBy}
+                  onChange={event => setMetricsGroupBy(event.target.value)}
+                >
+                  {DELIVERY_METRIC_GROUPS.map(item => <option key={item.value} value={item.value}>{item.label}</option>)}
+                </select>
+              </label>
+              <button type="button" className="btn-outline delivery-metrics-clear" onClick={onClearMetricsFilters}>
+                Limpiar filtros
+              </button>
+            </section>
+
+            <section className="order-block delivery-metrics-panel delivery-performance-panel">
+              <div className="delivery-performance-head">
+                <div>
+                  <h4>Rendimiento de domiciliarios</h4>
+                  <span>Comparativo del periodo seleccionado</span>
+                </div>
+                <label className="delivery-performance-sort">
+                  <span>Ordenar por</span>
+                  <select value={performanceSort} onChange={event => setPerformanceSort(event.target.value)}>
+                    {DELIVERY_PERFORMANCE_SORTS.map(item => <option key={item.value} value={item.value}>{item.label}</option>)}
+                  </select>
+                </label>
+              </div>
+
+              {loading ? (
+                <div className="delivery-performance-skeleton" aria-label="Cargando rendimiento de domiciliarios">
+                  <span />
+                  <span />
+                  <span />
+                </div>
+              ) : deliveryPerformance.rows.length === 0 && deliveryPerformance.unassignedSummary.asignados === 0 ? (
+                <p className="orders-message delivery-performance-empty">No hay datos de domiciliarios para el periodo seleccionado.</p>
+              ) : (
+                <>
+                  <div className="delivery-performance-summary" aria-label="Resumen de rendimiento de domiciliarios">
+                    <p><span>Domiciliarios activos</span><strong>{deliveryPerformance.summary.activos}</strong></p>
+                    <p><span>Entregas completadas</span><strong>{deliveryPerformance.summary.totalEntregados}</strong></p>
+                    <p><span>Tiempo promedio</span><strong>{performanceDurationLabel(deliveryPerformance.summary.averageTime)}</strong></p>
+                    <p><span>Novedades</span><strong>{deliveryPerformance.summary.totalNovedades}</strong></p>
+                    <p><span>Reasignados</span><strong>{deliveryPerformance.summary.totalReasignados}</strong></p>
+                    <p className="is-unassigned"><span>Pedidos sin asignacion</span><strong>{deliveryPerformance.unassignedSummary.asignados}</strong></p>
+                  </div>
+
+                  {deliveryPerformance.rows.length > 0 ? (
+                  <div className="delivery-performance-table-wrap">
+                    <table className="delivery-performance-table">
+                      <thead>
+                        <tr>
+                          <th>Posición</th>
+                          <th>Domiciliario</th>
+                          <th>Entregados</th>
+                          <th>Tasa de entrega</th>
+                          <th>Tiempo promedio</th>
+                          <th>Novedades</th>
+                          <th>Reasignados</th>
+                          <th>Estado</th>
+                          <th>Acción</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {deliveryPerformance.rows.map((item, index) => (
+                          <tr key={item.key}>
+                            <td data-label="Posición"><strong className="delivery-performance-rank">#{index + 1}</strong></td>
+                            <td data-label="Domiciliario">
+                              <div className="delivery-performance-person">
+                                <span aria-hidden="true">
+                                  {item.photoUrl ? <img src={item.photoUrl} alt="" loading="lazy" /> : item.initials}
+                                </span>
+                                <div>
+                                  <strong>{item.nombre}</strong>
+                                </div>
+                              </div>
+                            </td>
+                            <td data-label="Entregados">
+                              <strong>{item.entregados}</strong>
+                              <small>{item.entregados} de {item.asignados} asignados</small>
+                            </td>
+                            <td data-label="Tasa de entrega">
+                              <div className="delivery-performance-rate">
+                                <strong>{item.tasaEntregaLabel}</strong>
+                                <span aria-hidden="true"><i style={{ width: `${Math.min(Math.max(item.tasaEntrega, 0), 100)}%` }} /></span>
+                              </div>
+                            </td>
+                            <td data-label="Tiempo promedio"><strong>{item.tiempoPromedioLabel}</strong><small>por entrega</small></td>
+                            <td data-label="Novedades"><strong>{item.novedades}</strong><small>{item.tasaNovedadesLabel}</small></td>
+                            <td data-label="Reasignados"><strong>{item.reasignados}</strong><small>{item.tasaReasignacionLabel}</small></td>
+                            <td data-label="Estado"><span className={`delivery-performance-status ${item.status.tone}`}>{item.status.label}</span></td>
+                            <td data-label="Acción">
+                              <button
+                                type="button"
+                                className="btn-outline delivery-performance-detail"
+                                onClick={() => setSelectedPerformanceCourier(item)}
+                                aria-label={`Ver detalle de ${item.nombre}`}
+                              >
+                                Ver detalle
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  ) : null}
+
+                  {deliveryPerformance.rows.length > 0 ? (
+                  <div className="delivery-performance-cards" aria-label="Rendimiento de domiciliarios en tarjetas">
+                    {deliveryPerformance.rows.map(item => (
+                      <article key={`card-${item.key}`} className="delivery-performance-card">
+                        <div className="delivery-performance-card-head">
+                          <div className="delivery-performance-person">
+                            <span aria-hidden="true">
+                              {item.photoUrl ? <img src={item.photoUrl} alt="" loading="lazy" /> : item.initials}
+                            </span>
+                            <div>
+                              <strong>{item.nombre}</strong>
+                            </div>
+                          </div>
+                          <span className={`delivery-performance-status ${item.status.tone}`}>{item.status.label}</span>
+                        </div>
+                        <p><span>Entregados</span><strong>{item.entregados} de {item.asignados}</strong></p>
+                        <p><span>Tasa de entrega</span><strong>{item.tasaEntregaLabel}</strong></p>
+                        <p><span>Tiempo promedio</span><strong>{item.tiempoPromedioLabel}</strong></p>
+                        <p><span>Novedades</span><strong>{item.novedades} · {item.reasignados} reasignados</strong></p>
+                        <button
+                          type="button"
+                          className="btn-outline delivery-performance-detail"
+                          onClick={() => setSelectedPerformanceCourier(item)}
+                          aria-label={`Ver detalle de ${item.nombre}`}
+                        >
+                          Ver detalle
+                        </button>
+                      </article>
+                    ))}
+                  </div>
+                  ) : null}
+
+                  <div className="delivery-performance-note">
+                    <p><strong>Tasa de entrega:</strong> entregas completadas / pedidos finalizados.</p>
+                    <p><strong>Tiempo promedio:</strong> tiempo desde asignación hasta entrega.</p>
+                    <p><strong>Novedades:</strong> pedidos con novedad / pedidos gestionados.</p>
+                    <p><strong>Reasignados:</strong> pedidos reasignados / pedidos asignados.</p>
+                  </div>
+                </>
+              )}
+            </section>
+
+            {selectedPerformanceCourier ? (
+              <div className="delivery-modal-backdrop" role="presentation" onMouseDown={() => setSelectedPerformanceCourier(null)}>
+                <article className="order-block delivery-performance-modal" role="dialog" aria-modal="true" aria-label={`Detalle de ${selectedPerformanceCourier.nombre}`} onMouseDown={event => event.stopPropagation()}>
+                  <div className="delivery-section-head">
+                    <h4>{selectedPerformanceCourier.nombre}</h4>
+                    <button type="button" className="delivery-modal-close" onClick={() => setSelectedPerformanceCourier(null)} aria-label="Cerrar detalle">×</button>
+                  </div>
+                  <div className="delivery-performance-modal-profile">
+                    <span aria-hidden="true">
+                      {selectedPerformanceCourier.photoUrl ? <img src={selectedPerformanceCourier.photoUrl} alt="" loading="lazy" /> : selectedPerformanceCourier.initials}
+                    </span>
+                    <div>
+                      <strong>{selectedPerformanceCourier.nombre}</strong>
+                    </div>
+                  </div>
+                  <div className="delivery-courier-detail-grid">
+                    <p><span>Total asignados</span><strong>{selectedPerformanceCourier.asignados}</strong></p>
+                    <p><span>Entregados</span><strong>{selectedPerformanceCourier.entregados}</strong></p>
+                    <p><span>No entregados</span><strong>{selectedPerformanceCourier.noEntregados}</strong></p>
+                    <p><span>Tasa de entrega</span><strong>{selectedPerformanceCourier.tasaEntregaLabel}</strong></p>
+                    <p><span>Tiempo promedio</span><strong>{selectedPerformanceCourier.tiempoPromedioLabel}</strong></p>
+                    <p><span>Novedades</span><strong>{selectedPerformanceCourier.novedades}</strong></p>
+                    <p><span>Reasignaciones</span><strong>{selectedPerformanceCourier.reasignados}</strong></p>
+                    <p><span>Pedidos activos</span><strong>{selectedPerformanceCourier.pedidosActivos}</strong></p>
+                  </div>
+                  <section className="delivery-performance-orders" aria-label={`Pedidos entregados por ${selectedPerformanceCourier.nombre}`}>
+                    <div className="delivery-performance-orders-head">
+                      <h5>Pedidos entregados por domiciliario</h5>
+                      <span>{selectedPerformanceCourier.deliveredOrders.length} de {selectedPerformanceCourier.entregados}</span>
+                    </div>
+                    {selectedPerformanceCourier.deliveredOrders.length === 0 ? (
+                      <p className="delivery-performance-modal-note">La fuente de metricas no envio el detalle individual de pedidos entregados para este domiciliario.</p>
+                    ) : (
+                      <div className="delivery-performance-orders-list">
+                        {selectedPerformanceCourier.deliveredOrders.map(order => (
+                          <article key={order.key} className="delivery-performance-order">
+                            <div>
+                              <strong>Pedido {order.orderCode}</strong>
+                              <span>{[order.date, order.time].filter(Boolean).join(" - ") || "-"}</span>
+                            </div>
+                            <div>
+                              <span>{order.address || "Sin direccion registrada"}</span>
+                            </div>
+                          </article>
+                        ))}
+                      </div>
+                    )}
+                  </section>
+                </article>
+              </div>
+            ) : null}
+
+            <section className="delivery-metrics-grid">
+              <article className="order-block delivery-metrics-panel delivery-history-panel">
+                <div className="delivery-history-head">
+                  <div>
+                    <h4>Histórico de pedidos</h4>
+                    <span>Comportamiento del periodo seleccionado</span>
+                  </div>
+                  <strong>{metricGroupBadgeLabel(deliveryMetrics.agruparPor)}</strong>
+                </div>
+                {deliveryMetricsChart.historicalItems.length === 0 ? (
+                  <p className="orders-message delivery-history-empty">No hay datos para el periodo seleccionado.</p>
+                ) : (
+                  <>
+                    <div className="delivery-history-summary" aria-label="Resumen histórico">
+                      <p><span>Total</span><strong>{deliveryMetricsChart.historicalTotal}</strong></p>
+                      <p><span>Promedio</span><strong>{deliveryMetricsChart.historicalAverage.toFixed(1)}</strong></p>
+                      <p><span>Máximo</span><strong>{deliveryMetricsChart.historicalMax}</strong></p>
+                    </div>
+                    <div className="delivery-history-chart-scroll">
+                      <div
+                        className="delivery-history-chart"
+                        style={{ minWidth: `${deliveryMetricsChart.historicalMinWidth}px` }}
+                      >
+                        <ResponsiveContainer width="100%" height={310}>
+                          <BarChart
+                            data={deliveryMetricsChart.historicalItems}
+                            margin={{ top: 14, right: 18, left: 0, bottom: 10 }}
+                          >
+                            <CartesianGrid stroke="#eef2f7" vertical={false} />
+                            <XAxis
+                              dataKey="label"
+                              interval={deliveryMetricsChart.historicalXAxisInterval}
+                              axisLine={false}
+                              tickLine={false}
+                              tick={{ fill: "#64748b", fontSize: 11, fontWeight: 800 }}
+                            />
+                            <YAxis
+                              allowDecimals={false}
+                              axisLine={false}
+                              tickLine={false}
+                              tick={{ fill: "#64748b", fontSize: 11, fontWeight: 800 }}
+                              width={42}
+                            />
+                            <Tooltip cursor={{ fill: "rgba(233, 30, 114, 0.08)" }} content={<DeliveryHistoryTooltip />} />
+                            <Bar dataKey="total" fill="#e91e72" radius={[8, 8, 0, 0]} maxBarSize={34} />
+                          </BarChart>
+                        </ResponsiveContainer>
+                      </div>
+                    </div>
+                  </>
+                )}
+              </article>
+
+              <article className="order-block delivery-metrics-panel delivery-state-panel">
+                <div className="delivery-state-head">
+                  <div>
+                    <h4>Estados de entrega</h4>
+                    <span>Resumen del periodo seleccionado</span>
+                  </div>
+                  <strong>4 estados</strong>
+                </div>
+                <div className="delivery-state-kpi-grid" aria-label="Indicadores de estados de entrega">
+                  {deliveryMetricStates.deliveryRows.map(item => {
+                    const Icon = item.Icon;
+                    return (
+                      <article key={item.key} className={`delivery-state-kpi ${item.tone}`}>
+                        <span className="delivery-state-kpi-icon" aria-hidden="true"><Icon size={16} /></span>
+                        <strong>{item.value}</strong>
+                        <span>{item.label}</span>
+                        <small>{item.percentLabel}</small>
+                      </article>
+                    );
+                  })}
+                  <article className="delivery-state-kpi is-brand">
+                    <span className="delivery-state-kpi-icon" aria-hidden="true"><Truck size={16} /></span>
+                    <strong>{deliveryMetricStates.totalPedidos}</strong>
+                    <span>Total pedidos</span>
+                    <small>Total del periodo</small>
+                  </article>
+                </div>
+                <div className="delivery-state-distribution">
+                  <div className="delivery-state-distribution-head">
+                    <h5>Distribucion de estados</h5>
+                    <span>100% del total de pedidos</span>
+                  </div>
+                  <div className="delivery-state-stack" aria-label="Distribucion porcentual de estados de entrega">
+                    {deliveryMetricStates.deliveryRows.map(item => (
+                      item.value > 0 ? (
+                        <span
+                          key={item.key}
+                          className={item.tone}
+                          style={{ flexBasis: `${item.percent}%` }}
+                          title={`${item.label}: ${item.value} pedidos (${item.percentLabel})`}
+                          aria-label={`${item.label}: ${item.value} pedidos, ${item.percentLabel}`}
+                        />
+                      ) : null
+                    ))}
+                    {deliveryMetricStates.totalPedidos === 0 ? <span className="is-empty" aria-label="Sin pedidos en el periodo" /> : null}
+                  </div>
+                  <div className="delivery-state-legend">
+                    {deliveryMetricStates.deliveryRows.map(item => (
+                      <p key={`legend-${item.key}`} className={item.tone}>
+                        <i aria-hidden="true" />
+                        <span>{item.label}</span>
+                        <strong>{item.percentLabel}</strong>
+                      </p>
+                    ))}
+                  </div>
+                </div>
+                <div className={`delivery-state-operational ${deliveryMetricStates.pedidosPorAtender > 0 ? "has-work" : "is-clear"}`}>
+                  <p>{deliveryMetricStates.pedidosPorAtender > 0
+                    ? `Hay ${deliveryMetricStates.pedidosPorAtender} pedidos por atender entre pendientes y en ruta.`
+                    : "No hay pedidos pendientes por atender."}</p>
+                  {deliveryMetricStates.pedidosPorAtender > 0 ? (
+                    <button type="button" className="btn-outline" onClick={onViewPendingDeliveries} aria-label="Ver pedidos pendientes">
+                      Ver pendientes
+                    </button>
+                  ) : null}
+                </div>
+              </article>
+            </section>
+
+          </section>
         ) : modo === "disponibles" ? (
           <>
             <section className="delivery-summary-grid">
               <article className="order-block delivery-summary-card">
                 <strong>{availableSummary}</strong>
-                <span>{availableCoords ? "Distancias ordenadas por ubicaciÃ³n actual" : "Activa ubicaciÃ³n para calcular distancias"}</span>
+                <span>{availableCoords ? "Distancias ordenadas por ubicación actual" : "Activa ubicación para calcular distancias"}</span>
               </article>
               <article className="order-block delivery-summary-card">
-                <strong>{availableCoords ? "UbicaciÃ³n lista" : "UbicaciÃ³n pendiente"}</strong>
-                <span>{availableCoords ? `${availableCoords.lat.toFixed(4)}, ${availableCoords.lng.toFixed(4)}` : "Se solicitarÃ¡ al tomar o refrescar disponibles"}</span>
+                <strong>{availableCoords ? "Ubicación lista" : "Ubicación pendiente"}</strong>
+                <span>{availableCoords ? `${availableCoords.lat.toFixed(4)}, ${availableCoords.lng.toFixed(4)}` : "Se solicitará al tomar o refrescar disponibles"}</span>
               </article>
             </section>
 
@@ -2181,12 +4178,12 @@ export function DeliveryPage({
                   </div>
                   <p className="delivery-address">{deliveryArrangementName(item) || "Arreglo sin nombre"}</p>
 
-                  <p className="delivery-address">{item.direccion || "Sin direcciÃ³n"}</p>
+                  <p className="delivery-address">{item.direccion || "Sin dirección"}</p>
                   <p className="delivery-meta">
                     {item.barrio || "Barrio sin definir"}
-                    {` Â· ${formatDistanceKm(getDistanceValue(item))}`}
+                    {` · ${formatDistanceKm(getDistanceValue(item))}`}
                     {item.horaEntrega || formatTimeOnly(item.fechaEntregaProgramada)
-                      ? ` Â· ${item.horaEntrega || formatTimeOnly(item.fechaEntregaProgramada)}`
+                      ? ` · ${item.horaEntrega || formatTimeOnly(item.fechaEntregaProgramada)}`
                       : ""}
                   </p>
 
@@ -2224,11 +4221,11 @@ export function DeliveryPage({
                       <span className={`order-badge ${stateBadgeClass(item.estado)}`}>{item.estado || "Asignado"}</span>
                     </div>
                     <p className="delivery-address">{deliveryArrangementName(item) || "Arreglo sin nombre"}</p>
-                    <p className="delivery-address">{item.direccion || "Sin direcciÃ³n"}</p>
+                    <p className="delivery-address">{item.direccion || "Sin dirección"}</p>
                     <p className="delivery-meta">
                       {item.barrio || "Barrio sin definir"}
                       {item.horaEntrega || formatTimeOnly(item.fechaEntregaProgramada)
-                        ? ` Â· ${item.horaEntrega || formatTimeOnly(item.fechaEntregaProgramada)}`
+                        ? ` · ${item.horaEntrega || formatTimeOnly(item.fechaEntregaProgramada)}`
                         : ""}
                     </p>
                     <div className="delivery-courier-actions">
@@ -2258,11 +4255,11 @@ export function DeliveryPage({
                       <span className={`order-badge ${stateBadgeClass(item.estado)}`}>{item.estado || "EnRuta"}</span>
                     </div>
                     <p className="delivery-address">{deliveryArrangementName(item) || "Arreglo sin nombre"}</p>
-                    <p className="delivery-address">{item.direccion || "Sin direcciÃ³n"}</p>
+                    <p className="delivery-address">{item.direccion || "Sin dirección"}</p>
                     <p className="delivery-meta">
                       {item.barrio || "Barrio sin definir"}
                       {item.horaEntrega || formatTimeOnly(item.fechaEntregaProgramada)
-                        ? ` Â· ${item.horaEntrega || formatTimeOnly(item.fechaEntregaProgramada)}`
+                        ? ` · ${item.horaEntrega || formatTimeOnly(item.fechaEntregaProgramada)}`
                         : ""}
                     </p>
                     <div className="delivery-courier-actions">
@@ -2432,13 +4429,129 @@ export function DeliveryPage({
             </article>
           </section>
         )}
+
+        {resolvingNoveltyRow ? (
+          <div className="delivery-modal-backdrop" role="presentation" onMouseDown={onCloseResolveNovelty}>
+            <article className="delivery-novelty-resolve-modal" role="dialog" aria-modal="true" aria-label="Resolver novedad" onMouseDown={event => event.stopPropagation()}>
+              <div className="delivery-novelty-resolve-card">
+                <div className="delivery-novelty-resolve-thumb">
+                  {resolveDeliveryImageUrl(resolvingNoveltyRow.item, catalogProductIndex) || deliveryProductImages[deliveryItemKey(resolvingNoveltyRow.item)] ? (
+                    <img src={resolveDeliveryImageUrl(resolvingNoveltyRow.item, catalogProductIndex) || deliveryProductImages[deliveryItemKey(resolvingNoveltyRow.item)]} alt="" />
+                  ) : (
+                    <Truck size={24} />
+                  )}
+                </div>
+                <div>
+                  <strong>#{resolvingNoveltyRow.orderCode}</strong>
+                  <span>{resolvingNoveltyRow.label}</span>
+                </div>
+                <b>Abierta</b>
+              </div>
+
+              <div className="delivery-novelty-resolve-head">
+                <h4>Que paso despues de la novedad</h4>
+                <button type="button" className="delivery-modal-close" onClick={onCloseResolveNovelty} aria-label="Cerrar modal">
+                  <X size={18} />
+                </button>
+              </div>
+
+              <div className="delivery-novelty-resolution-options" role="radiogroup" aria-label="Resultado de la novedad">
+                {[
+                  {
+                    key: "entregar",
+                    icon: CheckCircle2,
+                    title: "Entregar pedido",
+                    copy: "Cierra la novedad y marca el pedido como entregado.",
+                  },
+                  {
+                    key: "reintentar",
+                    icon: Route,
+                    title: "Reintentar entrega",
+                    copy: "El pedido vuelve a Mis pedidos para continuar la ruta.",
+                  },
+                  {
+                    key: "disponibles",
+                    icon: Truck,
+                    title: "Devolver a disponibles",
+                    copy: "El pedido vuelve a la bolsa de pedidos disponibles.",
+                  },
+                ].map(option => {
+                  const Icon = option.icon;
+                  const active = noveltyResolveForm.accion === option.key;
+                  return (
+                    <button
+                      type="button"
+                      key={option.key}
+                      className={active ? "is-active" : ""}
+                      onClick={() => {
+                        setNoveltyResolveError("");
+                        setNoveltyResolveForm(current => ({ ...current, accion: option.key }));
+                      }}
+                      aria-pressed={active}
+                    >
+                      <Icon size={18} />
+                      <span>
+                        <strong>{option.title}</strong>
+                        <small>{option.copy}</small>
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              <div className="delivery-novelty-resolution-form">
+                <label>
+                  <span>Nombre de quien recibe (opcional)</span>
+                  <input
+                    type="text"
+                    value={noveltyResolveForm.recibidoNombre}
+                    onChange={event => setNoveltyResolveForm(current => ({ ...current, recibidoNombre: event.target.value }))}
+                    placeholder="Nombre del recibido"
+                  />
+                </label>
+                <label>
+                  <span>Documento (opcional)</span>
+                  <input
+                    type="text"
+                    value={noveltyResolveForm.recibidoDocumento}
+                    onChange={event => setNoveltyResolveForm(current => ({ ...current, recibidoDocumento: event.target.value }))}
+                    placeholder="Documento de quien recibe"
+                  />
+                </label>
+                <label>
+                  <span>Observaciones *</span>
+                  <textarea
+                    rows="4"
+                    value={noveltyResolveForm.observacion}
+                    onChange={event => setNoveltyResolveForm(current => ({ ...current, observacion: event.target.value }))}
+                    placeholder="Notas internas"
+                  />
+                </label>
+              </div>
+
+              {noveltyResolveError ? <p className="delivery-novelty-resolve-error">{noveltyResolveError}</p> : null}
+
+              <div className="delivery-novelty-resolve-actions">
+                <button type="button" className="btn-outline" onClick={onCloseResolveNovelty}>Cancelar</button>
+                <button
+                  type="button"
+                  className="btn-primary"
+                  onClick={onSaveResolveNovelty}
+                  disabled={actionKey === `resolver-novedad-${resolvingNoveltyRow.item?.idEntrega || resolvingNoveltyRow.raw?.idEntrega}`}
+                >
+                  {actionKey === `resolver-novedad-${resolvingNoveltyRow.item?.idEntrega || resolvingNoveltyRow.raw?.idEntrega}` ? "Guardando..." : "Guardar resolucion"}
+                </button>
+              </div>
+            </article>
+          </div>
+        ) : null}
       </main>
 
       <aside className={`orders-drawer ${deliveryDrawerOpen ? "open" : ""}`}>
         <div className="orders-drawer-head">
           <strong>Detalle Domicilio</strong>
           <div className="orders-drawer-head-actions">
-            <button type="button" className="icon-btn" onClick={closeDeliveryDetail} title="Cerrar barra lateral">âœ•</button>
+            <button type="button" className="icon-btn" onClick={closeDeliveryDetail} title="Cerrar barra lateral">×</button>
           </div>
         </div>
 
@@ -2450,7 +4563,7 @@ export function DeliveryPage({
               <section className="order-block">
                 <h4>Detalle del pedido</h4>
                 <div className="delivery-detail-list">
-                  <p><span>NÃºmero del pedido</span><strong>{deliveryOrderCodeLabel(selectedDeliveryItem)}</strong></p>
+                  <p><span>Número del pedido</span><strong>{deliveryOrderCodeLabel(selectedDeliveryItem)}</strong></p>
                   <p><span>Arreglo</span><strong>{deliveryArrangementName(selectedDeliveryItem) || "-"}</strong></p>
                   <p><span>Cliente</span><strong>{selectedDeliveryItem.cliente || selectedDeliveryItem.destinatario || "-"}</strong></p>
                   <p><span>Destinatario</span><strong>{selectedDeliveryItem.destinatario || "-"}</strong></p>
@@ -2458,9 +4571,9 @@ export function DeliveryPage({
                   <p><span>Barrio</span><strong>{selectedDeliveryItem.barrio || "-"}</strong></p>
                   <p><span>Fecha entrega</span><strong>{formatDateOnly(selectedDeliveryItem.fechaEntregaProgramada) || "-"}</strong></p>
                   <p><span>Hora entrega</span><strong>{selectedDeliveryItem.horaEntrega || formatTimeOnly(selectedDeliveryItem.fechaEntregaProgramada) || "-"}</strong></p>
-                  <p><span>Estado</span><strong>{selectedDeliveryItem.estado || "-"}</strong></p>
+                  <p><span>Estado</span><strong>{deliveryStatusMeta(selectedDeliveryItem).label || "-"}</strong></p>
                   <p><span>Domiciliario</span><strong>{selectedDeliveryItem.domiciliario || "-"}</strong></p>
-                  <p><span>TelÃ©fono</span><strong>{selectedDeliveryItem.telefonoDestino || "-"}</strong></p>
+                  <p><span>Teléfono</span><strong>{selectedDeliveryItem.telefonoDestino || "-"}</strong></p>
                   <p><span>Mensaje</span><strong>{selectedDeliveryItem.mensaje || "-"}</strong></p>
                   <p><span>Observaciones personalizados</span><strong>{selectedDeliveryItem.observacion || "-"}</strong></p>
                 </div>
@@ -2605,7 +4718,7 @@ export function DeliveryPage({
                           rows="3"
                           value={deliveryForm.noEntregadoMotivo}
                           onChange={event => setDeliveryForm(current => ({ ...current, noEntregadoMotivo: event.target.value }))}
-                          placeholder="Describe por quÃ© no se pudo entregar"
+                          placeholder="Describe por qué no se pudo entregar"
                         />
                       </label>
                       <label className="order-detail-edit-label">
