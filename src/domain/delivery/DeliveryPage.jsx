@@ -271,6 +271,10 @@ function priorityTone(priority) {
   return "is-pendiente";
 }
 
+function compactStatusValue(value) {
+  return normalizeStatus(value).replace(/[^A-Z0-9]+/g, "");
+}
+
 function deliveryRawStatus(item) {
   const code = item?.estadoEntregaCodigo
     || item?.estado_entrega_codigo
@@ -295,7 +299,7 @@ function deliveryRawStatus(item) {
 
 function deliveryStatusMeta(item) {
   const { code, name } = deliveryRawStatus(item);
-  const status = normalizeStatus(code || name).replace(/_/g, "");
+  const status = compactStatusValue(code || name);
   const label = String(name || code || "Pendiente").trim();
 
   if (status === "ENTREGADO") return { key: "entregado", label: label || "Entregado", tone: "done" };
@@ -306,9 +310,15 @@ function deliveryStatusMeta(item) {
   return { key: "pendiente", label: label || "Pendiente", tone: "pending" };
 }
 
+function hasExplicitDeliveryStatus(item) {
+  const { code, name } = deliveryRawStatus(item);
+  const status = compactStatusValue(code || name);
+  return ["ENTREGADO", "ENRUTA", "ENCAMINO", "ASIGNADO", "PARAENTREGA", "NOENTREGADO", "REPROGRAMADO", "CANCELADO", "RECHAZADO"].includes(status);
+}
+
 function isCanceledDeliveryStatus(item) {
   const { code, name } = deliveryRawStatus(item);
-  const status = normalizeStatus(code || name).replace(/_/g, "");
+  const status = compactStatusValue(code || name);
   return status === "CANCELADO" || status === "RECHAZADO";
 }
 
@@ -555,6 +565,7 @@ function deliveryNoveltyStatusMeta(item) {
 }
 
 function isOpenDeliveryNovelty(item) {
+  if (!hasExplicitDeliveryStatus(item)) return true;
   return deliveryStatusMeta(item).key === "no-entregado";
 }
 
@@ -1442,6 +1453,15 @@ export function DeliveryPage({
     });
   }, [api, empresaId, sucursalId, metricsFechaDesde, metricsFechaHasta, metricsDomiciliarioId, metricsGroupBy, modo]);
 
+  const loadNoveltyDeliveries = useCallback(async () => {
+    const data = await api.listarDomiciliosAdmin({
+      empresaId,
+      sucursalId,
+      filtro: "noentregado",
+    });
+    setAdminItems(filterDomicilioItems(normalizeDeliveryItemsPayload(data)).filter(item => !isCanceledDeliveryStatus(item)));
+  }, [api, empresaId, sucursalId]);
+
   const loadAdmin = useCallback(async () => {
     const queryPlan = buildDeliveryAdminQueryPlan({ filtro, statusFilter, fechaFiltro, deliverySearch });
     const baseParams = {
@@ -1594,7 +1614,11 @@ export function DeliveryPage({
     }
     if (modo === "metricas" || modo === "novedades") {
       runLoad(async () => {
-        await Promise.all([loadDomiciliarios(), loadDeliveryMetrics()]);
+        await Promise.all([
+          loadDomiciliarios(),
+          loadDeliveryMetrics(),
+          ...(modo === "novedades" ? [loadNoveltyDeliveries()] : []),
+        ]);
       }).catch(() => {});
       return;
     }
@@ -1603,7 +1627,7 @@ export function DeliveryPage({
       return;
     }
     runLoad(loadMyOrders).catch(() => {});
-  }, [modo, runLoad, loadAdmin, loadBarrios, loadAvailableOrders, loadMyOrders, loadDomiciliarios, loadCourierDirectory, loadDeliveryMetrics, availableCoords]);
+  }, [modo, runLoad, loadAdmin, loadBarrios, loadAvailableOrders, loadMyOrders, loadDomiciliarios, loadCourierDirectory, loadDeliveryMetrics, loadNoveltyDeliveries, availableCoords]);
 
   const withCoords = async actionLabel => {
     if (isOffline) {
@@ -1684,7 +1708,11 @@ export function DeliveryPage({
       if (modo === "admin") {
         await loadAdmin();
       } else if (modo === "metricas" || modo === "novedades") {
-        await Promise.all([loadDomiciliarios(), loadDeliveryMetrics()]);
+        await Promise.all([
+          loadDomiciliarios(),
+          loadDeliveryMetrics(),
+          ...(modo === "novedades" ? [loadNoveltyDeliveries()] : []),
+        ]);
       } else if (modo === "domiciliarios") {
         await loadCourierDirectory();
       } else if (modo === "barrios" || modo === "crear-barrio") {
@@ -2364,7 +2392,8 @@ export function DeliveryPage({
       metricsPayload?.pedidosNovedades,
       metricsPayload?.novedadesPedidos,
       metricsPayload?.novedadesPorPedido,
-    ].find(Array.isArray) || [];
+      adminItems,
+    ].find(source => Array.isArray(source) && source.length > 0) || [];
     const allRows = detailSource
       .map((raw, index) => {
         const label = formatDeliveryNoveltyLabel(
@@ -2519,7 +2548,7 @@ export function DeliveryPage({
         .filter(row => ["cliente-no-responde", "direccion-incorrecta", "rechazo"].includes(row.type?.key))
         .reduce((acc, row) => acc + (row.total || 1), 0),
     };
-  }, [deliveryNoveltyInsights, metricsPayload, noveltySearch, noveltyStatusFilter, noveltyTypeFilter, resolvedNoveltyKeys, resolvedNoveltyObservations]);
+  }, [adminItems, deliveryNoveltyInsights, metricsPayload, noveltySearch, noveltyStatusFilter, noveltyTypeFilter, resolvedNoveltyKeys, resolvedNoveltyObservations]);
   const deliveryMetricStates = useMemo(() => {
     const deliveryRows = [
       { key: "entregados", label: "Entregados", value: metricNumber(deliveryMetrics.resumen.entregados), tone: "is-success", Icon: CheckCircle2 },
