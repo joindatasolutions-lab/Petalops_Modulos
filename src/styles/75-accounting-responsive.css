@@ -195,6 +195,47 @@
   text-overflow: ellipsis !important;
 }
 
+.accounting-page-view .accounting-line-chart {
+  display: block !important;
+  min-height: 276px !important;
+  padding: 14px 12px 8px !important;
+  border: 1px solid #edf1f6 !important;
+  border-radius: 10px !important;
+  background:
+    linear-gradient(#eef2f7 1px, transparent 1px) 0 18px / 100% 42px,
+    linear-gradient(180deg, #ffffff 0%, #fbfcfe 100%) !important;
+  overflow: hidden !important;
+}
+
+.accounting-page-view .accounting-sales-tooltip {
+  display: grid !important;
+  gap: 3px !important;
+  min-width: 132px !important;
+  padding: 10px 11px !important;
+  border: 1px solid #f3c5d7 !important;
+  border-radius: 9px !important;
+  background: #ffffff !important;
+  box-shadow: 0 16px 38px rgba(15, 23, 42, 0.14) !important;
+}
+
+.accounting-page-view .accounting-sales-tooltip strong {
+  color: #111827 !important;
+  font-size: 12px !important;
+  font-weight: 950 !important;
+}
+
+.accounting-page-view .accounting-sales-tooltip span {
+  color: #d9367a !important;
+  font-size: 15px !important;
+  font-weight: 950 !important;
+}
+
+.accounting-page-view .accounting-sales-tooltip small {
+  color: #64748b !important;
+  font-size: 11px !important;
+  font-weight: 800 !important;
+}
+
 @media (max-width: 1280px) {
   .accounting-page-view .orders-page-header.accounting-page-header {
     grid-template-columns: minmax(0, 1fr) !important;
