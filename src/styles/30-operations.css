@@ -2733,7 +2733,7 @@
 .orders-drawer-backdrop {
   position: fixed;
   inset: 0;
-  z-index: 45;
+  z-index: 10070;
   background: rgba(17, 24, 39, 0.42);
   opacity: 0;
   pointer-events: none;
@@ -2747,7 +2747,7 @@
 }
 
 .orders-drawer {
-  z-index: 50;
+  z-index: 10090;
 }
 
 /* Orders filters and responsive stability */
@@ -3360,7 +3360,6 @@
   background: var(--orders-primary-soft);
 }
 
-.orders-store-submenu,
 .orders-alert-card,
 .orders-message {
   margin-bottom: 8px;

@@ -1123,6 +1123,7 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
   const [openOrderActionsId, setOpenOrderActionsId] = useState(null);
   const [catalogProducts, setCatalogProducts] = useState([]);
   const [orderNotification, setOrderNotification] = useState(null);
+  const [mobileHeaderScrolled, setMobileHeaderScrolled] = useState(false);
   const [newOrderOpen, setNewOrderOpen] = useState(false);
   const [newOrderForm, setNewOrderForm] = useState(DEFAULT_NEW_ORDER_FORM);
   const [newOrderProductQuery, setNewOrderProductQuery] = useState("");
@@ -1787,6 +1788,12 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
   }, [detailEditBarrios, newOrderOpen]);
 
   useEffect(() => {
+    const hasOverlay = drawerOpen || newOrderOpen || messageCardOpen || Boolean(orderNotification);
+    document.body.classList.toggle("orders-mobile-overlay-open", hasOverlay);
+    return () => document.body.classList.remove("orders-mobile-overlay-open");
+  }, [drawerOpen, messageCardOpen, newOrderOpen, orderNotification]);
+
+  useEffect(() => {
     if (!isEditingDetail) return;
     // Carga el catálogo completo al abrir modo edición.
     let disposed = false;
@@ -1814,12 +1821,35 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
     Promise.resolve(loadBarrioOptions(query)).catch(() => {});
   }, [detailEditBarrioQuery, isEditingDetail, loadBarrioOptions]);
 
+  useEffect(() => {
+    const onScroll = () => {
+      const scrollTop = window.scrollY || document.documentElement.scrollTop || document.body.scrollTop || 0;
+      setMobileHeaderScrolled(scrollTop > 10);
+    };
+
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+
   const applyFilterValue = (name, value) => {
     setFilters(current => {
       if (current[name] === value && Number(current.page || 1) === 1) return current;
       return {
         ...current,
         [name]: value,
+        page: 1
+      };
+    });
+  };
+
+  const applySingleDateFilter = value => {
+    setFilters(current => {
+      if (current.fechaDesde === value && current.fechaHasta === value && Number(current.page || 1) === 1) return current;
+      return {
+        ...current,
+        fechaDesde: value,
+        fechaHasta: value,
         page: 1
       };
     });
@@ -2043,6 +2073,7 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
   };
 
   const closeDrawer = () => {
+    setOpenOrderActionsId(null);
     setDrawerOpen(false);
     setSelectedPedidoId(null);
     setIsDuplicatingDetail(false);
@@ -2607,7 +2638,15 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
   };
 
   const toggleStoreDeliveries = () => {
-    applyFilterValue("soloTienda", !filters.soloTienda);
+    const nextSoloTienda = !filters.soloTienda;
+    applyFilterValue("soloTienda", nextSoloTienda);
+    setOrderNotification({
+      tone: nextSoloTienda ? "success" : "info",
+      title: nextSoloTienda ? "Entregas en tienda" : "Todos los pedidos",
+      message: nextSoloTienda
+        ? "Mostrando pedidos marcados como recoger en tienda."
+        : "Mostrando todos los pedidos con los filtros actuales.",
+    });
   };
 
   const applyDatePreset = preset => {
@@ -2747,9 +2786,10 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
       };
     });
   }, [ordersMetrics, yesterdayMetrics]);
+  const ordersOverlayOpen = drawerOpen || newOrderOpen || messageCardOpen || Boolean(orderNotification);
   return (
     <>
-      <div className={`app-shell ${sidebarPinned ? "is-sidebar-pinned" : ""} ${sidebarMobileOpen ? "is-sidebar-mobile-open" : ""}`}>
+      <div className={`app-shell ${sidebarPinned ? "is-sidebar-pinned" : ""} ${sidebarMobileOpen ? "is-sidebar-mobile-open" : ""} ${drawerOpen ? "is-orders-drawer-open" : ""} ${ordersOverlayOpen ? "is-orders-overlay-open" : ""} ${mobileHeaderScrolled ? "is-mobile-header-scrolled" : ""}`}>
         <AppSidebar
           activeKey="pedidos"
           sidebarPinned={sidebarPinned}
@@ -2918,27 +2958,28 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
                 <input type="date" value={filters.fechaHasta} onChange={event => applyFilterValue("fechaHasta", event.target.value)} />
               </label>
 
+              <div className="orders-mobile-date-actions">
+                <label className="orders-mobile-date-filter">
+                  <CalendarDays size={16} strokeWidth={2} aria-hidden="true" />
+                  <input
+                    type="date"
+                    value={filters.fechaDesde || filters.fechaHasta}
+                    onChange={event => applySingleDateFilter(event.target.value)}
+                  />
+                </label>
+
+                <button type="button" className="orders-mobile-clear-filter" onClick={clearOrderFilters}>
+                  <RotateCw size={15} strokeWidth={2} aria-hidden="true" />
+                  <span>Limpiar</span>
+                </button>
+              </div>
+
               <button type="button" className="orders-filter-link" onClick={clearOrderFilters}>
                 <RotateCw size={15} strokeWidth={2} aria-hidden="true" />
                 <span>Limpiar filtros</span>
               </button>
             </div>
           </section>
-
-          {filters.soloTienda ? (
-            <section className="orders-store-submenu" aria-live="polite">
-              <div className="orders-store-submenu-icon">
-                <Gift size={18} strokeWidth={2} />
-              </div>
-              <div className="orders-store-submenu-copy">
-                <strong>Entregas en tienda</strong>
-                <span>{total} arreglo{total === 1 ? "" : "s"} marcado{total === 1 ? "" : "s"} como recoger en tienda con los filtros actuales.</span>
-              </div>
-              <button type="button" className="btn-outline orders-store-submenu-clear" onClick={toggleStoreDeliveries}>
-                Ver todos
-              </button>
-            </section>
-          ) : null}
 
           {error && <p className="orders-message">{error}</p>}
           {loading && (
@@ -3503,7 +3544,7 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
         </div>
       ) : null}
 
-      <div className={`orders-drawer-backdrop${drawerOpen ? " open" : ""}`} aria-hidden="true" />
+      <div className={`orders-drawer-backdrop${drawerOpen ? " open" : ""}`} aria-hidden="true" onClick={closeDrawer} />
 
       <aside className={`orders-drawer ${drawerOpen ? "open" : ""}`}>
         <div className="orders-drawer-head orders-detail-premium-head">
