@@ -4,7 +4,7 @@ import { tenantConfig } from "../../config/tenantConfig.js";
 import { createApiClient } from "../../infrastructure/apiClient.js";
 import { AppSidebar } from "../../shared/AppSidebar.jsx";
 import { useSidebarState } from "../../shared/useSidebarState.js";
-import { formatDateOnly, formatTimeOnly, normalizeStatus } from "../../shared/utils.js";
+import { COLOMBIA_TIME_ZONE, formatDateOnly, formatTimeOnly, normalizeStatus } from "../../shared/utils.js";
 import {
   AlertTriangle,
   CheckCircle2,
@@ -53,10 +53,10 @@ export function buildDeliveryAdminQueryPlan({ filtro = "hoy", statusFilter = "to
   const backendStatusFilter = DELIVERY_STATUS_BACKEND_FILTER[statusFilter] || null;
   const filtroConsulta = backendStatusFilter || filtro;
   const searchTerm = String(deliverySearch || "").trim();
-  const searchByOrderNumber = /\d/.test(searchTerm);
+  const searchByOrderNumber = /^#?\d{1,10}$/.test(searchTerm);
   return {
     fecha: searchByOrderNumber ? null : fechaFiltro,
-    q: searchTerm,
+    q: searchByOrderNumber ? searchTerm : "",
     filtersToFetch: searchByOrderNumber && statusFilter === "todos"
       ? DELIVERY_SEARCH_BACKEND_FILTERS
       : [filtroConsulta],
@@ -335,6 +335,9 @@ function isDeliveryAllowedPedidoStatus(item) {
 }
 
 function isDeliveryTimeLate(item) {
+  if (deliveryStatusMeta(item).key === "entregado") return false;
+  const scheduledTime = deliveryScheduledBogotaTime(item);
+  if (scheduledTime != null) return scheduledTime < currentBogotaTime();
   const remaining = Number(item?.tiempoRestanteHoras);
   return Number.isFinite(remaining) && remaining < 0;
 }
@@ -362,16 +365,95 @@ function deliveryPaymentMeta(item) {
   return { label: raw || "Sin dato", tone: "neutral" };
 }
 
+function normalizeDeliveryClock(value) {
+  const text = String(value || "").trim();
+  if (!text || text === "-") return "";
+  const match = text.match(/(\d{1,2})(?::(\d{2}))?\s*(a\.?m\.?|p\.?m\.?)?/i);
+  if (!match) return "";
+  let hours = Number(match[1]);
+  const minutes = Number(match[2] || 0);
+  const meridiem = String(match[3] || "").toLowerCase();
+  if (!Number.isFinite(hours) || !Number.isFinite(minutes) || hours > 23 || minutes > 59) return "";
+  if (meridiem.startsWith("p") && hours < 12) hours += 12;
+  if (meridiem.startsWith("a") && hours === 12) hours = 0;
+  return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
+}
+
+function bogotaDateParts(date = new Date()) {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: COLOMBIA_TIME_ZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  }).formatToParts(date);
+  const value = key => Number(parts.find(part => part.type === key)?.value || 0);
+  return {
+    year: value("year"),
+    month: value("month"),
+    day: value("day"),
+    hour: value("hour"),
+    minute: value("minute"),
+    second: value("second"),
+  };
+}
+
+function currentBogotaTime() {
+  const parts = bogotaDateParts();
+  return Date.UTC(parts.year, parts.month - 1, parts.day, parts.hour, parts.minute, parts.second);
+}
+
+function deliveryScheduledBogotaTime(item) {
+  const rawDate = item?.fechaEntrega
+    || item?.fecha_entrega
+    || item?.fechaEntregaProgramada
+    || item?.fecha_entrega_programada
+    || item?.fechaProgramada
+    || item?.fecha_programada;
+  const date = formatDateOnly(rawDate);
+  if (!date) return null;
+
+  const rawTime = item?.horaEntrega
+    || item?.hora_entrega
+    || item?.hora
+    || formatTimeOnly(item?.fechaEntregaProgramada)
+    || formatTimeOnly(rawDate);
+  const time = normalizeDeliveryClock(rawTime) || "23:59";
+  const dateParts = date.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  const timeParts = time.match(/^(\d{2}):(\d{2})$/);
+  if (!dateParts || !timeParts) return null;
+  return Date.UTC(
+    Number(dateParts[1]),
+    Number(dateParts[2]) - 1,
+    Number(dateParts[3]),
+    Number(timeParts[1]),
+    Number(timeParts[2]),
+    0
+  );
+}
+
+function formatDeliveryDuration(totalMinutes) {
+  const minutes = Math.abs(Math.round(totalMinutes));
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  return h > 0 ? `${h} h${m > 0 ? ` ${m} m` : ""}` : `${m} m`;
+}
+
 function deliveryRemainingLabel(item) {
+  if (deliveryStatusMeta(item).key === "entregado") return "Entregado";
+  const scheduledTime = deliveryScheduledBogotaTime(item);
+  if (scheduledTime != null) {
+    const diffMinutes = (scheduledTime - currentBogotaTime()) / 60000;
+    const value = formatDeliveryDuration(diffMinutes);
+    return diffMinutes < 0 ? `Retraso ${value}` : "";
+  }
   const hours = Number(item?.tiempoRestanteHoras);
   if (!Number.isFinite(hours)) return "Sin ETA";
-  const totalMinutes = Math.abs(Math.round(hours * 60));
-  const h = Math.floor(totalMinutes / 60);
-  const m = totalMinutes % 60;
-  const value = h > 0
-    ? `${h} h${m > 0 ? ` ${m} m` : ""}`
-    : `${m} m`;
-  return hours < 0 ? `Retraso ${value}` : `${value} restantes`;
+  const value = formatDeliveryDuration(hours * 60);
+  return hours < 0 ? `Retraso ${value}` : "";
 }
 
 function formatMetricPercent(value, total) {
@@ -922,14 +1004,28 @@ function deliverySearchValues(item) {
     item?.nombreDestinatario,
     item?.nombre_destinatario,
     item?.recibe,
+    item?.cliente?.nombre,
+    item?.cliente?.nombreCompleto,
+    item?.cliente?.telefono,
+    item?.cliente?.telefonoCompleto,
+    item?.destinatario?.nombre,
+    item?.destinatario?.telefono,
     item?.direccion,
     item?.direccionDestino,
     item?.direccion_destino,
     item?.direccionEntrega,
     item?.direccion_entrega,
+    item?.destinatario?.direccion,
+    item?.destinatario?.direccionDestino,
+    item?.entrega?.direccion,
+    item?.entrega?.direccionDestino,
     address.primary,
     address.secondary,
     item?.barrio,
+    item?.barrioNombre,
+    item?.barrio_nombre,
+    item?.destinatario?.barrio,
+    item?.entrega?.barrio,
     item?.zona,
     item?.ciudad,
     item?.municipio,
@@ -939,6 +1035,25 @@ function deliverySearchValues(item) {
     item?.telefonoCliente,
     item?.telefono_cliente,
     item?.celular,
+    item?.domiciliario,
+    item?.nombreDomiciliario,
+    item?.nombre_domiciliario,
+    item?.repartidor,
+    item?.mensajero,
+    item?.courierName,
+    item?.courier?.nombre,
+    item?.domiciliarioInfo?.nombre,
+    item?.estado,
+    item?.estadoEntrega,
+    item?.estado_entrega,
+    item?.estadoEntregaNombre,
+    item?.estado_entrega_nombre,
+    deliveryStatusMeta(item).label,
+    deliveryStatusMeta(item).key,
+    item?.prioridad,
+    item?.metodoPago,
+    item?.metodo_pago,
+    item?.estadoPago,
     item?.mensaje,
     item?.observacion,
     item?.notas,
@@ -1042,6 +1157,16 @@ function deliveryDateTimeLabel(item) {
   const date = deliveryDateLabel(item);
   const time = deliveryTimeLabel(item);
   return [date, time && time !== "-" ? time : ""].filter(Boolean).join(" · ") || "-";
+}
+
+function deliverySearchIgnoresDate(deliverySearch) {
+  return /^#?\d{1,10}$/.test(String(deliverySearch || "").trim());
+}
+
+function deliveryMatchesSelectedDate(item, fechaFiltro, deliverySearch) {
+  if (!fechaFiltro || deliverySearchIgnoresDate(deliverySearch)) return true;
+  const date = deliveryDateLabel(item);
+  return !date || date === fechaFiltro;
 }
 
 function courierName(item) {
@@ -2223,13 +2348,20 @@ export function DeliveryPage({
     return visibleAdminItems;
   }, [modo, availableItems, myOrdersItems, visibleAdminItems]);
 
+  const dispatchFilteredBaseItems = useMemo(() => (
+    dispatchItems.filter(item => (
+      deliveryMatchesSelectedDate(item, fechaFiltro, deliverySearch)
+      && deliveryMatchesSearch(item, deliverySearch)
+    ))
+  ), [deliverySearch, dispatchItems, fechaFiltro]);
+
   const filteredDispatchItems = useMemo(() => {
     const byStatus = statusFilter === "todos"
-      ? dispatchItems
-      : dispatchItems.filter(item => deliveryStatusMeta(item).key === statusFilter);
+      ? dispatchFilteredBaseItems
+      : dispatchFilteredBaseItems.filter(item => deliveryStatusMeta(item).key === statusFilter);
 
-    return byStatus.filter(item => deliveryMatchesSearch(item, deliverySearch));
-  }, [deliverySearch, dispatchItems, statusFilter]);
+    return byStatus;
+  }, [dispatchFilteredBaseItems, statusFilter]);
 
   useEffect(() => {
     const missingItems = filteredDispatchItems
@@ -2284,12 +2416,12 @@ export function DeliveryPage({
   const courierDirectoryRows = courierDirectoryItems;
   const dispatchKpis = useMemo(() => {
     const base = { pendiente: 0, asignado: 0, "en-camino": 0, entregado: 0, "no-entregado": 0, reprogramado: 0 };
-    dispatchItems.forEach(item => {
+    dispatchFilteredBaseItems.forEach(item => {
       const key = deliveryStatusMeta(item).key;
       base[key] = (base[key] || 0) + 1;
     });
     return base;
-  }, [dispatchItems]);
+  }, [dispatchFilteredBaseItems]);
   const deliveryMetrics = useMemo(() => {
     const resumen = {
       ...DEFAULT_DELIVERY_METRICS_SUMMARY,
@@ -2942,7 +3074,7 @@ export function DeliveryPage({
                     aria-pressed={statusFilter === item.key}
                   >
                     <span className="orders-header-metric-icon" aria-hidden="true"><Icon size={18} strokeWidth={2} /></span>
-                    <strong>{item.key === "todos" ? dispatchItems.length : (dispatchKpis[item.key] || 0)}</strong>
+                    <strong>{item.key === "todos" ? dispatchFilteredBaseItems.length : (dispatchKpis[item.key] || 0)}</strong>
                     <span>{item.label}</span>
                   </button>
                 );
@@ -3017,8 +3149,12 @@ export function DeliveryPage({
                         <div className="delivery-card-section delivery-card-state">
                           <span>Estado</span>
                           <span className={`delivery-status-pill is-${meta.tone}`}>{meta.label}</span>
-                          <p>Tiempo restante</p>
-                          <strong className={`delivery-time-left ${timeLate ? "is-late" : ""}`}>{deliveryRemainingLabel(item)}</strong>
+                          {timeLate ? (
+                            <>
+                              <p>Retraso</p>
+                              <strong className="delivery-time-left is-late">{deliveryRemainingLabel(item)}</strong>
+                            </>
+                          ) : null}
                         </div>
 
                         <div className="delivery-card-actions" onClick={event => event.stopPropagation()}>
@@ -3064,14 +3200,14 @@ export function DeliveryPage({
                             </button>
                             {openDeliveryActionsKey === itemKey ? (
                               <div className="orders-row-menu-panel delivery-actions-menu-panel">
-                                <button type="button" className="orders-row-menu-item" onClick={() => { setOpenDeliveryActionsKey(""); openMaps(item); }}>
-                                  <Route size={15} /> Abrir ruta
+                                <button type="button" className="orders-row-menu-item" onClick={() => { setOpenDeliveryActionsKey(""); handleModeChange("metricas"); }}>
+                                  <Route size={15} /> Ir a metricas
                                 </button>
-                                <button type="button" className="orders-row-menu-item" onClick={() => { setOpenDeliveryActionsKey(""); openWhatsApp(item); }}>
-                                  <MessageCircle size={15} /> WhatsApp cliente
+                                <button type="button" className="orders-row-menu-item" onClick={() => { setOpenDeliveryActionsKey(""); handleModeChange("domiciliarios"); }}>
+                                  <UserRound size={15} /> Ir a domiciliarios
                                 </button>
-                                <button type="button" className="orders-row-menu-item" onClick={() => { setOpenDeliveryActionsKey(""); openDeliveryDetail(item); }}>
-                                  <MoreVertical size={15} /> Ver detalle
+                                <button type="button" className="orders-row-menu-item" onClick={() => { setOpenDeliveryActionsKey(""); handleModeChange("novedades"); }}>
+                                  <MessageCircle size={15} /> Ir a novedades
                                 </button>
                               </div>
                             ) : null}
@@ -3543,7 +3679,7 @@ export function DeliveryPage({
                       </select>
                     </td>
                     <td data-label="Estado"><span className={`order-badge ${stateBadgeClass(item.estado)}`}>{item.estado}</span></td>
-                    <td data-label="Tiempo restante">{typeof item.tiempoRestanteHoras === "number" ? `${item.tiempoRestanteHoras} h` : "-"}</td>
+                    <td data-label="Tiempo restante">{isDeliveryTimeLate(item) ? deliveryRemainingLabel(item) : "-"}</td>
                     <td data-label="Prioridad"><span className={`order-badge ${priorityTone(item.prioridad)}`}>{item.prioridad || "MEDIA"}</span></td>
                     <td data-label="Acciones">
                       <div className="order-actions">
