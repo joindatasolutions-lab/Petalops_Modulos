@@ -2996,12 +2996,14 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
               </span>
             </div>
           )}
-          {!loading && !error && items.length === 0 && (
-            <p className="orders-message">No hay pedidos para los filtros seleccionados.</p>
-          )}
-
           <section className="orders-page-section">
             <h2 className="orders-section-title">Listado de pedidos</h2>
+            {!loading && !error && items.length === 0 ? (
+              <div className="orders-empty-state" role="status" aria-live="polite">
+                <strong>No hay pedidos</strong>
+                <span>Ajusta los filtros o limpia la busqueda para ver otros resultados.</span>
+              </div>
+            ) : (
             <div className="orders-table-wrap orders-page-table-wrap">
               <table className="orders-table orders-list-table">
                 <colgroup>
@@ -3257,8 +3259,10 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
                 </tbody>
               </table>
             </div>
+            )}
           </section>
 
+          {total > 0 && (
           <footer className="records-pager orders-records-pager" aria-label="Paginación de pedidos">
             <p>Mostrando {visibleFrom} a {visibleTo} de {total} pedidos</p>
             <nav className="records-pager-pages" aria-label="Páginas de pedidos">
@@ -3310,6 +3314,7 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
               <span>por página</span>
             </label>
           </footer>
+          )}
         </main>
       </div>
 
