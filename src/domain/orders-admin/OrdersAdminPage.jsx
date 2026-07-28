@@ -6,6 +6,7 @@ import { AppSidebar } from "../../shared/AppSidebar.jsx";
 import { useSidebarState } from "../../shared/useSidebarState.js";
 import { formatearCOP, normalizeStatus, shiftIsoDate, splitDateTimeParts, todayIsoDateBogota } from "../../shared/utils.js";
 import { useDebouncedValue } from "../../shared/useDebouncedValue.js";
+import { useOrderInvoices } from "./hooks/useOrderInvoices.js";
 import {
   IconCheck,
   IconFileText,
@@ -992,6 +993,10 @@ const DEFAULT_NEW_ORDER_FORM = {
   canalFlora: "",
 };
 
+function resolveCatalogTenantSlug(session) {
+  return String(session?.empresaSlug || "").trim();
+}
+
 function normalizeOrdersKpis(value, fallbackFacturasPendientesImpresion = 0) {
   const source = value && typeof value === "object" ? value : {};
   return {
@@ -1049,12 +1054,27 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
   const [ordersKpis, setOrdersKpis] = useState(DEFAULT_ORDERS_KPIS);
   const [metricItems, setMetricItems] = useState([]);
   const [metricFacturasPendientesImpresion, setMetricFacturasPendientesImpresion] = useState(0);
+  const [localPendingInvoiceIds, setLocalPendingInvoiceIds] = useState(() => new Set());
   const [yesterdayMetrics, setYesterdayMetrics] = useState(() => buildOrdersMetrics([], 0, shiftIsoDate(todayIsoDate(), -1)));
   const [todaySalesTotal, setTodaySalesTotal] = useState(0);
   const [filters, setFilters] = useState(initialFilters);
   const [selectedPedidoId, setSelectedPedidoId] = useState(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [detalle, setDetalle] = useState(null);
+  const { isInvoicePendingForOrder, markInvoiceGenerated, markInvoiceDownloaded } = useOrderInvoices({
+    items,
+    detalle,
+    selectedPedidoId,
+    setItems,
+    setDetalle,
+    setFacturasPendientesImpresion,
+    setMetricFacturasPendientesImpresion,
+    setOrdersKpis,
+    setLocalPendingInvoiceIds,
+    resolveOrderId,
+    shouldShowPendingInvoiceAlert,
+    canInvoiceStatus,
+  });
   const [messageCardOpen, setMessageCardOpen] = useState(false);
   const [messageCardData, setMessageCardData] = useState(null);
   const [messageCardOrder, setMessageCardOrder] = useState(null);
@@ -1141,14 +1161,22 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
   const visibleOrdersLoadingRequest = useRef(0);
   const loadOrdersRef = useRef(null);
   const loadTodaySalesSummaryRef = useRef(null);
+  const lastDatedOrdersSnapshot = useRef({ key: "", items: [] });
   const ordersFilterCache = useMemo(() => new Map(), []);
   const debouncedQuery = useDebouncedValue(filters.q, 300);
   const empresaId = Number(session?.empresaID || tenantConfig.empresaId);
   const sucursalId = Number(session?.sucursalID || tenantConfig.sucursalId);
+  const catalogTenantSlug = resolveCatalogTenantSlug(session);
+  const catalogUrl = useMemo(() => {
+    return catalogTenantSlug
+      ? `https://catalogo-web.joindata.com.co/catalogo/${encodeURIComponent(catalogTenantSlug)}`
+      : "";
+  }, [catalogTenantSlug]);
   const displayUserName = useMemo(
     () => String(session?.nombre || session?.login || "Usuario").trim() || "Usuario",
     [session]
   );
+
   const pedidoMenuFields = useMemo(
     () => (Array.isArray(detalle?.camposEmpresa?.pedidoDetalle) ? detalle.camposEmpresa.pedidoDetalle : []),
     [detalle]
@@ -1405,10 +1433,10 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
     const cached = !silent ? ordersFilterCache.get(cacheKey) : null;
 
     if (cached) {
-      const cachedItems = requestFilters.soloTienda
+      const cachedItems = requestFilters.sinImprimir || requestFilters.soloTienda
         ? cached.items
         : filterOrdersByCreatedDateRange(cached.items, requestFechaDesde, requestFechaHasta);
-      const cachedMetricItems = requestFilters.soloTienda
+      const cachedMetricItems = requestFilters.sinImprimir || requestFilters.soloTienda
         ? cached.metricItems
         : filterOrdersByCreatedDateRange(cached.metricItems, requestFechaDesde, requestFechaHasta);
       const cachedHadOutOfRangeItems = cachedItems.length !== (Array.isArray(cached.items) ? cached.items.length : 0);
@@ -1449,19 +1477,43 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
       if (silent && (requestId !== ordersRequestTracker.current || visibleOrdersLoadingRequest.current)) return;
 
       const loadedItems = extractOrdersPayloadItems(data);
-      const dateItems = requestFilters.soloTienda
-        ? loadedItems
-        : filterOrdersByCreatedDateRange(loadedItems, requestFechaDesde, requestFechaHasta);
+      const dateRangeKey = `${requestFechaDesde || ""}|${requestFechaHasta || ""}`;
+      const fallbackPendingItems = requestFilters.sinImprimir && loadedItems.length === 0 && lastDatedOrdersSnapshot.current.key === dateRangeKey
+        ? lastDatedOrdersSnapshot.current.items.filter(shouldShowPendingInvoiceAlert)
+        : [];
+      const sourceItems = fallbackPendingItems.length > 0 ? fallbackPendingItems : loadedItems;
+      const dateItems = requestFilters.sinImprimir || requestFilters.soloTienda
+        ? sourceItems
+        : filterOrdersByCreatedDateRange(sourceItems, requestFechaDesde, requestFechaHasta);
       const storeItems = dateItems;
       const statusItems = filterOrdersByStatus(storeItems, requestFilters.estado);
       const paymentItems = filterOrdersByPaymentMethod(statusItems, requestFilters.metodoPago);
-      const visibleItems = filterOrdersBySearch(paymentItems, requestFilters.q, requestFilters.empresaId);
+      const searchedItems = filterOrdersBySearch(paymentItems, requestFilters.q, requestFilters.empresaId);
+      const visibleItems = searchedItems.map(item => {
+        const pedidoId = Number(resolveOrderId(item));
+        if (!localPendingInvoiceIds.has(pedidoId)) return item;
+        const financiero = item.financiero && typeof item.financiero === "object"
+          ? { ...item.financiero, facturaImpresa: false }
+          : item.financiero;
+        return { ...item, facturaImpresa: false, ...(financiero ? { financiero } : {}) };
+      });
       const backendReturnedOutOfRangeItems = dateItems.length !== loadedItems.length;
       const nextTotal = requestFilters.estado || backendReturnedOutOfRangeItems
         ? visibleItems.length
         : resolveOrdersPayloadTotal(data, visibleItems);
       const nextFacturasPendientesImpresion = Number(data.facturasPendientesImpresion || 0);
-      const nextKpis = normalizeOrdersKpis(data?.kpis, nextFacturasPendientesImpresion);
+      const visiblePendingInvoices = visibleItems.filter(shouldShowPendingInvoiceAlert).length;
+      const normalizedKpis = normalizeOrdersKpis(data?.kpis, nextFacturasPendientesImpresion);
+      const nextKpis = {
+        ...normalizedKpis,
+        sinImprimir: Math.max(Number(normalizedKpis.sinImprimir || 0), visiblePendingInvoices),
+      };
+      if (!requestFilters.sinImprimir) {
+        lastDatedOrdersSnapshot.current = {
+          key: dateRangeKey,
+          items: visibleItems,
+        };
+      }
       const nextCacheValue = {
         items: visibleItems,
         total: nextTotal,
@@ -1500,7 +1552,7 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
         setLoading(false);
       }
     }
-  }, [api, debouncedQuery, filters.estado, filters.sinImprimir, filters.soloTienda, filters.metodoPago, filters.fechaDesde, filters.fechaHasta, filters.page, filters.pageSize, empresaId, ordersFilterCache, ordersRequestTracker, sucursalId]);
+  }, [api, debouncedQuery, filters.estado, filters.sinImprimir, filters.soloTienda, filters.metodoPago, filters.fechaDesde, filters.fechaHasta, filters.page, filters.pageSize, empresaId, localPendingInvoiceIds, ordersFilterCache, ordersRequestTracker, sucursalId]);
 
   const loadYesterdayMetrics = useCallback(async () => {
     setYesterdayMetrics(buildOrdersMetrics([], 0, shiftIsoDate(todayIsoDate(), -1)));
@@ -1894,6 +1946,8 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
 
     setApprovingPedidoIds(current => [...current, Number(pedidoId)]);
     try {
+      const wasPendingInvoice = isInvoicePendingForOrder(pedidoId);
+      const pendingInvoicesBeforeApproval = Number(ordersKpis.sinImprimir || 0);
       const response = await api.aprobarPedido(pedidoId);
       const floristaAsignado = resolveFloristaName(response);
       optimisticStatusPatch(
@@ -1907,7 +1961,10 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
       const refreshedItem = (Array.isArray(refreshed?.items) ? refreshed.items : [])
         .find(current => Number(resolveOrderId(current)) === Number(pedidoId));
       const assignedOrderNumber = resolveAssignedOrderNumber(response, response?.pedido, response?.data, refreshedItem);
-      await downloadInvoice(pedidoId, { refreshAfter: false });
+      const refreshedPendingInvoices = Number(refreshed?.kpis?.sinImprimir || 0);
+      if (!wasPendingInvoice && refreshedPendingInvoices <= pendingInvoicesBeforeApproval) {
+        markInvoiceGenerated(pedidoId, { wasPendingInvoice });
+      }
       setOrderNotification({
         tone: "success",
         title: "Pedido aprobado",
@@ -1986,6 +2043,7 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
     }
 
     try {
+      const wasPendingInvoice = isInvoicePendingForOrder(pedidoId);
       const { blob, filename } = await api.descargarFacturaPedido(pedidoId);
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
@@ -1995,6 +2053,7 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
       link.click();
       link.remove();
       URL.revokeObjectURL(url);
+      markInvoiceDownloaded(pedidoId, { wasPendingInvoice });
       if (refreshAfter) {
         await loadOrders(true);
       }
@@ -2705,7 +2764,7 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
         return { ...base, estado: "CANCELADO" };
       }
       if (metric === "facturas") {
-        return { ...base, estado: "APROBADO", sinImprimir: true };
+        return { ...base, estado: "", sinImprimir: true };
       }
       return base;
     });
@@ -2887,6 +2946,23 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
                   <RotateCw size={18} strokeWidth={2} />
                   <span>Actualizar</span>
                 </button>
+                <a
+                  className={`btn-primary orders-header-refresh${catalogUrl ? "" : " is-disabled"}`}
+                  href={catalogUrl || undefined}
+                  target="_blank"
+                  rel="noreferrer"
+                  aria-disabled={!catalogUrl}
+                  title={catalogUrl ? "Abrir catalogo" : "Catalogo no disponible: falta el slug de la empresa"}
+                  onClick={event => {
+                    if (!catalogUrl) {
+                      event.preventDefault();
+                      globalThis.alert("No fue posible abrir el catalogo: falta el slug de la empresa.");
+                    }
+                  }}
+                >
+                  <IconFileText size={18} stroke={2.1} />
+                  <span>Catalogo</span>
+                </a>
                 <button type="button" className="btn-primary orders-new-order-btn" onClick={openNewOrderModal} title="Nuevo pedido">
                   <Plus size={18} strokeWidth={2.2} />
                   <span>Nuevo pedido</span>
@@ -3147,7 +3223,7 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
                                   {canDownloadInvoice && (
                                     <button type="button" role="menuitem" className="is-invoice" onClick={() => { setOpenOrderActionsId(null); downloadInvoice(pedidoId); }}>
                                       <Receipt size={14} strokeWidth={2} />
-                                      <span>Generar factura</span>
+                                      <span>Descargar factura</span>
                                     </button>
                                   )}
                                   {canViewMessageCard && (
@@ -3239,7 +3315,7 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
                                 {canDownloadInvoice && (
                                   <button type="button" role="menuitem" className="is-invoice" onClick={() => { setOpenOrderActionsId(null); downloadInvoice(pedidoId); }}>
                                     <Receipt size={14} strokeWidth={2} />
-                                    <span>Generar factura</span>
+                                    <span>Descargar factura</span>
                                   </button>
                                 )}
                                 {canViewMessageCard && (
