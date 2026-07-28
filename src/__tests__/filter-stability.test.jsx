@@ -5,6 +5,8 @@ import { buildDeliveryAdminQueryPlan, deliveryMatchesSearch } from "../domain/de
 import { filterInventoryItems } from "../domain/inventory/InventoryPage.jsx";
 import { filterNeighborhoodItems, sortNeighborhoods } from "../domain/neighborhoods/NeighborhoodsPage.jsx";
 import { buildOrdersMetrics, extractOrdersPayloadItems, filterOrdersByCreatedDateRange, filterOrdersBySearch, filterOrdersByStatus, isStorePickupOrder, localDateEndParam, localDateStartParam, resolveOrdersPayloadTotal, shouldShowPendingInvoiceAlert } from "../domain/orders-admin/OrdersAdminPage.jsx";
+import { buildNewOrderCheckoutPayload } from "../domain/orders-admin/orderPayloadBuilders.js";
+import { buildOrderFinancialPreview } from "../domain/orders-admin/ordersDomain.js";
 import {
   buildVisibleProductionItems,
   catalogCodeCandidates,
@@ -145,6 +147,56 @@ describe("estabilidad de filtros por vista", () => {
 
     expect(extractOrdersPayloadItems(payload)).toEqual(rows);
     expect(resolveOrdersPayloadTotal(payload, [])).toBe(2);
+  });
+
+  it("Pedidos: domicilio obsequiado cobra cero sin perder el valor original", () => {
+    const preview = buildOrderFinancialPreview(
+      { subtotal: 100000, iva: 0, domicilio: 12000 },
+      [],
+      false,
+      0,
+      0,
+      true
+    );
+
+    expect(preview.domicilio).toBe(0);
+    expect(preview.domicilioOriginal).toBe(12000);
+    expect(preview.domicilioObsequiado).toBe(true);
+    expect(preview.total).toBe(100000);
+  });
+
+  it("Pedidos: checkout manual conserva cliente identificado por telefono", () => {
+    const payload = buildNewOrderCheckoutPayload({
+      empresaId: 3,
+      sucursalId: 1,
+      productoID: 99,
+      form: {
+        clienteID: 55,
+        clienteNombre: "Prueba Join",
+        clienteTelefono: "3001234567",
+        clienteEmail: "joindatasolutions@gmail.com",
+        clienteTipoIdent: "CC",
+        clienteIdentificacion: "1062397422",
+        destinatarioNombre: "Prueba Join",
+        telefonoDestino: "",
+        direccion: "Calle 1",
+        barrioNombre: "Centro",
+        domicilioObsequiado: false,
+        fechaEntrega: "2026-07-27",
+        horaEntrega: "08:00",
+        cantidad: 1,
+        precio: "",
+        mensajeTarjeta: "",
+        firma: "",
+        observacionGeneral: "",
+        metodoPago: "Efectivo",
+        canalFlora: "WhatsApp",
+      },
+    });
+
+    expect(payload.cliente.clienteID).toBe(55);
+    expect(payload.cliente.identificacion).toBe("1062397422");
+    expect(payload.cliente.email).toBe("joindatasolutions@gmail.com");
   });
 
   it("Produccion: empresa 3 resuelve imagen por codigo_catalogo antes que codigo_producto", () => {
