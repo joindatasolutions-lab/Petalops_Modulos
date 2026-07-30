@@ -69,6 +69,7 @@ const DELIVERY_VIEWS = [
   { value: "metricas", label: "Métricas" },
   { value: "domiciliarios", label: "Domiciliarios" },
 ];
+const DELIVERY_SUPPORTED_MODES = new Set([...DELIVERY_VIEWS.map(item => item.value), "disponibles", "mis-pedidos"]);
 
 const DELIVERY_STATUS_FILTERS = [
   { key: "todos", label: "Todos", icon: Truck },
@@ -1727,10 +1728,6 @@ export function DeliveryPage({
       runLoad(loadAdmin).catch(() => {});
       return;
     }
-    if (modo === "barrios" || modo === "crear-barrio") {
-      runLoad(loadBarrios).catch(() => {});
-      return;
-    }
     if (modo === "domiciliarios") {
       runLoad(async () => {
         await Promise.all([loadDomiciliarios(), loadCourierDirectory()]);
@@ -1752,7 +1749,7 @@ export function DeliveryPage({
       return;
     }
     runLoad(loadMyOrders).catch(() => {});
-  }, [modo, runLoad, loadAdmin, loadBarrios, loadAvailableOrders, loadMyOrders, loadDomiciliarios, loadCourierDirectory, loadDeliveryMetrics, loadNoveltyDeliveries, availableCoords]);
+  }, [modo, runLoad, loadAdmin, loadAvailableOrders, loadMyOrders, loadDomiciliarios, loadCourierDirectory, loadDeliveryMetrics, loadNoveltyDeliveries, availableCoords]);
 
   const withCoords = async actionLabel => {
     if (isOffline) {
@@ -1769,18 +1766,20 @@ export function DeliveryPage({
     setError("");
     setFeedback("");
 
-    if (nextMode !== "disponibles") {
-      setModo(nextMode);
+    const safeMode = DELIVERY_SUPPORTED_MODES.has(nextMode) ? nextMode : "admin";
+
+    if (safeMode !== "disponibles") {
+      setModo(safeMode);
       return;
     }
 
     try {
       const coords = await withCoords("consultar pedidos disponibles");
-      setModo(nextMode);
+      setModo(safeMode);
       setLoading(true);
       await loadAvailableOrders(coords);
     } catch (nextError) {
-      setModo(nextMode);
+      setModo(safeMode);
       setAvailableCoords(null);
       setError(nextError?.message || "No fue posible obtener tu ubicación.");
     } finally {
@@ -1840,8 +1839,6 @@ export function DeliveryPage({
         ]);
       } else if (modo === "domiciliarios") {
         await loadCourierDirectory();
-      } else if (modo === "barrios" || modo === "crear-barrio") {
-        await loadBarrios();
       } else {
         await loadMyOrders();
       }
@@ -4441,164 +4438,7 @@ export function DeliveryPage({
               </div>
             </article>
           </section>
-        ) : modo === "crear-barrio" ? (
-          <section className="delivery-barrios-layout">
-            <article className="order-block users-top-panel delivery-barrios-form-panel">
-              <h4>Crear barrio</h4>
-              <div className="users-create-user-form">
-                <label className="order-detail-edit-label">
-                  Zona ID
-                  <input
-                    type="number"
-                    min="0"
-                    value={barrioForm.zonaID}
-                    onChange={event => onChangeBarrioForm("zonaID", event.target.value)}
-                    placeholder="Ej: 1"
-                  />
-                </label>
-                <label className="order-detail-edit-label">
-                  Nombre barrio
-                  <input
-                    type="text"
-                    value={barrioForm.nombreBarrio}
-                    onChange={event => onChangeBarrioForm("nombreBarrio", event.target.value)}
-                    placeholder="Nombre del barrio"
-                  />
-                </label>
-                <label className="order-detail-edit-label">
-                  Costo domicilio
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    value={barrioForm.costoDomicilio}
-                    onChange={event => onChangeBarrioForm("costoDomicilio", event.target.value)}
-                    placeholder="0"
-                  />
-                </label>
-                <label className="order-detail-edit-label">
-                  Activo
-                  <select
-                    value={barrioForm.activo ? "1" : "0"}
-                    onChange={event => onChangeBarrioForm("activo", event.target.value === "1")}
-                  >
-                    <option value="1">S?</option>
-                    <option value="0">No</option>
-                  </select>
-                </label>
-                <button type="button" className="btn-primary" onClick={onCrearBarrio} disabled={barrioSaving}>
-                  {barrioSaving ? "Guardando..." : "Crear barrio"}
-                </button>
-              </div>
-            </article>
-          </section>
-        ) : (
-          <section className="delivery-barrios-layout">
-            <article className="order-block delivery-barrios-search-panel">
-              <label className="order-detail-edit-label">
-                Buscar barrio
-                <input
-                  type="text"
-                  value={barriosSearch}
-                  onChange={event => setBarriosSearch(event.target.value)}
-                  placeholder="Busca por zona, barrio o costo"
-                />
-              </label>
-            </article>
-            <article className="order-block users-table-panel delivery-barrios-table-panel">
-              <h4>Barrios registrados</h4>
-              <div className="orders-table-wrap">
-                <table className="orders-table delivery-admin-table">
-                  <thead>
-                    <tr>
-                      <th>Zona ID</th>
-                      <th>Nombre barrio</th>
-                      <th>Costo domicilio</th>
-                      <th>Activo</th>
-                      <th>Acciones</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredBarriosItems.length === 0 ? (
-                      <tr>
-                        <td colSpan={5}>No hay barrios para el filtro seleccionado.</td>
-                      </tr>
-                    ) : filteredBarriosItems.map(item => (
-                      <tr key={item.idBarrio}>
-                        <td>
-                          {editingBarrioId === item.idBarrio ? (
-                            <input
-                              type="number"
-                              min="0"
-                              value={barrioEditForm.zonaID}
-                              onChange={event => setBarrioEditForm(current => ({ ...current, zonaID: event.target.value }))}
-                              placeholder="Zona"
-                            />
-                          ) : (
-                            item.zonaID ?? "-"
-                          )}
-                        </td>
-                        <td>
-                          {editingBarrioId === item.idBarrio ? (
-                            <input
-                              type="text"
-                              value={barrioEditForm.nombreBarrio}
-                              onChange={event => setBarrioEditForm(current => ({ ...current, nombreBarrio: event.target.value }))}
-                              placeholder="Nombre del barrio"
-                            />
-                          ) : (
-                            item.nombreBarrio || "-"
-                          )}
-                        </td>
-                        <td>
-                          {editingBarrioId === item.idBarrio ? (
-                            <input
-                              type="number"
-                              min="0"
-                              step="0.01"
-                              value={barrioEditForm.costoDomicilio}
-                              onChange={event => setBarrioEditForm(current => ({ ...current, costoDomicilio: event.target.value }))}
-                              placeholder="0"
-                            />
-                          ) : (
-                            Number(item.costoDomicilio || 0)
-                          )}
-                        </td>
-                        <td>{item.activo ? "S?" : "No"}</td>
-                        <td>
-                          <div className="order-actions">
-                            {editingBarrioId === item.idBarrio ? (
-                              <>
-                                <button type="button" className="btn-primary" onClick={() => onSaveEditBarrio(item.idBarrio)} disabled={barrioSaving}>
-                                  {barrioSaving ? "Guardando..." : "Guardar"}
-                                </button>
-                                <button type="button" className="btn-outline" onClick={onCancelEditBarrio} disabled={barrioSaving}>
-                                  Cancelar
-                                </button>
-                                <button type="button" className="btn-outline" onClick={() => onDeleteBarrio(item.idBarrio)} disabled={barrioSaving}>
-                                  Borrar
-                                </button>
-                              </>
-                            ) : (
-                              <>
-                                <button type="button" className="btn-outline" onClick={() => onStartEditBarrio(item)}>
-                                  Editar
-                                </button>
-                                <button type="button" className="btn-outline" onClick={() => onDeleteBarrio(item.idBarrio)} disabled={barrioSaving}>
-                                  Borrar
-                                </button>
-                              </>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </article>
-          </section>
-        )}
+        ) : null}
 
         {resolvingNoveltyRow ? (
           <div className="delivery-modal-backdrop" role="presentation" onMouseDown={onCloseResolveNovelty}>
