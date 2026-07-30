@@ -1,4 +1,4 @@
-﻿
+
 .delivery-kpi strong {
   grid-area: value;
   font-size: 23px;
@@ -575,290 +575,6 @@
   grid-template-columns: 1fr 1fr 1fr 2fr;
 }
 
-.users-page-view .users-filters .orders-filter-control {
-  border: none !important;
-}
-
-/* La tabla de Usuarios comparte el patrón de fila-píldora con Contabilidad y
-   Clientes (40-delivery.css), pero ese patrón usa colores que ya no son los
-   vigentes de la marca: el borde gris-azulado genérico y el marrón oscuro
-   #e91e72 (heredado de Pipeline/Delivery/Production). El color vivo actual,
-   confirmado contra los botones reales de Pedidos ("Actualizar", "Nuevo
-   pedido", filtros activos), es el rosa #e91e72 — se homologa todo a ese. */
-.users-page-view .users-table tbody tr td:first-child {
-  border-left: 4px solid #e91e72 !important;
-}
-
-.users-page-view .users-table td {
-  border-top: 1px solid #ffd0e3 !important;
-  border-bottom: 1px solid #ffd0e3 !important;
-}
-
-.users-page-view .users-table tbody tr td:last-child {
-  border-right: 1px solid #ffd0e3 !important;
-}
-
-.users-page-view .users-table th {
-  background: #fcfafb !important;
-  color: #9ca3af !important;
-  border-bottom: 1px solid #ffd0e3 !important;
-}
-
-.users-page-view .users-table td,
-.users-page-view .users-table th {
-  padding: 10px 8px !important;
-}
-
-.users-page-view .users-table td[data-label="Accion"] {
-  padding-right: 12px !important;
-}
-
-.users-page-view .users-table .btn-outline {
-  border-color: #ffd0e3 !important;
-  color: #e91e72 !important;
-  background: #fff !important;
-}
-
-.users-page-view .users-table .btn-outline:hover {
-  border-color: #e91e72 !important;
-  background: #fff6fa !important;
-}
-
-/* .orders-page-section no trae padding propio (solo el borde/fondo blanco de
-   la "card"), así que el título, el buscador y la tabla quedaban pegados al
-   borde de la tarjeta. Se le da aire por dentro y la tabla queda con su
-   propio recuadro anidado en vez de fundirse con el borde exterior. */
-.users-page-view .orders-page-section.users-table-panel {
-  padding: 18px 20px !important;
-}
-
-/* Toolbar del listado: título a la izquierda, buscador a la derecha, en la
-   misma línea, en vez del buscador suelto en el encabezado. */
-.users-table-toolbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  flex-wrap: wrap;
-  margin: 0 0 12px;
-}
-
-/* Los botones de Editar/Inactivar/Eliminar heredaban el tamaño de botón
-   grande (15px) de .btn-outline, mucho más grande que el badge de estado
-   (12px) al lado y que obligaba a la columna Acción a ser más ancha de lo
-   necesario, forzando scroll horizontal para ver "Eliminar". Se homologa al
-   tamaño del badge y se compacta el padding. */
-.users-page-view .users-table td[data-label="Accion"] .btn-outline {
-  font-size: 12px !important;
-  font-weight: 700 !important;
-  padding: 6px 10px !important;
-  min-height: 30px !important;
-  border-radius: 8px !important;
-}
-
-.users-page-view .users-table-toolbar .orders-section-title {
-  margin: 0;
-  width: auto !important;
-  flex: 0 1 auto !important;
-}
-
-.orders-page-view .users-table-search {
-  flex: 0 1 320px !important;
-  min-width: 220px !important;
-  width: auto !important;
-}
-
-@media (max-width: 560px) {
-  .users-table-toolbar {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .orders-page-view .users-table-search {
-    flex-basis: auto !important;
-  }
-}
-
-/* .orders-page-view's shared header/filter system assumes a fixed-height,
-   no-scroll, single-table dashboard (Pedidos): grid-template-rows locks the
-   header/filter bands to a few dvh and clips overflow. Usuarios has far more
-   content (create form, module toggles, two tables), so it needs a normal
-   auto-height scrolling page instead. Same fix already applied to Inventario
-   in 70-inventory.css for the same reason; mirrored here, scoped only to
-   .users-page-view so no other module is affected. */
-.orders-admin-view.orders-page-view.users-page-view {
-  display: grid !important;
-  grid-template-columns: none !important;
-  grid-template-rows: none !important;
-  grid-template-areas: none !important;
-  grid-auto-flow: row !important;
-  align-content: start !important;
-  height: auto !important;
-  min-height: 100vh !important;
-  max-height: none !important;
-  overflow: visible !important;
-}
-
-.orders-admin-view.orders-page-view.users-page-view > * {
-  grid-row: auto !important;
-  grid-column: auto !important;
-}
-
-.orders-admin-view.orders-page-view.users-page-view .orders-page-header.users-page-header {
-  display: flex !important;
-  flex-direction: row !important;
-  flex-wrap: wrap !important;
-  align-items: flex-start !important;
-  align-content: flex-start !important;
-  justify-content: space-between !important;
-  gap: 12px 20px !important;
-  height: auto !important;
-  min-height: 0 !important;
-  max-height: none !important;
-  overflow: visible !important;
-}
-
-/* Título (breadcrumb + h1 + descripción) y buscador/acciones se alinean
-   arriba entre sí (align-items:flex-start), en vez de centrarse contra la
-   altura del bloque de título completo (que es más alto por tener 3
-   líneas) — así el buscador y el botón Actualizar no dependen de ningún
-   ajuste manual de posición para verse alineados con el título. */
-.orders-admin-view.orders-page-view.users-page-view .orders-page-header.users-page-header .orders-page-heading {
-  display: flex !important;
-  flex-direction: column !important;
-  flex: 1 1 240px !important;
-  min-width: 200px !important;
-  width: auto !important;
-  align-self: flex-start !important;
-  grid-column: auto !important;
-  grid-row: auto !important;
-  order: 0;
-}
-
-.orders-admin-view.orders-page-view.users-page-view .orders-page-header.users-page-header .orders-page-breadcrumb,
-.orders-admin-view.orders-page-view.users-page-view .orders-page-header.users-page-header .orders-page-description {
-  display: block !important;
-}
-
-.orders-admin-view.orders-page-view.users-page-view .orders-page-header.users-page-header .orders-header-search {
-  flex: 1 1 260px !important;
-  min-width: 220px !important;
-  align-self: flex-start !important;
-  margin-top: 0 !important;
-  order: 1;
-  grid-area: auto !important;
-}
-
-/* Se disuelve el wrapper (display:contents) para que el botón Actualizar
-   quede en la misma línea que título/buscador (misma altura de una sola
-   línea → se centran bien entre sí), y las métricas caigan en su propia
-   franja de ancho completo debajo, en vez de forzar a todo el bloque
-   "side" (botón + 3 tarjetas KPI) a compartir línea con el título. */
-.orders-admin-view.orders-page-view.users-page-view .orders-page-header.users-page-header .orders-header-side {
-  display: contents !important;
-}
-
-.orders-admin-view.orders-page-view.users-page-view .orders-page-header.users-page-header .header-actions {
-  display: flex !important;
-  flex-wrap: wrap !important;
-  justify-content: flex-end !important;
-  align-items: center !important;
-  flex: 0 0 auto !important;
-  align-self: flex-start !important;
-  width: auto !important;
-  height: auto !important;
-  gap: 10px !important;
-  order: 1;
-  grid-area: auto !important;
-}
-
-.orders-admin-view.orders-page-view.users-page-view .users-create-trigger {
-  background: #ffffff !important;
-  border: 1px solid #ffd0e3 !important;
-  color: #e91e72 !important;
-}
-
-.orders-admin-view.orders-page-view.users-page-view .users-create-trigger:hover {
-  background: #fff3f8 !important;
-}
-
-.orders-admin-view.orders-page-view.users-page-view .orders-header-metrics {
-  display: grid !important;
-  flex: 1 1 100% !important;
-  width: 100% !important;
-  grid-template-columns: repeat(3, minmax(110px, 1fr)) !important;
-  grid-auto-rows: min-content !important;
-  align-content: start !important;
-  height: auto !important;
-  max-height: none !important;
-  margin-top: 4px !important;
-  order: 2;
-}
-
-.orders-admin-view.orders-page-view.users-page-view .orders-header-metrics .orders-header-metric-card {
-  min-height: 0 !important;
-  height: auto !important;
-  align-self: start !important;
-}
-
-.orders-admin-view.orders-page-view.users-page-view .orders-filter-section {
-  height: auto !important;
-  min-height: 0 !important;
-  max-height: none !important;
-  overflow: visible !important;
-  padding: 12px !important;
-  grid-row: auto !important;
-}
-
-/* Pedidos' single-table dashboard forces any .orders-page-section to grid-row:4
-   with height:100%, assuming exactly one such section exists. Usuarios nests
-   two (users list + company module summary) inside .users-grid-layout, so both
-   were landing in the same cell and rendering on top of each other. Reset them
-   to auto-flow as normal, independently-sized rows. */
-.orders-admin-view.orders-page-view.users-page-view .users-grid-layout .orders-page-section.users-table-panel {
-  grid-row: auto !important;
-  grid-column: 1 / -1 !important;
-  height: auto !important;
-  min-height: 0 !important;
-  align-self: start !important;
-  grid-template-rows: none !important;
-}
-
-.users-table td[data-label="ID"],
-.users-table th:first-child {
-  width: 56px;
-}
-
-.users-table td[data-label="Accion"],
-.users-table th:last-child {
-  width: 1px;
-  white-space: nowrap;
-}
-
-/* Reserva espacio para el botón flotante de menú (hamburguesa fija arriba a
-   la izquierda) entre 761-980px, igual que Inventario, para que no tape el
-   breadcrumb/título. */
-@media (max-width: 980px) {
-  .orders-admin-view.orders-page-view.users-page-view {
-    padding-top: 56px !important;
-  }
-}
-
-@media (max-width: 560px) {
-  .orders-admin-view.orders-page-view.users-page-view .orders-header-metrics {
-    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
-  }
-
-  .orders-admin-view.orders-page-view.users-page-view .orders-page-header.users-page-header .orders-header-side {
-    min-width: 0 !important;
-    flex-basis: 100% !important;
-  }
-
-  .orders-admin-view.orders-page-view.users-page-view .orders-page-header.users-page-header .orders-header-search {
-    flex-basis: 100% !important;
-  }
-}
-
 .users-grid-layout {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -899,29 +615,215 @@
   z-index: 1;
 }
 
+.users-create-open-btn {
+  gap: 8px;
+}
+
+.users-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  background: rgba(38, 22, 32, 0.36);
+  backdrop-filter: blur(6px);
+}
+
+.users-modal-panel {
+  display: grid;
+  align-content: start;
+  gap: 14px;
+  width: min(780px, 100%);
+  max-height: min(90vh, 920px);
+  padding: 18px;
+  border: 1px solid rgba(206, 164, 183, 0.52);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.98);
+  box-shadow: 0 28px 80px rgba(64, 31, 52, 0.22);
+  overflow-y: auto;
+}
+
+.users-modal-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.users-modal-head h3 {
+  margin: 0;
+  color: #241b20;
+  font-size: 22px;
+  line-height: 1.2;
+}
+
+.users-modal-head .orders-admin-subtitle {
+  margin: 0 0 6px;
+  font-size: 13px;
+}
+
+.users-modal-head .orders-admin-subtitle:last-child {
+  margin-bottom: 0;
+}
+
+.users-modal-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  flex: 0 0 38px;
+  border: 1px solid #ead9de;
+  border-radius: 12px;
+  background: #fff;
+  color: #8a3252;
+  cursor: pointer;
+}
+
+.users-modal-close:hover,
+.users-modal-close:focus-visible {
+  border-color: rgba(138, 50, 82, 0.3);
+  background: #fff7fa;
+  outline: none;
+}
+
+.users-create-modal .users-create-user-form {
+  gap: 9px;
+}
+
+.users-create-modal input,
+.users-create-modal select {
+  min-height: 40px;
+  padding-block: 8px;
+  font-size: 14px;
+}
+
+.users-role-picker {
+  display: grid;
+  gap: 7px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.users-role-picker legend {
+  margin: 0 0 2px;
+  padding: 0;
+  color: #6f5960;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.users-role-options {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.users-role-option {
+  display: grid;
+  grid-template-columns: 15px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  min-height: 46px;
+  padding: 8px 10px;
+  border: 1px solid #ead9de;
+  border-radius: 11px;
+  background: #fff;
+  color: #3f3138;
+  cursor: pointer;
+}
+
+.users-role-option:hover {
+  border-color: rgba(138, 50, 82, 0.24);
+  background: #fff7fa;
+}
+
+.users-role-option.is-selected {
+  border-color: rgba(190, 98, 129, 0.58);
+  background: #fdf0f5;
+  color: #7f2947;
+}
+
+.users-role-option input {
+  width: 15px !important;
+  min-width: 15px;
+  height: 15px;
+  min-height: 15px !important;
+  margin: 0;
+  accent-color: #9b315b;
+}
+
+.users-role-option span {
+  display: grid;
+  min-width: 0;
+  gap: 1px;
+}
+
+.users-role-option strong,
+.users-role-option small {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  line-height: 1.15;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.users-role-option strong {
+  font-size: 14px;
+  font-weight: 900;
+}
+
+.users-role-option small {
+  color: #8a7780;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.users-modal-actions {
+  display: grid;
+  grid-template-columns: minmax(140px, 0.45fr) minmax(180px, 1fr);
+  gap: 10px;
+  align-items: stretch;
+  margin-top: 2px;
+}
+
+.users-modal-actions .btn-outline,
+.users-modal-actions .btn-primary {
+  width: 100%;
+}
+
 .users-user-module-picker {
   position: relative;
   border: 1px solid #ead9de;
-  border-radius: 10px;
+  border-radius: 12px;
   background: #fffafc;
   padding: 10px;
   overflow: visible;
   z-index: 25;
 }
 
+.users-user-module-picker > .users-modulo-company-label {
+  display: block;
+  margin: 0 0 8px;
+  font-size: 13px;
+}
+
 .users-module-dropdown-trigger {
   width: 100%;
   min-height: 42px;
-  border: 1px solid #dfd8dc;
-  border-radius: 10px;
+  border: 1px solid #dfc9d2;
+  border-radius: 12px;
   background: #fff;
-  color: #5e5057;
+  color: #3f3138;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 10px 12px;
+  padding: 8px 11px;
   font-size: 14px;
-  font-weight: 600;
+  font-weight: 800;
   cursor: pointer;
 }
 
@@ -936,51 +838,83 @@
 }
 
 .users-module-dropdown-panel {
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: calc(100% - 4px);
+  position: static;
+  display: grid;
+  gap: 8px;
+  margin-top: 8px;
   border: 1px solid #ead9de;
-  border-radius: 10px;
+  border-radius: 12px;
   background: #fff;
   padding: 8px;
-  box-shadow: 0 14px 28px rgba(47, 45, 49, 0.14);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.78);
   z-index: 40;
-  max-height: 220px;
-  overflow-y: auto;
+  max-height: none;
+  overflow: visible;
 }
 
 .users-user-module-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
 }
 
 .users-user-module-item {
   display: inline-flex;
   align-items: center;
+  min-width: 0;
+  min-height: 36px;
   gap: 8px;
-  padding: 8px;
+  padding: 6px 9px;
   border: 1px solid #ead9de;
-  border-radius: 8px;
+  border-radius: 10px;
   background: #fff;
-  font-size: 13px;
+  color: #3f3138;
+  font-size: 13.5px;
+  font-weight: 700;
   cursor: pointer;
+}
+
+.users-user-module-item:hover {
+  border-color: rgba(138, 50, 82, 0.24);
+  background: #fff7fa;
+}
+
+.users-user-module-item.is-selected {
+  border-color: rgba(190, 98, 129, 0.58);
+  background: #fdf0f5;
+  color: #7f2947;
+}
+
+.users-user-module-item.is-disabled {
+  background: #f8f7f8;
+  color: #a89ca2;
+  cursor: not-allowed;
+}
+
+.users-user-module-item-all {
+  justify-content: flex-start;
+  border-color: rgba(190, 98, 129, 0.22);
+  background: #fff8fb;
+}
+
+.users-user-module-item span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  line-height: 1.25;
 }
 
 .users-user-module-item input[type="checkbox"] {
   appearance: none;
   -webkit-appearance: none;
-  width: 16px !important;
-  max-width: 16px;
-  width: 16px;
-  height: 16px;
-  min-height: 16px !important;
-  min-width: 16px;
+  width: 15px !important;
+  max-width: 15px;
+  height: 15px;
+  min-height: 15px !important;
+  min-width: 15px;
   margin: 0;
   padding: 0 !important;
   border: 1px solid #cfb6c0;
-  border-radius: 4px;
+  border-radius: 5px;
   background: #fff;
   display: inline-grid;
   place-content: center;
@@ -991,11 +925,11 @@
 
 .users-user-module-item input[type="checkbox"]::before {
   content: "";
-  width: 8px;
-  height: 8px;
+  width: 7px;
+  height: 7px;
   transform: scale(0);
   transition: transform 0.12s ease;
-  border-radius: 2px;
+  border-radius: 3px;
   background: #a74f70;
 }
 
@@ -1194,8 +1128,8 @@
   color: #8a3d57;
 }
 
-/* Pedidos-style card chrome for "Crear usuario" / "Habilitación comercial de
-   módulos": rounder corners, soft shadow and a bold section-title heading to
+/* Pedidos-style card chrome for "Crear usuario" / "Habilitaci�n comercial de
+   m�dulos": rounder corners, soft shadow and a bold section-title heading to
    match .orders-page-section / .orders-section-title elsewhere on this page. */
 .users-page-view .order-block {
   border-radius: 16px;
@@ -1271,10 +1205,10 @@
   flex: 1 1 160px;
 }
 
-/* Sin color-scheme:light explícito, Edge/Chrome puede pintar el texto nativo
+/* Sin color-scheme:light expl�cito, Edge/Chrome puede pintar el texto nativo
    de un <select> cerrado con el color de enlace del tema del sistema (se ve
    azul y subrayado) sin que ninguna propiedad `color` del autor lo controle.
-   Esto también evita que el picker se pinte en modo oscuro si el SO lo está. */
+   Esto tambi�n evita que el picker se pinte en modo oscuro si el SO lo est�. */
 .users-page-view {
   color-scheme: light;
 }
@@ -1301,7 +1235,7 @@
 }
 
 /* El campo de Empresa se renderiza como <input readOnly> (no <select>) para
-   usuarios sin alcance global, y heredaba el fondo rosado genérico de los
+   usuarios sin alcance global, y heredaba el fondo rosado gen�rico de los
    inputs normales en vez del blanco que usan Sucursal/Estado, rompiendo la
    consistencia visual de la fila de filtros. */
 .users-filters .orders-filter-control input[readonly] {
@@ -1311,8 +1245,8 @@
 }
 
 /* Los selects/inputs de la fila de filtros truncaban su propio texto
-   ("Todos los estad…", "…o log…") porque el ancho de columna no dejaba
-   espacio suficiente junto al ícono; se permite que el texto respire y,
+   ("Todos los estad�", "�o log�") porque el ancho de columna no dejaba
+   espacio suficiente junto al �cono; se permite que el texto respire y,
    si de verdad no cabe, se recorta con elipsis en vez de cortarse a la mitad. */
 .users-filters .orders-filter-control,
 .orders-header-search {
@@ -2209,8 +2143,8 @@
 
 /* Pipeline Operativo */
 /* -------------------------------------------------------
-   PIPELINE ï¿½ Centro de operaciones en tiempo real
-   Inspiraciï¿½n: Monday.com / Linear / ClickUp
+   PIPELINE � Centro de operaciones en tiempo real
+   Inspiraci�n: Monday.com / Linear / ClickUp
    ------------------------------------------------------- */
 
 .pipeline-view {
@@ -2222,27 +2156,27 @@
   display: flex;
   flex-direction: column;
   gap: 10px;
-  /* Cubre el gradiente rosa del app-shell ï¿½ fondo neutro como otros mï¿½dulos */
+  /* Cubre el gradiente rosa del app-shell � fondo neutro como otros m�dulos */
   background: #f4f5f7;
   font-family: "Manrope", "Segoe UI", sans-serif;
 }
 
-/* -- Header ï¿½ el pipeline usa orders-admin-header orders-page-header
-   (mismas clases que Pedidos ï¿½ no se necesita CSS adicional) -- */
+/* -- Header � el pipeline usa orders-admin-header orders-page-header
+   (mismas clases que Pedidos � no se necesita CSS adicional) -- */
 
-/* -- KPI Cards ï¿½ misma estructura que producciï¿½n/inventario -- */
+/* -- KPI Cards � misma estructura que producci�n/inventario -- */
 
 .pipeline-metrics-grid {
   grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
 }
 
-/* Colores por mï¿½trica */
+/* Colores por m�trica */
 .pipeline-metric-card:nth-child(1) { --metric-bg: #f0f0ff; --metric-accent: #4f46e5; }
 .pipeline-metric-card:nth-child(2) { --metric-bg: #eff6ff; --metric-accent: #2563eb; }
 .pipeline-metric-card:nth-child(3) { --metric-bg: #fffbeb; --metric-accent: #d97706; }
 .pipeline-metric-card:nth-child(4) { --metric-bg: #f0fdf4; --metric-accent: #15803d; }
 
-/* Mini mï¿½tricas del header (si se usan en otro contexto) */
+/* Mini m�tricas del header (si se usan en otro contexto) */
 .pipeline-header-metrics {
   display: flex;
   align-items: center;
@@ -2286,7 +2220,7 @@
 .pipeline-header-metric--green { background: rgba(21, 128, 61, 0.06); border-color: rgba(21, 128, 61, 0.12); }
 .pipeline-header-metric--green strong { color: #15803d; }
 
-/* Mini mï¿½tricas del header */
+/* Mini m�tricas del header */
 .pipeline-header-metrics {
   display: flex;
   align-items: center;
@@ -2338,9 +2272,9 @@
   min-width: 116px;
 }
 
-/* -- Filtros pipeline ï¿½ reutiliza production-filters-bar exacto ------- */
+/* -- Filtros pipeline � reutiliza production-filters-bar exacto ------- */
 
-/* Grid de 6 columnas ï¿½ pipeline tiene 6 filtros vs 4 de producciï¿½n */
+/* Grid de 6 columnas � pipeline tiene 6 filtros vs 4 de producci�n */
 .orders-filters.pipeline-filters-bar {
   grid-template-columns: minmax(200px, 1.5fr) repeat(5, minmax(130px, 1fr)) !important;
   margin-top: 0 !important;
@@ -2422,7 +2356,7 @@
   gap: 8px;
 }
 
-/* Cabecera de columna ï¿½ fondo neutro, color solo en badge */
+/* Cabecera de columna � fondo neutro, color solo en badge */
 .pipeline-column-head {
   display: flex;
   justify-content: space-between;
@@ -2480,7 +2414,7 @@
   align-items: center;
 }
 
-/* Estado vacï¿½o mejorado */
+/* Estado vac�o mejorado */
 .pipeline-empty-state {
   display: flex;
   flex-direction: column;
@@ -2515,7 +2449,7 @@
   line-height: 1.5;
 }
 
-/* -- Cards ï¿½ misma estï¿½tica que filas de Pedidos/Producciï¿½n -- */
+/* -- Cards � misma est�tica que filas de Pedidos/Producci�n -- */
 
 .pipeline-card {
   background: #ffffff;
@@ -2528,7 +2462,7 @@
   gap: 6px;
   font-family: "Manrope", "Segoe UI", sans-serif;
   font-size: 13.5px;
-  /* Borde izquierdo de color igual que en tabla-card de pedidos/producciï¿½n */
+  /* Borde izquierdo de color igual que en tabla-card de pedidos/producci�n */
   box-shadow:
     inset 3px 0 0 var(--column-accent, #e91e72),
     0 3px 10px rgba(17, 24, 39, 0.05);
@@ -2560,7 +2494,7 @@
   letter-spacing: 0.02em;
 }
 
-/* Prioridad ï¿½ colores semï¿½nticos */
+/* Prioridad � colores sem�nticos */
 .pipeline-priority {
   display: inline-flex;
   align-items: center;
@@ -2578,7 +2512,7 @@
 .pipeline-priority.is-high   { background: #fee2e2; color: #b91c1c; }
 .pipeline-priority.is-urgent { background: #b91c1c; color: #ffffff; }
 
-/* Cliente ï¿½ peso visual principal (igual que nombre en producciï¿½n: 14px) */
+/* Cliente � peso visual principal (igual que nombre en producci�n: 14px) */
 .pipeline-card-client {
   margin: 0;
   font-size: 14px;
@@ -2618,7 +2552,7 @@
 
 .pipeline-card-product svg { flex-shrink: 0; margin-top: 1px; color: #9ca3af; }
 
-/* Valor + asignaciï¿½n */
+/* Valor + asignaci�n */
 .pipeline-card-info-row {
   display: flex;
   align-items: center;
@@ -2670,7 +2604,7 @@
   flex-shrink: 0;
 }
 
-/* Estado tiempo ï¿½ indicador visual fuerte */
+/* Estado tiempo � indicador visual fuerte */
 .pipeline-time-status {
   display: inline-flex;
   align-items: center;
