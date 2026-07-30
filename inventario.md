@@ -12,6 +12,9 @@ Las flores vencen
 Los materiales se consumen diferente
 Los chocolates manejan lotes
 Las bases tienen variantes
+
+
+
 Separarlos por módulos.
 
 

@@ -942,50 +942,6 @@ select:focus {
   color: #e91e72;
 }
 
-.orders-store-submenu {
-  display: flex;
-  align-items: center;
-  gap: 13px;
-  margin: -2px 0 14px;
-  padding: 13px 15px;
-  border: 0.5px solid #cdebdc;
-  border-radius: 14px;
-  background: #f4fbf7;
-}
-
-.orders-store-submenu-icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 36px;
-  height: 36px;
-  border-radius: 9px;
-  background: #dff5e9;
-  color: #176b4d;
-  flex: 0 0 auto;
-}
-
-.orders-store-submenu-copy {
-  display: grid;
-  gap: 2px;
-  min-width: 0;
-  flex: 1 1 auto;
-}
-
-.orders-store-submenu-copy strong {
-  color: #176b4d;
-  font-size: 14px;
-}
-
-.orders-store-submenu-copy span {
-  color: #4f6258;
-  font-size: 13px;
-}
-
-.orders-store-submenu-clear {
-  flex: 0 0 auto;
-}
-
 .orders-alert-card {
   display: flex;
   align-items: center;

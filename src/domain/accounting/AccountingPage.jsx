@@ -6,6 +6,7 @@ import { AppSidebar } from "../../shared/AppSidebar.jsx";
 import { useSidebarState } from "../../shared/useSidebarState.js";
 import { formatearCOP, normalizeStatus, splitDateTimeParts, toIsoDateEnd, toIsoDateStart } from "../../shared/utils.js";
 import { Activity, BadgeDollarSign, Banknote, BarChart3, Brain, CalendarDays, ChevronDown, CircleAlert, CircleCheck, Columns3, CreditCard, Download, FileSpreadsheet, FileText, Filter, ListChecks, MoreHorizontal, Package, Receipt, RefreshCw, Search, ShoppingCart, Sparkles, Tag, Wallet, XCircle } from "lucide-react";
+import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 
 const ACCOUNTING_VIEWS = [
   { key: "ventas", label: "Ventas" },
@@ -70,6 +71,18 @@ export function filterAccountingDetailRows(rows, detailFilter = "todos") {
     if (detailFilter === "conNotas") return getAdjustmentNoteItems(row).length > 0;
     return true;
   });
+}
+
+function AccountingSalesTooltip({ active, payload, label }) {
+  if (!active || !Array.isArray(payload) || payload.length === 0) return null;
+  const row = payload[0]?.payload || {};
+  return (
+    <div className="accounting-sales-tooltip">
+      <strong>{label}</strong>
+      <span>${formatearCOP(row.value || 0)}</span>
+      <small>{Number(row.pedidos || 0)} pedidos</small>
+    </div>
+  );
 }
 
 function formatAdjustmentNotesForExport(row) {
@@ -492,39 +505,17 @@ export function AccountingPage({
   }, [summaryTotals, detailInsight, orderRows.length]);
 
   const salesTrendRows = useMemo(() => {
-    const maxValue = Math.max(...orderRows.map(row => Number(row.totalVenta || 0)), 0);
-    return orderRows.map(row => ({
+    const rowsWithSales = orderRows.filter(row => Number(row.totalVenta || 0) > 0);
+    const maxValue = Math.max(...rowsWithSales.map(row => Number(row.totalVenta || 0)), 0);
+    return rowsWithSales.map(row => ({
       key: row.fecha,
       label: row.fecha,
+      shortLabel: String(row.fecha || "").slice(5),
       value: Number(row.totalVenta || 0),
       pedidos: Number(row.cantidadPedidos || 0),
       height: maxValue > 0 ? Math.max((Number(row.totalVenta || 0) / maxValue) * 100, 8) : 0,
     }));
   }, [orderRows]);
-
-  const salesTrendChart = useMemo(() => {
-    const rows = salesTrendRows;
-    const width = 1000;
-    const height = 190;
-    const paddingX = 34;
-    const paddingTop = 22;
-    const paddingBottom = 34;
-    const plotHeight = height - paddingTop - paddingBottom;
-    const maxValue = Math.max(...rows.map(row => Number(row.value || 0)), 0);
-    const points = rows.map((row, index) => {
-      const x = rows.length <= 1
-        ? width / 2
-        : paddingX + (index * (width - paddingX * 2)) / (rows.length - 1);
-      const ratio = maxValue > 0 ? Number(row.value || 0) / maxValue : 0;
-      const y = paddingTop + (1 - ratio) * plotHeight;
-      return { ...row, x, y };
-    });
-    const linePath = points.map((point, index) => `${index === 0 ? "M" : "L"} ${point.x} ${point.y}`).join(" ");
-    const areaPath = points.length > 0
-      ? `${linePath} L ${points[points.length - 1].x} ${height - paddingBottom} L ${points[0].x} ${height - paddingBottom} Z`
-      : "";
-    return { width, height, points, linePath, areaPath };
-  }, [salesTrendRows]);
 
   const monthlySalesRows = useMemo(() => {
     const grouped = new Map();
@@ -1080,25 +1071,41 @@ export function AccountingPage({
                   {salesTrendRows.length === 0 ? (
                     <p className="accounting-empty-state">No hay ventas para graficar.</p>
                   ) : (
-                    <svg
-                      className="accounting-trend-svg"
-                      viewBox={`0 0 ${salesTrendChart.width} ${salesTrendChart.height}`}
-                      role="img"
-                      aria-label="Ventas por dia"
-                      preserveAspectRatio="none"
-                    >
-                      <path className="accounting-trend-area" d={salesTrendChart.areaPath} />
-                      <path className="accounting-trend-line" d={salesTrendChart.linePath} />
-                      {salesTrendChart.points.map(point => (
-                        <g key={point.key}>
-                          <line className="accounting-trend-guide" x1={point.x} x2={point.x} y1={point.y} y2="156" />
-                          <circle className="accounting-trend-dot" cx={point.x} cy={point.y} r="5">
-                            <title>{`${point.label}: $${formatearCOP(point.value)}`}</title>
-                          </circle>
-                          <text className="accounting-trend-label" x={point.x} y="178">{String(point.label).slice(5)}</text>
-                        </g>
-                      ))}
-                    </svg>
+                    <ResponsiveContainer width="100%" height={248}>
+                      <AreaChart data={salesTrendRows} margin={{ top: 12, right: 18, left: 4, bottom: 6 }}>
+                        <defs>
+                          <linearGradient id="accountingSalesGradient" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor="#d9367a" stopOpacity={0.22} />
+                            <stop offset="95%" stopColor="#d9367a" stopOpacity={0.02} />
+                          </linearGradient>
+                        </defs>
+                        <CartesianGrid stroke="#eef2f7" vertical={false} />
+                        <XAxis
+                          dataKey="shortLabel"
+                          axisLine={false}
+                          tickLine={false}
+                          tick={{ fill: "#64748b", fontSize: 11, fontWeight: 800 }}
+                        />
+                        <YAxis
+                          axisLine={false}
+                          tickLine={false}
+                          tick={{ fill: "#64748b", fontSize: 11, fontWeight: 800 }}
+                          tickFormatter={value => `$${formatearCOP(value)}`}
+                          width={76}
+                        />
+                        <Tooltip content={<AccountingSalesTooltip />} cursor={{ stroke: "#d9367a", strokeOpacity: 0.18 }} />
+                        <Area
+                          type="monotone"
+                          dataKey="value"
+                          name="Ventas"
+                          stroke="#d9367a"
+                          strokeWidth={3}
+                          fill="url(#accountingSalesGradient)"
+                          activeDot={{ r: 6, strokeWidth: 3, stroke: "#ffffff", fill: "#d9367a" }}
+                          dot={{ r: 4, strokeWidth: 2, stroke: "#ffffff", fill: "#d9367a" }}
+                        />
+                      </AreaChart>
+                    </ResponsiveContainer>
                   )}
                 </div>
               </article>

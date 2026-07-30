@@ -3631,14 +3631,14 @@
 
 .users-module-dropdown-trigger {
   min-height: 42px !important;
-  border-radius: 14px !important;
+  border-radius: 12px !important;
   box-shadow: 0 8px 20px rgba(17, 24, 39, 0.055) !important;
 }
 
 .users-module-dropdown-panel {
   z-index: 40 !important;
-  border-radius: 16px !important;
-  box-shadow: 0 22px 46px rgba(15, 23, 42, 0.16) !important;
+  border-radius: 12px !important;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.72) !important;
 }
 
 @media (max-width: 1180px) {
