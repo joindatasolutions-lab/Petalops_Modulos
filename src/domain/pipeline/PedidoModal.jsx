@@ -10,8 +10,6 @@ export function PedidoModal({ item, detail, onClose, api, empresaId, sucursalId,
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
-  if (!item) return null;
-
   useEffect(() => {
     if (!item) return;
     setIsEditing(false);
@@ -121,6 +119,12 @@ export function PedidoModal({ item, detail, onClose, api, empresaId, sucursalId,
       setSaving(false);
     }
   };
+
+  // Todos los hooks deben ejecutarse siempre en el mismo orden en cada
+  // render; este guard va despues de declararlos todos (si no, React lanza
+  // "Rendered more hooks than during the previous render" al pasar de
+  // item=null a item=algo, lo que tumbaba el arbol entero sin error visible).
+  if (!item) return null;
 
   return (
     <div className="pipeline-modal-overlay" onClick={onClose}>

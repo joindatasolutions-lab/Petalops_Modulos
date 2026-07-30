@@ -9,7 +9,7 @@ import {
 import { PedidoCard } from "./PedidoCard.jsx";
 
 const COLUMN_CONFIG = {
-  pedido_inicial:  { tone: "is-created",    accentColor: "#8a3252" },
+  pedido_inicial:  { tone: "is-created",    accentColor: "#e91e72" },
   produccion_base: { tone: "is-production",  accentColor: "#2563eb" },
   listo:           { tone: "is-ready",       accentColor: "#15803d" },
   en_camino:       { tone: "is-route",       accentColor: "#d97706" },
