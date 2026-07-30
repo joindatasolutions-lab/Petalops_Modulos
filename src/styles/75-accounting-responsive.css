@@ -10,18 +10,18 @@
   position: relative !important;
   z-index: 900 !important;
   display: grid !important;
-  grid-template-columns: minmax(320px, 1fr) auto !important;
+  grid-template-columns: minmax(180px, 0.28fr) minmax(0, 1fr) !important;
   grid-template-areas:
     "heading actions"
     "metrics metrics" !important;
-  align-items: start !important;
+  align-items: center !important;
   gap: 16px 18px !important;
   width: 100% !important;
   max-width: 100% !important;
   min-width: 0 !important;
   min-height: 0 !important;
   height: auto !important;
-  margin: 0 0 14px !important;
+  margin: 0 0 8px !important;
   padding: 16px 18px !important;
   overflow: visible !important;
 }
@@ -31,9 +31,10 @@
   display: flex !important;
   flex-direction: column !important;
   align-items: flex-start !important;
+  justify-content: center !important;
   gap: 8px !important;
-  width: 100% !important;
-  max-width: 680px !important;
+  width: auto !important;
+  max-width: none !important;
   min-width: 0 !important;
 }
 
@@ -122,7 +123,8 @@
 
 .accounting-page-view .orders-page-header.accounting-page-header .accounting-menu-panel {
   top: calc(100% + 8px) !important;
-  right: 0 !important;
+  left: 0 !important;
+  right: auto !important;
   z-index: 1100 !important;
 }
 
@@ -137,12 +139,14 @@
 .accounting-page-view .orders-page-header.accounting-page-header .orders-header-metrics.accounting-header-metrics {
   grid-area: metrics !important;
   display: grid !important;
-  grid-template-columns: repeat(5, minmax(150px, 1fr)) !important;
+  grid-template-columns: repeat(5, minmax(118px, 1fr)) !important;
   align-items: stretch !important;
-  gap: 10px !important;
+  gap: 8px !important;
   width: 100% !important;
   max-width: 100% !important;
   min-width: 0 !important;
+  height: 42px !important;
+  min-height: 0 !important;
   margin: 0 !important;
   padding: 0 !important;
   overflow: visible !important;
@@ -150,31 +154,34 @@
 
 .accounting-page-view .orders-page-header.accounting-page-header .orders-header-metric-card {
   display: grid !important;
-  grid-template-columns: 42px minmax(0, 1fr) !important;
+  grid-template-columns: 26px minmax(0, 1fr) !important;
   grid-template-rows: auto auto !important;
   align-items: center !important;
-  column-gap: 10px !important;
+  column-gap: 8px !important;
   width: 100% !important;
   min-width: 0 !important;
   max-width: 100% !important;
-  min-height: 58px !important;
-  height: auto !important;
-  padding: 10px 12px !important;
+  min-height: 42px !important;
+  height: 42px !important;
+  padding: 6px 10px !important;
+  border-radius: 9px !important;
+  box-shadow: none !important;
   overflow: hidden !important;
 }
 
 .accounting-page-view .orders-page-header.accounting-page-header .orders-header-metric-icon {
   grid-column: 1 !important;
   grid-row: 1 / span 2 !important;
-  width: 38px !important;
-  height: 38px !important;
+  width: 26px !important;
+  height: 26px !important;
+  border-radius: 9px !important;
 }
 
 .accounting-page-view .orders-page-header.accounting-page-header .orders-header-metric-card strong {
   grid-column: 2 !important;
   grid-row: 1 !important;
   max-width: 100% !important;
-  font-size: 20px !important;
+  font-size: 15px !important;
   line-height: 1.05 !important;
   letter-spacing: 0 !important;
   white-space: nowrap !important;
@@ -186,7 +193,7 @@
   grid-column: 2 !important;
   grid-row: 2 !important;
   max-width: 100% !important;
-  font-size: 10px !important;
+  font-size: 9px !important;
   line-height: 1.15 !important;
   letter-spacing: 0 !important;
   text-transform: uppercase !important;
@@ -195,48 +202,17 @@
   text-overflow: ellipsis !important;
 }
 
-.accounting-page-view .accounting-line-chart {
-  display: block !important;
-  min-height: 276px !important;
-  padding: 14px 12px 8px !important;
-  border: 1px solid #edf1f6 !important;
-  border-radius: 10px !important;
-  background:
-    linear-gradient(#eef2f7 1px, transparent 1px) 0 18px / 100% 42px,
-    linear-gradient(180deg, #ffffff 0%, #fbfcfe 100%) !important;
-  overflow: hidden !important;
+/* Reserva espacio para el botón flotante de menú (hamburguesa fija arriba a
+   la izquierda), igual que en Usuarios/Inventario: sin el breadcrumb que
+   antes empujaba el título hacia abajo, "Contabilidad" quedaba pegado al
+   botón flotante. */
+@media (max-width: 980px) {
+  .orders-admin-view.accounting-page-view {
+    padding-top: 56px !important;
+  }
 }
 
-.accounting-page-view .accounting-sales-tooltip {
-  display: grid !important;
-  gap: 3px !important;
-  min-width: 132px !important;
-  padding: 10px 11px !important;
-  border: 1px solid #f3c5d7 !important;
-  border-radius: 9px !important;
-  background: #ffffff !important;
-  box-shadow: 0 16px 38px rgba(15, 23, 42, 0.14) !important;
-}
-
-.accounting-page-view .accounting-sales-tooltip strong {
-  color: #111827 !important;
-  font-size: 12px !important;
-  font-weight: 950 !important;
-}
-
-.accounting-page-view .accounting-sales-tooltip span {
-  color: #d9367a !important;
-  font-size: 15px !important;
-  font-weight: 950 !important;
-}
-
-.accounting-page-view .accounting-sales-tooltip small {
-  color: #64748b !important;
-  font-size: 11px !important;
-  font-weight: 800 !important;
-}
-
-@media (max-width: 1280px) {
+@media (max-width: 900px) {
   .accounting-page-view .orders-page-header.accounting-page-header {
     grid-template-columns: minmax(0, 1fr) !important;
     grid-template-areas:
@@ -255,7 +231,12 @@
 
   .accounting-page-view .orders-page-header.accounting-page-header .accounting-header-metrics,
   .accounting-page-view .orders-page-header.accounting-page-header .orders-header-metrics.accounting-header-metrics {
-    grid-template-columns: repeat(3, minmax(150px, 1fr)) !important;
+    height: auto !important;
+    grid-template-columns: repeat(3, minmax(110px, 1fr)) !important;
+  }
+
+  .accounting-page-view .orders-page-header.accounting-page-header .orders-header-metric-card {
+    height: auto !important;
   }
 }
 
@@ -292,5 +273,145 @@
   .accounting-page-view .orders-page-header.accounting-page-header .accounting-header-metrics,
   .accounting-page-view .orders-page-header.accounting-page-header .orders-header-metrics.accounting-header-metrics {
     grid-template-columns: minmax(0, 1fr) !important;
+  }
+}
+
+/* Filtros: exactamente dos filas (fecha + chips arriba, exportar abajo) en
+   cualquier submenu y en cualquier dispositivo. Se usa flexbox con un
+   "salto de linea" forzado antes de accounting-filter-actions (flex-basis
+   100%) en vez de grid, para no depender de contar columnas/filas segun
+   que submenu agregue o no el filtro extra de Arreglos. */
+.accounting-page-view .orders-filters.accounting-filters {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  grid-template-columns: none !important;
+  align-items: center !important;
+  gap: 8px 10px !important;
+  min-height: 0 !important;
+  margin: 4px 0 14px !important;
+  padding: 8px 10px !important;
+  border-radius: 9px !important;
+  overflow: visible !important;
+}
+
+.accounting-page-view .accounting-date-range-control {
+  flex: 0 1 auto !important;
+  width: auto !important;
+  grid-template-columns: auto minmax(94px, 118px) auto minmax(94px, 118px) auto !important;
+  min-height: 34px !important;
+  height: 34px !important;
+  padding: 0 10px !important;
+  gap: 6px !important;
+}
+
+.accounting-page-view .accounting-date-range-control input {
+  height: 34px !important;
+  font-size: 12px !important;
+}
+
+.accounting-page-view .accounting-date-range-control span {
+  font-size: 12px !important;
+}
+
+.accounting-page-view .accounting-period-tabs {
+  flex: 0 1 auto !important;
+  display: flex !important;
+  flex-wrap: wrap !important;
+  gap: 6px !important;
+  width: auto !important;
+  min-height: 34px !important;
+  height: auto !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  overflow: visible !important;
+}
+
+.accounting-page-view .accounting-period-tabs button {
+  flex: 0 0 auto !important;
+  min-width: 0 !important;
+  min-height: 34px !important;
+  height: 34px !important;
+  padding: 0 10px !important;
+  border: 1px solid #e7c3d3 !important;
+  border-radius: 999px !important;
+  background: #ffffff !important;
+  color: #8a3252 !important;
+  font-size: 11px !important;
+  font-weight: 800 !important;
+  text-align: center !important;
+  white-space: nowrap !important;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease, color 0.15s ease !important;
+}
+
+.accounting-page-view .accounting-period-tabs button:hover {
+  border-color: #e91e72 !important;
+  color: #e91e72 !important;
+}
+
+.accounting-page-view .accounting-period-tabs button.is-active {
+  background: #fff0f6 !important;
+  border-color: #e91e72 !important;
+  color: #e91e72 !important;
+  box-shadow: 0 4px 10px rgba(233, 30, 114, 0.18) !important;
+  transform: translateY(-1px) !important;
+}
+
+/* Las acciones de exportar se acomodan al final de la fila (empujadas con
+   margin-left: auto) cuando hay espacio, en vez de forzar una fila nueva
+   con espacio vacio de por medio. flex-wrap en el contenedor ya se encarga
+   de bajarlas a su propia linea cuando no caben. */
+.accounting-page-view .accounting-filter-actions {
+  flex: 0 1 auto !important;
+  display: flex !important;
+  flex-wrap: wrap !important;
+  justify-content: flex-start !important;
+  width: auto !important;
+  max-width: none !important;
+  min-width: 0 !important;
+  gap: 8px !important;
+  margin-left: auto !important;
+}
+
+.accounting-page-view .accounting-export-btn,
+.accounting-page-view .accounting-more-btn {
+  flex: 0 0 auto !important;
+  width: auto !important;
+  min-width: 0 !important;
+  max-width: none !important;
+  min-height: 34px !important;
+  height: 34px !important;
+  padding: 0 12px !important;
+  border-radius: 999px !important;
+}
+
+.accounting-page-view .accounting-arrangements-filter {
+  flex: 0 1 auto !important;
+}
+
+@media (max-width: 480px) {
+  .accounting-page-view .accounting-date-range-control {
+    flex: 1 1 100% !important;
+    grid-template-columns: auto minmax(0, 1fr) !important;
+  }
+
+  .accounting-page-view .accounting-date-range-control span,
+  .accounting-page-view .accounting-date-range-control svg:last-child,
+  .accounting-page-view .accounting-date-range-control input:nth-of-type(2) {
+    display: none !important;
+  }
+
+  .accounting-page-view .accounting-period-tabs {
+    flex-basis: 100% !important;
+  }
+
+  .accounting-page-view .accounting-period-tabs button {
+    min-width: 0 !important;
+    flex: 1 1 auto !important;
+  }
+
+  .accounting-page-view .accounting-export-btn,
+  .accounting-page-view .accounting-more-btn {
+    flex: 1 1 auto !important;
   }
 }
