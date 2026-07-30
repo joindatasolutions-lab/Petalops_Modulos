@@ -1175,9 +1175,9 @@
 
   .app-shell.is-sidebar-mobile-open .sidebar-mobile-fab {
     left: min(calc(84vw + 10px), 296px) !important;
-    background: #8a3252 !important;
+    background: #e91e72 !important;
     color: #ffffff !important;
-    border-color: #8a3252 !important;
+    border-color: #e91e72 !important;
   }
 
   .app-shell .app-sidebar {
@@ -1907,7 +1907,7 @@
 
   .app-shell.is-sidebar-mobile-open .sidebar-mobile-fab {
     left: min(calc(84vw + 10px), 296px) !important;
-    background: #8a3252 !important;
+    background: #e91e72 !important;
     color: #ffffff !important;
     box-shadow: 0 12px 28px rgba(138, 50, 82, 0.24) !important;
   }
@@ -2918,7 +2918,7 @@
   height: 20px;
   border-radius: 999px;
   background: rgba(159, 47, 95, 0.1);
-  color: #9f2f5f;
+  color: #e91e72;
   font-size: 10.5px;
   font-weight: 800;
 }
@@ -2999,7 +2999,7 @@
 
 .inventory-page-view .inventory-movement-quick-btn.is-ajuste {
   border-color: rgba(159, 47, 95, 0.35) !important;
-  color: #9f2f5f !important;
+  color: #e91e72 !important;
 }
 
 .inventory-page-view .inventory-movement-quick-btn.is-ajuste:hover {
@@ -3081,7 +3081,7 @@
   flex-shrink: 0;
   border-radius: 10px;
   background: rgba(159, 47, 95, 0.08);
-  color: #9f2f5f;
+  color: #e91e72;
 }
 
 .inventory-page-view .inventory-receta-summary-item div {
@@ -3114,6 +3114,120 @@
   }
 }
 
+/* Vincular / crear producto de catalogo para un Arreglo */
+.inventory-page-view .inventory-producto-modo-toggle {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 4px 0 10px;
+}
+
+.inventory-page-view .inventory-producto-modo-toggle .btn-outline.is-active {
+  border-color: rgba(233, 30, 114, 0.32);
+  background: #f7eef2;
+  color: #e91e72;
+}
+
+.inventory-page-view .inventory-producto-picker {
+  position: relative;
+}
+
+.inventory-page-view .inventory-producto-picker-results {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 260px;
+  margin-top: 6px;
+  padding: 6px;
+  border: 1px solid rgba(159, 47, 95, 0.16);
+  border-radius: 12px;
+  background: #ffffff;
+  overflow-y: auto;
+}
+
+.inventory-page-view .inventory-producto-picker-results button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.inventory-page-view .inventory-producto-picker-results button:hover {
+  background: #f7eef2;
+}
+
+.inventory-page-view .inventory-producto-picker-results img,
+.inventory-page-view .inventory-producto-picker-selected img {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  object-fit: cover;
+  flex: 0 0 auto;
+}
+
+.inventory-page-view .inventory-producto-picker-noimg {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  flex: 0 0 auto;
+  border-radius: 8px;
+  background: rgba(159, 47, 95, 0.08);
+  color: #e91e72;
+}
+
+.inventory-page-view .inventory-producto-picker-results strong,
+.inventory-page-view .inventory-producto-picker-selected strong {
+  display: block;
+  font-size: 13px;
+  color: #111827;
+}
+
+.inventory-page-view .inventory-producto-picker-results span,
+.inventory-page-view .inventory-producto-picker-selected span {
+  font-size: 11px;
+  color: #6b7280;
+}
+
+.inventory-page-view .inventory-producto-picker-selected {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 8px;
+  padding: 8px 10px;
+  border: 1.5px solid rgba(233, 30, 114, 0.28);
+  border-radius: 12px;
+  background: #fff7fb;
+}
+
+.inventory-page-view .inventory-producto-picker-selected > div {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.inventory-page-view .inventory-producto-picker-selected small {
+  display: block;
+  margin-top: 2px;
+  color: #6b7280;
+  font-size: 11px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.inventory-page-view .inventory-producto-picker-clear {
+  flex: 0 0 auto;
+  min-height: 30px;
+  padding: 0 12px;
+  font-size: 12px;
+}
+
 /* Simulador de pedido */
 .inventory-page-view .inventory-simulator {
   margin-top: 14px;
@@ -3133,7 +3247,7 @@
 }
 
 .inventory-page-view .inventory-simulator-heading svg {
-  color: #9f2f5f;
+  color: #e91e72;
   flex-shrink: 0;
 }
 
@@ -3190,5 +3304,72 @@
 @media (max-width: 640px) {
   .inventory-page-view .inventory-simulator-form {
     max-width: 100%;
+  }
+}
+
+/* Modal "Crear/Editar proveedor": overlay con blur real (backdrop-filter en
+   el propio overlay, no solo en la tarjeta) y boton de cierre (X). */
+.inventory-page-view .inventory-provider-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: rgba(15, 23, 42, 0.4);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+
+.inventory-page-view .inventory-provider-modal {
+  width: min(560px, 100%);
+  max-height: 90vh;
+  overflow-y: auto;
+  background: #ffffff;
+  border-radius: 18px;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.25);
+  padding: 20px 22px 24px;
+}
+
+.inventory-page-view .inventory-provider-modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.inventory-page-view .inventory-provider-modal-head h4 {
+  margin: 0;
+  color: #11162f;
+  font-size: 19px;
+  font-weight: 800;
+}
+
+.inventory-page-view .inventory-provider-modal-close {
+  flex: 0 0 auto;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+}
+
+.inventory-page-view .inventory-table-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+@media (max-width: 640px) {
+  .inventory-page-view .inventory-provider-modal {
+    padding: 16px 16px 20px;
+    border-radius: 14px;
   }
 }
