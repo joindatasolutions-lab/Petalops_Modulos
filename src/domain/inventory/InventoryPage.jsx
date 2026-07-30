@@ -4,7 +4,7 @@ import { tenantConfig } from "../../config/tenantConfig.js";
 import { createApiClient } from "../../infrastructure/apiClient.js";
 import { AppSidebar } from "../../shared/AppSidebar.jsx";
 import { useSidebarState } from "../../shared/useSidebarState.js";
-import { formatearCOP, normalizeStatus } from "../../shared/utils.js";
+import { formatearCOP, normalizeStatus, todayIsoDateBogota } from "../../shared/utils.js";
 import {
   Archive,
   ArrowDownToLine,
@@ -28,7 +28,9 @@ import {
   RefreshCw,
   RotateCcw,
   Search,
+  ShoppingCart,
   SlidersHorizontal,
+  Tag,
   TrendingUp,
   TriangleAlert,
   Truck,
@@ -87,11 +89,29 @@ const MODULES = [
     subcategorias: [],
     unidades: [],
   },
+  {
+    key: "proveedores",
+    label: "Proveedores",
+    categoria: null,
+    icon: Truck,
+    subcategorias: [],
+    unidades: [],
+  },
 ];
+
+const initialProveedorForm = {
+  nombre: "",
+  codigoProveedor: "",
+  telefono: "",
+  email: "",
+  direccion: "",
+  activo: true,
+};
 
 const COLOR_OPTIONS = [
   "", "Rojo", "Rosado", "Blanco", "Amarillo", "Naranja",
   "Lila", "Morado", "Azul", "Verde", "Dorado", "Plateado", "Multicolor",
+  "Beige", "Café", "Gris", "Negro", "Transparente",
 ];
 
 const MOVIMIENTO_TIPO_OPTIONS = ["Entrada", "Salida", "Ajuste", "Pérdida"];
@@ -121,8 +141,9 @@ function inventoryRowClass(item) {
   ].filter(Boolean).join(" ");
 }
 
-function todayIsoDate() { return new Date().toISOString().slice(0, 10); }
+function todayIsoDate() { return todayIsoDateBogota(); }
 function isTodayDate(value) { return String(value || "").slice(0, 10) === todayIsoDate(); }
+function isSameMonthAsToday(value) { return String(value || "").slice(0, 7) === todayIsoDate().slice(0, 7); }
 
 function stockLevel(item) {
   const stock = Number(item?.stockActual || 0);
@@ -180,13 +201,14 @@ export function filterInventoryItems(items, { stockFiltro = "", subcategoriaFilt
 export function InventoryPage({
   session,
   canViewPipeline, canViewPedidos, canViewProduccion, canViewDomicilios, canViewBarrios,
-  canViewInventario, canViewContabilidad, canViewTrazabilidad,
+  canViewInventario, canViewContabilidad,
   canViewClientesPanel, canViewUsuariosPanel,
   onGoPipeline, onGoPedidos, onGoProduccion, onGoDomicilios, onGoBarrios, onGoInventario,
-  onGoContabilidad, onGoTrazabilidad, onGoClientes, onGoUsuarios, onLogout,
+  onGoContabilidad, onGoClientes, onGoUsuarios, onLogout,
 }) {
   const api = useMemo(() => createApiClient(tenantConfig), []);
   const empresaId = Number(session?.empresaID || tenantConfig.empresaId);
+  const sucursalId = Number(session?.sucursalID || tenantConfig.sucursalId);
   const displayUserName = useMemo(
     () => String(session?.nombre || session?.login || "Usuario").trim() || "Usuario",
     [session]
@@ -203,6 +225,8 @@ export function InventoryPage({
   const [openInventoryMenuId, setOpenInventoryMenuId] = useState(null);
 
   // ── Datos ──
+  const inventarioRequestIdRef = useRef(0);
+  const catalogoRequestIdRef = useRef(0);
   const [items, setItems] = useState([]);
   const [allItems, setAllItems] = useState([]);
   const [proveedores, setProveedores] = useState([]);
@@ -241,7 +265,20 @@ export function InventoryPage({
 
   const [createForm, setCreateForm] = useState(initialCreateForm);
   const [stockForm, setStockForm] = useState({ inventarioID: "", tipoMovimiento: "Entrada", cantidad: "1", stockObjetivo: "", motivo: "" });
-  const [recetaForm, setRecetaForm] = useState({ nombre: "", descripcion: "" });
+  const initialRecetaForm = {
+    nombre: "",
+    descripcion: "",
+    capacidadManual: "",
+    productoModo: "nuevo", // "nuevo" (crea producto en catalogo) | "vincular" (usa uno existente) | "ninguno"
+    productoID: "",
+    precioVenta: "",
+    imagenUrl: "",
+  };
+  const [recetaForm, setRecetaForm] = useState(initialRecetaForm);
+  const [recetaProductoSeleccionado, setRecetaProductoSeleccionado] = useState(null);
+  const [catalogoQuery, setCatalogoQuery] = useState("");
+  const [catalogoResultados, setCatalogoResultados] = useState([]);
+  const [catalogoBuscando, setCatalogoBuscando] = useState(false);
   const [ingredienteForm, setIngredienteForm] = useState({ inventarioID: "", cantidad: "1" });
   const [simuladorCantidad, setSimuladorCantidad] = useState("1");
 
@@ -249,6 +286,10 @@ export function InventoryPage({
   const [savingStock, setSavingStock] = useState(false);
   const [savingReceta, setSavingReceta] = useState(false);
   const [savingIngrediente, setSavingIngrediente] = useState(false);
+  const [proveedorForm, setProveedorForm] = useState(initialProveedorForm);
+  const [savingProveedor, setSavingProveedor] = useState(false);
+  const [showProveedorModal, setShowProveedorModal] = useState(false);
+  const [editingProveedorId, setEditingProveedorId] = useState(null);
 
   // ── Cambiar módulo ──
   const cambiarModulo = useCallback(key => {
@@ -286,6 +327,25 @@ export function InventoryPage({
     const agotados = items.filter(item => normalizeStatus(item?.estadoStock) === "AGOTADO").length;
     return { valorInventario, stockTotal, entradasHoy, salidasHoy, bajoStock, agotados };
   }, [items, movimientos]);
+
+  // ── Métricas especificas del submenu Bases (items ya viene filtrado por
+  // categoria="Bases" via la API cuando moduloActivo === "bases") ──
+  const basesMetrics = useMemo(() => {
+    const totalBases = items.length;
+    const stockBajo = items.filter(item => normalizeStatus(item?.estadoStock) === "BAJO_STOCK").length;
+    const agotadas = items.filter(item => normalizeStatus(item?.estadoStock) === "AGOTADO").length;
+    const basesInventarioIds = new Set(items.map(item => item.inventarioID));
+    const comprasEsteMes = movimientos.filter(mov =>
+      normalizeStatus(mov?.tipoMovimiento) === "ENTRADA"
+      && basesInventarioIds.has(mov?.inventarioID)
+      && isSameMonthAsToday(mov?.fecha)
+    ).length;
+    const proveedorIdsEnBases = new Set(
+      items.map(item => item.proveedorID).filter(id => id != null)
+    );
+    const proveedoresActivos = proveedores.filter(p => proveedorIdsEnBases.has(p.idProveedor) && p.activo).length;
+    return { totalBases, stockBajo, agotadas, comprasEsteMes, proveedoresActivos };
+  }, [items, movimientos, proveedores]);
 
   // ── Items filtrados en vista ──
   const visibleItems = useMemo(() => {
@@ -363,13 +423,13 @@ export function InventoryPage({
 
   // ── Arreglos: costo de producción, capacidad de fabricación y componente
   // limitante, calculados en el navegador cruzando la receta con el stock
-  // actual (allItems). No depende de precio de venta (no existe esa columna
-  // todavía en el backend) ni de datos de Pedidos/ventas. ──
+  // actual (allItems). Precio de venta / vendidos hoy / reservados vienen del
+  // backend (via el producto del catálogo vinculado a la receta). ──
   const recetaResumen = useMemo(() => {
     const detalles = recetaDetalle?.detalles;
     if (!Array.isArray(detalles) || detalles.length === 0) return null;
     let costoTotal = 0;
-    let capacidad = Infinity;
+    let capacidadAuto = Infinity;
     let limitante = null;
     const ingredientes = detalles.map(det => {
       const item = allItems.find(i => i.inventarioID === det.inventarioID);
@@ -378,17 +438,32 @@ export function InventoryPage({
       const costoUnitario = Number(item?.valorUnitario || 0);
       costoTotal += costoUnitario * cantidadReq;
       const posibles = cantidadReq > 0 ? Math.floor(stock / cantidadReq) : Infinity;
-      if (posibles < capacidad) {
-        capacidad = posibles;
+      if (posibles < capacidadAuto) {
+        capacidadAuto = posibles;
         limitante = det;
       }
       return { det, stock, cantidadReq, posibles };
     });
+    capacidadAuto = Number.isFinite(capacidadAuto) ? capacidadAuto : 0;
+    const tieneManual = recetaDetalle?.capacidadManual != null && recetaDetalle.capacidadManual !== "";
+    const capacidad = tieneManual ? Number(recetaDetalle.capacidadManual) : capacidadAuto;
+    const precioVenta = recetaDetalle?.precioVenta != null ? Number(recetaDetalle.precioVenta) : null;
+    const utilidad = precioVenta != null ? precioVenta - costoTotal : null;
+    const reservados = Number(recetaDetalle?.reservados || 0);
+    const vendidosHoy = Number(recetaDetalle?.vendidosHoy || 0);
+    const disponibles = Math.max(0, capacidad - reservados);
     return {
       costoTotal,
-      capacidad: Number.isFinite(capacidad) ? capacidad : 0,
+      capacidadAuto,
+      capacidad,
+      capacidadEsManual: tieneManual,
       limitante,
       ingredientes,
+      precioVenta,
+      utilidad,
+      reservados,
+      vendidosHoy,
+      disponibles,
     };
   }, [recetaDetalle, allItems]);
 
@@ -415,6 +490,10 @@ export function InventoryPage({
   const loadInventario = useCallback(async () => {
     const cat = MODULES.find(m => m.key === moduloActivo)?.categoria;
     if (!cat) { setItems([]); return; }
+    // Evita que una respuesta vieja (p.ej. de un modulo/pestaña anterior que
+    // tarda mas en responder) sobreescriba el resultado de una peticion mas
+    // reciente al llegar fuera de orden.
+    const requestId = ++inventarioRequestIdRef.current;
     setLoading(true);
     setError("");
     try {
@@ -425,12 +504,14 @@ export function InventoryPage({
         proveedorId: proveedorFiltro ? Number(proveedorFiltro) : null,
         q: q || null,
       });
+      if (requestId !== inventarioRequestIdRef.current) return;
       setItems(Array.isArray(data.items) ? data.items : []);
     } catch (nextError) {
+      if (requestId !== inventarioRequestIdRef.current) return;
       setItems([]);
       setError(nextError?.message || "No fue posible cargar inventario.");
     } finally {
-      setLoading(false);
+      if (requestId === inventarioRequestIdRef.current) setLoading(false);
     }
   }, [api, empresaId, moduloActivo, estadoFiltro, proveedorFiltro, q]);
 
@@ -465,8 +546,38 @@ export function InventoryPage({
     } catch { setRecetaDetalle(null); }
   }, [api]);
 
+  // Busca productos del catalogo de ventas para vincular un Arreglo existente
+  // (reutiliza precio/imagen ya definidos ahi, en vez de duplicarlos). Usa un
+  // contador de peticiones para que una busqueda vieja (p.ej. la carga inicial
+  // sin filtro, que trae mas filas y puede tardar mas) no sobreescriba el
+  // resultado de una busqueda mas reciente al llegar fuera de orden.
+  const buscarProductoCatalogo = useCallback(async query => {
+    const requestId = ++catalogoRequestIdRef.current;
+    setCatalogoBuscando(true);
+    try {
+      const data = await api.buscarArreglosCatalogo({ empresaId, sucursalId, q: query });
+      if (requestId !== catalogoRequestIdRef.current) return;
+      setCatalogoResultados(Array.isArray(data) ? data : []);
+    } catch {
+      if (requestId !== catalogoRequestIdRef.current) return;
+      setCatalogoResultados([]);
+    } finally {
+      if (requestId === catalogoRequestIdRef.current) setCatalogoBuscando(false);
+    }
+  }, [api, empresaId, sucursalId]);
+
   useEffect(() => { loadProveedores().catch(() => {}); }, [loadProveedores]);
   useEffect(() => { loadMovimientos().catch(() => {}); }, [loadMovimientos]);
+
+  useEffect(() => {
+    if (moduloActivo !== "arreglos" || vistaActiva !== "crear" || recetaForm.productoModo !== "vincular") return undefined;
+    // Sin texto todavia se trae el catalogo completo (para poder explorarlo),
+    // el contador de peticiones (catalogoRequestIdRef) evita que esa carga
+    // inicial, al tardar mas por traer mas filas, pise una busqueda posterior
+    // mas especifica que llegue primero.
+    const timeoutId = setTimeout(() => { buscarProductoCatalogo(catalogoQuery).catch(() => {}); }, 350);
+    return () => clearTimeout(timeoutId);
+  }, [moduloActivo, vistaActiva, recetaForm.productoModo, catalogoQuery, buscarProductoCatalogo]);
 
   useEffect(() => {
     if (moduloActivo === "arreglos") { loadRecetas().catch(() => {}); loadAllItems().catch(() => {}); }
@@ -519,6 +630,67 @@ export function InventoryPage({
     }
   };
 
+  // ── Modal proveedor ──
+  const openCreateProveedorModal = () => {
+    setEditingProveedorId(null);
+    setProveedorForm(initialProveedorForm);
+    setError("");
+    setInfo("");
+    setShowProveedorModal(true);
+  };
+
+  const openEditProveedorModal = item => {
+    setEditingProveedorId(item.idProveedor);
+    setProveedorForm({
+      nombre: item.nombre || "",
+      codigoProveedor: item.codigoProveedor || "",
+      telefono: item.telefono || "",
+      email: item.email || "",
+      direccion: item.direccion || "",
+      activo: Boolean(item.activo),
+    });
+    setError("");
+    setInfo("");
+    setShowProveedorModal(true);
+  };
+
+  const closeProveedorModal = () => {
+    setShowProveedorModal(false);
+    setEditingProveedorId(null);
+    setProveedorForm(initialProveedorForm);
+  };
+
+  // ── Submit proveedor ──
+  const submitProveedor = async event => {
+    event.preventDefault();
+    setSavingProveedor(true);
+    setError("");
+    setInfo("");
+    try {
+      const payload = {
+        empresaId,
+        nombre: String(proveedorForm.nombre || "").trim(),
+        codigoProveedor: String(proveedorForm.codigoProveedor || "").trim() || null,
+        telefono: String(proveedorForm.telefono || "").trim() || null,
+        email: String(proveedorForm.email || "").trim() || null,
+        direccion: String(proveedorForm.direccion || "").trim() || null,
+        activo: Boolean(proveedorForm.activo),
+      };
+      if (editingProveedorId) {
+        await api.actualizarProveedorInventario({ ...payload, proveedorId: editingProveedorId });
+      } else {
+        await api.crearProveedorInventario(payload);
+      }
+      await loadProveedores();
+      setInfo(editingProveedorId ? "Proveedor actualizado correctamente." : "Proveedor creado correctamente.");
+      closeProveedorModal();
+    } catch (nextError) {
+      setError(nextError?.message || "No fue posible guardar proveedor.");
+    } finally {
+      setSavingProveedor(false);
+    }
+  };
+
   // ── Submit ajustar stock ──
   const submitStock = async event => {
     event.preventDefault();
@@ -565,11 +737,39 @@ export function InventoryPage({
   // ── Submit receta ──
   const submitReceta = async event => {
     event.preventDefault();
+    if (recetaForm.productoModo === "nuevo" && !String(recetaForm.precioVenta).trim()) {
+      setError("Indica el precio de venta o vincula un producto existente.");
+      return;
+    }
+    if (recetaForm.productoModo === "vincular" && !recetaForm.productoID) {
+      setError("Selecciona el producto del catálogo a vincular.");
+      return;
+    }
+    // Al vincular un producto existente, el arreglo toma nombre/descripción
+    // de ese producto — no se piden de nuevo (serían el mismo dato repetido).
+    const nombre = recetaForm.productoModo === "vincular"
+      ? String(recetaProductoSeleccionado?.nombreProducto || "").trim()
+      : recetaForm.nombre.trim();
+    const descripcion = recetaForm.productoModo === "vincular"
+      ? (String(recetaProductoSeleccionado?.descripcion || "").trim() || null)
+      : (recetaForm.descripcion.trim() || null);
+
     setSavingReceta(true);
     setError("");
     try {
-      await api.crearReceta({ empresaId, nombre: recetaForm.nombre.trim(), descripcion: recetaForm.descripcion.trim() || null });
-      setRecetaForm({ nombre: "", descripcion: "" });
+      await api.crearReceta({
+        empresaId,
+        nombre,
+        descripcion,
+        productoID: recetaForm.productoModo === "vincular" ? Number(recetaForm.productoID) : null,
+        precioVenta: recetaForm.productoModo === "nuevo" ? recetaForm.precioVenta : null,
+        imagenUrl: recetaForm.productoModo === "nuevo" ? (recetaForm.imagenUrl.trim() || null) : null,
+        capacidadManual: recetaForm.capacidadManual.trim() ? recetaForm.capacidadManual : null,
+      });
+      setRecetaForm(initialRecetaForm);
+      setRecetaProductoSeleccionado(null);
+      setCatalogoQuery("");
+      setCatalogoResultados([]);
       await loadRecetas();
       setInfo("Arreglo creado.");
       setVistaActiva("lista");
@@ -608,7 +808,14 @@ export function InventoryPage({
 
   const toggleRecetaActivo = async rec => {
     try {
-      await api.actualizarReceta({ recetaId: rec.idReceta, nombre: rec.nombre, descripcion: rec.descripcion || "", activo: !rec.activo });
+      await api.actualizarReceta({
+        recetaId: rec.idReceta,
+        nombre: rec.nombre,
+        descripcion: rec.descripcion || "",
+        productoID: rec.productoID || null,
+        capacidadManual: rec.capacidadManual ?? null,
+        activo: !rec.activo,
+      });
       await loadRecetas();
       setInfo(`${rec.nombre} ${rec.activo ? "desactivado" : "activado"}.`);
     } catch (nextError) {
@@ -632,8 +839,8 @@ export function InventoryPage({
         toggleSidebar={toggleSidebar}
         closeSidebarMobile={() => setSidebarMobileOpen(false)}
         onLogout={onLogout}
-        permissions={{ pipeline: canViewPipeline, pedidos: canViewPedidos, produccion: canViewProduccion, domicilios: canViewDomicilios, barrios: canViewBarrios, inventario: canViewInventario, contabilidad: canViewContabilidad, trazabilidad: canViewTrazabilidad, clientes: canViewClientesPanel, usuarios: canViewUsuariosPanel }}
-        navigation={{ pipeline: onGoPipeline, pedidos: onGoPedidos, produccion: onGoProduccion, domicilios: onGoDomicilios, barrios: onGoBarrios, inventario: onGoInventario, contabilidad: onGoContabilidad, trazabilidad: onGoTrazabilidad, clientes: onGoClientes, usuarios: onGoUsuarios }}
+        permissions={{ pipeline: canViewPipeline, pedidos: canViewPedidos, produccion: canViewProduccion, domicilios: canViewDomicilios, barrios: canViewBarrios, inventario: canViewInventario, contabilidad: canViewContabilidad, clientes: canViewClientesPanel, usuarios: canViewUsuariosPanel }}
+        navigation={{ pipeline: onGoPipeline, pedidos: onGoPedidos, produccion: onGoProduccion, domicilios: onGoDomicilios, barrios: onGoBarrios, inventario: onGoInventario, contabilidad: onGoContabilidad, clientes: onGoClientes, usuarios: onGoUsuarios }}
       />
 
       <main className="orders-admin-view orders-page-view inventory-page-view">
@@ -664,10 +871,16 @@ export function InventoryPage({
                   placeholder={`Buscar en ${moduloLabel.toLowerCase()}...`}
                 />
               </label>
-              {moduloActivo !== "movimientos" && vistaActiva === "lista" ? (
+              {moduloActivo !== "movimientos" && moduloActivo !== "proveedores" && vistaActiva === "lista" ? (
                 <button type="button" className="btn-outline inventory-header-action" onClick={() => setVistaActiva("crear")}>
                   <PackagePlus size={18} strokeWidth={2} aria-hidden="true" />
                   <span>Nuevo {moduloLabel === "Arreglos" ? "Arreglo" : moduloLabel === "Flores" ? "Flor" : moduloLabel === "Bases" ? "Base" : moduloLabel === "Materiales" ? "Material" : moduloLabel === "Adicionales" ? "Adicional" : ""}</span>
+                </button>
+              ) : null}
+              {moduloActivo === "proveedores" ? (
+                <button type="button" className="btn-outline inventory-header-action" onClick={openCreateProveedorModal}>
+                  <PackagePlus size={18} strokeWidth={2} aria-hidden="true" />
+                  <span>Nuevo proveedor</span>
                 </button>
               ) : null}
               {vistaActiva !== "lista" ? (
@@ -682,38 +895,68 @@ export function InventoryPage({
               </button>
             </div>
           </div>
-          <div className="orders-header-metrics inventory-header-metrics" aria-label="Indicadores de inventario">
-            <article className="orders-header-metric-card is-primary">
-              <span className="orders-header-metric-icon" aria-hidden="true"><DollarSign size={18} strokeWidth={2} /></span>
-              <strong>${formatearCOP(inventoryMetrics.valorInventario)}</strong>
-              <span>Valor inventario</span>
-            </article>
-            <article className="orders-header-metric-card is-teal">
-              <span className="orders-header-metric-icon" aria-hidden="true"><Boxes size={18} strokeWidth={2} /></span>
-              <strong>{inventoryMetrics.stockTotal}</strong>
-              <span>Stock total</span>
-            </article>
-            <article className="orders-header-metric-card is-green">
-              <span className="orders-header-metric-icon" aria-hidden="true"><ArrowDownToLine size={18} strokeWidth={2} /></span>
-              <strong>{inventoryMetrics.entradasHoy}</strong>
-              <span>Entradas hoy</span>
-            </article>
-            <article className="orders-header-metric-card is-purple">
-              <span className="orders-header-metric-icon" aria-hidden="true"><ArrowUpFromLine size={18} strokeWidth={2} /></span>
-              <strong>{inventoryMetrics.salidasHoy}</strong>
-              <span>Salidas hoy</span>
-            </article>
-            <article className="orders-header-metric-card is-blue">
-              <span className="orders-header-metric-icon" aria-hidden="true"><TriangleAlert size={18} strokeWidth={2} /></span>
-              <strong>{inventoryMetrics.bajoStock}</strong>
-              <span>Bajo stock</span>
-            </article>
-            <article className="orders-header-metric-card is-orange">
-              <span className="orders-header-metric-icon" aria-hidden="true"><CircleX size={18} strokeWidth={2} /></span>
-              <strong>{inventoryMetrics.agotados}</strong>
-              <span>Agotados</span>
-            </article>
-          </div>
+          {moduloActivo === "bases" ? (
+            <div className="orders-header-metrics inventory-header-metrics" aria-label="Indicadores de bases">
+              <article className="orders-header-metric-card is-primary">
+                <span className="orders-header-metric-icon" aria-hidden="true"><Boxes size={18} strokeWidth={2} /></span>
+                <strong>{basesMetrics.totalBases}</strong>
+                <span>Total bases</span>
+              </article>
+              <article className="orders-header-metric-card is-orange">
+                <span className="orders-header-metric-icon" aria-hidden="true"><TriangleAlert size={18} strokeWidth={2} /></span>
+                <strong>{basesMetrics.stockBajo}</strong>
+                <span>Stock bajo</span>
+              </article>
+              <article className="orders-header-metric-card is-purple">
+                <span className="orders-header-metric-icon" aria-hidden="true"><CircleX size={18} strokeWidth={2} /></span>
+                <strong>{basesMetrics.agotadas}</strong>
+                <span>Agotadas</span>
+              </article>
+              <article className="orders-header-metric-card is-green">
+                <span className="orders-header-metric-icon" aria-hidden="true"><ArrowDownToLine size={18} strokeWidth={2} /></span>
+                <strong>{basesMetrics.comprasEsteMes}</strong>
+                <span>Compras este mes</span>
+              </article>
+              <article className="orders-header-metric-card is-blue">
+                <span className="orders-header-metric-icon" aria-hidden="true"><Truck size={18} strokeWidth={2} /></span>
+                <strong>{basesMetrics.proveedoresActivos}</strong>
+                <span>Proveedores activos</span>
+              </article>
+            </div>
+          ) : (
+            <div className="orders-header-metrics inventory-header-metrics" aria-label="Indicadores de inventario">
+              <article className="orders-header-metric-card is-primary">
+                <span className="orders-header-metric-icon" aria-hidden="true"><DollarSign size={18} strokeWidth={2} /></span>
+                <strong>${formatearCOP(inventoryMetrics.valorInventario)}</strong>
+                <span>Valor inventario</span>
+              </article>
+              <article className="orders-header-metric-card is-teal">
+                <span className="orders-header-metric-icon" aria-hidden="true"><Boxes size={18} strokeWidth={2} /></span>
+                <strong>{inventoryMetrics.stockTotal}</strong>
+                <span>Stock total</span>
+              </article>
+              <article className="orders-header-metric-card is-green">
+                <span className="orders-header-metric-icon" aria-hidden="true"><ArrowDownToLine size={18} strokeWidth={2} /></span>
+                <strong>{inventoryMetrics.entradasHoy}</strong>
+                <span>Entradas hoy</span>
+              </article>
+              <article className="orders-header-metric-card is-purple">
+                <span className="orders-header-metric-icon" aria-hidden="true"><ArrowUpFromLine size={18} strokeWidth={2} /></span>
+                <strong>{inventoryMetrics.salidasHoy}</strong>
+                <span>Salidas hoy</span>
+              </article>
+              <article className="orders-header-metric-card is-blue">
+                <span className="orders-header-metric-icon" aria-hidden="true"><TriangleAlert size={18} strokeWidth={2} /></span>
+                <strong>{inventoryMetrics.bajoStock}</strong>
+                <span>Bajo stock</span>
+              </article>
+              <article className="orders-header-metric-card is-orange">
+                <span className="orders-header-metric-icon" aria-hidden="true"><CircleX size={18} strokeWidth={2} /></span>
+                <strong>{inventoryMetrics.agotados}</strong>
+                <span>Agotados</span>
+              </article>
+            </div>
+          )}
         </header>
 
         {/* ── MENSAJES ── */}
@@ -750,7 +993,7 @@ export function InventoryPage({
             <section className="orders-filters inventory-filters">
               {subcategoriasModulo.length > 0 ? (
                 <div className="filter-field">
-                  <span>Subcategoría</span>
+                  <span>{moduloActivo === "materiales" ? "Categoría" : "Subcategoría"}</span>
                   <div className="orders-filter-control inventory-filter-control">
                     <Layers size={17} strokeWidth={2} />
                     <select value={subcategoriaFiltro} onChange={e => setSubcategoriaFiltro(e.target.value)}>
@@ -805,8 +1048,9 @@ export function InventoryPage({
                     <thead>
                       <tr>
                         <th>Código</th>
-                        <th>Nombre</th>
+                        <th>{(moduloActivo === "bases" || moduloActivo === "materiales") ? "Producto" : "Nombre"}</th>
                         {moduloActivo !== "flores" ? <th>Categoría</th> : null}
+                        {moduloActivo === "materiales" ? <th>Subcategoría</th> : null}
                         {(moduloActivo === "bases" || moduloActivo === "materiales") ? <th>Tamaño</th> : null}
                         {moduloActivo !== "adicionales" ? <th>Color</th> : null}
                         {moduloActivo === "adicionales" ? <th>Marca</th> : null}
@@ -831,7 +1075,7 @@ export function InventoryPage({
                         return (
                           <tr key={item.inventarioID} className={inventoryRowClass(item)}>
                             <td data-label="Código">{item.codigo}</td>
-                            <td data-label="Nombre">
+                            <td data-label={(moduloActivo === "bases" || moduloActivo === "materiales") ? "Producto" : "Nombre"}>
                               <div className="inventory-product-cell">
                                 <strong>{item.nombre}</strong>
                                 {item.subcategoria ? <span className="inventory-subcategoria-badge">{item.subcategoria}</span> : null}
@@ -839,6 +1083,9 @@ export function InventoryPage({
                             </td>
                             {moduloActivo !== "flores" ? (
                               <td data-label="Categoría">{item.subcategoria || item.categoria || "-"}</td>
+                            ) : null}
+                            {moduloActivo === "materiales" ? (
+                              <td data-label="Subcategoría">{item.descripcion || "-"}</td>
                             ) : null}
                             {(moduloActivo === "bases" || moduloActivo === "materiales") ? (
                               <td data-label="Tamaño">{item.tamano || "-"}</td>
@@ -1046,15 +1293,15 @@ export function InventoryPage({
                     <input type="text" placeholder="Ej: FLO-ROSA-001" value={createForm.codigo} onChange={e => setCreateForm(f => ({ ...f, codigo: e.target.value }))} required />
                   </label>
                   <label className="inventory-field">
-                    <span>Nombre</span>
-                    <input type="text" placeholder={`Nombre del ${moduloLabel.toLowerCase()}`} value={createForm.nombre} onChange={e => setCreateForm(f => ({ ...f, nombre: e.target.value }))} required />
+                    <span>{(moduloActivo === "bases" || moduloActivo === "materiales") ? "Producto" : "Nombre"}</span>
+                    <input type="text" placeholder={moduloActivo === "bases" ? "Ej: Florero cerámico blanco" : moduloActivo === "materiales" ? "Ej: Cinta flora" : `Nombre del ${moduloLabel.toLowerCase()}`} value={createForm.nombre} onChange={e => setCreateForm(f => ({ ...f, nombre: e.target.value }))} required />
                   </label>
                 </div>
                 {subcategoriasModulo.length > 0 ? (
                   <label className="inventory-field">
-                    <span>Subcategoría</span>
+                    <span>{moduloActivo === "materiales" ? "Categoría" : "Subcategoría"}</span>
                     <select value={createForm.subcategoria} onChange={e => setCreateForm(f => ({ ...f, subcategoria: e.target.value }))}>
-                      <option value="">Sin subcategoría</option>
+                      <option value="">{moduloActivo === "materiales" ? "Sin categoría" : "Sin subcategoría"}</option>
                       {subcategoriasModulo.map(sub => <option key={sub} value={sub}>{sub}</option>)}
                     </select>
                   </label>
@@ -1096,8 +1343,13 @@ export function InventoryPage({
                   </label>
                 ) : null}
                 <label className="inventory-field">
-                  <span>Descripción</span>
-                  <input type="text" placeholder="Descripción opcional" value={createForm.descripcion} onChange={e => setCreateForm(f => ({ ...f, descripcion: e.target.value }))} />
+                  <span>{moduloActivo === "materiales" ? "Subcategoría" : "Descripción"}</span>
+                  <input
+                    type="text"
+                    placeholder={moduloActivo === "materiales" ? "Ej: Satinada, Ladrillo, Transparente" : "Descripción opcional"}
+                    value={createForm.descripcion}
+                    onChange={e => setCreateForm(f => ({ ...f, descripcion: e.target.value }))}
+                  />
                 </label>
                 <label className="inventory-field">
                   <span>Proveedor</span>
@@ -1108,7 +1360,7 @@ export function InventoryPage({
                 </label>
                 <div className="inventory-two-cols">
                   <label className="inventory-field">
-                    <span>Stock inicial</span>
+                    <span>{(moduloActivo === "bases" || moduloActivo === "materiales") ? "Cantidad" : "Stock inicial"}</span>
                     <input type="number" min="0" step="0.01" value={createForm.stockActual} onChange={e => setCreateForm(f => ({ ...f, stockActual: e.target.value }))} required />
                   </label>
                   <label className="inventory-field">
@@ -1206,9 +1458,15 @@ export function InventoryPage({
                 ) : recetas.map(rec => (
                   <div key={rec.idReceta} className={`inventory-receta-card${rec.activo ? "" : " is-inactive"}`}>
                     <div className="inventory-receta-header">
+                      {rec.imagenUrl ? (
+                        <img className="inventory-receta-thumb" src={rec.imagenUrl} alt={rec.nombre} />
+                      ) : null}
                       <div>
                         <strong>{rec.nombre}</strong>
                         {rec.descripcion ? <p>{rec.descripcion}</p> : null}
+                        {rec.precioVenta != null ? (
+                          <span className="inventory-receta-precio">${formatearCOP(Number(rec.precioVenta))}</span>
+                        ) : null}
                       </div>
                       <div className="inventory-receta-meta">
                         <span className={`order-badge ${rec.activo ? "is-entregado" : "is-cancelado"}`}>{rec.activo ? "Activo" : "Inactivo"}</span>
@@ -1263,6 +1521,15 @@ export function InventoryPage({
 
                         {recetaResumen && recetaDetalle.detalles.length > 0 ? (
                           <div className="inventory-receta-summary">
+                            {recetaResumen.precioVenta != null ? (
+                              <div className="inventory-receta-summary-item">
+                                <span className="inventory-receta-summary-icon"><Tag size={16} strokeWidth={2} /></span>
+                                <div>
+                                  <strong>${formatearCOP(recetaResumen.precioVenta)}</strong>
+                                  <span>Precio de venta</span>
+                                </div>
+                              </div>
+                            ) : null}
                             <div className="inventory-receta-summary-item">
                               <span className="inventory-receta-summary-icon"><DollarSign size={16} strokeWidth={2} /></span>
                               <div>
@@ -1270,11 +1537,20 @@ export function InventoryPage({
                                 <span>Costo de producción</span>
                               </div>
                             </div>
+                            {recetaResumen.utilidad != null ? (
+                              <div className="inventory-receta-summary-item">
+                                <span className="inventory-receta-summary-icon"><TrendingUp size={16} strokeWidth={2} /></span>
+                                <div>
+                                  <strong>${formatearCOP(recetaResumen.utilidad)}</strong>
+                                  <span>Utilidad</span>
+                                </div>
+                              </div>
+                            ) : null}
                             <div className="inventory-receta-summary-item">
                               <span className="inventory-receta-summary-icon"><Gauge size={16} strokeWidth={2} /></span>
                               <div>
-                                <strong>{recetaResumen.capacidad}</strong>
-                                <span>Capacidad de fabricación</span>
+                                <strong>{recetaResumen.capacidad}{recetaResumen.capacidadEsManual ? " *" : ""}</strong>
+                                <span>Capacidad de fabricación{recetaResumen.capacidadEsManual ? " (manual)" : ""}</span>
                               </div>
                             </div>
                             <div className="inventory-receta-summary-item">
@@ -1282,6 +1558,27 @@ export function InventoryPage({
                               <div>
                                 <strong>{recetaResumen.limitante?.nombre || "-"}</strong>
                                 <span>Componente limitante</span>
+                              </div>
+                            </div>
+                            <div className="inventory-receta-summary-item">
+                              <span className="inventory-receta-summary-icon"><CheckCircle2 size={16} strokeWidth={2} /></span>
+                              <div>
+                                <strong>{recetaResumen.disponibles}</strong>
+                                <span>Disponibles</span>
+                              </div>
+                            </div>
+                            <div className="inventory-receta-summary-item">
+                              <span className="inventory-receta-summary-icon"><ClipboardList size={16} strokeWidth={2} /></span>
+                              <div>
+                                <strong>{recetaResumen.reservados}</strong>
+                                <span>Reservados</span>
+                              </div>
+                            </div>
+                            <div className="inventory-receta-summary-item">
+                              <span className="inventory-receta-summary-icon"><ShoppingCart size={16} strokeWidth={2} /></span>
+                              <div>
+                                <strong>{recetaResumen.vendidosHoy}</strong>
+                                <span>Vendidos hoy</span>
                               </div>
                             </div>
                           </div>
@@ -1345,19 +1642,125 @@ export function InventoryPage({
           <section className="inventory-grid-layout inventory-single-layout">
             <article className="order-block inventory-panel inventory-form-panel">
               <h4><UtensilsCrossed size={18} strokeWidth={2} /> Nuevo Arreglo</h4>
-              <p className="inventory-form-help">Define el nombre y descripción del arreglo. Luego agrega los ingredientes desde la lista.</p>
+              <p className="inventory-form-help">
+                {recetaForm.productoModo === "vincular"
+                  ? "Busca el producto del catálogo que representa este arreglo — el arreglo toma su nombre, descripción, precio e imagen directamente de ahí. Luego agrega los ingredientes (la receta) desde la lista."
+                  : "Define el producto floral: nombre, descripción, precio e imagen. Luego agrega los ingredientes (la receta) desde la lista."}
+              </p>
               <form className="users-create-form" onSubmit={submitReceta}>
+                <div className="inventory-producto-modo-toggle">
+                  <button
+                    type="button"
+                    className={`btn-outline${recetaForm.productoModo === "nuevo" ? " is-active" : ""}`}
+                    onClick={() => { setRecetaForm(f => ({ ...f, productoModo: "nuevo", productoID: "" })); setRecetaProductoSeleccionado(null); setCatalogoQuery(""); setCatalogoResultados([]); }}
+                  >
+                    Crear producto nuevo
+                  </button>
+                  <button
+                    type="button"
+                    className={`btn-outline${recetaForm.productoModo === "vincular" ? " is-active" : ""}`}
+                    onClick={() => { setRecetaForm(f => ({ ...f, productoModo: "vincular" })); setCatalogoBuscando(true); }}
+                  >
+                    Vincular producto existente
+                  </button>
+                </div>
+
+                {recetaForm.productoModo === "nuevo" ? (
+                  <>
+                    <label className="inventory-field">
+                      <span>Nombre del arreglo</span>
+                      <input type="text" placeholder="Ej: Box Romántico 24 Rosas" value={recetaForm.nombre} onChange={e => setRecetaForm(f => ({ ...f, nombre: e.target.value }))} required />
+                    </label>
+                    <label className="inventory-field">
+                      <span>Descripción</span>
+                      <input type="text" placeholder="Descripción opcional" value={recetaForm.descripcion} onChange={e => setRecetaForm(f => ({ ...f, descripcion: e.target.value }))} />
+                    </label>
+                    <div className="inventory-two-cols">
+                      <label className="inventory-field">
+                        <span>Precio de venta</span>
+                        <input type="number" min="0" step="0.01" placeholder="Ej: 85000" value={recetaForm.precioVenta} onChange={e => setRecetaForm(f => ({ ...f, precioVenta: e.target.value }))} required />
+                      </label>
+                      <label className="inventory-field">
+                        <span>Imagen (URL)</span>
+                        <input type="text" placeholder="https://…" value={recetaForm.imagenUrl} onChange={e => setRecetaForm(f => ({ ...f, imagenUrl: e.target.value }))} />
+                      </label>
+                    </div>
+                  </>
+                ) : (
+                  <div className="inventory-field inventory-producto-picker">
+                    <span>Buscar producto del catálogo</span>
+                    <input
+                      type="text"
+                      placeholder="Buscar por nombre o código…"
+                      value={catalogoQuery}
+                      onChange={e => { setCatalogoQuery(e.target.value); setRecetaProductoSeleccionado(null); setRecetaForm(f => ({ ...f, productoID: "" })); }}
+                    />
+                    {catalogoBuscando ? <p className="inventory-form-help">Buscando…</p> : null}
+                    {recetaProductoSeleccionado ? (
+                      <div className="inventory-producto-picker-selected">
+                        {recetaProductoSeleccionado.imagenUrl ? <img src={recetaProductoSeleccionado.imagenUrl} alt="" /> : null}
+                        <div>
+                          <strong>{recetaProductoSeleccionado.nombreProducto}</strong>
+                          <span>${formatearCOP(recetaProductoSeleccionado.precio)} · {recetaProductoSeleccionado.codigoProducto}</span>
+                          {recetaProductoSeleccionado.descripcion ? <small>{recetaProductoSeleccionado.descripcion}</small> : null}
+                        </div>
+                        <button
+                          type="button"
+                          className="btn-outline inventory-producto-picker-clear"
+                          onClick={() => { setRecetaProductoSeleccionado(null); setRecetaForm(f => ({ ...f, productoID: "" })); setCatalogoQuery(""); }}
+                        >
+                          Cambiar
+                        </button>
+                      </div>
+                    ) : catalogoResultados.length > 0 ? (
+                      <div className="inventory-producto-picker-results">
+                        {catalogoResultados.map(p => (
+                          <button
+                            key={p.idProducto}
+                            type="button"
+                            onClick={() => {
+                              setRecetaProductoSeleccionado(p);
+                              setRecetaForm(f => ({ ...f, productoID: String(p.idProducto) }));
+                              setCatalogoResultados([]);
+                            }}
+                          >
+                            {p.imagenUrl ? <img src={p.imagenUrl} alt="" /> : <span className="inventory-producto-picker-noimg"><Tag size={14} strokeWidth={2} /></span>}
+                            <div>
+                              <strong>{p.nombreProducto}</strong>
+                              <span>${formatearCOP(p.precio)} · {p.codigoProducto}</span>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    ) : !catalogoBuscando ? (
+                      <p className="inventory-form-help">
+                        {catalogoQuery.trim() ? "Sin productos que coincidan con la búsqueda." : "No hay productos en el catálogo para esta sucursal."}
+                      </p>
+                    ) : null}
+                  </div>
+                )}
+
                 <label className="inventory-field">
-                  <span>Nombre del arreglo</span>
-                  <input type="text" placeholder="Ej: Box Romántico 24 Rosas" value={recetaForm.nombre} onChange={e => setRecetaForm(f => ({ ...f, nombre: e.target.value }))} required />
+                  <span>Capacidad de fabricación manual (opcional)</span>
+                  <input
+                    type="number"
+                    min="0"
+                    step="1"
+                    placeholder="Déjalo vacío para calcularla automáticamente según el inventario"
+                    value={recetaForm.capacidadManual}
+                    onChange={e => setRecetaForm(f => ({ ...f, capacidadManual: e.target.value }))}
+                  />
                 </label>
-                <label className="inventory-field">
-                  <span>Descripción</span>
-                  <input type="text" placeholder="Descripción opcional" value={recetaForm.descripcion} onChange={e => setRecetaForm(f => ({ ...f, descripcion: e.target.value }))} />
-                </label>
+
                 <div className="order-actions">
                   <button type="submit" className="btn-primary" disabled={savingReceta}>{savingReceta ? "Guardando..." : "Crear Arreglo"}</button>
-                  <button type="button" className="btn-outline" onClick={() => setVistaActiva("lista")}>Cancelar</button>
+                  <button
+                    type="button"
+                    className="btn-outline"
+                    onClick={() => { setVistaActiva("lista"); setRecetaForm(initialRecetaForm); setRecetaProductoSeleccionado(null); setCatalogoQuery(""); setCatalogoResultados([]); }}
+                  >
+                    Cancelar
+                  </button>
                 </div>
               </form>
             </article>
@@ -1446,6 +1849,155 @@ export function InventoryPage({
               </table>
             </article>
           </section>
+        ) : null}
+
+        {/* ════════════════════════════════════════════════════
+            MÓDULO: PROVEEDORES
+        ════════════════════════════════════════════════════ */}
+        {moduloActivo === "proveedores" ? (
+          <section className="inventory-grid-layout inventory-single-layout inventory-provider-layout">
+            <article className="orders-table-wrap users-table-wrap users-table-panel inventory-provider-table-panel">
+              <div className="inventory-section-title">
+                <h4>Proveedores registrados</h4>
+                <p>Nombre, código, contacto y estado usados por el selector de <strong>Proveedor</strong> en inventario.</p>
+              </div>
+              <div className="inventory-table-scroll">
+                <table className="orders-table users-table inventory-table">
+                  <thead>
+                    <tr>
+                      <th>ID</th>
+                      <th>Nombre</th>
+                      <th>Código</th>
+                      <th>Teléfono</th>
+                      <th>Email</th>
+                      <th>Dirección</th>
+                      <th>Estado</th>
+                      <th>Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {proveedores.map(item => (
+                      <tr key={item.idProveedor}>
+                        <td data-label="ID">{item.idProveedor}</td>
+                        <td data-label="Nombre">{item.nombre}</td>
+                        <td data-label="Código">{item.codigoProveedor || "-"}</td>
+                        <td data-label="Teléfono">{item.telefono || "-"}</td>
+                        <td data-label="Email">{item.email || "-"}</td>
+                        <td data-label="Dirección">{item.direccion || "-"}</td>
+                        <td data-label="Estado">
+                          <span className={`order-badge ${item.activo ? "is-entregado" : "is-cancelado"}`}>
+                            {item.activo ? "Activo" : "Inactivo"}
+                          </span>
+                        </td>
+                        <td data-label="Acciones">
+                          <button type="button" className="btn-outline inventory-table-action" onClick={() => openEditProveedorModal(item)}>
+                            <Pencil size={14} strokeWidth={2} aria-hidden="true" />
+                            <span>Editar</span>
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                    {proveedores.length === 0 ? (
+                      <tr><td colSpan="8" className="inventory-empty-note">Sin proveedores registrados.</td></tr>
+                    ) : null}
+                  </tbody>
+                </table>
+              </div>
+            </article>
+          </section>
+        ) : null}
+
+        {showProveedorModal ? (
+          <div
+            className="inventory-provider-modal-overlay"
+            role="presentation"
+            onClick={closeProveedorModal}
+          >
+            <section
+              className="inventory-provider-modal"
+              role="dialog"
+              aria-modal="true"
+              aria-label={editingProveedorId ? "Editar proveedor" : "Crear proveedor"}
+              onClick={event => event.stopPropagation()}
+            >
+              <div className="inventory-provider-modal-head">
+                <h4>{editingProveedorId ? "Editar proveedor" : "Crear proveedor"}</h4>
+                <button
+                  type="button"
+                  className="btn-outline inventory-provider-modal-close"
+                  onClick={closeProveedorModal}
+                  aria-label="Cerrar"
+                >
+                  <X size={16} strokeWidth={2} />
+                </button>
+              </div>
+              <form className="users-create-form inventory-provider-form" onSubmit={submitProveedor}>
+                <label className="inventory-field">
+                  <span>Nombre proveedor</span>
+                  <input
+                    type="text"
+                    placeholder="Ej: Flores de la Sabana"
+                    value={proveedorForm.nombre}
+                    onChange={event => setProveedorForm(current => ({ ...current, nombre: event.target.value }))}
+                    required
+                  />
+                </label>
+                <label className="inventory-field">
+                  <span>Código proveedor</span>
+                  <small className="inventory-field-hint">Opcional. Consecutivo interno para identificar al proveedor.</small>
+                  <input
+                    type="text"
+                    placeholder="Ej: PROV-FLO-003"
+                    value={proveedorForm.codigoProveedor}
+                    onChange={event => setProveedorForm(current => ({ ...current, codigoProveedor: event.target.value }))}
+                  />
+                </label>
+                <label className="inventory-field">
+                  <span>Teléfono</span>
+                  <input
+                    type="tel"
+                    placeholder="Ej: 3001234567"
+                    value={proveedorForm.telefono}
+                    onChange={event => setProveedorForm(current => ({ ...current, telefono: event.target.value }))}
+                  />
+                </label>
+                <label className="inventory-field">
+                  <span>Email</span>
+                  <input
+                    type="email"
+                    placeholder="Ej: contacto@proveedor.com"
+                    value={proveedorForm.email}
+                    onChange={event => setProveedorForm(current => ({ ...current, email: event.target.value }))}
+                  />
+                </label>
+                <label className="inventory-field">
+                  <span>Dirección</span>
+                  <input
+                    type="text"
+                    placeholder="Ej: Cra 10 # 20-30, Bogotá"
+                    value={proveedorForm.direccion}
+                    onChange={event => setProveedorForm(current => ({ ...current, direccion: event.target.value }))}
+                  />
+                </label>
+                <label className="inventory-field inventory-checkbox-field">
+                  <input
+                    type="checkbox"
+                    checked={proveedorForm.activo}
+                    onChange={event => setProveedorForm(current => ({ ...current, activo: event.target.checked }))}
+                  />
+                  <span>Dejar proveedor activo</span>
+                </label>
+                <div className="order-actions inventory-provider-actions">
+                  <button type="submit" className="btn-primary" disabled={savingProveedor}>
+                    {savingProveedor ? "Guardando..." : editingProveedorId ? "Guardar cambios" : "Crear proveedor"}
+                  </button>
+                  <button type="button" className="btn-outline" disabled={savingProveedor} onClick={closeProveedorModal}>
+                    Cancelar
+                  </button>
+                </div>
+              </form>
+            </section>
+          </div>
         ) : null}
 
       </main>
