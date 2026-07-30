@@ -1,122 +1,16 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import {
-  Bike,
-  CheckCircle2,
-  ClipboardList,
-  History,
-  ListChecks,
-  PackageSearch,
-  RotateCw,
-  Timer,
-  Truck,
-} from "lucide-react";
+import { CheckCircle2, ListChecks, RotateCw, Timer, Truck } from "lucide-react";
 import { tenantConfig } from "../../config/tenantConfig.js";
 import { createApiClient } from "../../infrastructure/apiClient.js";
 import { AppSidebar } from "../../shared/AppSidebar.jsx";
 import { useSidebarState } from "../../shared/useSidebarState.js";
-import { formatDateTimeCompact, todayIsoDateBogota } from "../../shared/utils.js";
+import { formatDateTimeCompact } from "../../shared/utils.js";
 import { PipelineColumn } from "./PipelineColumn.jsx";
 import { PipelineFilters } from "./PipelineFilters.jsx";
 import { PedidoModal } from "./PedidoModal.jsx";
+import { INITIAL_FILTERS, PIPELINE_COLUMNS, PIPELINE_TABS, STAGE_TO_ESTADO_ID } from "./pipelineConfig.jsx";
+import { buildColumnItems as buildPipelineColumnItems, buildPipelineMetrics, formatApprovalAction, formatApprovalAuditError, formatHistoryActor, formatHistoryReason, normalizePipelineBoard, resolveHistoryTypeClass, resolveHistoryTypeLabel, todayIsoDate } from "./pipelineDomain.js";
 
-const PIPELINE_STAGES = [
-  "creado",
-  "aprobado",
-  "pendiente_produccion",
-  "en_produccion",
-  "listo",
-  "en_camino",
-  "entregado",
-  "cancelado",
-];
-
-const PIPELINE_COLUMNS = [
-  { key: "pedido_inicial",  title: "Creado / Aprobado",       stages: ["creado", "aprobado"],                    dropStage: "aprobado" },
-  { key: "produccion_base", title: "Pendiente / En producción", stages: ["pendiente_produccion", "en_produccion"], dropStage: "en_produccion" },
-  { key: "listo",           title: "Listo",                    stages: ["listo"],                                  dropStage: "listo" },
-  { key: "en_camino",       title: "En camino",                stages: ["en_camino"],                              dropStage: "en_camino" },
-  { key: "entregado",       title: "Entregado",                stages: ["entregado"],                              dropStage: "entregado" },
-  { key: "cancelado",       title: "Cancelado",                stages: ["cancelado"],                              dropStage: "cancelado" },
-];
-
-const STAGE_TO_ESTADO_ID = {
-  creado: 1, aprobado: 2, pendiente_produccion: 3,
-  en_produccion: 4, listo: 5, en_camino: 5, entregado: 20, cancelado: 6,
-};
-
-const PIPELINE_TABS = [
-  { key: "pipeline",  label: "Pipeline",               icon: ClipboardList },
-  { key: "historial", label: "Historial reasignaciones", icon: History },
-  { key: "pedidos",   label: "Historial pedidos",       icon: PackageSearch },
-];
-
-const INITIAL_FILTERS = {
-  sucursalID: null,
-  fechaDesde: todayIsoDateBogota(),
-  fechaHasta: todayIsoDateBogota(),
-  domiciliarioID: "",
-  floristaID: "",
-  numeroPedido: "",
-  estadoStage: "",
-  soloAtrasados: false,
-  soloEnProduccion: false,
-};
-
-function normalizePipelineBoard(payload) {
-  return PIPELINE_STAGES.reduce((board, stage) => ({
-    ...board,
-    [stage]: Array.isArray(payload?.[stage]) ? payload[stage] : [],
-  }), {});
-}
-
-function todayIsoDate() { return todayIsoDateBogota(); }
-
-function sanitizeUiText(value) {
-  return String(value || "")
-    .replaceAll("MÃ³dulo", "Modulo")
-    .replaceAll("Ã¡", "a").replaceAll("Ã©", "e")
-    .replaceAll("Ã­", "i").replaceAll("Ã³", "o")
-    .replaceAll("Ãº", "u").replaceAll("Ã±", "n").replaceAll("Ã'", "N")
-    .trim();
-}
-
-function formatHistoryActor(value) {
-  const raw = sanitizeUiText(value);
-  if (!raw) return "-";
-  return raw.replace(/\./g, " · ");
-}
-
-function formatHistoryReason(value) { return sanitizeUiText(value) || "-"; }
-
-function resolveHistoryTypeLabel(tipoMovimiento) {
-  const type = String(tipoMovimiento || "").trim().toUpperCase();
-  if (type === "ASIGNACION_MANUAL") return "Asignacion";
-  if (type === "REASIGNACION_MANUAL") return "Reasignacion";
-  if (type === "DESASIGNACION_MANUAL") return "Desasignacion";
-  return "Movimiento";
-}
-
-function resolveHistoryTypeClass(tipoMovimiento) {
-  const label = resolveHistoryTypeLabel(tipoMovimiento);
-  if (label === "Asignacion") return "is-admin";
-  if (label === "Desasignacion") return "is-auto";
-  return "is-reassignment";
-}
-
-function formatApprovalAuditError(error) {
-  const message = sanitizeUiText(error?.message || error?.detail || "");
-  if (message.toLowerCase().includes("modulo 'trazabilidad' no disponible en el plan")) {
-    return "El historial de pedidos no esta disponible en este ambiente porque el backend publicado aun responde con la regla anterior de Trazabilidad.";
-  }
-  return message || "No fue posible cargar el historial de pedidos.";
-}
-
-function formatApprovalAction(value) {
-  const action = String(value || "").trim().toUpperCase();
-  if (action === "APROBAR_PEDIDO" || action === "APROBAR_PEDIDO_PIPELINE") return "Aprobo pedido";
-  if (action === "GUARDAR_PEDIDO") return "Guardo edicion";
-  return action || "-";
-}
 
 export function PipelineOperativo({
   session,
@@ -153,17 +47,7 @@ export function PipelineOperativo({
   const displayUserName = String(session?.nombre || session?.login || "Usuario").trim() || "Usuario";
   const activeSucursalId = filters.sucursalID ?? sucursalFromSession;
 
-  // ── Mini métricas del header ──────────────────────────────────────────────
-  const pipelineMetrics = useMemo(() => ({
-    activos: [
-      ...board.creado, ...board.aprobado,
-      ...board.pendiente_produccion, ...board.en_produccion,
-      ...board.listo, ...board.en_camino,
-    ].length,
-    enProduccion: [...board.pendiente_produccion, ...board.en_produccion].length,
-    enCamino: board.en_camino.length,
-    entregados: board.entregado.length,
-  }), [board]);
+  const pipelineMetrics = useMemo(() => buildPipelineMetrics(board), [board]);
 
   const loadBoard = useCallback(async () => {
     setLoading(true);
@@ -285,13 +169,7 @@ export function PipelineOperativo({
     }
   };
 
-  const buildColumnItems = stages => {
-    const selectedStage = String(filters.estadoStage || "").trim();
-    const visibleStages = selectedStage
-      ? stages.filter(stage => stage === selectedStage)
-      : stages;
-    return visibleStages.flatMap(stage => Array.isArray(board?.[stage]) ? board[stage] : []);
-  };
+  const selectedStage = String(filters.estadoStage || "").trim();
 
   return (
     <div className={`app-shell ${sidebarPinned ? "is-sidebar-pinned" : ""} ${sidebarMobileOpen ? "is-sidebar-mobile-open" : ""}`}>
@@ -513,7 +391,7 @@ export function PipelineOperativo({
                 key={column.key}
                 dropStageKey={column.dropStage}
                 title={column.title}
-                items={buildColumnItems(column.stages)}
+                items={buildPipelineColumnItems(board, column.stages, selectedStage)}
                 onOpen={onOpen}
                 onDropCard={onDropCard}
                 onDragStart={onDragStart}

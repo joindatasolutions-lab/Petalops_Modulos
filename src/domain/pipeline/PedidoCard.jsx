@@ -1,29 +1,6 @@
 import { Clock, DollarSign, MapPin, Package2, Store, User, Bike } from "lucide-react";
 
-const PRIORITY_CONFIG = {
-  BAJA:    { label: "Baja",    className: "is-low" },
-  MEDIA:   { label: "Media",   className: "is-medium" },
-  ALTA:    { label: "Alta",    className: "is-high" },
-  URGENTE: { label: "Urgente", className: "is-urgent" },
-  CRITICA: { label: "Crítica", className: "is-urgent" },
-};
-
-function getTimeStatus(tiempoRestante) {
-  const remaining = Number(tiempoRestante);
-  if (!Number.isFinite(remaining)) return { label: "-", className: "is-unknown", icon: null };
-  if (remaining < 0) {
-    const abs = Math.round(Math.abs(remaining));
-    return { label: `Retrasado ${abs} min`, className: "is-late", icon: "alert" };
-  }
-  if (remaining <= 30) {
-    return { label: `${Math.round(remaining)} min restantes`, className: "is-soon", icon: "warn" };
-  }
-  return { label: "A tiempo", className: "is-ontime", icon: "ok" };
-}
-
-function formatProgress(progress) {
-  return Math.max(0, Math.min(100, Number(progress || 0)));
-}
+import { formatProgress, getTimeStatus, isPickupOrder, PRIORITY_CONFIG } from "./pipelineDomain.js";
 
 export function PedidoCard({ item, onOpen, onDragStart }) {
   const priorityKey = String(item.prioridad || "MEDIA").toUpperCase();
@@ -31,8 +8,7 @@ export function PedidoCard({ item, onOpen, onDragStart }) {
   const timeStatus = getTimeStatus(item.tiempo_restante_entrega);
   const progressWidth = formatProgress(item.progreso_porcentaje);
 
-  const isPickup = String(item.tipo_entrega || "").toLowerCase().includes("recog") ||
-                   String(item.tipo_entrega || "").toLowerCase().includes("tienda");
+  const isPickup = isPickupOrder(item);
 
   return (
     <article

@@ -1,31 +1,6 @@
-import {
-  BadgeCheck,
-  CheckCircle,
-  PackagePlus,
-  Timer,
-  Truck,
-  XCircle,
-} from "lucide-react";
 import { PedidoCard } from "./PedidoCard.jsx";
 
-const COLUMN_CONFIG = {
-  pedido_inicial:  { tone: "is-created",    accentColor: "#e91e72" },
-  produccion_base: { tone: "is-production",  accentColor: "#2563eb" },
-  listo:           { tone: "is-ready",       accentColor: "#15803d" },
-  en_camino:       { tone: "is-route",       accentColor: "#d97706" },
-  entregado:       { tone: "is-delivered",   accentColor: "#15803d" },
-  cancelado:       { tone: "is-cancelled",   accentColor: "#dc2626" },
-};
-
-const EMPTY_CONTENT = {
-  pedido_inicial:  { Icon: PackagePlus, title: "Sin pedidos nuevos",     subtitle: "Los pedidos creados o aprobados aparecerán aquí" },
-  produccion_base: { Icon: Timer,       title: "Sin pedidos en producción", subtitle: "Los pedidos asignados a floristas aparecerán aquí" },
-  listo:           { Icon: BadgeCheck,  title: "Nada listo aún",         subtitle: "Los arreglos terminados aparecerán aquí" },
-  en_camino:       { Icon: Truck,       title: "Sin pedidos en camino",  subtitle: "Los pedidos despachados aparecerán aquí" },
-  entregado:       { Icon: CheckCircle, title: "Sin entregas hoy",       subtitle: "Las entregas completadas aparecerán aquí" },
-  cancelado:       { Icon: XCircle,     title: "Sin pedidos cancelados", subtitle: "Los pedidos cancelados aparecerán aquí" },
-};
-
+import { COLUMN_CONFIG, EMPTY_CONTENT } from "./pipelineConfig.jsx";
 export function PipelineColumn({ dropStageKey, title, items, onOpen, onDropCard, onDragStart }) {
   const config = COLUMN_CONFIG[dropStageKey] || COLUMN_CONFIG.pedido_inicial;
   const emptyContent = EMPTY_CONTENT[dropStageKey] || EMPTY_CONTENT.pedido_inicial;
