@@ -14,7 +14,7 @@ import { tenantConfig } from "../../config/tenantConfig.js";
 import { createApiClient } from "../../infrastructure/apiClient.js";
 import { AppSidebar } from "../../shared/AppSidebar.jsx";
 import { useSidebarState } from "../../shared/useSidebarState.js";
-import { formatDateTimeCompact } from "../../shared/utils.js";
+import { formatDateTimeCompact, todayIsoDateBogota } from "../../shared/utils.js";
 import { PipelineColumn } from "./PipelineColumn.jsx";
 import { PipelineFilters } from "./PipelineFilters.jsx";
 import { PedidoModal } from "./PedidoModal.jsx";
@@ -52,8 +52,8 @@ const PIPELINE_TABS = [
 
 const INITIAL_FILTERS = {
   sucursalID: null,
-  fechaDesde: new Date().toISOString().slice(0, 10),
-  fechaHasta: new Date().toISOString().slice(0, 10),
+  fechaDesde: todayIsoDateBogota(),
+  fechaHasta: todayIsoDateBogota(),
   domiciliarioID: "",
   floristaID: "",
   numeroPedido: "",
@@ -69,7 +69,7 @@ function normalizePipelineBoard(payload) {
   }), {});
 }
 
-function todayIsoDate() { return new Date().toISOString().slice(0, 10); }
+function todayIsoDate() { return todayIsoDateBogota(); }
 
 function sanitizeUiText(value) {
   return String(value || "")
@@ -121,10 +121,10 @@ function formatApprovalAction(value) {
 export function PipelineOperativo({
   session,
   canViewPipeline, canViewPedidos, canViewProduccion, canViewDomicilios, canViewBarrios,
-  canViewInventario, canViewContabilidad, canViewTrazabilidad,
+  canViewInventario, canViewContabilidad,
   canViewClientesPanel, canViewUsuariosPanel,
   onGoPipeline, onGoPedidos, onGoProduccion, onGoDomicilios, onGoBarrios, onGoInventario,
-  onGoContabilidad, onGoTrazabilidad, onGoClientes, onGoUsuarios, onLogout,
+  onGoContabilidad, onGoClientes, onGoUsuarios, onLogout,
 }) {
   const api = useMemo(() => createApiClient(tenantConfig), []);
   const { sidebarPinned, sidebarMobileOpen, setSidebarMobileOpen, toggleSidebar } = useSidebarState();
@@ -302,8 +302,8 @@ export function PipelineOperativo({
         toggleSidebar={toggleSidebar}
         closeSidebarMobile={() => setSidebarMobileOpen(false)}
         onLogout={onLogout}
-        permissions={{ pipeline: canViewPipeline, pedidos: canViewPedidos, produccion: canViewProduccion, domicilios: canViewDomicilios, barrios: canViewBarrios, inventario: canViewInventario, contabilidad: canViewContabilidad, trazabilidad: canViewTrazabilidad, clientes: canViewClientesPanel, usuarios: canViewUsuariosPanel }}
-        navigation={{ pipeline: onGoPipeline, pedidos: onGoPedidos, produccion: onGoProduccion, domicilios: onGoDomicilios, barrios: onGoBarrios, inventario: onGoInventario, contabilidad: onGoContabilidad, trazabilidad: onGoTrazabilidad, clientes: onGoClientes, usuarios: onGoUsuarios }}
+        permissions={{ pipeline: canViewPipeline, pedidos: canViewPedidos, produccion: canViewProduccion, domicilios: canViewDomicilios, barrios: canViewBarrios, inventario: canViewInventario, contabilidad: canViewContabilidad, clientes: canViewClientesPanel, usuarios: canViewUsuariosPanel }}
+        navigation={{ pipeline: onGoPipeline, pedidos: onGoPedidos, produccion: onGoProduccion, domicilios: onGoDomicilios, barrios: onGoBarrios, inventario: onGoInventario, contabilidad: onGoContabilidad, clientes: onGoClientes, usuarios: onGoUsuarios }}
       />
 
       <main className="orders-admin-view pipeline-view">
