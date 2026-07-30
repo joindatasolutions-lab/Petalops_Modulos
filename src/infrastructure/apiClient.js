@@ -216,10 +216,12 @@ export function createApiClient(config) {
       return requestJson("/auth/usuarios/empresas");
     },
 
-    async listarClientes({ empresaId, q = "", soloActivos = false }) {
+    async listarClientes({ empresaId, q = "", celular = "", telefono = "", soloActivos = false }) {
       const params = new URLSearchParams();
       params.set("empresaID", String(empresaId));
       if (q) params.set("q", String(q));
+      if (celular) params.set("celular", String(celular));
+      if (telefono) params.set("telefono", String(telefono));
       if (soloActivos) params.set("soloActivos", "true");
       return requestJson(`/clientes?${params.toString()}`);
     },
@@ -599,6 +601,9 @@ export function createApiClient(config) {
       detallePago,
       montoEfectivo,
       omitirRecargoLink,
+      domicilio,
+      domicilioObsequiado,
+      omitirCostoDomicilio,
       descuentoMonto,
       descuentoNota,
       saldoFavorMonto,
@@ -636,6 +641,9 @@ export function createApiClient(config) {
           detallePago: Array.isArray(detallePago) ? detallePago : null,
           montoEfectivo: montoEfectivo != null ? Number(montoEfectivo) : null,
           omitirRecargoLink: omitirRecargoLink != null ? Boolean(omitirRecargoLink) : null,
+          domicilio: domicilio != null ? Number(domicilio) : null,
+          domicilioObsequiado: domicilioObsequiado != null ? Boolean(domicilioObsequiado) : null,
+          omitirCostoDomicilio: omitirCostoDomicilio != null ? Boolean(omitirCostoDomicilio) : null,
           descuentoMonto: descuentoMonto != null ? Number(descuentoMonto) : null,
           descuentoNota: descuentoNota ?? null,
           saldoFavorMonto: saldoFavorMonto != null ? Number(saldoFavorMonto) : null,

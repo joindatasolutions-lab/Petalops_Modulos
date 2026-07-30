@@ -68,4 +68,65 @@ describe("apiClient.listarPedidos", () => {
       status: 500,
     });
   });
+
+  it("envia celular como criterio explicito al listar clientes", async () => {
+    const fetchMock = vi.fn(async () => ({
+      ok: true,
+      json: async () => ({ items: [] }),
+    }));
+    vi.stubGlobal("fetch", fetchMock);
+    vi.stubGlobal("localStorage", {
+      getItem: () => "token-test",
+    });
+
+    const api = createApiClient({ apiBaseUrl: "https://api.test" });
+    await api.listarClientes({
+      empresaId: 3,
+      celular: "3128896624",
+      telefono: "3128896624",
+      q: "3128896624",
+      soloActivos: true,
+    });
+
+    const [url] = fetchMock.mock.calls[0];
+    const parsed = new URL(url);
+
+    expect(parsed.pathname).toBe("/clientes");
+    expect(parsed.searchParams.get("empresaID")).toBe("3");
+    expect(parsed.searchParams.get("celular")).toBe("3128896624");
+    expect(parsed.searchParams.get("telefono")).toBe("3128896624");
+    expect(parsed.searchParams.get("q")).toBe("3128896624");
+    expect(parsed.searchParams.get("soloActivos")).toBe("true");
+  });
+
+  it("envia domicilio obsequiado al actualizar detalle de pedido", async () => {
+    const fetchMock = vi.fn(async () => ({
+      ok: true,
+      json: async () => ({ ok: true }),
+    }));
+    vi.stubGlobal("fetch", fetchMock);
+    vi.stubGlobal("localStorage", {
+      getItem: () => "token-test",
+    });
+
+    const api = createApiClient({ apiBaseUrl: "https://api.test" });
+    await api.actualizarDetallePedidoPipeline({
+      pedidoId: 77,
+      barrioNombre: "El Prado",
+      direccion: "Calle 1 #2-3",
+      domicilio: 0,
+      domicilioObsequiado: true,
+      omitirCostoDomicilio: true,
+    });
+
+    const [url, options] = fetchMock.mock.calls[0];
+    const body = JSON.parse(options.body);
+
+    expect(url).toBe("https://api.test/pedido/77/detalle");
+    expect(body.barrioNombre).toBe("El Prado");
+    expect(body.direccion).toBe("Calle 1 #2-3");
+    expect(body.domicilio).toBe(0);
+    expect(body.domicilioObsequiado).toBe(true);
+    expect(body.omitirCostoDomicilio).toBe(true);
+  });
 });
