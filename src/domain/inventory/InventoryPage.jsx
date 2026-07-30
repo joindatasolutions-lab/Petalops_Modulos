@@ -4,7 +4,7 @@ import { tenantConfig } from "../../config/tenantConfig.js";
 import { createApiClient } from "../../infrastructure/apiClient.js";
 import { AppSidebar } from "../../shared/AppSidebar.jsx";
 import { useSidebarState } from "../../shared/useSidebarState.js";
-import { formatearCOP, normalizeStatus, todayIsoDateBogota } from "../../shared/utils.js";
+import { formatearCOP } from "../../shared/utils.js";
 import {
   Archive,
   ArrowDownToLine,
@@ -37,166 +37,11 @@ import {
   UtensilsCrossed,
   X,
 } from "lucide-react";
+import { COLOR_OPTIONS, MODULES, MOVIMIENTO_TIPO_OPTIONS, initialProveedorForm } from "./inventoryConfig.jsx";
+import { buildBasesMetrics, buildCategorySummary, buildCreateItemPayload, buildCriticalItems, buildExpiryAlerts, buildInventoryMetrics, buildLastMovementByItem, buildProveedorForm, buildProveedorPayload, buildRecetaResumen, buildSimulacionPedido, buildTopSellers, filterInventoryItems, inventoryRowClass, isExpired, isNearExpiry, lastMovementLabelForItem, rotationLevel, statusClass, stockLevel } from "./inventoryDomain.js";
+export { filterInventoryItems } from "./inventoryDomain.js";
 
 // ─── Configuración de módulos ────────────────────────────────────────────────
-
-const MODULES = [
-  {
-    key: "flores",
-    label: "Flores",
-    categoria: "Flores",
-    icon: Flower2,
-    subcategorias: ["Rosas", "Girasoles", "Hortensias", "Claveles", "Follaje", "Otras"],
-    unidades: ["Tallo", "Paquete", "Unidad"],
-  },
-  {
-    key: "bases",
-    label: "Bases",
-    categoria: "Bases",
-    icon: Boxes,
-    subcategorias: ["Box", "Madera", "Vidrio", "Cerámica", "Otros"],
-    unidades: ["Unidad"],
-  },
-  {
-    key: "materiales",
-    label: "Materiales",
-    categoria: "Materiales",
-    icon: Layers,
-    subcategorias: ["Cintas", "Papeles", "Celofán", "Moños", "Yute", "Oasis", "Plástico", "Frascos", "Insumos Operativos", "Otros"],
-    unidades: ["Rollo", "Unidad", "Paquete", "Pliego", "Caja", "Bloque"],
-  },
-  {
-    key: "adicionales",
-    label: "Adicionales",
-    categoria: "Adicionales",
-    icon: Gift,
-    subcategorias: ["Chocolates", "Vinos", "Peluches", "Toppers", "Otros"],
-    unidades: ["Unidad", "Caja"],
-  },
-  {
-    key: "arreglos",
-    label: "Arreglos",
-    categoria: null,
-    icon: UtensilsCrossed,
-    subcategorias: [],
-    unidades: [],
-  },
-  {
-    key: "movimientos",
-    label: "Movimientos",
-    categoria: null,
-    icon: ClipboardList,
-    subcategorias: [],
-    unidades: [],
-  },
-  {
-    key: "proveedores",
-    label: "Proveedores",
-    categoria: null,
-    icon: Truck,
-    subcategorias: [],
-    unidades: [],
-  },
-];
-
-const initialProveedorForm = {
-  nombre: "",
-  codigoProveedor: "",
-  telefono: "",
-  email: "",
-  direccion: "",
-  activo: true,
-};
-
-const COLOR_OPTIONS = [
-  "", "Rojo", "Rosado", "Blanco", "Amarillo", "Naranja",
-  "Lila", "Morado", "Azul", "Verde", "Dorado", "Plateado", "Multicolor",
-  "Beige", "Café", "Gris", "Negro", "Transparente",
-];
-
-const MOVIMIENTO_TIPO_OPTIONS = ["Entrada", "Salida", "Ajuste", "Pérdida"];
-
-const INVENTORY_STATUS_CLASS = {
-  DISPONIBLE: "is-entregado",
-  BAJO_STOCK: "is-pendiente",
-  AGOTADO: "is-rechazado",
-  INACTIVO: "is-cancelado",
-};
-
-// ─── Helpers ─────────────────────────────────────────────────────────────────
-
-function statusClass(estadoStock) {
-  const key = normalizeStatus(estadoStock);
-  return INVENTORY_STATUS_CLASS[key] || "is-pendiente";
-}
-
-function inventoryRowClass(item) {
-  const status = normalizeStatus(item?.estadoStock);
-  return [
-    "inventory-row-card",
-    status === "DISPONIBLE" ? "inventory-row-available" : "",
-    status === "BAJO_STOCK" ? "inventory-row-warning" : "",
-    status === "AGOTADO" ? "inventory-row-danger" : "",
-    status === "INACTIVO" || item?.activo === false ? "inventory-row-muted" : "",
-  ].filter(Boolean).join(" ");
-}
-
-function todayIsoDate() { return todayIsoDateBogota(); }
-function isTodayDate(value) { return String(value || "").slice(0, 10) === todayIsoDate(); }
-function isSameMonthAsToday(value) { return String(value || "").slice(0, 7) === todayIsoDate().slice(0, 7); }
-
-function stockLevel(item) {
-  const stock = Number(item?.stockActual || 0);
-  const minimum = Math.max(Number(item?.stockMinimo || 0), 1);
-  if (stock <= 0) return { key: "critical", label: "Crítico", percent: 8, className: "is-critical" };
-  if (stock <= minimum) return { key: "critical", label: "Crítico", percent: 18, className: "is-critical" };
-  if (stock <= minimum * 2.5) return { key: "medium", label: "Medio", percent: 52, className: "is-medium" };
-  return { key: "healthy", label: "Saludable", percent: 92, className: "is-healthy" };
-}
-
-function rotationLevel(item) {
-  const stock = Number(item?.stockActual || 0);
-  const minimum = Math.max(Number(item?.stockMinimo || 0), 1);
-  if (stock <= minimum) return { label: "Alta", className: "is-high" };
-  if (stock <= minimum * 2.5) return { label: "Media", className: "is-medium" };
-  return { label: "Baja", className: "is-low" };
-}
-
-function relativeMovementLabel(dateValue) {
-  const raw = String(dateValue || "").trim();
-  if (!raw) return "-";
-  const parsed = new Date(raw);
-  if (Number.isNaN(parsed.getTime())) return "-";
-  const diffMs = Date.now() - parsed.getTime();
-  if (diffMs < 0) return "Hoy";
-  const minutes = Math.floor(diffMs / 60000);
-  if (minutes < 60) return minutes <= 1 ? "Hace 1 min" : `Hace ${minutes} min`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return hours === 1 ? "Hace 1 hora" : `Hace ${hours} horas`;
-  const days = Math.floor(hours / 24);
-  return days === 1 ? "Hace 1 día" : `Hace ${days} días`;
-}
-
-function isNearExpiry(fechaVencimiento) {
-  if (!fechaVencimiento) return false;
-  const diff = new Date(fechaVencimiento).getTime() - Date.now();
-  return diff >= 0 && diff <= 7 * 24 * 60 * 60 * 1000;
-}
-
-function isExpired(fechaVencimiento) {
-  if (!fechaVencimiento) return false;
-  return new Date(fechaVencimiento).getTime() < Date.now();
-}
-
-export function filterInventoryItems(items, { stockFiltro = "", subcategoriaFiltro = "" } = {}) {
-  return (Array.isArray(items) ? items : []).filter(item => {
-    if (stockFiltro && stockLevel(item).key !== stockFiltro) return false;
-    if (subcategoriaFiltro && String(item.subcategoria || "").toLowerCase() !== subcategoriaFiltro.toLowerCase()) return false;
-    return true;
-  });
-}
-
-// ─── Componente principal ─────────────────────────────────────────────────────
 
 export function InventoryPage({
   session,
@@ -317,104 +162,23 @@ export function InventoryPage({
     }));
   }, [moduloConfig]);
 
-  // ── Métricas generales (todos los items cargados) ──
-  const inventoryMetrics = useMemo(() => {
-    const stockTotal = items.reduce((sum, item) => sum + Number(item.stockActual || 0), 0);
-    const valorInventario = items.reduce((sum, item) => sum + (Number(item.stockActual || 0) * Number(item.valorUnitario || 0)), 0);
-    const entradasHoy = movimientos.filter(m => isTodayDate(m.fecha) && normalizeStatus(m.tipoMovimiento) === "ENTRADA").length;
-    const salidasHoy = movimientos.filter(m => isTodayDate(m.fecha) && normalizeStatus(m.tipoMovimiento) === "SALIDA").length;
-    const bajoStock = items.filter(item => normalizeStatus(item?.estadoStock) === "BAJO_STOCK").length;
-    const agotados = items.filter(item => normalizeStatus(item?.estadoStock) === "AGOTADO").length;
-    return { valorInventario, stockTotal, entradasHoy, salidasHoy, bajoStock, agotados };
-  }, [items, movimientos]);
+  const inventoryMetrics = useMemo(() => buildInventoryMetrics(items, movimientos), [items, movimientos]);
 
-  // ── Métricas especificas del submenu Bases (items ya viene filtrado por
-  // categoria="Bases" via la API cuando moduloActivo === "bases") ──
-  const basesMetrics = useMemo(() => {
-    const totalBases = items.length;
-    const stockBajo = items.filter(item => normalizeStatus(item?.estadoStock) === "BAJO_STOCK").length;
-    const agotadas = items.filter(item => normalizeStatus(item?.estadoStock) === "AGOTADO").length;
-    const basesInventarioIds = new Set(items.map(item => item.inventarioID));
-    const comprasEsteMes = movimientos.filter(mov =>
-      normalizeStatus(mov?.tipoMovimiento) === "ENTRADA"
-      && basesInventarioIds.has(mov?.inventarioID)
-      && isSameMonthAsToday(mov?.fecha)
-    ).length;
-    const proveedorIdsEnBases = new Set(
-      items.map(item => item.proveedorID).filter(id => id != null)
-    );
-    const proveedoresActivos = proveedores.filter(p => proveedorIdsEnBases.has(p.idProveedor) && p.activo).length;
-    return { totalBases, stockBajo, agotadas, comprasEsteMes, proveedoresActivos };
-  }, [items, movimientos, proveedores]);
+  const basesMetrics = useMemo(() => buildBasesMetrics(items, movimientos, proveedores), [items, movimientos, proveedores]);
 
-  // ── Items filtrados en vista ──
-  const visibleItems = useMemo(() => {
-    return filterInventoryItems(items, { stockFiltro, subcategoriaFiltro });
-  }, [items, stockFiltro, subcategoriaFiltro]);
+  const visibleItems = useMemo(() => filterInventoryItems(items, { stockFiltro, subcategoriaFiltro }), [items, stockFiltro, subcategoriaFiltro]);
 
-  // ── Panel de categorías: muestra subcategorías del módulo activo ──
-  const categorySummary = useMemo(() => {
-    const totalStock = Math.max(items.reduce((sum, item) => sum + Number(item.stockActual || 0), 0), 1);
-    const byKey = new Map();
-    items.forEach(item => {
-      const key = String(item.subcategoria || item.categoria || "Sin categoría").trim() || "Sin categoría";
-      byKey.set(key, (byKey.get(key) || 0) + Number(item.stockActual || 0));
-    });
-    return Array.from(byKey.entries())
-      .map(([label, cantidad]) => ({ label, cantidad, percent: Math.round((cantidad / totalStock) * 100) }))
-      .sort((a, b) => b.cantidad - a.cantidad)
-      .slice(0, 6);
-  }, [items]);
+  const categorySummary = useMemo(() => buildCategorySummary(items), [items]);
 
-  const criticalItems = useMemo(
-    () => items
-      .filter(item => ["critical", "medium"].includes(stockLevel(item).key))
-      .sort((a, b) => Number(a.stockActual || 0) - Number(b.stockActual || 0))
-      .slice(0, 5),
-    [items]
-  );
+  const criticalItems = useMemo(() => buildCriticalItems(items), [items]);
 
-  const expiryAlerts = useMemo(
-    () => items.filter(item => item.fechaVencimiento && (isExpired(item.fechaVencimiento) || isNearExpiry(item.fechaVencimiento))),
-    [items]
-  );
+  const expiryAlerts = useMemo(() => buildExpiryAlerts(items), [items]);
 
-  // ── Más vendidos: suma de "Salida" por item, dentro del módulo activo ──
-  const topSellers = useMemo(() => {
-    const salidasPorInventarioId = new Map();
-    movimientos.forEach(mov => {
-      if (normalizeStatus(mov?.tipoMovimiento) !== "SALIDA") return;
-      const id = mov?.inventarioID;
-      if (id == null) return;
-      salidasPorInventarioId.set(id, (salidasPorInventarioId.get(id) || 0) + Number(mov?.cantidad || 0));
-    });
-    return items
-      .map(item => ({ item, vendidos: salidasPorInventarioId.get(item.inventarioID) || 0 }))
-      .filter(entry => entry.vendidos > 0)
-      .sort((a, b) => b.vendidos - a.vendidos)
-      .slice(0, 5);
-  }, [items, movimientos]);
+  const topSellers = useMemo(() => buildTopSellers(items, movimientos), [items, movimientos]);
 
-  const lastMovementByItem = useMemo(() => {
-    const map = new Map();
-    movimientos.forEach(movement => {
-      const keys = [String(movement.codigo || "").trim(), String(movement.nombre || "").trim().toLowerCase()].filter(Boolean);
-      keys.forEach(key => {
-        const current = map.get(key);
-        const currentTime = current ? new Date(current.fecha || 0).getTime() : 0;
-        const nextTime = new Date(movement.fecha || 0).getTime();
-        if (!current || nextTime > currentTime) map.set(key, movement);
-      });
-    });
-    return map;
-  }, [movimientos]);
+  const lastMovementByItem = useMemo(() => buildLastMovementByItem(movimientos), [movimientos]);
 
-  const lastMovementForItem = useCallback(item => {
-    const byCode = lastMovementByItem.get(String(item?.codigo || "").trim());
-    if (byCode) return relativeMovementLabel(byCode.fecha);
-    const byName = lastMovementByItem.get(String(item?.nombre || "").trim().toLowerCase());
-    return relativeMovementLabel(byName?.fecha);
-  }, [lastMovementByItem]);
+  const lastMovementForItem = useCallback(item => lastMovementLabelForItem(item, lastMovementByItem), [lastMovementByItem]);
 
   const movimientosFiltrados = useMemo(() => {
     if (!tipoMovimientoFiltro) return movimientos;
@@ -425,59 +189,9 @@ export function InventoryPage({
   // limitante, calculados en el navegador cruzando la receta con el stock
   // actual (allItems). Precio de venta / vendidos hoy / reservados vienen del
   // backend (via el producto del catálogo vinculado a la receta). ──
-  const recetaResumen = useMemo(() => {
-    const detalles = recetaDetalle?.detalles;
-    if (!Array.isArray(detalles) || detalles.length === 0) return null;
-    let costoTotal = 0;
-    let capacidadAuto = Infinity;
-    let limitante = null;
-    const ingredientes = detalles.map(det => {
-      const item = allItems.find(i => i.inventarioID === det.inventarioID);
-      const stock = Number(item?.stockActual || 0);
-      const cantidadReq = Number(det.cantidad || 0);
-      const costoUnitario = Number(item?.valorUnitario || 0);
-      costoTotal += costoUnitario * cantidadReq;
-      const posibles = cantidadReq > 0 ? Math.floor(stock / cantidadReq) : Infinity;
-      if (posibles < capacidadAuto) {
-        capacidadAuto = posibles;
-        limitante = det;
-      }
-      return { det, stock, cantidadReq, posibles };
-    });
-    capacidadAuto = Number.isFinite(capacidadAuto) ? capacidadAuto : 0;
-    const tieneManual = recetaDetalle?.capacidadManual != null && recetaDetalle.capacidadManual !== "";
-    const capacidad = tieneManual ? Number(recetaDetalle.capacidadManual) : capacidadAuto;
-    const precioVenta = recetaDetalle?.precioVenta != null ? Number(recetaDetalle.precioVenta) : null;
-    const utilidad = precioVenta != null ? precioVenta - costoTotal : null;
-    const reservados = Number(recetaDetalle?.reservados || 0);
-    const vendidosHoy = Number(recetaDetalle?.vendidosHoy || 0);
-    const disponibles = Math.max(0, capacidad - reservados);
-    return {
-      costoTotal,
-      capacidadAuto,
-      capacidad,
-      capacidadEsManual: tieneManual,
-      limitante,
-      ingredientes,
-      precioVenta,
-      utilidad,
-      reservados,
-      vendidosHoy,
-      disponibles,
-    };
-  }, [recetaDetalle, allItems]);
+  const recetaResumen = useMemo(() => buildRecetaResumen(recetaDetalle, allItems), [recetaDetalle, allItems]);
 
-  const simulacionPedido = useMemo(() => {
-    if (!recetaResumen) return null;
-    const cantidad = Number(simuladorCantidad || 0);
-    if (!cantidad || cantidad <= 0) return null;
-    const detalle = recetaResumen.ingredientes.map(({ det, stock }) => {
-      const necesario = Number(det.cantidad || 0) * cantidad;
-      const faltante = Math.max(0, necesario - stock);
-      return { nombre: det.nombre, codigo: det.codigo, necesario, disponible: stock, faltante, ok: faltante === 0 };
-    });
-    return { cantidad, permitido: detalle.every(d => d.ok), detalle };
-  }, [recetaResumen, simuladorCantidad]);
+  const simulacionPedido = useMemo(() => buildSimulacionPedido(recetaResumen, simuladorCantidad), [recetaResumen, simuladorCantidad]);
 
   // ── Loaders ──
   const loadProveedores = useCallback(async () => {
@@ -599,25 +313,7 @@ export function InventoryPage({
     setError("");
     setInfo("");
     try {
-      await api.crearItemInventario({
-        empresaID: empresaId,
-        codigo: String(createForm.codigo || "").trim(),
-        nombre: String(createForm.nombre || "").trim(),
-        categoria: String(createForm.categoria || "").trim(),
-        subcategoria: String(createForm.subcategoria || "").trim() || null,
-        color: String(createForm.color || "").trim() || null,
-        descripcion: String(createForm.descripcion || "").trim() || null,
-        tamano: String(createForm.tamano || "").trim() || null,
-        unidadMedida: String(createForm.unidadMedida || "Unidad").trim(),
-        fechaVencimiento: createForm.fechaVencimiento || null,
-        marca: String(createForm.marca || "").trim() || null,
-        precioVenta: moduloActivo === "adicionales" ? Number(createForm.precioVenta || 0) : null,
-        proveedorID: createForm.proveedorID ? Number(createForm.proveedorID) : null,
-        stockActual: Number(createForm.stockActual || 0),
-        stockMinimo: Number(createForm.stockMinimo || 0),
-        valorUnitario: Number(createForm.valorUnitario || 0),
-        activo: true,
-      });
+      await api.crearItemInventario(buildCreateItemPayload(createForm, empresaId, moduloActivo));
       setCreateForm(initialCreateForm);
       await loadInventario();
       await loadMovimientos();
@@ -641,14 +337,7 @@ export function InventoryPage({
 
   const openEditProveedorModal = item => {
     setEditingProveedorId(item.idProveedor);
-    setProveedorForm({
-      nombre: item.nombre || "",
-      codigoProveedor: item.codigoProveedor || "",
-      telefono: item.telefono || "",
-      email: item.email || "",
-      direccion: item.direccion || "",
-      activo: Boolean(item.activo),
-    });
+    setProveedorForm(buildProveedorForm(item));
     setError("");
     setInfo("");
     setShowProveedorModal(true);
@@ -667,15 +356,7 @@ export function InventoryPage({
     setError("");
     setInfo("");
     try {
-      const payload = {
-        empresaId,
-        nombre: String(proveedorForm.nombre || "").trim(),
-        codigoProveedor: String(proveedorForm.codigoProveedor || "").trim() || null,
-        telefono: String(proveedorForm.telefono || "").trim() || null,
-        email: String(proveedorForm.email || "").trim() || null,
-        direccion: String(proveedorForm.direccion || "").trim() || null,
-        activo: Boolean(proveedorForm.activo),
-      };
+      const payload = buildProveedorPayload(proveedorForm, empresaId);
       if (editingProveedorId) {
         await api.actualizarProveedorInventario({ ...payload, proveedorId: editingProveedorId });
       } else {
