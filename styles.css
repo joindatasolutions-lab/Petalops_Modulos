@@ -8,4 +8,5 @@
 @import "./src/styles/70-inventory.css";
 @import "./src/styles/65-delivery-responsive.css";
 @import "./src/styles/75-accounting-responsive.css";
+@import "./src/styles/77-clients-responsive.css";
 @import "./production-mobile.css";
