@@ -4,6 +4,7 @@ import {
   ChevronDown,
   Clock3,
   Gift,
+  FileText,
   Plus,
   Receipt,
   RotateCw,
@@ -26,6 +27,8 @@ export function OrdersHeader({
   metricCards,
   activeMetric,
   headerSalesSummary,
+  canViewCatalogo = false,
+  catalogUrl = "",
   onFilterChange,
   onToggleStoreDeliveries,
   onRefresh,
@@ -62,15 +65,52 @@ export function OrdersHeader({
             className={`btn-primary orders-header-refresh orders-store-toggle${filters.soloTienda ? " is-active" : ""}`}
             onClick={onToggleStoreDeliveries}
             title={filters.soloTienda ? "Ver todos los pedidos" : "Ver entregas en tienda"}
+            aria-label={filters.soloTienda ? "Ver todos los pedidos" : "Ver entregas en tienda"}
+            data-tooltip={filters.soloTienda ? "Ver todos los pedidos" : "Ver entregas en tienda"}
           >
             <Gift size={18} strokeWidth={2} />
             <span>{filters.soloTienda ? "Todos los pedidos" : "Entregas en tienda"}</span>
           </button>
-          <button type="button" className="btn-primary orders-header-refresh" onClick={onRefresh} title="Actualizar pedidos">
+          <button
+            type="button"
+            className="btn-primary orders-header-refresh"
+            onClick={onRefresh}
+            title="Actualizar pedidos"
+            aria-label="Actualizar pedidos"
+            data-tooltip="Actualizar pedidos"
+          >
             <RotateCw size={18} strokeWidth={2} />
             <span>Actualizar</span>
           </button>
-          <button type="button" className="btn-primary orders-new-order-btn" onClick={onNewOrder} title="Nuevo pedido">
+          {canViewCatalogo ? (
+            <a
+              className={`btn-primary orders-header-refresh orders-catalog-link${catalogUrl ? "" : " is-disabled"}`}
+              href={catalogUrl || undefined}
+              target="_blank"
+              rel="noreferrer"
+              aria-disabled={!catalogUrl}
+              aria-label="Abrir catalogo"
+              data-tooltip="Abrir catalogo"
+              title={catalogUrl ? "Abrir catalogo" : "Catalogo no disponible: falta el slug de la empresa"}
+              onClick={event => {
+                if (!catalogUrl) {
+                  event.preventDefault();
+                  globalThis.alert("No fue posible abrir el catalogo: falta el slug de la empresa.");
+                }
+              }}
+            >
+              <FileText size={18} strokeWidth={2.1} />
+              <span>Catalogo</span>
+            </a>
+          ) : null}
+          <button
+            type="button"
+            className="btn-primary orders-new-order-btn"
+            onClick={onNewOrder}
+            title="Nuevo pedido"
+            aria-label="Nuevo pedido"
+            data-tooltip="Nuevo pedido"
+          >
             <Plus size={18} strokeWidth={2.2} />
             <span>Nuevo pedido</span>
             <ChevronDown size={15} strokeWidth={2.2} />

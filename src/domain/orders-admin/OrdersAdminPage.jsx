@@ -124,7 +124,11 @@ export {
   shouldShowPendingInvoiceAlert,
 } from "./ordersDomain.js";
 
-export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canViewProduccion, canViewDomicilios, canViewBarrios, canViewInventario, canViewContabilidad, canViewTrazabilidad, canViewClientesPanel, canViewUsuariosPanel, onLogout, onGoPipeline, onGoPedidos, onGoProduccion, onGoDomicilios, onGoBarrios, onGoInventario, onGoContabilidad, onGoTrazabilidad, onGoClientes, onGoUsuarios }) {
+function resolveCatalogTenantSlug(session) {
+  return String(session?.empresaSlug || "").trim();
+}
+
+export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canViewCatalogo, canViewProduccion, canViewDomicilios, canViewBarrios, canViewInventario, canViewContabilidad, canViewTrazabilidad, canViewClientesPanel, canViewUsuariosPanel, onLogout, onGoPipeline, onGoPedidos, onGoProduccion, onGoDomicilios, onGoBarrios, onGoInventario, onGoContabilidad, onGoTrazabilidad, onGoClientes, onGoUsuarios }) {
   const [filters, setFilters] = useState(initialFilters);
   const [selectedPedidoId, setSelectedPedidoId] = useState(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -208,6 +212,13 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
   const debouncedNewOrderPhone = useDebouncedValue(newOrderForm.clienteTelefono, 500);
   const empresaId = Number(session?.empresaID || tenantConfig.empresaId);
   const sucursalId = Number(session?.sucursalID || tenantConfig.sucursalId);
+  const catalogTenantSlug = resolveCatalogTenantSlug(session);
+  const catalogUrl = useMemo(
+    () => catalogTenantSlug
+      ? `https://catalogo-web.joindata.com.co/catalogo/${encodeURIComponent(catalogTenantSlug)}`
+      : "",
+    [catalogTenantSlug]
+  );
   const {
     loading,
     error,
@@ -1785,6 +1796,8 @@ const ordersOverlayOpen = drawerOpen || newOrderOpen || messageCardOpen || Boole
             metricCards={orderMetricCards}
             activeMetric={activeOrderMetric}
             headerSalesSummary={headerSalesSummary}
+            canViewCatalogo={canViewCatalogo}
+            catalogUrl={catalogUrl}
             onFilterChange={applyFilterValue}
             onToggleStoreDeliveries={toggleStoreDeliveries}
             onRefresh={refresh}
