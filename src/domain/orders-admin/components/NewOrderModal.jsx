@@ -60,6 +60,65 @@ export function NewOrderModal({
   const setNewOrderBarrioQuery = onSetBarrioQuery;
   const setNewOrderBarrioDropdownOpen = onSetBarrioDropdownOpen;
   const loadBarrioOptions = onLoadBarrios;
+  const addedProducts = Array.isArray(newOrderForm.productos) ? newOrderForm.productos : [];
+  const currentProductId = Number(newOrderForm.productoID || 0);
+  const hasCurrentProduct = currentProductId > 0;
+  const selectedBarrio = (Array.isArray(filteredNewOrderBarrios) ? filteredNewOrderBarrios : [])
+    .find(item => item?.nombre === newOrderForm.barrioNombre);
+  const selectedDeliveryCost = Number(selectedBarrio?.costoDomicilio ?? newOrderForm.barrioCostoDomicilio ?? 0);
+
+  const addCurrentProduct = () => {
+    if (!hasCurrentProduct) return;
+    setNewOrderForm(current => {
+      const currentProducts = Array.isArray(current.productos) ? current.productos : [];
+      const nextProduct = {
+        productoID: Number(current.productoID),
+        productoCodigo: current.productoCodigo,
+        productoNombre: current.productoNombre,
+        cantidad: Math.max(1, Number(current.cantidad || 1)),
+        precio: current.precio || "",
+      };
+      return {
+        ...current,
+        productos: [...currentProducts, nextProduct],
+        productoID: "",
+        productoCodigo: "",
+        productoNombre: "",
+        cantidad: 1,
+        precio: "",
+      };
+    });
+    setNewOrderProductQuery("");
+  };
+
+  const removeProduct = index => {
+    setNewOrderForm(current => ({
+      ...current,
+      productos: (Array.isArray(current.productos) ? current.productos : []).filter((_, currentIndex) => currentIndex !== index),
+    }));
+  };
+
+  const selectProduct = item => {
+    setNewOrderProductDropdownOpen(false);
+    setNewOrderForm(current => ({
+      ...current,
+      productoID: String(item.id),
+      productoCodigo: displayProductCode(item, empresaId),
+      productoNombre: buildProductoLabel(item, empresaId),
+      precio: item.precio != null ? String(item.precio) : current.precio,
+    }));
+  };
+
+  const selectBarrio = item => {
+    setNewOrderBarrioDropdownOpen(false);
+    setNewOrderForm(current => ({
+      ...current,
+      barrioNombre: item.nombre,
+      barrioCostoDomicilio: item.costoDomicilio != null ? Number(item.costoDomicilio) : null,
+      direccion: normalizeDeliveryType(item.nombre) === "recogida_en_tienda" ? "Recoger En Tienda" : current.direccion,
+      domicilioObsequiado: normalizeDeliveryType(item.nombre) === "recogida_en_tienda" ? false : current.domicilioObsequiado,
+    }));
+  };
 
   return (
         <div className="orders-modal-backdrop" role="presentation">
@@ -116,16 +175,11 @@ export function NewOrderModal({
                             <li
                               key={`new-${item.id}`}
                               className={`order-combobox-option${String(item.id) === String(newOrderForm.productoID) ? " is-selected" : ""}`}
-                              onClick={() => {
-                                setNewOrderForm(current => ({
-                                  ...current,
-                                  productoID: String(item.id),
-                                  productoCodigo: displayProductCode(item, empresaId),
-                                  productoNombre: buildProductoLabel(item, empresaId),
-                                  precio: item.precio != null ? String(item.precio) : current.precio,
-                                }));
-                                setNewOrderProductDropdownOpen(false);
+                              onMouseDown={event => {
+                                event.preventDefault();
+                                selectProduct(item);
                               }}
+                              onClick={() => selectProduct(item)}
                             >
                               {buildProductoLabel(item, empresaId)}
                               {item.precio != null ? <span className="order-combobox-price">${formatearCOP(Number(item.precio))}</span> : null}
@@ -139,13 +193,55 @@ export function NewOrderModal({
                 <div className="order-detail-edit-grid">
                   <label className="order-detail-edit-label">
                     Cantidad
-                    <input type="number" min="1" step="1" value={newOrderForm.cantidad} onChange={event => updateNewOrderForm("cantidad", Math.max(1, Number(event.target.value || 1)))} />
+                    <input
+                      type="number"
+                      min="1"
+                      step="1"
+                      value={newOrderForm.cantidad}
+                      onChange={event => {
+                        const value = event.target.value;
+                        updateNewOrderForm("cantidad", value === "" ? "" : Math.max(1, Number(value)));
+                      }}
+                      onBlur={() => {
+                        if (!Number(newOrderForm.cantidad || 0)) {
+                          updateNewOrderForm("cantidad", 1);
+                        }
+                      }}
+                    />
                   </label>
                   <label className="order-detail-edit-label">
                     Precio manual
                     <input type="text" inputMode="numeric" value={newOrderForm.precio} onChange={event => updateNewOrderForm("precio", sanitizeWholePesoInput(event.target.value) ?? "")} placeholder="Opcional" />
                   </label>
                 </div>
+                <div className="orders-new-order-product-actions">
+                  <button type="button" className="btn-outline" onClick={addCurrentProduct} disabled={!hasCurrentProduct}>
+                    Agregar arreglo
+                  </button>
+                  <span>{addedProducts.length} agregado{addedProducts.length === 1 ? "" : "s"}</span>
+                </div>
+                {addedProducts.length > 0 ? (
+                  <ul className="orders-new-order-products">
+                    {addedProducts.map((item, index) => (
+                      <li key={`added-product-${item.productoID}-${index}`}>
+                        <div>
+                          <strong>{item.productoNombre || item.productoCodigo || `Producto ${item.productoID}`}</strong>
+                          <span>
+                            {(() => {
+                              const quantity = Math.max(1, Number(item.cantidad || 1));
+                              const unitPrice = Number(item.precio || 0);
+                              if (!unitPrice) return `Cant. ${quantity}`;
+                              return `Cant. ${quantity} - Total $${formatearCOP(quantity * unitPrice)}`;
+                            })()}
+                          </span>
+                        </div>
+                        <button type="button" className="icon-btn" onClick={() => removeProduct(index)} title="Quitar arreglo">
+                          <IconX size={15} stroke={2} />
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
               </section>
 
               <section className="orders-new-order-section">
@@ -169,8 +265,8 @@ export function NewOrderModal({
                     <input type="email" value={newOrderForm.clienteEmail} onChange={event => updateNewOrderForm("clienteEmail", event.target.value)} placeholder="Opcional" />
                   </label>
                   <label className="order-detail-edit-label">
-                    Documento
-                    <input type="text" value={newOrderForm.clienteIdentificacion} onChange={event => updateNewOrderForm("clienteIdentificacion", event.target.value)} placeholder="Opcional" />
+                    Numero de identificacion
+                    <input type="text" value={newOrderForm.clienteIdentificacion} onChange={event => updateNewOrderForm("clienteIdentificacion", event.target.value)} />
                   </label>
                 </div>
               </section>
@@ -184,7 +280,7 @@ export function NewOrderModal({
                   </label>
                   <label className="order-detail-edit-label">
                     Telefono destinatario
-                    <input type="tel" value={newOrderForm.telefonoDestino} onChange={event => updateNewOrderForm("telefonoDestino", event.target.value)} placeholder="Si es diferente" />
+                    <input type="tel" value={newOrderForm.telefonoDestino} onChange={event => updateNewOrderForm("telefonoDestino", event.target.value)} />
                   </label>
                   <label className="order-detail-edit-label">
                     Fecha
@@ -229,14 +325,11 @@ export function NewOrderModal({
                             <li
                               key={`new-barrio-${item.nombre}`}
                               className={`order-combobox-option${item.nombre === newOrderForm.barrioNombre ? " is-selected" : ""}`}
-                              onClick={() => {
-                                updateNewOrderForm("barrioNombre", item.nombre);
-                                if (normalizeDeliveryType(item.nombre) === "recogida_en_tienda") {
-                                  updateNewOrderForm("direccion", "Recoger En Tienda");
-                                  updateNewOrderForm("domicilioObsequiado", false);
-                                }
-                                setNewOrderBarrioDropdownOpen(false);
+                              onMouseDown={event => {
+                                event.preventDefault();
+                                selectBarrio(item);
                               }}
+                              onClick={() => selectBarrio(item)}
                             >
                               {item.nombre}
                               {item.costoDomicilio != null ? <span className="order-combobox-price">${formatearCOP(item.costoDomicilio)}</span> : null}
@@ -247,6 +340,15 @@ export function NewOrderModal({
                     ) : null}
                   </div>
                 </label>
+                {newOrderForm.barrioNombre ? (
+                  <p className="orders-new-order-delivery-cost">
+                    {isStorePickup
+                      ? "Domicilio: $0 - Recoger en tienda"
+                      : newOrderForm.domicilioObsequiado
+                        ? `Domicilio: $0 - Obsequiado${selectedDeliveryCost ? ` (valor barrio $${formatearCOP(selectedDeliveryCost)})` : ""}`
+                        : `Domicilio: $${formatearCOP(selectedDeliveryCost)}`}
+                  </p>
+                ) : null}
                 <label className="order-detail-edit-check">
                   <input
                     type="checkbox"
@@ -259,21 +361,12 @@ export function NewOrderModal({
               </section>
 
               <section className="orders-new-order-section">
-                <h3>Mensaje y pago</h3>
+                <h3>Mensaje</h3>
                 <div className="order-detail-edit-grid">
                   <label className="order-detail-edit-label">
                     Firma
                     <input type="text" value={newOrderForm.firma} onChange={event => updateNewOrderForm("firma", event.target.value)} placeholder="De parte de..." />
                   </label>
-                  {paymentFieldConfig ? (
-                    <label className="order-detail-edit-label">
-                      {paymentFieldConfig.titulo || "Metodo de pago"}
-                      <select value={newOrderForm.metodoPago} onChange={event => updateNewOrderForm("metodoPago", event.target.value)}>
-                        <option value="">Seleccionar</option>
-                        {paymentFieldOptions.map(option => <option key={option} value={option}>{option}</option>)}
-                      </select>
-                    </label>
-                  ) : null}
                   {salesChannelFieldConfig ? (
                     <label className="order-detail-edit-label">
                       {salesChannelFieldConfig.titulo || "Canal"}

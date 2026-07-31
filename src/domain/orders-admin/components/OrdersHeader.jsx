@@ -84,7 +84,7 @@ export function OrdersHeader({
           </button>
           {canViewCatalogo ? (
             <a
-              className={`btn-primary orders-header-refresh orders-catalog-link${catalogUrl ? "" : " is-disabled"}`}
+              className={`btn-primary orders-catalog-link${catalogUrl ? "" : " is-disabled"}`}
               href={catalogUrl || undefined}
               target="_blank"
               rel="noreferrer"
@@ -106,7 +106,11 @@ export function OrdersHeader({
           <button
             type="button"
             className="btn-primary orders-new-order-btn"
-            onClick={onNewOrder}
+            onClick={event => {
+              event.preventDefault();
+              event.stopPropagation();
+              onNewOrder?.();
+            }}
             title="Nuevo pedido"
             aria-label="Nuevo pedido"
             data-tooltip="Nuevo pedido"

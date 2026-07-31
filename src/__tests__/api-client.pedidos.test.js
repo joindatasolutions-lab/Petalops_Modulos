@@ -129,4 +129,39 @@ describe("apiClient.listarPedidos", () => {
     expect(body.domicilioObsequiado).toBe(true);
     expect(body.omitirCostoDomicilio).toBe(true);
   });
+
+  it("crea nuevo pedido manual usando /pedido/manual", async () => {
+    const fetchMock = vi.fn(async () => ({
+      ok: true,
+      json: async () => ({ pedidoID: 123 }),
+    }));
+    vi.stubGlobal("fetch", fetchMock);
+    vi.stubGlobal("localStorage", {
+      getItem: () => "token-test",
+    });
+
+    const api = createApiClient({ apiBaseUrl: "https://api.test" });
+    await api.crearPedidoManual({
+      empresaID: 3,
+      sucursalID: 3,
+      productos: [{ productoID: 123, cantidad: 1, productoPrecio: 90000 }],
+      domicilioObsequiado: true,
+      omitirCostoDomicilio: true,
+      domicilio: 0,
+      domicilioOriginal: 15000,
+      descuentoDomicilio: 15000,
+    });
+
+    const [url, options] = fetchMock.mock.calls[0];
+    const parsed = new URL(url);
+    const body = JSON.parse(options.body);
+
+    expect(parsed.pathname).toBe("/pedido/manual");
+    expect(options.method).toBe("POST");
+    expect(body.domicilio).toBe(0);
+    expect(body.domicilioOriginal).toBe(15000);
+    expect(body.descuentoDomicilio).toBe(15000);
+    expect(body.domicilioObsequiado).toBe(true);
+    expect(body.omitirCostoDomicilio).toBe(true);
+  });
 });

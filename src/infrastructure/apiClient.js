@@ -574,6 +574,16 @@ export function createApiClient(config) {
       });
     },
 
+    async crearPedidoManual(payload) {
+      return requestJson("/pedido/manual", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(payload)
+      });
+    },
+
     async actualizarDetallePedidoPipeline({
       pedidoId,
       detalleID,
