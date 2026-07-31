@@ -38,7 +38,7 @@ function formatProgress(progress) {
   return Math.max(0, Math.min(100, Number(progress || 0)));
 }
 
-export function PedidoCard({ item, stage, onOpen, onDragStart }) {
+export function PedidoCard({ item, stage, onOpen }) {
   const priorityKey = String(item.prioridad || "MEDIA").toUpperCase();
   const priority = PRIORITY_CONFIG[priorityKey] || PRIORITY_CONFIG.MEDIA;
   const timeStatus = getTimeStatus(item.tiempo_restante_entrega, stage, item);
@@ -50,8 +50,6 @@ export function PedidoCard({ item, stage, onOpen, onDragStart }) {
   return (
     <article
       className={`pipeline-card ${timeStatus.className}`}
-      draggable
-      onDragStart={event => onDragStart(event, item)}
       onClick={() => onOpen(item)}
     >
       {/* Fila 1: Número pedido + Prioridad */}

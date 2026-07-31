@@ -39,11 +39,6 @@ const PIPELINE_COLUMNS = [
   { key: "cancelado",       title: "Cancelado",                stages: ["cancelado"],                              dropStage: "cancelado" },
 ];
 
-const STAGE_TO_ESTADO_ID = {
-  creado: 1, aprobado: 2, pendiente_produccion: 3,
-  en_produccion: 4, listo: 5, en_camino: 5, entregado: 20, cancelado: 6,
-};
-
 const PIPELINE_TABS = [
   { key: "pipeline",  label: "Pipeline",               icon: ClipboardList },
   { key: "historial", label: "Historial reasignaciones", icon: History },
@@ -146,8 +141,6 @@ export function PipelineOperativo({
   const [auditLoading, setAuditLoading] = useState(false);
   const [auditError, setAuditError] = useState("");
   const [auditData, setAuditData] = useState({ resumen: [], detalle: [], total: 0 });
-  const [processingPedidoIds, setProcessingPedidoIds] = useState([]);
-
   const empresaId = Number(session?.empresaID || tenantConfig.empresaId);
   const sucursalFromSession = session?.sucursalID != null ? Number(session.sucursalID) : null;
   const displayUserName = String(session?.nombre || session?.login || "Usuario").trim() || "Usuario";
@@ -261,28 +254,6 @@ export function PipelineOperativo({
       if (!current || Number(current.id_pedido) !== Number(pedidoId)) return current;
       return { ...current, hora_entrega: horaEntrega || current.hora_entrega };
     });
-  };
-
-  const onDragStart = (event, item) => event.dataTransfer.setData("pedidoId", String(item.id_pedido));
-
-  const onDropCard = async (pedidoId, stage) => {
-    const estadoId = STAGE_TO_ESTADO_ID[stage];
-    if (!estadoId) return;
-    if (processingPedidoIds.includes(Number(pedidoId))) {
-      globalThis.alert("Este pedido ya se esta actualizando. Espera un momento.");
-      return;
-    }
-    setProcessingPedidoIds(current => [...current, Number(pedidoId)]);
-    try {
-      await api.cambiarEstadoPedidoPipeline({ pedidoId, nuevoEstadoId: estadoId });
-      await loadBoard();
-    } catch (nextError) {
-      const message = nextError?.detail || nextError?.message || "No fue posible mover el pedido.";
-      setError(message);
-      globalThis.alert(message);
-    } finally {
-      setProcessingPedidoIds(current => current.filter(id => id !== Number(pedidoId)));
-    }
   };
 
   const buildColumnItems = stages => {
@@ -515,8 +486,6 @@ export function PipelineOperativo({
                 title={column.title}
                 items={buildColumnItems(column.stages)}
                 onOpen={onOpen}
-                onDropCard={onDropCard}
-                onDragStart={onDragStart}
               />
             ))}
           </section>
