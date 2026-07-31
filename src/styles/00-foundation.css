@@ -2159,6 +2159,54 @@ select:focus {
   word-break: break-word;
 }
 
+.order-detail-edit-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  width: fit-content;
+  min-height: 34px;
+  margin: 2px 0 0;
+  padding: 7px 10px;
+  border: 1px solid #ead9de;
+  border-radius: 10px;
+  background: #fffafd;
+  color: #5f5459;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.2;
+  cursor: pointer;
+}
+
+.order-detail-edit-check input[type="checkbox"] {
+  flex: 0 0 auto;
+  width: 16px;
+  height: 16px;
+  min-width: 16px;
+  min-height: 16px;
+  margin: 0;
+  accent-color: #8a3252;
+  cursor: pointer;
+}
+
+.order-detail-edit-check span {
+  display: block;
+}
+
+.order-detail-edit-check:has(input:checked) {
+  border-color: rgba(138, 50, 82, 0.38);
+  background: #fff3f8;
+  color: #8a3252;
+}
+
+.order-detail-edit-check:has(input:disabled) {
+  opacity: 0.62;
+  cursor: not-allowed;
+}
+
+.order-detail-edit-check:has(input:disabled) input {
+  cursor: not-allowed;
+}
+
 .order-detail-edit-payment-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -2205,6 +2253,10 @@ select:focus {
 .order-detail-edit-adjustment-summary strong {
   color: #e91e72;
   font-size: 13px;
+}
+
+.order-detail-edit-delivery-summary {
+  margin-top: -2px;
 }
 
 .order-detail-edit-actions {
