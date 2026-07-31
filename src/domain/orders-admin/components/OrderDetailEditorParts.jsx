@@ -313,6 +313,7 @@ export function OrderDetailDeliverySection({
   barriosLoading,
   filteredBarrioOptions,
   domicilioObsequiado,
+  financialPreview,
   onDestinatarioNombreChange,
   onTelefonoDestinoChange,
   onDireccionChange,
@@ -431,6 +432,14 @@ export function OrderDetailDeliverySection({
         />
         <span>Domicilio obsequiado</span>
       </label>
+
+      {financialPreview?.domicilioObsequiado && financialPreview.domicilioOriginal > 0 ? (
+        <div className="order-detail-edit-adjustment-summary order-detail-edit-delivery-summary">
+          <span>Domicilio obsequiado: -${formatearCOP(financialPreview.domicilioOriginal)}</span>
+          <span>Total base + domicilio: ${formatearCOP(financialPreview.baseTotal)}</span>
+          <strong>Total ajustado: ${formatearCOP(financialPreview.total)}</strong>
+        </div>
+      ) : null}
     </>
   );
 }

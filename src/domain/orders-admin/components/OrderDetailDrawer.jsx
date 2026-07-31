@@ -138,6 +138,7 @@ export function OrderDetailDrawer({
                 empresaId={empresaId}
                 paymentTitle={detailTitles.paymentTitle || "Metodo de pago"}
                 salesChannelTitle={detailTitles.salesChannelTitle || "Celular Flora"}
+                financialPreview={editor.isEditing ? payment.financialPreview : null}
               />
             </OrderDetailErrorBoundary>
           )}

@@ -161,6 +161,24 @@ export function roundCurrency(value) {
   return Math.round(Number(value || 0) * 100) / 100;
 }
 
+function isTruthyFlag(value) {
+  if (value === true) return true;
+  if (value === false || value == null) return false;
+  const normalized = String(value).trim().toLowerCase();
+  return ["1", "true", "si", "sí", "yes", "y"].includes(normalized);
+}
+
+export function isDeliveryGifted(...sources) {
+  return sources.some(source => isTruthyFlag(source?.domicilioObsequiado)
+    || isTruthyFlag(source?.domicilio_obsequiado)
+    || isTruthyFlag(source?.domicilioGratis)
+    || isTruthyFlag(source?.domicilio_gratis)
+    || isTruthyFlag(source?.envioGratis)
+    || isTruthyFlag(source?.envio_gratis)
+    || isTruthyFlag(source?.omitirCostoDomicilio)
+    || isTruthyFlag(source?.omitir_costo_domicilio));
+}
+
 export function initialsFromName(value) {
   const parts = String(value || "")
     .trim()
@@ -771,7 +789,7 @@ export function getOrderFinancialTotal(financiero) {
 
   const subtotal = roundCurrency(financiero?.subtotal ?? 0);
   const iva = roundCurrency(financiero?.iva ?? 0);
-  const domicilio = roundCurrency(financiero?.domicilio ?? 0);
+  const domicilio = isDeliveryGifted(financiero) ? 0 : roundCurrency(financiero?.domicilio ?? 0);
   const recargo = roundCurrency(financiero?.recargoLinkMonto ?? 0);
   const descuento = roundCurrency(financiero?.descuentoMonto ?? 0);
   const saldoFavor = roundCurrency(financiero?.saldoFavorMonto ?? 0);
@@ -796,7 +814,7 @@ export function resolveOrderListTotal(item) {
 
   const subtotal = roundCurrency(financiero?.subtotal ?? item?.subtotal ?? 0);
   const iva = roundCurrency(financiero?.iva ?? item?.iva ?? 0);
-  const domicilio = roundCurrency(
+  const domicilioOriginal = roundCurrency(
     financiero?.domicilio ??
     financiero?.costoDomicilio ??
     financiero?.costo_domicilio ??
@@ -805,6 +823,7 @@ export function resolveOrderListTotal(item) {
     item?.costo_domicilio ??
     0
   );
+  const domicilio = isDeliveryGifted(financiero, item, item?.entrega, item?.destinatario) ? 0 : domicilioOriginal;
   const recargo = roundCurrency(financiero?.recargoLinkMonto ?? item?.recargoLinkMonto ?? 0);
   const descuento = roundCurrency(financiero?.descuentoMonto ?? item?.descuentoMonto ?? 0);
   const saldoFavor = roundCurrency(financiero?.saldoFavorMonto ?? item?.saldoFavorMonto ?? 0);

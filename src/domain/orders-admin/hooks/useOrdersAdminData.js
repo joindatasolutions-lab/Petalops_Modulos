@@ -4,6 +4,7 @@ import { shiftIsoDate } from "../../../shared/utils.js";
 import { DEFAULT_ORDERS_KPIS } from "../ordersAdminConstants.js";
 import { buildOrdersCacheKey, rememberOrdersCache } from "../ordersCache.js";
 import { normalizeOrdersKpis } from "../ordersKpis.js";
+import { applyDeliveryGiftOverrideToItem } from "../deliveryGiftOverrides.js";
 import {
   buildOrdersMetrics,
   extractOrdersPayloadItems,
@@ -125,7 +126,7 @@ export function useOrdersAdminData({
       if (!silent && requestId !== requestTracker.current) return;
       if (silent && (requestId !== requestTracker.current || visibleLoadingRequest.current)) return;
 
-      const loadedItems = extractOrdersPayloadItems(data);
+      const loadedItems = extractOrdersPayloadItems(data).map(applyDeliveryGiftOverrideToItem);
       const dateItems = requestFilters.soloTienda
         ? loadedItems
         : filterOrdersByCreatedDateRange(loadedItems, requestFechaDesde, requestFechaHasta);

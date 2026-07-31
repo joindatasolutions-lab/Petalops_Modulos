@@ -114,6 +114,7 @@ export function useOrderDetailEditor({
         barriosLoading: state.detailEditBarriosLoading,
         filteredBarrioOptions,
         domicilioObsequiado: state.detailEditDomicilioObsequiado,
+        financialPreview: state.detailEditFinancialPreview,
         onDestinatarioNombreChange: setters.setDetailEditDestinatarioNombre,
         onTelefonoDestinoChange: setters.setDetailEditTelefonoDestino,
         onDireccionChange: setters.setDetailEditDireccion,

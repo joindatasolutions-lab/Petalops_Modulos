@@ -6,7 +6,7 @@ import { filterInventoryItems } from "../domain/inventory/InventoryPage.jsx";
 import { filterNeighborhoodItems, sortNeighborhoods } from "../domain/neighborhoods/NeighborhoodsPage.jsx";
 import { buildOrdersMetrics, extractOrdersPayloadItems, filterOrdersByCreatedDateRange, filterOrdersBySearch, filterOrdersByStatus, isStorePickupOrder, localDateEndParam, localDateStartParam, resolveOrdersPayloadTotal, shouldShowPendingInvoiceAlert } from "../domain/orders-admin/OrdersAdminPage.jsx";
 import { buildNewOrderCheckoutPayload } from "../domain/orders-admin/orderPayloadBuilders.js";
-import { buildOrderFinancialPreview } from "../domain/orders-admin/ordersDomain.js";
+import { buildOrderFinancialPreview, getOrderFinancialTotal, resolveOrderListTotal } from "../domain/orders-admin/ordersDomain.js";
 import {
   buildVisibleProductionItems,
   catalogCodeCandidates,
@@ -163,6 +163,20 @@ describe("estabilidad de filtros por vista", () => {
     expect(preview.domicilioOriginal).toBe(12000);
     expect(preview.domicilioObsequiado).toBe(true);
     expect(preview.total).toBe(100000);
+  });
+
+  it("Pedidos: totales guardados no cobran domicilio marcado como obsequio", () => {
+    const financiero = {
+      subtotal: 1,
+      iva: 0,
+      domicilio: 120000,
+      domicilioObsequiado: true,
+      total: 120001,
+    };
+
+    expect(getOrderFinancialTotal(financiero)).toBe(1);
+    expect(resolveOrderListTotal({ financiero })).toBe(1);
+    expect(resolveOrderListTotal({ subtotal: 1, domicilio: 120000, omitirCostoDomicilio: true })).toBe(1);
   });
 
   it("Pedidos: checkout manual conserva cliente identificado por telefono", () => {

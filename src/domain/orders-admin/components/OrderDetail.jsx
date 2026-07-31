@@ -10,6 +10,7 @@ import { formatearCOP, splitDateTimeParts } from "../../../shared/utils.js";
 import {
   getOrderFinancialTotal,
   initialsFromName,
+  isDeliveryGifted,
   normalizePaymentBreakdownForTotal,
   orderProductLabel,
 } from "../ordersDomain.js";
@@ -43,7 +44,7 @@ function OrderDetailAccordion({ title, icon, children, defaultOpen = false, clas
   );
 }
 
-export function OrderDetail({ detalle, empresaId = null, paymentTitle = "Metodo de pago", salesChannelTitle = "Celular Flora" }) {
+export function OrderDetail({ detalle, empresaId = null, paymentTitle = "Metodo de pago", salesChannelTitle = "Celular Flora", financialPreview = null }) {
   const safeDetalle = detalle && typeof detalle === "object" ? detalle : {};
   const cliente = safeDetalle.cliente && typeof safeDetalle.cliente === "object" ? safeDetalle.cliente : {};
   const destinatario = safeDetalle.destinatario && typeof safeDetalle.destinatario === "object" ? safeDetalle.destinatario : {};
@@ -53,7 +54,26 @@ export function OrderDetail({ detalle, empresaId = null, paymentTitle = "Metodo 
   const { date: fechaEntrega, time: horaEntrega } = splitDateTimeParts(destinatario.fechaEntrega);
   const tipoDocumentoCliente = formatClienteTipoDocumento(cliente);
   const numeroDocumentoCliente = formatClienteNumeroDocumento(cliente);
-  const totalPedido = getOrderFinancialTotal(financiero);
+  const hasFinancialPreview = financialPreview && typeof financialPreview === "object";
+  const totalPedido = hasFinancialPreview
+    ? Number(financialPreview.total || 0)
+    : getOrderFinancialTotal(financiero);
+  const subtotalPedido = hasFinancialPreview ? Number(financialPreview.subtotal || 0) : Number(financiero.subtotal || 0);
+  const ivaPedido = hasFinancialPreview ? Number(financialPreview.iva || 0) : Number(financiero.iva || 0);
+  const storedDomicilioObsequiado = isDeliveryGifted(financiero, safeDetalle.entrega, safeDetalle.destinatario);
+  const domicilioPedido = hasFinancialPreview
+    ? Number(financialPreview.domicilio || 0)
+    : (storedDomicilioObsequiado ? 0 : Number(financiero.domicilio || 0));
+  const domicilioOriginal = hasFinancialPreview ? Number(financialPreview.domicilioOriginal || 0) : Number(financiero.domicilio || 0);
+  const domicilioObsequiado = Boolean(
+    domicilioOriginal > 0 && (
+      (hasFinancialPreview && financialPreview.domicilioObsequiado) ||
+      (!hasFinancialPreview && storedDomicilioObsequiado)
+    )
+  );
+  const recargoLinkMonto = hasFinancialPreview ? Number(financialPreview.recargoMonto || 0) : Number(financiero.recargoLinkMonto || 0);
+  const descuentoMonto = hasFinancialPreview ? Number(financialPreview.descuentoMonto || 0) : Number(financiero.descuentoMonto || 0);
+  const saldoFavorMonto = hasFinancialPreview ? Number(financialPreview.saldoFavorMonto || 0) : Number(financiero.saldoFavorMonto || 0);
   const paymentBreakdown = normalizePaymentBreakdownForTotal(
     extractPaymentBreakdown(financiero),
     totalPedido
@@ -152,12 +172,13 @@ export function OrderDetail({ detalle, empresaId = null, paymentTitle = "Metodo 
           <strong>${formatearCOP(totalPedido)}</strong>
         </div>
         <div className="orders-detail-data-grid orders-detail-financial-grid">
-          {detailRow("Subtotal", `$${formatearCOP(Number(financiero.subtotal || 0))}`)}
-          {detailRow("IVA", `$${formatearCOP(Number(financiero.iva || 0))}`)}
-          {detailRow("Domicilio", `$${formatearCOP(Number(financiero.domicilio || 0))}`)}
-          {Number(financiero.recargoLinkMonto || 0) > 0 ? detailRow("Recargo link", `+$${formatearCOP(Number(financiero.recargoLinkMonto || 0))}`) : null}
-          {Number(financiero.descuentoMonto || 0) > 0 ? detailRow("Descuento", `-$${formatearCOP(Number(financiero.descuentoMonto || 0))}`) : null}
-          {Number(financiero.saldoFavorMonto || 0) > 0 ? detailRow("Saldo a favor", `$${formatearCOP(Number(financiero.saldoFavorMonto || 0))}`) : null}
+          {detailRow("Subtotal", `$${formatearCOP(subtotalPedido)}`)}
+          {detailRow("IVA", `$${formatearCOP(ivaPedido)}`)}
+          {detailRow("Domicilio", `$${formatearCOP(domicilioPedido)}`)}
+          {domicilioObsequiado ? detailRow("Domicilio obsequiado", `-$${formatearCOP(domicilioOriginal)}`) : null}
+          {recargoLinkMonto > 0 ? detailRow("Recargo link", `+$${formatearCOP(recargoLinkMonto)}`) : null}
+          {descuentoMonto > 0 ? detailRow("Descuento", `-$${formatearCOP(descuentoMonto)}`) : null}
+          {saldoFavorMonto > 0 ? detailRow("Saldo a favor", `$${formatearCOP(saldoFavorMonto)}`) : null}
           {detailRow("Estado pago", financiero.estadoPago || "-")}
           {detailRow(paymentTitle, formatMetodoPago(financiero))}
           {paymentBreakdown.length > 0 ? detailRow("Desglose pagos", paymentBreakdown.map(item => `${item.metodo}: $${formatearCOP(item.monto)}`).join(" / ")) : null}

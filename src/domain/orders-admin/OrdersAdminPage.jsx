@@ -50,6 +50,11 @@ import { useMessageCardController } from "./hooks/useMessageCardController.js";
 import { useOrderDetailEditor } from "./hooks/useOrderDetailEditor.js";
 import { useOrdersAdminData } from "./hooks/useOrdersAdminData.js";
 import { useOrdersCatalogs } from "./hooks/useOrdersCatalogs.js";
+import {
+  applyDeliveryGiftOverrideToDetail,
+  forgetDeliveryGiftOverride,
+  rememberDeliveryGiftOverride,
+} from "./deliveryGiftOverrides.js";
 
 import {
   buildCatalogProductIndex,
@@ -69,6 +74,7 @@ import {
   isCashPaymentMethod,
   isCustomArrangement,
   isEmpresaAdminRole,
+  isDeliveryGifted,
   isLinkPaymentMethod,
   isOrderNumberSearchTerm,
   isStorePickupOrder,
@@ -356,8 +362,6 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
       ));
       if (normalizedDeliveryType === "recogida_en_tienda") {
         baseFinancial.domicilio = 0;
-      } else if (detailEditDomicilioObsequiado) {
-        baseFinancial.domicilio = 0;
       } else if (detailEditSelectedBarrio?.costoDomicilio != null) {
         baseFinancial.domicilio = Number(detailEditSelectedBarrio.costoDomicilio || 0);
       }
@@ -578,12 +582,7 @@ const messageCard = useMessageCardController({
     setDetailEditTelefonoDestino(String(detalle.destinatario?.telefono || ""));
     setDetailEditDireccion(String(detalle.destinatario?.direccion || ""));
     setDetailEditBarrioNombre(String(detalle.destinatario?.barrio || ""));
-    setDetailEditDomicilioObsequiado(Boolean(
-      detalle.financiero?.domicilioObsequiado ||
-      detalle.financiero?.omitirCostoDomicilio ||
-      detalle.entrega?.domicilioObsequiado ||
-      detalle.entrega?.omitirCostoDomicilio
-    ));
+    setDetailEditDomicilioObsequiado(isDeliveryGifted(detalle.financiero, detalle.entrega, detalle.destinatario));
     setDetailEditBarrioQuery("");
     setDetailEditBarrios(dedupeBarrioItems([
       normalizeBarrioItem({ nombreBarrio: "Recoger en tienda" }),
@@ -736,18 +735,39 @@ const messageCard = useMessageCardController({
     });
   };
 
-  const openDetail = async pedidoId => {
+  const openDetail = async (pedidoId, detailPatch = null) => {
     setOpenOrderActionsId(null);
     setDrawerOpen(true);
     setSelectedPedidoId(pedidoId);
     setDetalle(null);
 
     try {
-      const detail = await api.obtenerDetallePedido(pedidoId);
+      const rawDetail = applyDeliveryGiftOverrideToDetail(pedidoId, await api.obtenerDetallePedido(pedidoId));
+      const detail = detailPatch && typeof detailPatch === "object"
+        ? {
+            ...rawDetail,
+            ...detailPatch,
+            financiero: {
+              ...(rawDetail?.financiero || {}),
+              ...(detailPatch.financiero || {}),
+            },
+            entrega: {
+              ...(rawDetail?.entrega || {}),
+              ...(detailPatch.entrega || {}),
+            },
+            destinatario: {
+              ...(rawDetail?.destinatario || {}),
+              ...(detailPatch.destinatario || {}),
+            },
+          }
+        : rawDetail;
       setDetalle(detail);
+      patchOrderListItemFromDetail(pedidoId, detail);
+      return detail;
     } catch (nextError) {
       console.error("Error obteniendo detalle:", nextError);
       setDetalle({ error: true });
+      return null;
     }
   };
 
@@ -788,7 +808,6 @@ const messageCard = useMessageCardController({
       const refreshedItem = (Array.isArray(refreshed?.items) ? refreshed.items : [])
         .find(current => Number(resolveOrderId(current)) === Number(pedidoId));
       const assignedOrderNumber = resolveAssignedOrderNumber(response, response?.pedido, response?.data, refreshedItem);
-      await downloadInvoice(pedidoId, { refreshAfter: false });
       setOrderNotification({
         tone: "success",
         title: "Pedido aprobado",
@@ -967,6 +986,32 @@ const openNewOrderModal = () => {
     if (newOrderSaving) return;
     setNewOrderOpen(false);
     setNewOrderError("");
+  };
+
+  const patchOrderListItemFromDetail = (pedidoId, detail) => {
+    if (!pedidoId || !detail || detail.error) return;
+
+    setItems(current => current.map(item => {
+      if (Number(resolveOrderId(item)) !== Number(pedidoId)) return item;
+      const financiero = detail.financiero && typeof detail.financiero === "object" ? detail.financiero : {};
+      return {
+        ...item,
+        total: financiero.total ?? item.total,
+        valorTotal: financiero.total ?? item.valorTotal,
+        subtotal: financiero.subtotal ?? item.subtotal,
+        iva: financiero.iva ?? item.iva,
+        domicilio: financiero.domicilio ?? item.domicilio,
+        recargoLinkMonto: financiero.recargoLinkMonto ?? item.recargoLinkMonto,
+        descuentoMonto: financiero.descuentoMonto ?? item.descuentoMonto,
+        saldoFavorMonto: financiero.saldoFavorMonto ?? item.saldoFavorMonto,
+        domicilioObsequiado: financiero.domicilioObsequiado ?? detail.entrega?.domicilioObsequiado ?? detail.destinatario?.domicilioObsequiado ?? item.domicilioObsequiado,
+        omitirCostoDomicilio: financiero.omitirCostoDomicilio ?? detail.entrega?.omitirCostoDomicilio ?? detail.destinatario?.omitirCostoDomicilio ?? item.omitirCostoDomicilio,
+        financiero: {
+          ...(item.financiero || {}),
+          ...financiero,
+        },
+      };
+    }));
   };
 
   const updateNewOrderForm = (name, value) => {
@@ -1260,7 +1305,39 @@ const openNewOrderModal = () => {
         setIsDuplicatingDetail(false);
       } else {
         await api.actualizarDetallePedidoPipeline(buildDetailEditApiPayload(selectedPedidoId));
-        await reloadDrawer();
+        const keepGiftedDelivery = normalizeDeliveryType(detailEditBarrioNombre) !== "recogida_en_tienda" && Boolean(detailEditDomicilioObsequiado);
+        const deliveryGiftFinancial = keepGiftedDelivery
+          ? {
+              subtotal: detailEditFinancialPreview.subtotal,
+              iva: detailEditFinancialPreview.iva,
+              domicilio: detailEditFinancialPreview.domicilioOriginal,
+              recargoLinkMonto: detailEditFinancialPreview.recargoMonto,
+              descuentoMonto: detailEditFinancialPreview.descuentoMonto,
+              saldoFavorMonto: detailEditFinancialPreview.saldoFavorMonto,
+              total: detailEditFinancialPreview.total,
+              domicilioObsequiado: true,
+              omitirCostoDomicilio: true,
+            }
+          : null;
+        if (keepGiftedDelivery) {
+          rememberDeliveryGiftOverride(selectedPedidoId, deliveryGiftFinancial);
+        } else {
+          forgetDeliveryGiftOverride(selectedPedidoId);
+        }
+        await reloadDrawer({
+          financiero: deliveryGiftFinancial || {
+            domicilioObsequiado: false,
+            omitirCostoDomicilio: false,
+          },
+          entrega: {
+            domicilioObsequiado: keepGiftedDelivery,
+            omitirCostoDomicilio: keepGiftedDelivery,
+          },
+          destinatario: {
+            domicilioObsequiado: keepGiftedDelivery,
+            omitirCostoDomicilio: keepGiftedDelivery,
+          },
+        });
       }
       const hasCashPayment = Number.isFinite(paymentValidation.cashAmount) && paymentValidation.cashAmount > 0;
       if (hasCashPayment && typeof window !== "undefined") {
@@ -1369,10 +1446,11 @@ const openNewOrderModal = () => {
     }
   };
 
-  const reloadDrawer = async () => {
+  const reloadDrawer = async (detailPatch = null) => {
     if (!selectedPedidoId) return;
-    await openDetail(selectedPedidoId);
+    const detail = await openDetail(selectedPedidoId, detailPatch);
     await loadOrders(true);
+    patchOrderListItemFromDetail(selectedPedidoId, detail);
     await loadTodaySalesSummary();
   };
 
