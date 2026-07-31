@@ -48,6 +48,9 @@ export function OrdersListSection({
         <h2 className="orders-section-title">Listado de pedidos</h2>
         {!loading && !error && items.length === 0 ? (
           <div className="orders-empty-state" role="status" aria-live="polite">
+            <span className="orders-empty-state-icon" aria-hidden="true">
+              <Search size={22} strokeWidth={2.2} />
+            </span>
             <strong>No hay pedidos</strong>
             <span>Ajusta los filtros o limpia la busqueda para ver otros resultados.</span>
           </div>
