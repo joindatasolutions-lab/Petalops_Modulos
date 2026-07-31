@@ -61,6 +61,7 @@ export function PipelineColumn({ dropStageKey, title, items, onOpen, onDropCard,
           <PedidoCard
             key={item.id_pedido}
             item={item}
+            stage={dropStageKey}
             onOpen={onOpen}
             onDragStart={onDragStart}
           />

@@ -1,4 +1,4 @@
-import { Clock, DollarSign, MapPin, Package2, Store, User, Bike } from "lucide-react";
+import { DollarSign, MapPin, Package2, Store, User, Bike } from "lucide-react";
 
 const PRIORITY_CONFIG = {
   BAJA:    { label: "Baja",    className: "is-low" },
@@ -8,7 +8,20 @@ const PRIORITY_CONFIG = {
   CRITICA: { label: "Crítica", className: "is-urgent" },
 };
 
-function getTimeStatus(tiempoRestante) {
+function isClosedStage(stage, item) {
+  const normalizedStage = String(stage || "").trim().toLowerCase();
+  const normalizedStatus = String(item?.estado || item?.estado_pedido || item?.estadoPedido || "").trim().toLowerCase();
+  return normalizedStage === "entregado" ||
+    normalizedStage === "cancelado" ||
+    normalizedStatus.includes("entregado") ||
+    normalizedStatus.includes("cancelado");
+}
+
+function getTimeStatus(tiempoRestante, stage, item) {
+  if (isClosedStage(stage, item)) {
+    return { label: "-", className: "is-ontime", icon: null };
+  }
+
   const remaining = Number(tiempoRestante);
   if (!Number.isFinite(remaining)) return { label: "-", className: "is-unknown", icon: null };
   if (remaining < 0) {
@@ -25,10 +38,10 @@ function formatProgress(progress) {
   return Math.max(0, Math.min(100, Number(progress || 0)));
 }
 
-export function PedidoCard({ item, onOpen, onDragStart }) {
+export function PedidoCard({ item, stage, onOpen, onDragStart }) {
   const priorityKey = String(item.prioridad || "MEDIA").toUpperCase();
   const priority = PRIORITY_CONFIG[priorityKey] || PRIORITY_CONFIG.MEDIA;
-  const timeStatus = getTimeStatus(item.tiempo_restante_entrega);
+  const timeStatus = getTimeStatus(item.tiempo_restante_entrega, stage, item);
   const progressWidth = formatProgress(item.progreso_porcentaje);
 
   const isPickup = String(item.tipo_entrega || "").toLowerCase().includes("recog") ||
@@ -86,14 +99,6 @@ export function PedidoCard({ item, onOpen, onDragStart }) {
           <Bike size={11} strokeWidth={2} aria-hidden="true" />
           <span>{item.domiciliario}</span>
           {item.hora_entrega || item.rango_hora ? <span className="pipeline-card-time-chip">{item.hora_entrega || item.rango_hora}</span> : null}
-        </div>
-      ) : null}
-
-      {/* Estado tiempo */}
-      {timeStatus.label !== "-" ? (
-        <div className={`pipeline-time-status ${timeStatus.className}`}>
-          <Clock size={11} strokeWidth={2} aria-hidden="true" />
-          <span>{timeStatus.label}</span>
         </div>
       ) : null}
 
