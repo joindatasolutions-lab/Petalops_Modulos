@@ -1,10 +1,21 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { tenantConfig } from "../../config/tenantConfig.js";
 import { createApiClient } from "../../infrastructure/apiClient.js";
 import { AppSidebar } from "../../shared/AppSidebar.jsx";
 import { useSidebarState } from "../../shared/useSidebarState.js";
-import { BadgeCheck, Cake, MailCheck, Plus, RefreshCw, Search, Sparkles, TrendingUp, UserCheck, UsersRound } from "lucide-react";
+import { todayIsoDateBogota } from "../../shared/utils.js";
+import { BadgeCheck, BarChart3, Cake, ChevronDown, Download, MailCheck, Plus, RefreshCw, Search, Sparkles, TrendingUp, UserCheck, UsersRound } from "lucide-react";
+
+const CLIENTS_VIEWS = [
+  { key: "clientes", label: "Clientes" },
+  { key: "metricas", label: "Métricas" },
+];
+
+const CLIENTS_VIEW_ICONS = {
+  clientes: UsersRound,
+  metricas: BarChart3,
+};
 
 const initialForm = {
   tipoIdent: "CC",
@@ -61,7 +72,6 @@ export function ClientsPage({
   canViewBarrios,
   canViewInventario,
   canViewContabilidad,
-  canViewTrazabilidad,
   canViewClientesPanel,
   canViewUsuariosPanel,
   onGoPipeline,
@@ -71,7 +81,6 @@ export function ClientsPage({
   onGoBarrios,
   onGoInventario,
   onGoContabilidad,
-  onGoTrazabilidad,
   onGoClientes,
   onGoUsuarios,
   onLogout,
@@ -85,6 +94,9 @@ export function ClientsPage({
   );
 
   const { sidebarPinned, sidebarMobileOpen, setSidebarMobileOpen, toggleSidebar } = useSidebarState();
+  const [activeView, setActiveView] = useState("clientes");
+  const [clientsMenuOpen, setClientsMenuOpen] = useState(false);
+  const clientsMenuRef = useRef(null);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -96,7 +108,7 @@ export function ClientsPage({
   const [form, setForm] = useState(initialForm);
 
   const clientsIntelligence = useMemo(() => {
-    const currentMonth = new Date().toISOString().slice(5, 7);
+    const currentMonth = todayIsoDateBogota().slice(5, 7);
     const total = items.length;
     const activos = items.filter(item => Boolean(item.activo)).length;
     const inactivos = Math.max(total - activos, 0);
@@ -137,7 +149,7 @@ export function ClientsPage({
       { key: "telefono", label: "Telefono", value: conTelefono, pct: percentValue(conTelefono, total), color: "#16a34a" },
       { key: "email", label: "Email", value: conEmail, pct: percentValue(conEmail, total), color: "#2563eb" },
       { key: "documento", label: "Documento", value: conDocumento, pct: percentValue(conDocumento, total), color: "#7c3aed" },
-      { key: "completos", label: "Ficha completa", value: completos, pct: percentValue(completos, total), color: "#8a3252" },
+      { key: "completos", label: "Ficha completa", value: completos, pct: percentValue(completos, total), color: "#e91e72" },
     ];
 
     const topMissing = [
@@ -188,6 +200,17 @@ export function ClientsPage({
     loadClientes().catch(() => {});
   }, [loadClientes]);
 
+  useEffect(() => {
+    if (!clientsMenuOpen) return undefined;
+    const handlePointerDown = event => {
+      if (clientsMenuRef.current && !clientsMenuRef.current.contains(event.target)) {
+        setClientsMenuOpen(false);
+      }
+    };
+    document.addEventListener("pointerdown", handlePointerDown);
+    return () => document.removeEventListener("pointerdown", handlePointerDown);
+  }, [clientsMenuOpen]);
+
 
   const openCreate = () => {
     setEditingClienteId(null);
@@ -228,6 +251,69 @@ export function ClientsPage({
 
   const onChangeForm = (field, value) => {
     setForm(current => ({ ...current, [field]: value }));
+  };
+
+  const exportClientesExcel = async () => {
+    if (items.length === 0) return;
+    setError("");
+    setInfo("");
+    try {
+      const rows = items.map(item => ({
+        "ID": item.clienteID,
+        "Tipo documento": item.tipoIdent || "",
+        "Documento": item.identificacion || "",
+        "Nombre completo": item.nombreCompleto || "",
+        "Indicativo": item.indicativo || "",
+        "Teléfono": item.telefono || "",
+        "Teléfono completo": item.telefonoCompleto || "",
+        "Email": item.email || "",
+        "Cumpleaños": item.fechaCumpleanos || "",
+        "Aniversario": item.fechaAniversario || "",
+        "Estado": item.activo ? "Activo" : "Inactivo",
+      }));
+      const XLSX = await import("xlsx");
+      const worksheet = XLSX.utils.json_to_sheet(rows);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, "Clientes");
+      XLSX.writeFile(workbook, `clientes-${todayIsoDateBogota()}.xlsx`);
+    } catch (nextError) {
+      setError(nextError?.message || "No fue posible exportar los clientes.");
+    }
+  };
+
+  const exportMetricasExcel = async () => {
+    if (items.length === 0) return;
+    setError("");
+    setInfo("");
+    try {
+      const ci = clientsIntelligence;
+      const resumen = [
+        { "Indicador": "Total clientes", "Valor": ci.total },
+        { "Indicador": "Clientes activos", "Valor": ci.activos },
+        { "Indicador": "Clientes inactivos", "Valor": ci.inactivos },
+        { "Indicador": "Con teléfono", "Valor": ci.conTelefono },
+        { "Indicador": "Con email", "Valor": ci.conEmail },
+        { "Indicador": "Con documento", "Valor": ci.conDocumento },
+        { "Indicador": "Ficha completa", "Valor": ci.completos },
+        { "Indicador": "Cumpleaños este mes", "Valor": ci.cumpleMes },
+        { "Indicador": "Aniversarios este mes", "Valor": ci.aniversarioMes },
+        { "Indicador": "% Activos", "Valor": `${ci.activosPct}%` },
+        { "Indicador": "% Contactabilidad", "Valor": `${ci.contactabilidadPct}%` },
+        { "Indicador": "% Ficha completa", "Valor": `${ci.completitudPct}%` },
+      ];
+      const calidad = ci.qualityRows.map(row => ({ "Campo": row.label, "Clientes": row.value, "Porcentaje": `${row.pct}%` }));
+      const documentos = ci.documentRows.map(row => ({ "Tipo documento": row.label, "Clientes": row.value, "Porcentaje": `${row.pct}%` }));
+      const indicativos = ci.indicativeRows.map(row => ({ "Indicativo": row.label, "Clientes": row.value, "Porcentaje": `${row.pct}%` }));
+      const XLSX = await import("xlsx");
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(resumen), "Resumen");
+      XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(calidad), "Calidad directorio");
+      if (documentos.length) XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(documentos), "Tipos de documento");
+      if (indicativos.length) XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(indicativos), "Indicativos");
+      XLSX.writeFile(workbook, `metricas-clientes-${todayIsoDateBogota()}.xlsx`);
+    } catch (nextError) {
+      setError(nextError?.message || "No fue posible exportar las métricas.");
+    }
   };
 
   const onSubmit = async event => {
@@ -283,7 +369,6 @@ export function ClientsPage({
           barrios: canViewBarrios,
           inventario: canViewInventario,
           contabilidad: canViewContabilidad,
-          trazabilidad: canViewTrazabilidad,
           clientes: canViewClientesPanel,
           usuarios: canViewUsuariosPanel,
         }}
@@ -295,7 +380,6 @@ export function ClientsPage({
           barrios: onGoBarrios,
           inventario: onGoInventario,
           contabilidad: onGoContabilidad,
-          trazabilidad: onGoTrazabilidad,
           clientes: onGoClientes,
           usuarios: onGoUsuarios,
         }}
@@ -303,73 +387,120 @@ export function ClientsPage({
 
       <main className="orders-admin-view clients-page-view">
         <header className="orders-admin-header orders-page-header clients-page-header">
-          <div>
-            <button type="button" className="sidebar-trigger" onClick={toggleSidebar}>☰ Menú</button>
-            <h1>Clientes</h1>
-            <p className="orders-admin-subtitle">Usuario: {displayUserName}</p>
+          <div className="orders-page-heading">
+            <div className="orders-page-title-row">
+              <h1>Clientes</h1>
+            </div>
           </div>
-          <div className="header-actions">
-            <button type="button" className="btn-primary orders-header-refresh" onClick={openCreate}>
-              <Plus size={18} strokeWidth={2} aria-hidden="true" />
-              <span>Agregar</span>
-            </button>
-            <button type="button" className="btn-outline orders-header-refresh" onClick={() => loadClientes()}>
-              <RefreshCw size={18} strokeWidth={2} aria-hidden="true" />
-              <span>Actualizar</span>
-            </button>
+          <div className="orders-header-side">
+            <div className="header-actions">
+              <div className="accounting-menu-dropdown clients-menu-dropdown" ref={clientsMenuRef}>
+                <button
+                  type="button"
+                  className={`btn-outline accounting-menu-trigger clients-menu-trigger${clientsMenuOpen ? " is-open" : ""}`}
+                  onClick={() => setClientsMenuOpen(current => !current)}
+                  aria-expanded={clientsMenuOpen}
+                  aria-haspopup="menu"
+                >
+                  {(() => {
+                    const activeOption = CLIENTS_VIEWS.find(item => item.key === activeView) || CLIENTS_VIEWS[0];
+                    const ActiveIcon = CLIENTS_VIEW_ICONS[activeOption.key] || UsersRound;
+                    return (
+                      <>
+                        <ActiveIcon size={18} strokeWidth={2} aria-hidden="true" />
+                        <span>{activeOption.label}</span>
+                        <ChevronDown size={16} strokeWidth={2} aria-hidden="true" />
+                      </>
+                    );
+                  })()}
+                </button>
+                {clientsMenuOpen ? (
+                  <div className="accounting-menu-panel clients-menu-panel" role="menu">
+                    {CLIENTS_VIEWS.map(item => {
+                      const Icon = CLIENTS_VIEW_ICONS[item.key] || UsersRound;
+                      return (
+                        <button
+                          key={item.key}
+                          type="button"
+                          role="menuitem"
+                          className={activeView === item.key ? "is-active" : ""}
+                          onClick={() => {
+                            setActiveView(item.key);
+                            setClientsMenuOpen(false);
+                          }}
+                        >
+                          <Icon size={16} strokeWidth={2} aria-hidden="true" />
+                          <span>{item.label}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                ) : null}
+              </div>
+              <button type="button" className="btn-primary orders-header-refresh" onClick={() => loadClientes()} disabled={loading}>
+                <RefreshCw size={18} strokeWidth={2} aria-hidden="true" />
+                <span>{loading ? "Actualizando..." : "Actualizar"}</span>
+              </button>
+              <button type="button" className="btn-primary orders-header-refresh" onClick={openCreate}>
+                <Plus size={18} strokeWidth={2} aria-hidden="true" />
+                <span>Agregar</span>
+              </button>
+            </div>
+            {activeView === "metricas" ? (
+              <div className="orders-header-metrics clients-header-metrics" aria-label="Metricas de clientes">
+                <article className="orders-header-metric-card is-primary">
+                  <span className="orders-header-metric-icon" aria-hidden="true"><UsersRound size={16} strokeWidth={2} /></span>
+                  <strong>{clientsIntelligence.total}</strong>
+                  <span>Total clientes</span>
+                </article>
+                <article className="orders-header-metric-card is-green">
+                  <span className="orders-header-metric-icon" aria-hidden="true"><UserCheck size={16} strokeWidth={2} /></span>
+                  <strong>{clientsIntelligence.activos}</strong>
+                  <span>Clientes activos</span>
+                </article>
+                <article className="orders-header-metric-card is-blue">
+                  <span className="orders-header-metric-icon" aria-hidden="true"><MailCheck size={16} strokeWidth={2} /></span>
+                  <strong>{clientsIntelligence.contactabilidadPct}%</strong>
+                  <span>Contactabilidad</span>
+                </article>
+                <article className="orders-header-metric-card is-purple">
+                  <span className="orders-header-metric-icon" aria-hidden="true"><BadgeCheck size={16} strokeWidth={2} /></span>
+                  <strong>{clientsIntelligence.completitudPct}%</strong>
+                  <span>Ficha completa</span>
+                </article>
+                <article className="orders-header-metric-card is-orange">
+                  <span className="orders-header-metric-icon" aria-hidden="true"><Cake size={16} strokeWidth={2} /></span>
+                  <strong>{clientsIntelligence.cumpleMes + clientsIntelligence.aniversarioMes}</strong>
+                  <span>Fechas clave</span>
+                </article>
+              </div>
+            ) : null}
           </div>
         </header>
-
-        <section className="orders-filters orders-page-filters clients-filters">
-          <div className="filter-field filter-field--wide">
-            <span>Búsqueda</span>
-            <Search size={17} strokeWidth={2} aria-hidden="true" />
-            <input
-              type="text"
-              placeholder="Buscar por nombre, documento, teléfono o email"
-              value={q}
-              onChange={event => setQ(event.target.value)}
-            />
-          </div>
-        </section>
 
         {error ? <p className="orders-message">{error}</p> : null}
         {info ? <p className="orders-message">{info}</p> : null}
         {loading ? <p className="orders-message">Cargando clientes...</p> : null}
 
-        <section className="clients-bi-cards" aria-label="Indicadores inteligentes de clientes">
-          <article className="clients-bi-card is-primary">
-            <UsersRound size={21} strokeWidth={2} aria-hidden="true" />
-            <span>Total clientes</span>
-            <strong>{clientsIntelligence.total}</strong>
-            <small>{clientsIntelligence.activosPct}% activos</small>
-          </article>
-          <article className="clients-bi-card is-green">
-            <UserCheck size={21} strokeWidth={2} aria-hidden="true" />
-            <span>Clientes activos</span>
-            <strong>{clientsIntelligence.activos}</strong>
-            <small>{clientsIntelligence.inactivos} inactivos</small>
-          </article>
-          <article className="clients-bi-card is-blue">
-            <MailCheck size={21} strokeWidth={2} aria-hidden="true" />
-            <span>Contactabilidad</span>
-            <strong>{clientsIntelligence.contactabilidadPct}%</strong>
-            <small>{clientsIntelligence.conTelefono} con telefono</small>
-          </article>
-          <article className="clients-bi-card is-purple">
-            <BadgeCheck size={21} strokeWidth={2} aria-hidden="true" />
-            <span>Ficha completa</span>
-            <strong>{clientsIntelligence.completitudPct}%</strong>
-            <small>{clientsIntelligence.completos} listos para CRM</small>
-          </article>
-          <article className="clients-bi-card is-orange">
-            <Cake size={21} strokeWidth={2} aria-hidden="true" />
-            <span>Fechas clave</span>
-            <strong>{clientsIntelligence.cumpleMes + clientsIntelligence.aniversarioMes}</strong>
-            <small>{clientsIntelligence.cumpleMes} cumple / {clientsIntelligence.aniversarioMes} aniversarios</small>
-          </article>
+        {activeView === "metricas" ? (
+        <section className="clients-table-toolbar clients-metrics-toolbar" aria-label="Acciones de metricas">
+          <div className="clients-table-toolbar-copy">
+            <span className="clients-table-toolbar-label">Business intelligence</span>
+            <strong>Descarga el resumen de metricas del directorio</strong>
+          </div>
+          <button
+            type="button"
+            className="btn-outline clients-download-btn"
+            onClick={exportMetricasExcel}
+            disabled={loading || items.length === 0}
+          >
+            <Download size={17} strokeWidth={2} aria-hidden="true" />
+            <span>Descargar metricas</span>
+          </button>
         </section>
+        ) : null}
 
+        {activeView === "metricas" ? (
         <section className="clients-intelligence-grid" aria-label="Business intelligence de clientes">
           <article className="clients-intelligence-panel clients-quality-panel">
             <div className="clients-panel-head">
@@ -478,20 +609,34 @@ export function ClientsPage({
             </div>
           </article>
         </section>
+        ) : null}
 
+        {activeView === "clientes" ? (
+        <>
         <section className="clients-table-toolbar" aria-label="Busqueda de clientes">
           <div className="clients-table-toolbar-copy">
             <span className="clients-table-toolbar-label">Detalle de clientes</span>
             <strong>Busca al cliente sin salir de la tabla</strong>
           </div>
-          <div className="orders-filter-control clients-search-control">
-            <Search size={17} strokeWidth={2} aria-hidden="true" />
-            <input
-              type="text"
-              placeholder="Buscar por nombre, documento, telefono o email"
-              value={q}
-              onChange={event => setQ(event.target.value)}
-            />
+          <div className="clients-table-toolbar-actions">
+            <div className="orders-filter-control clients-search-control">
+              <Search size={17} strokeWidth={2} aria-hidden="true" />
+              <input
+                type="text"
+                placeholder="Buscar por nombre, documento, telefono o email"
+                value={q}
+                onChange={event => setQ(event.target.value)}
+              />
+            </div>
+            <button
+              type="button"
+              className="btn-outline clients-download-btn"
+              onClick={exportClientesExcel}
+              disabled={items.length === 0}
+            >
+              <Download size={17} strokeWidth={2} aria-hidden="true" />
+              <span>Descargar Excel</span>
+            </button>
           </div>
         </section>
 
@@ -543,6 +688,8 @@ export function ClientsPage({
             </tbody>
           </table>
         </section>
+        </>
+        ) : null}
       </main>
 
       <aside className={`orders-drawer ${drawerOpen ? "open" : ""}`}>

@@ -3244,3 +3244,72 @@ main.orders-admin-view.orders-page-view.delivery-page-view,
     grid-row: 1 / span 5 !important;
   }
 }
+
+/* DOMICILIOS FINAL: keep this screen isolated from Barrios and responsive. */
+.delivery-page-view .delivery-barrios-layout,
+.delivery-page-view .delivery-barrios-search-panel,
+.delivery-page-view .delivery-barrios-table-panel {
+  display: none !important;
+}
+
+.delivery-page-view .orders-page-header.delivery-page-header {
+  grid-template-columns: minmax(0, 1fr) auto !important;
+  align-items: start !important;
+  overflow: visible !important;
+}
+
+.delivery-page-view .orders-page-header.delivery-page-header .orders-page-heading,
+.delivery-page-view .orders-page-header.delivery-page-header .orders-page-breadcrumb,
+.delivery-page-view .orders-page-header.delivery-page-header .orders-page-title-row,
+.delivery-page-view .orders-page-header.delivery-page-header h1 {
+  min-width: 0 !important;
+  max-width: 100% !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+}
+
+.delivery-page-view .orders-page-header.delivery-page-header .orders-page-breadcrumb {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  gap: 6px !important;
+  white-space: normal !important;
+}
+
+.delivery-page-view .delivery-dispatch-card {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr)) !important;
+  align-items: stretch !important;
+  overflow: visible !important;
+}
+
+.delivery-page-view .delivery-card-order,
+.delivery-page-view .delivery-card-section,
+.delivery-page-view .delivery-card-actions {
+  min-width: 0 !important;
+  overflow: visible !important;
+}
+
+.delivery-page-view .delivery-card-actions {
+  grid-template-columns: minmax(0, 1fr) auto !important;
+  grid-auto-flow: row !important;
+  min-width: 0 !important;
+}
+
+@media (max-width: 900px) {
+  .delivery-page-view .orders-page-header.delivery-page-header {
+    grid-template-columns: 1fr !important;
+  }
+
+  .delivery-page-view .orders-page-header.delivery-page-header .orders-header-side,
+  .delivery-page-view .orders-page-header.delivery-page-header .header-actions,
+  .delivery-page-view .orders-page-header.delivery-page-header .orders-header-refresh {
+    width: 100% !important;
+    min-width: 0 !important;
+  }
+}
+
+@media (max-width: 560px) {
+  .delivery-page-view .delivery-dispatch-card,
+  .delivery-page-view .delivery-card-actions {
+    grid-template-columns: 1fr !important;
+  }
+}

@@ -85,7 +85,7 @@ export function PedidoCard({ item, onOpen, onDragStart }) {
         <div className="pipeline-card-assign pipeline-card-assign--muted">
           <Bike size={11} strokeWidth={2} aria-hidden="true" />
           <span>{item.domiciliario}</span>
-          {item.hora_entrega ? <span className="pipeline-card-time-chip">{item.hora_entrega}</span> : null}
+          {item.hora_entrega || item.rango_hora ? <span className="pipeline-card-time-chip">{item.hora_entrega || item.rango_hora}</span> : null}
         </div>
       ) : null}
 

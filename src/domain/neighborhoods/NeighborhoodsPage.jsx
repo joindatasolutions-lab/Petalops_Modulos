@@ -87,7 +87,6 @@ export function NeighborhoodsPage({
   canViewBarrios,
   canViewInventario,
   canViewContabilidad,
-  canViewTrazabilidad,
   canViewClientesPanel,
   canViewUsuariosPanel,
   onLogout,
@@ -98,7 +97,6 @@ export function NeighborhoodsPage({
   onGoBarrios,
   onGoInventario,
   onGoContabilidad,
-  onGoTrazabilidad,
   onGoClientes,
   onGoUsuarios,
 }) {
@@ -380,7 +378,6 @@ export function NeighborhoodsPage({
           barrios: canViewBarrios,
           inventario: canViewInventario,
           contabilidad: canViewContabilidad,
-          trazabilidad: canViewTrazabilidad,
           clientes: canViewClientesPanel,
           usuarios: canViewUsuariosPanel,
         }}
@@ -392,7 +389,6 @@ export function NeighborhoodsPage({
           barrios: onGoBarrios,
           inventario: onGoInventario,
           contabilidad: onGoContabilidad,
-          trazabilidad: onGoTrazabilidad,
           clientes: onGoClientes,
           usuarios: onGoUsuarios,
         }}
