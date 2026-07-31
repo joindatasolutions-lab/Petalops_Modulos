@@ -19,7 +19,6 @@ export function buildNewOrderCheckoutPayload({
   sucursalId,
   productoID,
 }) {
-  if (!productoID) throw new Error("Selecciona un arreglo del catalogo.");
   if (!String(form.clienteNombre || "").trim()) throw new Error("Ingresa el nombre del cliente.");
   if (!String(form.clienteTelefono || "").trim()) throw new Error("Ingresa el telefono del cliente.");
   if (!String(form.destinatarioNombre || "").trim()) throw new Error("Ingresa el destinatario.");
@@ -28,24 +27,62 @@ export function buildNewOrderCheckoutPayload({
   const barrioSeleccionado = String(form.barrioNombre || "").trim() || null;
   const tipoEntrega = normalizeDeliveryType(barrioSeleccionado);
   const domicilioObsequiado = tipoEntrega !== "recogida_en_tienda" && Boolean(form.domicilioObsequiado);
+  const domicilioOriginal = tipoEntrega === "recogida_en_tienda"
+    ? 0
+    : normalizeWholePeso(form.barrioCostoDomicilio);
+  const domicilioCobrado = tipoEntrega === "recogida_en_tienda"
+    ? 0
+    : domicilioObsequiado
+      ? 0
+      : domicilioOriginal;
   if (tipoEntrega !== "recogida_en_tienda" && !String(form.direccion || "").trim()) {
     throw new Error("Ingresa la direccion de entrega o selecciona Recoger en tienda.");
   }
 
   const horaEntrega = normalizeTime(form.horaEntrega) || "08:00";
-  const producto = {
-    productoID,
-    cantidad: Number(form.cantidad || 1),
-  };
-  const precio = normalizeWholePeso(form.precio);
-  if (Number.isFinite(precio) && precio > 0) {
-    producto.productoPrecio = precio;
+  const lineItems = Array.isArray(form.productos) ? form.productos : [];
+  const productos = lineItems
+    .map(item => {
+      const nextProductoID = Number(item?.productoID || 0);
+      if (!nextProductoID) return null;
+      const producto = {
+        productoID: nextProductoID,
+        cantidad: Number(item?.cantidad || 1),
+      };
+      const precio = normalizeWholePeso(item?.precio);
+      if (Number.isFinite(precio) && precio > 0) {
+        producto.productoPrecio = precio;
+      }
+      return producto;
+    })
+    .filter(Boolean);
+
+  if (productoID && !productos.some(item => Number(item.productoID) === Number(productoID))) {
+    const producto = {
+      productoID,
+      cantidad: Number(form.cantidad || 1),
+    };
+    const precio = normalizeWholePeso(form.precio);
+    if (Number.isFinite(precio) && precio > 0) {
+      producto.productoPrecio = precio;
+    }
+    productos.push(producto);
   }
+
+  if (productos.length === 0) throw new Error("Agrega al menos un arreglo del catalogo.");
 
   return {
     empresaID: empresaId,
     sucursalID: sucursalId,
-    productos: [producto],
+    productos,
+    domicilio: domicilioCobrado,
+    costoDomicilio: domicilioCobrado,
+    domicilioOriginal,
+    descuentoDomicilio: domicilioObsequiado ? domicilioOriginal : 0,
+    domicilioObsequiado,
+    domicilio_obsequiado: domicilioObsequiado,
+    omitirCostoDomicilio: domicilioObsequiado,
+    omitir_costo_domicilio: domicilioObsequiado,
     cliente: {
       clienteID: form.clienteID != null ? Number(form.clienteID) : null,
       tipoIdent: form.clienteTipoIdent || null,
@@ -60,8 +97,13 @@ export function buildNewOrderCheckoutPayload({
       telefonoDestino: String(form.telefonoDestino || "").trim() || String(form.clienteTelefono || "").trim() || null,
       direccion: tipoEntrega === "recogida_en_tienda" ? "Recoger En Tienda" : String(form.direccion || "").trim(),
       barrioNombre: barrioSeleccionado,
+      costoDomicilio: domicilioCobrado,
+      domicilio: domicilioCobrado,
+      domicilioOriginal,
       domicilioObsequiado,
+      domicilio_obsequiado: domicilioObsequiado,
       omitirCostoDomicilio: domicilioObsequiado,
+      omitir_costo_domicilio: domicilioObsequiado,
       fechaEntrega: `${form.fechaEntrega}T${horaEntrega}:00`,
       rangoHora: horaEntrega,
       mensaje: form.mensajeTarjeta || null,
@@ -70,10 +112,15 @@ export function buildNewOrderCheckoutPayload({
     },
     financiero: {
       metodosPago: form.metodoPago ? [form.metodoPago] : null,
+      metodoPago: form.metodoPago || null,
       canalFlora: form.canalFlora || null,
-      domicilio: domicilioObsequiado ? 0 : null,
+      domicilio: domicilioCobrado,
+      domicilioOriginal,
+      descuentoDomicilio: domicilioObsequiado ? domicilioOriginal : 0,
       domicilioObsequiado,
+      domicilio_obsequiado: domicilioObsequiado,
       omitirCostoDomicilio: domicilioObsequiado,
+      omitir_costo_domicilio: domicilioObsequiado,
     },
   };
 }

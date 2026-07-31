@@ -213,6 +213,48 @@ describe("estabilidad de filtros por vista", () => {
     expect(payload.cliente.email).toBe("joindatasolutions@gmail.com");
   });
 
+  it("Pedidos: checkout manual descuenta domicilio obsequiado al crear pedido", () => {
+    const payload = buildNewOrderCheckoutPayload({
+      empresaId: 3,
+      sucursalId: 1,
+      productoID: 99,
+      form: {
+        clienteNombre: "Prueba Join",
+        clienteTelefono: "3001234567",
+        clienteEmail: "",
+        clienteIdentificacion: "",
+        destinatarioNombre: "Prueba Join",
+        telefonoDestino: "",
+        direccion: "Calle 1",
+        barrioNombre: "Centro",
+        barrioCostoDomicilio: 15000,
+        domicilioObsequiado: true,
+        fechaEntrega: "2026-07-27",
+        horaEntrega: "08:00",
+        cantidad: 1,
+        precio: "300000",
+        mensajeTarjeta: "",
+        firma: "",
+        observacionGeneral: "",
+        metodoPago: "Efectivo",
+        canalFlora: "WhatsApp",
+      },
+    });
+
+    expect(payload.entrega.domicilio).toBe(0);
+    expect(payload.entrega.domicilioOriginal).toBe(15000);
+    expect(payload.entrega.domicilioObsequiado).toBe(true);
+    expect(payload.domicilio).toBe(0);
+    expect(payload.domicilioOriginal).toBe(15000);
+    expect(payload.descuentoDomicilio).toBe(15000);
+    expect(payload.domicilioObsequiado).toBe(true);
+    expect(payload.omitirCostoDomicilio).toBe(true);
+    expect(payload.financiero.domicilio).toBe(0);
+    expect(payload.financiero.domicilioOriginal).toBe(15000);
+    expect(payload.financiero.descuentoDomicilio).toBe(15000);
+    expect(payload.financiero.omitirCostoDomicilio).toBe(true);
+  });
+
   it("Produccion: empresa 3 resuelve imagen por codigo_catalogo antes que codigo_producto", () => {
     const catalogIndex = new Map([
       ["catalog-code:0066", { codigo: "0066", nombre: "Virgen Guadalupe", imageUrl: "/catalogo-0066.png" }],

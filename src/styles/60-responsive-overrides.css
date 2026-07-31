@@ -2938,8 +2938,8 @@
 
   .orders-page-view .orders-page-header .header-actions {
     display: grid !important;
-    grid-template-columns: minmax(360px, 1fr) minmax(220px, 0.8fr) max-content max-content !important;
-    grid-template-areas: "search store refresh new" !important;
+    grid-template-columns: minmax(320px, 1fr) minmax(190px, 0.8fr) max-content max-content max-content !important;
+    grid-template-areas: "search store refresh catalog new" !important;
     align-items: center !important;
     gap: 14px !important;
   }
@@ -2954,6 +2954,10 @@
 
   .orders-page-view .orders-page-header .orders-header-refresh:not(.orders-store-toggle) {
     grid-area: refresh !important;
+  }
+
+  .orders-page-view .orders-catalog-link {
+    grid-area: catalog !important;
   }
 
   .orders-page-view .orders-new-order-btn {
@@ -5919,7 +5923,12 @@ body,
     grid-area: new !important;
   }
 
+  .orders-admin-view.orders-page-view .orders-catalog-link {
+    grid-area: catalog !important;
+  }
+
   .orders-admin-view.orders-page-view .orders-page-header .orders-header-refresh,
+  .orders-admin-view.orders-page-view .orders-page-header .orders-catalog-link,
   .orders-admin-view.orders-page-view .orders-page-header .orders-new-order-btn {
     display: inline-flex !important;
     align-items: center !important;
@@ -5956,6 +5965,7 @@ body,
 
   .orders-admin-view.orders-page-view .orders-page-header .orders-store-toggle span,
   .orders-admin-view.orders-page-view .orders-page-header .orders-header-refresh span,
+  .orders-admin-view.orders-page-view .orders-page-header .orders-catalog-link span,
   .orders-admin-view.orders-page-view .orders-page-header .orders-new-order-btn span,
   .orders-admin-view.orders-page-view .orders-page-header .orders-new-order-btn svg:last-child {
     display: none !important;

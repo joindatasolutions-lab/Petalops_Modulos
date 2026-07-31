@@ -28,6 +28,8 @@ export function rememberDeliveryGiftOverride(pedidoId, financiero = {}) {
     subtotal: financiero.subtotal,
     iva: financiero.iva,
     domicilio: financiero.domicilio,
+    domicilioOriginal: financiero.domicilioOriginal,
+    descuentoDomicilio: financiero.descuentoDomicilio,
     recargoLinkMonto: financiero.recargoLinkMonto,
     descuentoMonto: financiero.descuentoMonto,
     saldoFavorMonto: financiero.saldoFavorMonto,
@@ -54,11 +56,15 @@ export function applyDeliveryGiftOverrideToItem(item) {
   if (!override?.domicilioObsequiado) return item;
 
   const financiero = item?.financiero && typeof item.financiero === "object" ? item.financiero : {};
+  const entrega = item?.entrega && typeof item.entrega === "object" ? item.entrega : null;
+  const destinatario = item?.destinatario && typeof item.destinatario === "object" ? item.destinatario : null;
   const nextFinanciero = {
     ...financiero,
     subtotal: override.subtotal ?? financiero.subtotal,
     iva: override.iva ?? financiero.iva,
     domicilio: override.domicilio ?? financiero.domicilio ?? item?.domicilio,
+    domicilioOriginal: override.domicilioOriginal ?? financiero.domicilioOriginal ?? financiero.domicilio ?? item?.domicilio,
+    descuentoDomicilio: override.descuentoDomicilio ?? financiero.descuentoDomicilio,
     recargoLinkMonto: override.recargoLinkMonto ?? financiero.recargoLinkMonto,
     descuentoMonto: override.descuentoMonto ?? financiero.descuentoMonto,
     saldoFavorMonto: override.saldoFavorMonto ?? financiero.saldoFavorMonto,
@@ -72,6 +78,8 @@ export function applyDeliveryGiftOverrideToItem(item) {
     subtotal: override.subtotal ?? item?.subtotal,
     iva: override.iva ?? item?.iva,
     domicilio: override.domicilio ?? item?.domicilio,
+    domicilioOriginal: override.domicilioOriginal ?? item?.domicilioOriginal ?? item?.domicilio,
+    descuentoDomicilio: override.descuentoDomicilio ?? item?.descuentoDomicilio,
     recargoLinkMonto: override.recargoLinkMonto ?? item?.recargoLinkMonto,
     descuentoMonto: override.descuentoMonto ?? item?.descuentoMonto,
     saldoFavorMonto: override.saldoFavorMonto ?? item?.saldoFavorMonto,
@@ -80,6 +88,22 @@ export function applyDeliveryGiftOverrideToItem(item) {
     totalPedido: override.total ?? item?.totalPedido,
     domicilioObsequiado: true,
     omitirCostoDomicilio: true,
+    ...(entrega ? {
+      entrega: {
+        ...entrega,
+        domicilio: override.domicilio ?? entrega.domicilio,
+        domicilioOriginal: override.domicilioOriginal ?? entrega.domicilioOriginal ?? entrega.domicilio,
+        domicilioObsequiado: true,
+        omitirCostoDomicilio: true,
+      },
+    } : {}),
+    ...(destinatario ? {
+      destinatario: {
+        ...destinatario,
+        domicilioObsequiado: true,
+        omitirCostoDomicilio: true,
+      },
+    } : {}),
     financiero: nextFinanciero,
   };
 }

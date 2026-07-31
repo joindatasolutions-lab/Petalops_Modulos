@@ -44,7 +44,7 @@ import {
   buildAddDetailProductPayload,
   buildDetailUpdatePayload,
   buildDuplicateCheckoutPayload as buildDuplicateCheckoutPayloadData,
-  buildNewOrderCheckoutPayload as buildNewOrderCheckoutPayloadData,
+  buildNewOrderCheckoutPayload as buildNewOrderManualPayloadData,
 } from "./orderPayloadBuilders.js";
 import { useMessageCardController } from "./hooks/useMessageCardController.js";
 import { useOrderDetailEditor } from "./hooks/useOrderDetailEditor.js";
@@ -71,6 +71,7 @@ import {
   filterOrdersBySearch,
   filterOrdersByStatus,
   filterStorePickupOrders,
+  getOrderFinancialTotal,
   isCashPaymentMethod,
   isCustomArrangement,
   isEmpresaAdminRole,
@@ -1005,10 +1006,13 @@ const openNewOrderModal = () => {
     setItems(current => current.map(item => {
       if (Number(resolveOrderId(item)) !== Number(pedidoId)) return item;
       const financiero = detail.financiero && typeof detail.financiero === "object" ? detail.financiero : {};
+      const detailTotal = getOrderFinancialTotal(financiero);
+      const nextTotal = detailTotal > 0 ? detailTotal : financiero.total;
       return {
         ...item,
-        total: financiero.total ?? item.total,
-        valorTotal: financiero.total ?? item.valorTotal,
+        total: nextTotal ?? item.total,
+        valorTotal: nextTotal ?? item.valorTotal,
+        totalPedido: nextTotal ?? item.totalPedido,
         subtotal: financiero.subtotal ?? item.subtotal,
         iva: financiero.iva ?? item.iva,
         domicilio: financiero.domicilio ?? item.domicilio,
@@ -1044,13 +1048,17 @@ const openNewOrderModal = () => {
       celular: digits,
       telefono: digits,
       q: digits,
-      soloActivos: true,
+      soloActivos: false,
     });
-    const rows = Array.isArray(payload?.items)
-      ? payload.items
-      : Array.isArray(payload)
-        ? payload
-        : [];
+    const rows = [
+      payload?.items,
+      payload?.data?.items,
+      payload?.data?.clientes,
+      payload?.data?.rows,
+      payload?.clientes,
+      payload?.rows,
+      payload,
+    ].find(Array.isArray) || [];
 
     return rows.find(client => {
       const phones = [
@@ -1058,6 +1066,8 @@ const openNewOrderModal = () => {
         client?.telefonoCompleto,
         client?.telefono_completo,
         client?.celular,
+        client?.celularCompleto,
+        client?.celular_completo,
       ].map(normalizePhoneDigits).filter(Boolean);
       return phones.some(candidate => candidate === digits || candidate.endsWith(digits) || digits.endsWith(candidate));
     }) || rows[0] || null;
@@ -1075,12 +1085,12 @@ const openNewOrderModal = () => {
       setNewOrderForm(current => {
         hydratedForm = {
           ...current,
-          clienteID: client.clienteID ?? client.clienteId ?? client.id ?? current.clienteID,
+          clienteID: client.clienteID ?? client.clienteId ?? client.idCliente ?? client.id_cliente ?? client.id ?? current.clienteID,
           clienteNombre: resolveClientName(client) || current.clienteNombre,
-          clienteTelefono: current.clienteTelefono || client.telefonoCompleto || client.telefono || phone,
+          clienteTelefono: phone || client.telefonoCompleto || client.telefono || current.clienteTelefono,
           clienteEmail: client.email || "",
           clienteTipoIdent: normalizeIdentType(client.tipoIdent || client.tipo_ident || ""),
-          clienteIdentificacion: client.identificacion || "",
+          clienteIdentificacion: client.identificacion || client.numeroIdentificacion || client.numero_identificacion || client.documento || "",
         };
         return hydratedForm;
       });
@@ -1108,7 +1118,7 @@ const openNewOrderModal = () => {
     hydrateNewOrderClientByPhone(digits);
   }, [debouncedNewOrderPhone, newOrderOpen]);
 
-  const buildNewOrderCheckoutPayload = (form = newOrderForm) => buildNewOrderCheckoutPayloadData({
+  const buildNewOrderManualPayload = (form = newOrderForm) => buildNewOrderManualPayloadData({
     form,
     empresaId,
     sucursalId,
@@ -1121,7 +1131,9 @@ const openNewOrderModal = () => {
     setNewOrderSaving(true);
     try {
       const hydratedForm = await hydrateNewOrderClientByPhone(newOrderForm.clienteTelefono);
-      const created = await api.crearPedidoCheckout(buildNewOrderCheckoutPayload(hydratedForm || newOrderForm));
+      const manualPayload = buildNewOrderManualPayload(hydratedForm || newOrderForm);
+      const created = await api.crearPedidoManual(manualPayload);
+      const createdPedidoId = created?.pedidoID || created?.pedidoId || created?.pedido_id || created?.idPedido || created?.id_pedido || created?.id;
       setNewOrderOpen(false);
       setOrderNotification({
         type: "success",
@@ -1129,7 +1141,7 @@ const openNewOrderModal = () => {
         message: `Pedido #${created?.numeroPedido || created?.pedidoID || ""} registrado correctamente.`,
       });
       await loadOrders(false);
-      if (created?.pedidoID) await openDetail(created.pedidoID);
+      if (createdPedidoId) await openDetail(createdPedidoId);
     } catch (nextError) {
       setNewOrderError(nextError?.detail || nextError?.message || "No fue posible crear el pedido.");
     } finally {

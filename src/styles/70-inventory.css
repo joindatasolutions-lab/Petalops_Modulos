@@ -2942,6 +2942,7 @@
   }
 
   .orders-admin-view.orders-page-view .orders-page-header .orders-header-refresh,
+  .orders-admin-view.orders-page-view .orders-page-header .orders-catalog-link,
   .orders-admin-view.orders-page-view .orders-page-header .orders-new-order-btn {
     display: inline-flex !important;
     align-items: center !important;
@@ -2960,6 +2961,7 @@
   }
 
   .orders-admin-view.orders-page-view .orders-page-header .orders-header-refresh span,
+  .orders-admin-view.orders-page-view .orders-page-header .orders-catalog-link span,
   .orders-admin-view.orders-page-view .orders-page-header .orders-new-order-btn span,
   .orders-admin-view.orders-page-view .orders-page-header .orders-new-order-btn svg:last-child {
     display: none !important;
@@ -3029,6 +3031,7 @@
   }
 
   .orders-admin-view.orders-page-view .orders-page-header .orders-header-refresh,
+  .orders-admin-view.orders-page-view .orders-page-header .orders-catalog-link,
   .orders-admin-view.orders-page-view .orders-page-header .orders-new-order-btn {
     flex-basis: 34px !important;
     width: 34px !important;
@@ -3112,12 +3115,14 @@
   }
 
   .orders-admin-view.orders-page-view .orders-page-header .header-actions .orders-header-refresh,
+  .orders-admin-view.orders-page-view .orders-page-header .header-actions .orders-catalog-link,
   .orders-admin-view.orders-page-view .orders-page-header .header-actions .orders-new-order-btn {
     position: relative !important;
     overflow: visible !important;
   }
 
   .orders-admin-view.orders-page-view .orders-page-header .header-actions .orders-header-refresh::after,
+  .orders-admin-view.orders-page-view .orders-page-header .header-actions .orders-catalog-link::after,
   .orders-admin-view.orders-page-view .orders-page-header .header-actions .orders-new-order-btn::after {
     content: attr(data-tooltip) !important;
     position: absolute !important;
@@ -3145,6 +3150,8 @@
 
   .orders-admin-view.orders-page-view .orders-page-header .header-actions .orders-header-refresh:hover::after,
   .orders-admin-view.orders-page-view .orders-page-header .header-actions .orders-header-refresh:focus-visible::after,
+  .orders-admin-view.orders-page-view .orders-page-header .header-actions .orders-catalog-link:hover::after,
+  .orders-admin-view.orders-page-view .orders-page-header .header-actions .orders-catalog-link:focus-visible::after,
   .orders-admin-view.orders-page-view .orders-page-header .header-actions .orders-new-order-btn:hover::after,
   .orders-admin-view.orders-page-view .orders-page-header .header-actions .orders-new-order-btn:focus-visible::after {
     opacity: 1 !important;
