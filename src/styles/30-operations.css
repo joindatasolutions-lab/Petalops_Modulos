@@ -2310,7 +2310,7 @@
 }
 
 .orders-detail-head-meta > span:not(.order-badge)::before {
-  content: "ï¿½";
+  content: "/";
   margin-right: 7px;
   color: #cbd5e1;
 }
