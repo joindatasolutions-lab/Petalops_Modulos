@@ -6534,14 +6534,30 @@ body,
   }
 
   .orders-admin-view.orders-page-view .orders-page-table-wrap {
-    padding-inline: 0 !important;
+    width: calc(100vw - 24px) !important;
+    max-width: calc(100vw - 24px) !important;
+    margin-inline: auto !important;
+    padding: 0 !important;
+    border: 0 !important;
+    background: transparent !important;
+    box-shadow: none !important;
+  }
+
+  .orders-admin-view.orders-page-view .orders-table.orders-list-table,
+  .orders-admin-view.orders-page-view .orders-table.orders-list-table tbody,
+  .orders-admin-view.orders-page-view .orders-table.orders-list-table tbody tr.orders-row-card,
+  .orders-admin-view.orders-page-view .orders-table.orders-list-table tbody tr.orders-row-card > td.orders-mobile-card-cell {
+    display: block !important;
+    width: 100% !important;
+    max-width: 100% !important;
   }
 
   .orders-admin-view.orders-page-view .orders-mobile-card {
     box-sizing: border-box !important;
     width: 100% !important;
-    max-width: calc(100vw - 24px) !important;
+    max-width: 100% !important;
     min-width: 0 !important;
+    margin: 0 !important;
     overflow-x: hidden !important;
   }
 
