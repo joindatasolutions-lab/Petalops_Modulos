@@ -28,6 +28,10 @@ function canInvoiceStatus(status) {
   return normalizeStatus(status) === "APROBADO";
 }
 
+export function shouldAutoGenerateInvoiceForCompany(empresaId) {
+  return Number(empresaId) !== 3;
+}
+
 function getProductoId(raw) {
   return raw?.productoID ?? raw?.productoId ?? raw?.producto_id ?? raw?.idProducto ?? raw?.id_producto ?? raw?.id ?? null;
 }
