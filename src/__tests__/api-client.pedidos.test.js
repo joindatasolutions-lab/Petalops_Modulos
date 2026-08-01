@@ -69,6 +69,38 @@ describe("apiClient.listarPedidos", () => {
     });
   });
 
+  it("envia cambio administrativo de produccion con codigo canonico de estado", async () => {
+    const fetchMock = vi.fn(async () => ({
+      ok: true,
+      json: async () => ({ ok: true }),
+    }));
+    vi.stubGlobal("fetch", fetchMock);
+    vi.stubGlobal("localStorage", {
+      getItem: () => "token-test",
+    });
+
+    const api = createApiClient({ apiBaseUrl: "https://api.test" });
+    await api.cambiarEstadoProduccion({
+      produccionId: 123,
+      nuevoEstado: "EnProduccion",
+      observacionesInternas: "Cambio rápido de estado desde panel administrativo de producción",
+      usuarioCambio: "admin@petalops.test",
+      origenCambio: "panel_produccion_admin_rapido",
+      cambioAdministrativo: true,
+    });
+
+    const [url, options] = fetchMock.mock.calls[0];
+    const body = JSON.parse(options.body);
+
+    expect(url).toBe("https://api.test/produccion/123/estado");
+    expect(options.method).toBe("PUT");
+    expect(body.nuevoEstado).toBe("EnProduccion");
+    expect(body.nuevoEstadoCodigo).toBe("EN_PROCESO");
+    expect(body.codigoEstadoProduccion).toBe("EN_PROCESO");
+    expect(body.cambioAdministrativo).toBe(true);
+    expect(body.cambio_administrativo).toBe(true);
+  });
+
   it("envia celular como criterio explicito al listar clientes", async () => {
     const fetchMock = vi.fn(async () => ({
       ok: true,

@@ -1,5 +1,11 @@
 const PEDIDOS_MAX_PAGE_SIZE = 300;
 const LOGIN_TIMEOUT_MS = 30000;
+const PRODUCTION_STATUS_CODE_BY_UI = {
+  Pendiente: "PENDIENTE",
+  EnProduccion: "EN_PROCESO",
+  ParaEntrega: "LISTO",
+  Cancelado: "CANCELADO",
+};
 
 function normalizePedidosDateParam(value) {
   const text = String(value || "").trim();
@@ -876,7 +882,8 @@ export function createApiClient(config) {
       });
     },
 
-    async cambiarEstadoProduccion({ produccionId, nuevoEstado, observacionesInternas }) {
+    async cambiarEstadoProduccion({ produccionId, nuevoEstado, observacionesInternas, usuarioCambio, origenCambio, cambioAdministrativo = false }) {
+      const nuevoEstadoCodigo = PRODUCTION_STATUS_CODE_BY_UI[nuevoEstado] || String(nuevoEstado || "").trim().toUpperCase();
       return requestJson(`/produccion/${produccionId}/estado`, {
         method: "PUT",
         headers: {
@@ -884,7 +891,13 @@ export function createApiClient(config) {
         },
         body: JSON.stringify({
           nuevoEstado,
-          observacionesInternas: observacionesInternas || null
+          nuevoEstadoCodigo,
+          codigoEstadoProduccion: nuevoEstadoCodigo,
+          observacionesInternas: observacionesInternas || null,
+          usuarioCambio: usuarioCambio || null,
+          origenCambio: origenCambio || null,
+          cambioAdministrativo: Boolean(cambioAdministrativo),
+          cambio_administrativo: Boolean(cambioAdministrativo)
         })
       });
     },

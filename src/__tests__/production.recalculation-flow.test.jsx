@@ -154,4 +154,57 @@ describe("ProductionPage recalculo de produccion", () => {
       forceCancelarYCrearNueva: false,
     });
   });
+
+  it("permite a rol admin cambiar estado desde el drawer administrativo", async () => {
+    const { ProductionPage } = await import("../domain/production/ProductionPage.jsx");
+    const adminSession = {
+      ...session,
+      rol: "admin",
+      esGlobalJoin: false,
+      email: "admin.empresa@petalops.test",
+    };
+    const tree = ProductionPage({
+      session: adminSession,
+      canViewPipeline: true,
+      canViewPedidos: true,
+      canViewCatalogo: true,
+      canViewProduccion: true,
+      canViewDomicilios: true,
+      canViewBarrios: true,
+      canViewInventario: true,
+      canViewContabilidad: true,
+      canViewTrazabilidad: true,
+      canViewClientesPanel: true,
+      canViewUsuariosPanel: true,
+      onLogout: vi.fn(),
+      onGoPipeline: vi.fn(),
+      onGoPedidos: vi.fn(),
+      onGoProduccion: vi.fn(),
+      onGoDomicilios: vi.fn(),
+      onGoBarrios: vi.fn(),
+      onGoInventario: vi.fn(),
+      onGoContabilidad: vi.fn(),
+      onGoTrazabilidad: vi.fn(),
+      onGoClientes: vi.fn(),
+      onGoUsuarios: vi.fn(),
+    });
+
+    const changeStateButton = findButtonByText(tree, "Cambiar estado");
+    const quickStateButton = findButtonByText(tree, "Iniciar");
+    const recalculateButton = findButtonByText(tree, "Recalcular producciÃ³n");
+    expect(changeStateButton).toBeTruthy();
+    expect(quickStateButton).toBeTruthy();
+    expect(recalculateButton).toBeNull();
+
+    await quickStateButton.props.onClick();
+
+    expect(mockApi.cambiarEstadoProduccion).toHaveBeenCalledWith({
+      produccionId: selectedProductionItem.idProduccion,
+      nuevoEstado: "EnProduccion",
+      observacionesInternas: expect.stringContaining("panel administrativo"),
+      usuarioCambio: adminSession.email,
+      origenCambio: "panel_produccion_admin_rapido",
+      cambioAdministrativo: true,
+    });
+  });
 });
