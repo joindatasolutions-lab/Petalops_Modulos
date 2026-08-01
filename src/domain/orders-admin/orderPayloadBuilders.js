@@ -195,6 +195,9 @@ export function buildDetailUpdatePayload({
 }) {
   const tipoEntrega = normalizeDeliveryType(edit.barrioNombre);
   const domicilioObsequiado = tipoEntrega !== "recogida_en_tienda" && Boolean(edit.domicilioObsequiado);
+  const domicilioOriginal = tipoEntrega === "recogida_en_tienda"
+    ? 0
+    : normalizeWholePeso(edit.domicilioOriginal ?? edit.domicilio);
 
   return {
     pedidoId,
@@ -223,9 +226,13 @@ export function buildDetailUpdatePayload({
     detallePago: paymentValidation.paymentBreakdown,
     montoEfectivo: paymentValidation.cashAmount,
     omitirRecargoLink: edit.omitirRecargoLink,
-    domicilio: domicilioObsequiado ? 0 : null,
+    domicilio: domicilioObsequiado ? 0 : domicilioOriginal,
+    costoDomicilio: domicilioObsequiado ? 0 : domicilioOriginal,
+    domicilioOriginal,
+    descuentoDomicilio: domicilioObsequiado ? (domicilioOriginal ?? 0) : 0,
     domicilioObsequiado,
     omitirCostoDomicilio: domicilioObsequiado,
+    forzarRecalculoFinanciero: true,
     descuentoMonto: normalizeWholePeso(edit.descuentoMonto) ?? 0,
     descuentoNota: edit.descuentoNota || null,
     saldoFavorMonto: normalizeWholePeso(edit.saldoFavorMonto) ?? 0,

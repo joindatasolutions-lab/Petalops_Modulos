@@ -23,8 +23,8 @@ export function rememberDeliveryGiftOverride(pedidoId, financiero = {}) {
 
   const overrides = readOverrides();
   overrides[String(id)] = {
-    domicilioObsequiado: true,
-    omitirCostoDomicilio: true,
+    domicilioObsequiado: Boolean(financiero.domicilioObsequiado),
+    omitirCostoDomicilio: Boolean(financiero.omitirCostoDomicilio),
     subtotal: financiero.subtotal,
     iva: financiero.iva,
     domicilio: financiero.domicilio,
@@ -48,16 +48,25 @@ export function forgetDeliveryGiftOverride(pedidoId) {
   writeOverrides(overrides);
 }
 
+export function getDeliveryFinancialOverride(pedidoId) {
+  const id = Number(pedidoId);
+  if (!Number.isFinite(id) || id <= 0) return null;
+  const override = readOverrides()[String(id)];
+  return override && typeof override === "object" ? { ...override } : null;
+}
+
 export function applyDeliveryGiftOverrideToItem(item) {
   const pedidoId = resolveOrderId(item);
   if (!pedidoId) return item;
 
   const override = readOverrides()[String(pedidoId)];
-  if (!override?.domicilioObsequiado) return item;
+  if (!override) return item;
 
   const financiero = item?.financiero && typeof item.financiero === "object" ? item.financiero : {};
   const entrega = item?.entrega && typeof item.entrega === "object" ? item.entrega : null;
   const destinatario = item?.destinatario && typeof item.destinatario === "object" ? item.destinatario : null;
+  const domicilioObsequiado = Boolean(override.domicilioObsequiado);
+  const omitirCostoDomicilio = Boolean(override.omitirCostoDomicilio);
   const nextFinanciero = {
     ...financiero,
     subtotal: override.subtotal ?? financiero.subtotal,
@@ -69,8 +78,8 @@ export function applyDeliveryGiftOverrideToItem(item) {
     descuentoMonto: override.descuentoMonto ?? financiero.descuentoMonto,
     saldoFavorMonto: override.saldoFavorMonto ?? financiero.saldoFavorMonto,
     total: override.total ?? financiero.total,
-    domicilioObsequiado: true,
-    omitirCostoDomicilio: true,
+    domicilioObsequiado,
+    omitirCostoDomicilio,
   };
 
   return {
@@ -86,22 +95,22 @@ export function applyDeliveryGiftOverrideToItem(item) {
     total: override.total ?? item?.total,
     valorTotal: override.total ?? item?.valorTotal,
     totalPedido: override.total ?? item?.totalPedido,
-    domicilioObsequiado: true,
-    omitirCostoDomicilio: true,
+    domicilioObsequiado,
+    omitirCostoDomicilio,
     ...(entrega ? {
       entrega: {
         ...entrega,
         domicilio: override.domicilio ?? entrega.domicilio,
         domicilioOriginal: override.domicilioOriginal ?? entrega.domicilioOriginal ?? entrega.domicilio,
-        domicilioObsequiado: true,
-        omitirCostoDomicilio: true,
+        domicilioObsequiado,
+        omitirCostoDomicilio,
       },
     } : {}),
     ...(destinatario ? {
       destinatario: {
         ...destinatario,
-        domicilioObsequiado: true,
-        omitirCostoDomicilio: true,
+        domicilioObsequiado,
+        omitirCostoDomicilio,
       },
     } : {}),
     financiero: nextFinanciero,

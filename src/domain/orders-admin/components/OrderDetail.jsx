@@ -64,7 +64,9 @@ export function OrderDetail({ detalle, empresaId = null, paymentTitle = "Metodo 
   const domicilioPedido = hasFinancialPreview
     ? Number(financialPreview.domicilio || 0)
     : (storedDomicilioObsequiado ? 0 : Number(financiero.domicilio || 0));
-  const domicilioOriginal = hasFinancialPreview ? Number(financialPreview.domicilioOriginal || 0) : Number(financiero.domicilio || 0);
+  const domicilioOriginal = hasFinancialPreview
+    ? Number(financialPreview.domicilioOriginal || 0)
+    : Number(financiero.domicilioOriginal ?? financiero.domicilio ?? 0);
   const domicilioObsequiado = Boolean(
     domicilioOriginal > 0 && (
       (hasFinancialPreview && financialPreview.domicilioObsequiado) ||

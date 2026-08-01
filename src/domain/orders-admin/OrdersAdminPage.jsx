@@ -53,11 +53,13 @@ import { useOrdersCatalogs } from "./hooks/useOrdersCatalogs.js";
 import {
   applyDeliveryGiftOverrideToDetail,
   forgetDeliveryGiftOverride,
+  getDeliveryFinancialOverride,
   rememberDeliveryGiftOverride,
 } from "./deliveryGiftOverrides.js";
 
 import {
   buildCatalogProductIndex,
+  buildEditedOrderFinancialBase,
   buildOrderFinancialPreview,
   buildOrdersMetrics,
   buildPaginationItems,
@@ -306,19 +308,19 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
   );
   const detailSelectedProduct = useMemo(() => {
     if (detailProducts.length === 0) return null;
-    if (detailEditDetalleID) {
-      const byDetailId = detailProducts.find(product => String(product?.detalleID ?? "") === String(detailEditDetalleID));
-      if (byDetailId) return byDetailId;
-    }
     if (detailEditProductoID) {
       const byProductId = detailProducts.find(product => String(getProductoId(product) ?? "") === String(detailEditProductoID));
       if (byProductId) return byProductId;
+    }
+    if (detailEditDetalleID) {
+      const byDetailId = detailProducts.find(product => String(product?.detalleID ?? "") === String(detailEditDetalleID));
+      if (byDetailId) return byDetailId;
     }
     return detailProducts[0];
   }, [detailEditDetalleID, detailEditProductoID, detailProducts]);
   const detailEditDisplayProductoCodigo = useMemo(() => (
     displayProductCode(
-      detailSelectedProduct || detailEditCatalogProduct || {
+      detailEditCatalogProduct || detailSelectedProduct || {
         codigo: detailEditProductoCodigo,
         codigoProducto: detailEditProductoCodigo,
       },
@@ -339,12 +341,15 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
     [detailEditMetodosPago]
   );
   const detailEditIsCustomArrangement = useMemo(
-    () => isCustomArrangement({
+    () => detailEditCustomPriceEnabled || isCustomArrangement({
       codigo: detailEditProductoCodigo,
       nombre: detailEditNombreArreglo,
-      observaciones: detailEditProductoObservaciones,
+      observaciones: [
+        detailEditProductoObservaciones,
+        detailEditCatalogProduct?.descripcion,
+      ].filter(Boolean).join(" "),
     }),
-    [detailEditNombreArreglo, detailEditProductoCodigo, detailEditProductoObservaciones]
+    [detailEditCatalogProduct, detailEditCustomPriceEnabled, detailEditNombreArreglo, detailEditProductoCodigo, detailEditProductoObservaciones]
   );
   const detailEditHasCashPayment = useMemo(
     () => detailEditSelectedPaymentMethods.some(method => isCashPaymentMethod(method)),
@@ -365,9 +370,13 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
   }, [detailEditBarrioNombre, detailEditBarrios]);
   const detailEditFinancialPreview = useMemo(
     () => {
-      const baseFinancial = {
-        ...(detalle?.financiero || {}),
-      };
+      const baseFinancial = buildEditedOrderFinancialBase({
+        detalle,
+        detalleID: detailEditDetalleID,
+        cantidad: detailEditCantidad,
+        precio: detailEditPrecio,
+        selectedCatalogProduct: detailEditCatalogProduct,
+      });
       const normalizedDeliveryType = normalizeDeliveryType(detailEditBarrioNombreOrFallback(
         detailEditBarrioNombre,
         detalle?.destinatario?.barrio
@@ -386,11 +395,11 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
         normalizedDeliveryType !== "recogida_en_tienda" && detailEditDomicilioObsequiado
       );
     },
-    [detalle, detailEditBarrioNombre, detailEditDomicilioObsequiado, detailEditSelectedBarrio, detailEditSelectedPaymentMethods, detailEditOmitirRecargoLink, detailEditDescuentoMonto, detailEditSaldoFavorMonto]
+    [detalle, detailEditBarrioNombre, detailEditCantidad, detailEditCatalogProduct, detailEditDetalleID, detailEditDomicilioObsequiado, detailEditPrecio, detailEditSelectedBarrio, detailEditSelectedPaymentMethods, detailEditOmitirRecargoLink, detailEditDescuentoMonto, detailEditSaldoFavorMonto]
   );
   const detailEditShowPriceField = detailEditCustomPriceEnabled || detailEditPrecio != null;
   const detailEditSelectedProductLabel = useMemo(() => {
-    const selected = detailSelectedProduct || detailEditCatalogProduct;
+    const selected = detailEditCatalogProduct || detailSelectedProduct;
     if (selected) {
       return buildProductoLabel(selected, detailEmpresaId);
     }
@@ -407,9 +416,9 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
     () => isCustomArrangement({
       codigo: detailAddProductoCodigo,
       nombre: detailAddNombreArreglo,
-      observaciones: "",
+      observaciones: detailAddCatalogProduct?.descripcion,
     }),
-    [detailAddNombreArreglo, detailAddProductoCodigo]
+    [detailAddCatalogProduct, detailAddNombreArreglo, detailAddProductoCodigo]
   );
   const detailAddSelectedProductLabel = useMemo(() => {
     if (detailAddCatalogProduct) {
@@ -898,6 +907,14 @@ const messageCard = useMessageCardController({
     }
 
     try {
+      const financialOverride = getDeliveryFinancialOverride(pedidoId);
+      if (financialOverride && typeof api.actualizarFinanzasPedidoPipeline === "function") {
+        await api.actualizarFinanzasPedidoPipeline({
+          pedidoId,
+          ...financialOverride,
+          costoDomicilio: financialOverride.domicilio,
+        });
+      }
       const { blob, filename } = await api.descargarFacturaPedido(pedidoId);
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
@@ -1270,6 +1287,7 @@ const openNewOrderModal = () => {
     direccion: detailEditDireccion,
     barrioNombre: detailEditBarrioNombre,
     domicilioObsequiado: detailEditDomicilioObsequiado,
+    domicilioOriginal: detailEditFinancialPreview?.domicilioOriginal,
     firma: detailEditFirma,
     mensajeTarjeta: detailEditMensajeTarjeta,
     observacionGeneral: detailEditObservacionGeneral,
@@ -1329,26 +1347,28 @@ const openNewOrderModal = () => {
       } else {
         await api.actualizarDetallePedidoPipeline(buildDetailEditApiPayload(selectedPedidoId));
         const keepGiftedDelivery = normalizeDeliveryType(detailEditBarrioNombre) !== "recogida_en_tienda" && Boolean(detailEditDomicilioObsequiado);
-        const deliveryGiftFinancial = keepGiftedDelivery
+        const deliveryFinancialPatch = detailEditFinancialPreview
           ? {
               subtotal: detailEditFinancialPreview.subtotal,
               iva: detailEditFinancialPreview.iva,
-              domicilio: detailEditFinancialPreview.domicilioOriginal,
+              domicilio: keepGiftedDelivery ? detailEditFinancialPreview.domicilioOriginal : detailEditFinancialPreview.domicilio,
+              domicilioOriginal: detailEditFinancialPreview.domicilioOriginal,
+              descuentoDomicilio: keepGiftedDelivery ? detailEditFinancialPreview.domicilioOriginal : 0,
               recargoLinkMonto: detailEditFinancialPreview.recargoMonto,
               descuentoMonto: detailEditFinancialPreview.descuentoMonto,
               saldoFavorMonto: detailEditFinancialPreview.saldoFavorMonto,
               total: detailEditFinancialPreview.total,
-              domicilioObsequiado: true,
-              omitirCostoDomicilio: true,
+              domicilioObsequiado: keepGiftedDelivery,
+              omitirCostoDomicilio: keepGiftedDelivery,
             }
           : null;
-        if (keepGiftedDelivery) {
-          rememberDeliveryGiftOverride(selectedPedidoId, deliveryGiftFinancial);
+        if (deliveryFinancialPatch) {
+          rememberDeliveryGiftOverride(selectedPedidoId, deliveryFinancialPatch);
         } else {
           forgetDeliveryGiftOverride(selectedPedidoId);
         }
         await reloadDrawer({
-          financiero: deliveryGiftFinancial || {
+          financiero: deliveryFinancialPatch || {
             domicilioObsequiado: false,
             omitirCostoDomicilio: false,
           },

@@ -747,7 +747,7 @@ export function buildOrderFinancialPreview(
 ) {
   const subtotal = roundCurrency(financiero?.subtotal ?? 0);
   const iva = roundCurrency(financiero?.iva ?? 0);
-  const domicilioOriginal = roundCurrency(financiero?.domicilio ?? 0);
+  const domicilioOriginal = roundCurrency(financiero?.domicilioOriginal ?? financiero?.domicilio ?? 0);
   const domicilio = domicilioObsequiado ? 0 : domicilioOriginal;
   const baseTotal = roundCurrency(subtotal + iva + domicilio);
   const hasLinkPayment = normalizePaymentMethods(methods).some(isLinkPaymentMethod);
@@ -771,6 +771,64 @@ export function buildOrderFinancialPreview(
     descuentoMonto,
     saldoFavorMonto,
     total,
+  };
+}
+
+function productUnitPrice(product) {
+  const explicitPrice = normalizeWholePeso(product?.precioUnitario ?? product?.precio ?? product?.productoPrecio);
+  if (Number.isFinite(explicitPrice) && explicitPrice > 0) return explicitPrice;
+
+  const quantity = Number(product?.cantidad || 1);
+  const subtotal = normalizeWholePeso(product?.subtotal);
+  if (Number.isFinite(subtotal) && subtotal > 0 && quantity > 0) {
+    return Math.round(subtotal / quantity);
+  }
+
+  return null;
+}
+
+function productLineSubtotal(product) {
+  const quantity = Math.max(1, Number(product?.cantidad || 1));
+  const unitPrice = productUnitPrice(product);
+  if (Number.isFinite(unitPrice) && unitPrice > 0) {
+    return roundCurrency(unitPrice * quantity);
+  }
+  return roundCurrency(product?.subtotal ?? 0);
+}
+
+export function buildEditedOrderFinancialBase({
+  detalle,
+  detalleID,
+  cantidad,
+  precio,
+  selectedCatalogProduct = null,
+}) {
+  const financiero = detalle?.financiero && typeof detalle.financiero === "object" ? detalle.financiero : {};
+  const products = Array.isArray(detalle?.productos) ? detalle.productos : [];
+  const selectedDetailId = String(detalleID || "");
+  const selectedProduct = products.find(product => String(product?.detalleID ?? "") === selectedDetailId) || products[0] || null;
+  const currentProductsSubtotal = products.reduce((sum, product) => sum + productLineSubtotal(product), 0);
+  const storedSubtotal = roundCurrency(financiero.subtotal ?? currentProductsSubtotal);
+
+  if (!selectedProduct) {
+    return { ...financiero, subtotal: storedSubtotal };
+  }
+
+  const previousLineSubtotal = productLineSubtotal(selectedProduct);
+  const nextQuantity = Math.max(1, Number(cantidad || selectedProduct.cantidad || 1));
+  const nextUnitPrice = productUnitPrice({
+    precioUnitario: precio,
+  }) || productUnitPrice(selectedCatalogProduct) || productUnitPrice(selectedProduct) || 0;
+  const nextLineSubtotal = roundCurrency(nextUnitPrice * nextQuantity);
+  const subtotalBase = currentProductsSubtotal > 0 ? currentProductsSubtotal : storedSubtotal;
+  const subtotal = roundCurrency(Math.max(0, subtotalBase - previousLineSubtotal + nextLineSubtotal));
+  const ivaRate = storedSubtotal > 0 ? roundCurrency((Number(financiero.iva || 0) / storedSubtotal) * 100) / 100 : 0;
+  const iva = ivaRate > 0 ? roundCurrency(subtotal * ivaRate) : roundCurrency(financiero.iva ?? 0);
+
+  return {
+    ...financiero,
+    subtotal,
+    iva,
   };
 }
 
