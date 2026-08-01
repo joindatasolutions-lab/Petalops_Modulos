@@ -4,7 +4,7 @@ import { filterAccountingDetailRows } from "../domain/accounting/AccountingPage.
 import { buildDeliveryAdminQueryPlan, deliveryMatchesSearch } from "../domain/delivery/DeliveryPage.jsx";
 import { filterInventoryItems } from "../domain/inventory/InventoryPage.jsx";
 import { filterNeighborhoodItems, sortNeighborhoods } from "../domain/neighborhoods/NeighborhoodsPage.jsx";
-import { buildOrdersMetrics, extractOrdersPayloadItems, filterOrdersByCreatedDateRange, filterOrdersBySearch, filterOrdersByStatus, isStorePickupOrder, localDateEndParam, localDateStartParam, resolveOrdersPayloadTotal, shouldShowPendingInvoiceAlert } from "../domain/orders-admin/OrdersAdminPage.jsx";
+import { buildOrdersMetrics, extractOrdersPayloadItems, filterOrdersByCreatedDateRange, filterOrdersBySearch, filterOrdersByStatus, isStorePickupOrder, localDateEndParam, localDateStartParam, resolveOrdersPayloadTotal, shouldAutoGenerateInvoiceForCompany, shouldShowPendingInvoiceAlert } from "../domain/orders-admin/OrdersAdminPage.jsx";
 import { buildDetailUpdatePayload, buildNewOrderCheckoutPayload } from "../domain/orders-admin/orderPayloadBuilders.js";
 import { buildEditedOrderFinancialBase, buildOrderFinancialPreview, getOrderFinancialTotal, resolveOrderListTotal } from "../domain/orders-admin/ordersDomain.js";
 import {
@@ -56,6 +56,13 @@ describe("estabilidad de filtros por vista", () => {
     expect(buildOrdersMetrics(rows, 99, "2026-06-25").facturasNoImpresas).toBe(1);
     expect(shouldShowPendingInvoiceAlert(rows[0])).toBe(false);
     expect(shouldShowPendingInvoiceAlert(rows[1])).toBe(true);
+  });
+
+  it("Pedidos: genera factura automaticamente solo para empresas distintas a 3", () => {
+    expect(shouldAutoGenerateInvoiceForCompany(1)).toBe(true);
+    expect(shouldAutoGenerateInvoiceForCompany("2")).toBe(true);
+    expect(shouldAutoGenerateInvoiceForCompany(3)).toBe(false);
+    expect(shouldAutoGenerateInvoiceForCompany("3")).toBe(false);
   });
 
   it("Pedidos: detecta pedidos para recoger en tienda", () => {

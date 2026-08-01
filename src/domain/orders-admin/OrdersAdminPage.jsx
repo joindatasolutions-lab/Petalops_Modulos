@@ -95,6 +95,7 @@ import {
   resolveOrdersPayloadTotal,
   roundCurrency,
   sanitizeWholePesoInput,
+  shouldAutoGenerateInvoiceForCompany,
   shouldShowPendingInvoiceAlert,
   thisMonthRangeIso,
   thisWeekRangeIso,
@@ -124,6 +125,7 @@ export {
   localDateEndParam,
   localDateStartParam,
   resolveOrdersPayloadTotal,
+  shouldAutoGenerateInvoiceForCompany,
   shouldShowPendingInvoiceAlert,
 } from "./ordersDomain.js";
 
@@ -829,6 +831,9 @@ const messageCard = useMessageCardController({
       const refreshedItem = (Array.isArray(refreshed?.items) ? refreshed.items : [])
         .find(current => Number(resolveOrderId(current)) === Number(pedidoId));
       const assignedOrderNumber = resolveAssignedOrderNumber(response, response?.pedido, response?.data, refreshedItem);
+      if (shouldAutoGenerateInvoiceForCompany(empresaId)) {
+        await downloadInvoice(pedidoId, { refreshAfter: false });
+      }
       setOrderNotification({
         tone: "success",
         title: "Pedido aprobado",
