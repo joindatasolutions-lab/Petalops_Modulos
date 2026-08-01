@@ -5,8 +5,8 @@ import { buildDeliveryAdminQueryPlan, deliveryMatchesSearch } from "../domain/de
 import { filterInventoryItems } from "../domain/inventory/InventoryPage.jsx";
 import { filterNeighborhoodItems, sortNeighborhoods } from "../domain/neighborhoods/NeighborhoodsPage.jsx";
 import { buildOrdersMetrics, extractOrdersPayloadItems, filterOrdersByCreatedDateRange, filterOrdersBySearch, filterOrdersByStatus, isStorePickupOrder, localDateEndParam, localDateStartParam, resolveOrdersPayloadTotal, shouldShowPendingInvoiceAlert } from "../domain/orders-admin/OrdersAdminPage.jsx";
-import { buildNewOrderCheckoutPayload } from "../domain/orders-admin/orderPayloadBuilders.js";
-import { buildOrderFinancialPreview, getOrderFinancialTotal, resolveOrderListTotal } from "../domain/orders-admin/ordersDomain.js";
+import { buildDetailUpdatePayload, buildNewOrderCheckoutPayload } from "../domain/orders-admin/orderPayloadBuilders.js";
+import { buildEditedOrderFinancialBase, buildOrderFinancialPreview, getOrderFinancialTotal, resolveOrderListTotal } from "../domain/orders-admin/ordersDomain.js";
 import {
   buildVisibleProductionItems,
   catalogCodeCandidates,
@@ -163,6 +163,47 @@ describe("estabilidad de filtros por vista", () => {
     expect(preview.domicilioOriginal).toBe(12000);
     expect(preview.domicilioObsequiado).toBe(true);
     expect(preview.total).toBe(100000);
+  });
+
+  it("Pedidos: el modal de edicion recalcula subtotal y total con cantidad/precio editados", () => {
+    const detalle = {
+      financiero: { subtotal: 100000, iva: 0, domicilio: 12000 },
+      productos: [
+        { detalleID: 10, productoID: 99, cantidad: 1, precioUnitario: 100000, subtotal: 100000 },
+      ],
+    };
+
+    const base = buildEditedOrderFinancialBase({
+      detalle,
+      detalleID: 10,
+      cantidad: 2,
+      precio: 90000,
+    });
+    const preview = buildOrderFinancialPreview(base, [], false, 0, 0, false);
+
+    expect(base.subtotal).toBe(180000);
+    expect(preview.total).toBe(192000);
+  });
+
+  it("Pedidos: el payload de edicion conserva precio para arreglos personalizados", () => {
+    const payload = buildDetailUpdatePayload({
+      pedidoId: 77,
+      detalle: { destinatario: {} },
+      edit: {
+        detalleID: 10,
+        productoID: 99,
+        cantidad: 1,
+        precio: 85000,
+        isCustomArrangement: true,
+        barrioNombre: "El Prado",
+      },
+      paymentValidation: { methods: ["Efectivo"], paymentBreakdown: null, cashAmount: 85000 },
+      canalFlora: "WhatsApp",
+      canEditClientIdentity: true,
+    });
+
+    expect(payload.productoPrecio).toBe(85000);
+    expect(payload.metodosPago).toEqual(["Efectivo"]);
   });
 
   it("Pedidos: totales guardados no cobran domicilio marcado como obsequio", () => {

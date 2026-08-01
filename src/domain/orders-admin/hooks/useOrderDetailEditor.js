@@ -73,7 +73,6 @@ export function useOrderDetailEditor({
           setters.setDetailEditProductoID(String(item.id));
           setters.setDetailEditProductoCodigo(displayProductCode(item, detailEmpresaId));
           setters.setDetailEditNombreArreglo(String(item.nombre || ""));
-          setters.setDetailEditCantidad(Number(detalle?.productos?.[0]?.cantidad || 1));
           setters.setDetailEditProductoObservaciones("");
           setters.setDetailEditPrecio(item.precio != null ? normalizeWholePeso(item.precio) : null);
           setters.setDetailEditCustomPriceEnabled(isCustomArrangement({
