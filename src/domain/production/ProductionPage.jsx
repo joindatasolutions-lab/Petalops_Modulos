@@ -218,6 +218,33 @@ function hasAssignedFlorista(item) {
   return String(item?.floristaAsignado || "").trim().length > 0;
 }
 
+function productionActionErrorMessage(error, fallback) {
+  const detail = String(error?.detail || error?.message || "").trim();
+  if (!detail) return fallback;
+  const requestId = String(error?.requestId || "").trim();
+  return requestId && !detail.includes(requestId) ? `${detail} (request_id ${requestId})` : detail;
+}
+
+function floristaNamesMatch(leftName, rightName) {
+  const left = normalizeSearchText(leftName);
+  const right = normalizeSearchText(rightName);
+  if (!left || !right) return false;
+  if (left === right || left.includes(right) || right.includes(left)) return true;
+
+  const leftTokens = new Set(left.split(/\s+/).filter(Boolean));
+  const rightTokens = right.split(/\s+/).filter(Boolean);
+  const sharedTokens = rightTokens.filter(token => leftTokens.has(token));
+  return sharedTokens.length >= 2;
+}
+
+function itemMatchesCurrentFlorista(item, currentFloristaId, currentFloristaName) {
+  const itemFloristaId = item?.floristaID;
+  if (currentFloristaId != null && itemFloristaId != null && itemFloristaId !== "") {
+    return Number(itemFloristaId) === Number(currentFloristaId);
+  }
+  return floristaNamesMatch(item?.floristaAsignado, currentFloristaName);
+}
+
 function flattenPipelineCards(payload) {
   if (!payload || typeof payload !== "object") return [];
   const stages = ["creado", "aprobado", "pendiente_produccion", "en_produccion", "listo", "en_camino", "entregado", "cancelado"];
@@ -290,10 +317,10 @@ export function productionItemMatchesSearch(item, searchValue) {
   return searchableValues.some(value => normalizeSearchText(value).includes(search));
 }
 
-export function buildVisibleProductionItems(sourceItems, currentFloristaId, busquedaGeneral, soloMisAsignados, groupByPedido = true) {
+export function buildVisibleProductionItems(sourceItems, currentFloristaId, busquedaGeneral, soloMisAsignados, groupByPedido = true, currentFloristaName = "") {
   const search = normalizeSearchText(busquedaGeneral);
   const filtered = sourceItems.filter(item => {
-    if (!search && soloMisAsignados && currentFloristaId != null && Number(item?.floristaID) !== Number(currentFloristaId)) {
+    if (!search && soloMisAsignados && !itemMatchesCurrentFlorista(item, currentFloristaId, currentFloristaName)) {
       return false;
     }
     if (search && !productionItemMatchesSearch(item, search)) return false;
@@ -1226,7 +1253,8 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
   const normalizedRole = normalizeRole(session?.rol);
   const isSuperAdmin = Boolean(session?.esGlobalJoin) || ["super_admin", "join_superadmin"].includes(normalizedRole);
   const canManageProductionActions = Boolean(session?.esGlobalJoin) || ["admin", "empresa_admin"].includes(normalizedRole);
-  const canManageStateAndRecalculate = isSuperAdmin;
+  const canManageStateActions = canManageProductionActions || isSuperAdmin;
+  const canRecalculateProduction = isSuperAdmin;
   const canFloristaQuickState = !canManageProductionActions;
   const canResolveProductionImages = Boolean(canViewProduccion);
   const displayUserName = useMemo(
@@ -1326,19 +1354,27 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
     if (currentFloristaId == null) return null;
     return floristasDisponibilidad.find(item => Number(item.idFlorista) === Number(currentFloristaId)) || null;
   }, [currentFloristaId, floristasDisponibilidad]);
+  const currentFloristaName = useMemo(() => {
+    if (ownFloristaDisponibilidad?.nombre) return ownFloristaDisponibilidad.nombre;
+    if (currentFloristaId != null) {
+      const found = allFloristas.find(item => Number(item?.idFlorista) === Number(currentFloristaId));
+      if (found?.nombre) return found.nombre;
+    }
+    return session?.nombre || session?.name || "";
+  }, [allFloristas, currentFloristaId, ownFloristaDisponibilidad, session]);
   const catalogProductIndex = useMemo(
     () => buildCatalogProductIndex(catalogProducts),
     [catalogProducts]
   );
 
   const canChangeOwnProductionState = useCallback((item) => {
-    if (!canFloristaQuickState || currentFloristaId == null) return false;
-    return Number(item?.floristaID) === Number(currentFloristaId);
-  }, [canFloristaQuickState, currentFloristaId]);
+    if (!canFloristaQuickState) return false;
+    return itemMatchesCurrentFlorista(item, currentFloristaId, currentFloristaName);
+  }, [canFloristaQuickState, currentFloristaId, currentFloristaName]);
 
   const visibleItems = useMemo(
-    () => buildVisibleProductionItems(items, currentFloristaId, busquedaGeneral, activeMetricFilter ? false : soloMisAsignados, !activeMetricFilter),
-    [items, currentFloristaId, busquedaGeneral, soloMisAsignados, activeMetricFilter]
+    () => buildVisibleProductionItems(items, currentFloristaId, busquedaGeneral, activeMetricFilter ? false : soloMisAsignados, !activeMetricFilter, currentFloristaName),
+    [items, currentFloristaId, currentFloristaName, busquedaGeneral, soloMisAsignados, activeMetricFilter]
   );
   const searchOverridesFilters = useMemo(
     () => normalizeSearchText(busquedaGeneral).length > 0,
@@ -1869,7 +1905,7 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
 
   const refreshAndKeepSelection = async item => {
     const nextItems = await loadItems();
-    const nextVisible = buildVisibleProductionItems(nextItems, currentFloristaId, busquedaGeneral, soloMisAsignados);
+    const nextVisible = buildVisibleProductionItems(nextItems, currentFloristaId, busquedaGeneral, soloMisAsignados, true, currentFloristaName);
     const nextSelected = nextVisible.find(candidate => Number(candidate.pedidoID) === Number(item?.pedidoID));
     if (nextSelected) {
       if (assignmentDrawerOpen) {
@@ -1950,13 +1986,43 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
       await Promise.all(produccionIds.map(produccionId => api.cambiarEstadoProduccion({
         produccionId,
         nuevoEstado,
-        observacionesInternas: motivoAccion || null
+        observacionesInternas: motivoAccion || null,
+        usuarioCambio,
+        origenCambio: "panel_produccion_admin",
+        cambioAdministrativo: true
       })));
       await refreshAndKeepSelection(item);
       setMotivoAccion("");
     } catch (nextError) {
       console.error("Error cambiando estado:", nextError);
-      globalThis.alert("No fue posible cambiar el estado. Verifica transición válida.");
+      globalThis.alert(productionActionErrorMessage(nextError, "No fue posible cambiar el estado. Verifica transición válida."));
+    }
+  };
+
+  const cambiarEstadoAdminRapido = async item => {
+    const nuevoEstado = nextFloristaStatus(item?.estado);
+    const produccionIds = Array.isArray(item?.produccionIds) && item.produccionIds.length > 0
+      ? item.produccionIds
+      : [item.idProduccion];
+    if (!nuevoEstado) return;
+    if (!hasAssignedFlorista(item)) {
+      globalThis.alert("Asigna un florista antes de cambiar el estado de producción.");
+      return;
+    }
+
+    try {
+      await Promise.all(produccionIds.map(produccionId => api.cambiarEstadoProduccion({
+        produccionId,
+        nuevoEstado,
+        observacionesInternas: "Cambio rápido de estado desde panel administrativo de producción",
+        usuarioCambio,
+        origenCambio: "panel_produccion_admin_rapido",
+        cambioAdministrativo: true
+      })));
+      await refreshAndKeepSelection(item);
+    } catch (nextError) {
+      console.error("Error cambiando estado rápido de admin:", nextError);
+      globalThis.alert(productionActionErrorMessage(nextError, "No fue posible cambiar el estado. Verifica transición válida."));
     }
   };
 
@@ -1979,12 +2045,15 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
       await Promise.all(produccionIds.map(produccionId => api.cambiarEstadoProduccion({
         produccionId,
         nuevoEstado,
-        observacionesInternas: "Cambio de estado desde panel florista"
+        observacionesInternas: "Cambio de estado desde panel florista",
+        usuarioCambio,
+        origenCambio: "panel_produccion_florista",
+        cambioAdministrativo: false
       })));
       await loadItems();
     } catch (nextError) {
       console.error("Error cambiando estado rápido de florista:", nextError);
-      globalThis.alert("No fue posible cambiar el estado.");
+      globalThis.alert(productionActionErrorMessage(nextError, "No fue posible cambiar el estado."));
     }
   };
 
@@ -2336,6 +2405,16 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
                             <button type="button" onClick={() => openAssignmentDrawer(item)}>Asignar</button>
                           ) : null}
                           <button type="button" onClick={() => openActionsDrawer(item)}>Ver detalle</button>
+                          {canManageStateActions && shouldShowFloristaStateAction(item.estado) ? (
+                            <button
+                              type="button"
+                              title={hasAssignedFlorista(item) ? "Actualizar estado de producción" : "Asigna un florista antes de cambiar estado"}
+                              onClick={hasAssignedFlorista(item) && nextFloristaStatus(item.estado) ? () => cambiarEstadoAdminRapido(item) : undefined}
+                              disabled={!hasAssignedFlorista(item) || !nextFloristaStatus(item.estado)}
+                            >
+                              {nextFloristaLabel(item.estado) || "Listo"}
+                            </button>
+                          ) : null}
                           {canFloristaQuickState && (canChangeOwnProductionState(item) || isProductionReadyForDelivery(item.estado)) && shouldShowFloristaStateAction(item.estado) ? (
                             <button
                               type="button"
@@ -2519,6 +2598,19 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
                       </td>
                       <td>
                         <div className="production-row-actions production-row-actions--florista" aria-label="Acciones de producción">
+                          {canManageStateActions && shouldShowFloristaStateAction(item.estado) ? (
+                            <button
+                              type="button"
+                              className={`production-icon-action production-icon-action--state ${productionStateActionClass(item.estado)}`}
+                              title={hasAssignedFlorista(item) ? (nextFloristaStatus(item.estado) ? "Actualizar estado de producción" : "Pedido listo para entrega") : "Asigna un florista antes de cambiar estado"}
+                              aria-label={nextFloristaLabel(item.estado) || "Pedido listo para entrega"}
+                              onClick={hasAssignedFlorista(item) && nextFloristaStatus(item.estado) ? () => cambiarEstadoAdminRapido(item) : undefined}
+                              disabled={!hasAssignedFlorista(item) || !nextFloristaStatus(item.estado)}
+                            >
+                              <CirclePlay size={18} strokeWidth={2} aria-hidden="true" />
+                              <span className="production-action-label">{nextFloristaLabel(item.estado) || "Listo"}</span>
+                            </button>
+                          ) : null}
                           {canFloristaQuickState && (canChangeOwnProductionState(item) || isProductionReadyForDelivery(item.estado)) && shouldShowFloristaStateAction(item.estado) ? (
                             <button
                               type="button"
@@ -2660,6 +2752,18 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
 
                   <div className="production-capsule-actions">
                     <div className="production-row-actions production-row-actions--florista" aria-label="Acciones de producción">
+                      {canManageStateActions && shouldShowFloristaStateAction(item.estado) ? (
+                        <button
+                          type="button"
+                          className={`production-icon-action production-icon-action--state ${productionStateActionClass(item.estado)}`}
+                          title={hasAssignedFlorista(item) ? (nextFloristaStatus(item.estado) ? "Actualizar estado de producción" : "Pedido listo para entrega") : "Asigna un florista antes de cambiar estado"}
+                          aria-label={nextFloristaLabel(item.estado) || "Pedido listo para entrega"}
+                          onClick={hasAssignedFlorista(item) && nextFloristaStatus(item.estado) ? () => cambiarEstadoAdminRapido(item) : undefined}
+                          disabled={!hasAssignedFlorista(item) || !nextFloristaStatus(item.estado)}
+                        >
+                          <CirclePlay size={18} strokeWidth={2} aria-hidden="true" />
+                        </button>
+                      ) : null}
                       {canFloristaQuickState && (canChangeOwnProductionState(item) || isProductionReadyForDelivery(item.estado)) && shouldShowFloristaStateAction(item.estado) ? (
                         <button
                           type="button"
@@ -2977,31 +3081,35 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
               </section>
               ) : null}
 
-              {canManageStateAndRecalculate ? (
+              {canManageStateActions || canRecalculateProduction ? (
                 <>
-                  <section className="order-block">
-                    <h4> Estado</h4>
-                    <div className="order-actions" style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                      <select
-                        value={selectedEstadoById[productionSelectionKey(selectedItem)] || ""}
-                        onChange={event => setSelectedEstadoById(current => ({ ...current, [productionSelectionKey(selectedItem)]: event.target.value }))}
-                        title="Seleccionar nuevo estado"
-                      >
-                        <option value="">Estado...</option>
-                        {ESTADOS_UI.filter(state => normalizeStatus(state) !== normalizeStatus(selectedItem.estado)).map(state => (
-                          <option key={state} value={state}>{state}</option>
-                        ))}
-                      </select>
-                      <button type="button" className="btn-outline" title="Aplicar cambio de estado" onClick={() => cambiarEstado(selectedItem)}>Cambiar estado</button>
-                    </div>
-                  </section>
+                  {canManageStateActions ? (
+                    <section className="order-block">
+                      <h4> Estado</h4>
+                      <div className="order-actions" style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                        <select
+                          value={selectedEstadoById[productionSelectionKey(selectedItem)] || ""}
+                          onChange={event => setSelectedEstadoById(current => ({ ...current, [productionSelectionKey(selectedItem)]: event.target.value }))}
+                          title="Seleccionar nuevo estado"
+                        >
+                          <option value="">Estado...</option>
+                          {ESTADOS_UI.filter(state => normalizeStatus(state) !== normalizeStatus(selectedItem.estado)).map(state => (
+                            <option key={state} value={state}>{state}</option>
+                          ))}
+                        </select>
+                        <button type="button" className="btn-outline" title="Aplicar cambio de estado" onClick={() => cambiarEstado(selectedItem)}>Cambiar estado</button>
+                      </div>
+                    </section>
+                  ) : null}
 
-                  <section className="order-block">
-                    <h4>ï¸ Recalcular pedido</h4>
-                    <button type="button" className="btn-outline" title="Recalcular impacto del pedido" onClick={() => recalcularPedido(selectedItem)}>
-                      Recalcular producción
-                    </button>
-                  </section>
+                  {canRecalculateProduction ? (
+                    <section className="order-block">
+                      <h4>ï¸ Recalcular pedido</h4>
+                      <button type="button" className="btn-outline" title="Recalcular impacto del pedido" onClick={() => recalcularPedido(selectedItem)}>
+                        Recalcular producción
+                      </button>
+                    </section>
+                  ) : null}
                 </>
               ) : null}
             </>

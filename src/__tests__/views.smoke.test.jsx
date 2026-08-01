@@ -80,11 +80,28 @@ const views = [
   ["Usuarios", <UsersManagementPage {...pageProps} />],
 ];
 
+const productionOperatorWithoutFloristaProps = {
+  ...pageProps,
+  session: {
+    ...session,
+    esGlobalJoin: false,
+    rol: "produccion",
+    email: "operador.produccion@petalops.test",
+  },
+};
+
 describe("vistas principales", () => {
   it.each(views)("renderiza la vista %s sin romper", (_name, element) => {
     const html = renderToStaticMarkup(element);
 
     expect(html).toContain("<");
+    expect(html.length).toBeGreaterThan(500);
+  });
+
+  it("renderiza Produccion sin florista asociado sin romper", () => {
+    const html = renderToStaticMarkup(<ProductionPage {...productionOperatorWithoutFloristaProps} />);
+
+    expect(html).toContain("Producción");
     expect(html.length).toBeGreaterThan(500);
   });
 });

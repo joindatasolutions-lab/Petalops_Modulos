@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { filterAccountingDetailRows } from "../domain/accounting/AccountingPage.jsx";
 import { buildDeliveryAdminQueryPlan, deliveryMatchesSearch } from "../domain/delivery/DeliveryPage.jsx";
@@ -345,6 +345,27 @@ describe("estabilidad de filtros por vista", () => {
     expect(product.imageUrl).toBe("/catalogo-0066.png");
   });
 
+  it("Produccion florista: solo mis asignados acepta coincidencia por nombre cuando falta floristaID", () => {
+    const rows = buildVisibleProductionItems([
+      {
+        pedidoID: 97634,
+        idProduccion: 3085,
+        numeroPedido: 97634,
+        floristaAsignado: "Diego florista",
+        nombreArreglo: "Ramo demo",
+      },
+      {
+        pedidoID: 97635,
+        idProduccion: 3086,
+        numeroPedido: 97635,
+        floristaAsignado: "Otro florista",
+        nombreArreglo: "Ramo externo",
+      },
+    ], null, "", true, true, "Diego Ustariz Florista");
+
+    expect(rows.map(item => item.numeroPedido)).toEqual([97634]);
+  });
+
   it("Produccion empresa 3: si codigo_catalogo apunta a otro arreglo, resuelve por nombre exacto", () => {
     const catalogIndex = new Map([
       ["catalog-code:0057", { codigo: "0057", nombre: "Corazón Mini Rosas", imageUrl: "/corazon-mini-rosas.png" }],
@@ -552,6 +573,34 @@ describe("estabilidad de filtros por vista", () => {
       { numeroPedido: 96595, nombreArreglo: "Personalizado" },
       new Map()
     )).resolves.toBe("/catalogo-0096.png");
+  });
+
+  it("Produccion: no consulta catalogo al resolver imagen desde pedidos sin permiso de catalogo", async () => {
+    const api = {
+      async listarPedidos() {
+        return {
+          items: [{
+            numeroPedido: 97634,
+            productosDetalle: [{
+              nombreProducto: "Prueba",
+              codigoCatalogo: "CAT-PRUEBA",
+            }],
+          }],
+        };
+      },
+      buscarArreglosCatalogo: vi.fn(async () => ({ items: [] })),
+    };
+
+    await expect(resolvePedidoListProductionImageUrl(
+      api,
+      2,
+      2,
+      { numeroPedido: 97634, nombreArreglo: "Prueba", codigoCatalogo: "CAT-PRUEBA" },
+      new Map(),
+      { canUseCatalogApi: false }
+    )).resolves.toBe("");
+
+    expect(api.buscarArreglosCatalogo).not.toHaveBeenCalled();
   });
 
   it("Produccion: busqueda por pedido o codigo no depende solo del nombre visible", () => {
