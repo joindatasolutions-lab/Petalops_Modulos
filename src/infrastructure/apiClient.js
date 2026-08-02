@@ -280,7 +280,7 @@ export function createApiClient(config) {
       return requestJson("/auth/usuarios/empresas/modulos");
     },
 
-    async crearEmpresaGestion({ nombreComercial, planID, estado = "Activo" }) {
+    async crearEmpresaGestion({ nombreComercial, planID, estado = "Activo", slug = "", adminLogin = "", adminPassword = "", adminEmail = "", sucursalNombre = "" }) {
       return requestJson("/auth/usuarios/empresas", {
         method: "POST",
         headers: {
@@ -290,6 +290,11 @@ export function createApiClient(config) {
           nombreComercial,
           planID,
           estado,
+          slug,
+          adminLogin,
+          adminPassword,
+          adminEmail,
+          sucursalNombre,
         })
       });
     },

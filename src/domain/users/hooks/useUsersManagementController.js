@@ -25,6 +25,7 @@ export function useUsersManagementController({ session, canViewUsuariosGlobal })
   const [sucursalID, setSucursalID] = useState("");
   const [estadoFiltro, setEstadoFiltro] = useState("");
   const [q, setQ] = useState("");
+  const [activePanel, setActivePanel] = useState(canViewUsuariosGlobal ? "tenants" : "usuarios");
 
   const [items, setItems] = useState([]);
   const [empresas, setEmpresas] = useState([]);
@@ -50,6 +51,16 @@ export function useUsersManagementController({ session, canViewUsuariosGlobal })
   const [showEditDrawer, setShowEditDrawer] = useState(false);
   const [showEditModuleDropdown, setShowEditModuleDropdown] = useState(false);
   const [form, setForm] = useState(UserFormModel.initial());
+  const [tenantForm, setTenantForm] = useState({
+    nombreComercial: "",
+    slug: "",
+    planID: "1",
+    estado: "Activo",
+    sucursalNombre: "",
+    adminLogin: "",
+    adminPassword: "",
+    adminEmail: "",
+  });
 
   const empresaSeleccionadaNombre = useMemo(() => {
     const found = empresas.find(item => Number(item.empresaID) === Number(empresaID));
@@ -296,7 +307,57 @@ export function useUsersManagementController({ session, canViewUsuariosGlobal })
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [closeCreateModal, showCreateModal]);
 
-  const submitCreate = async event => {
+
+  const submitCreateTenant = async event => {
+    event.preventDefault();
+    if (!canViewUsuariosGlobal) return;
+    const nombreComercial = String(tenantForm.nombreComercial || "").trim();
+    const adminLogin = String(tenantForm.adminLogin || "").trim().toLowerCase();
+    const adminPassword = String(tenantForm.adminPassword || "");
+    if (nombreComercial.length < 3) {
+      setError("El nombre comercial del tenant debe tener al menos 3 caracteres.");
+      return;
+    }
+    if (adminLogin.length < 3 || adminPassword.length < 6) {
+      setError("Define un login y una contrasena inicial valida para el admin del tenant.");
+      return;
+    }
+    setSaving(true);
+    setError("");
+    setInfo("");
+    try {
+      const response = await api.crearEmpresaGestion({
+        nombreComercial,
+        slug: tenantForm.slug,
+        planID: Number(tenantForm.planID || 1),
+        estado: tenantForm.estado || "Activo",
+        sucursalNombre: tenantForm.sucursalNombre,
+        adminLogin,
+        adminPassword,
+        adminEmail: tenantForm.adminEmail,
+      });
+      await loadEmpresas();
+      await loadEmpresasModuloResumen();
+      if (response?.empresaID) setEmpresaID(Number(response.empresaID));
+      setTenantForm({
+        nombreComercial: "",
+        slug: "",
+        planID: "1",
+        estado: "Activo",
+        sucursalNombre: "",
+        adminLogin: "",
+        adminPassword: "",
+        adminEmail: "",
+      });
+      setActivePanel("usuarios");
+      setInfo(`Tenant ${nombreComercial} creado con admin ${adminLogin}.`);
+    } catch (nextError) {
+      console.error("Error creando tenant:", nextError);
+      setError(nextError?.message || "No fue posible crear el tenant.");
+    } finally {
+      setSaving(false);
+    }
+  };  const submitCreate = async event => {
     event.preventDefault();
     const payload = UserFormModel.normalizeCreate(form);
     const validationError = UserFormModel.validateCreate(payload);
@@ -570,6 +631,11 @@ export function useUsersManagementController({ session, canViewUsuariosGlobal })
   return {
     ...sidebar,
     displayUserName,
+    activePanel,
+    setActivePanel,
+    tenantForm,
+    setTenantForm,
+    submitCreateTenant,
     empresaID,
     setEmpresaID,
     sucursalID,
@@ -582,6 +648,7 @@ export function useUsersManagementController({ session, canViewUsuariosGlobal })
     empresas,
     sucursales,
     loading,
+    saving,
     error,
     info,
     moduleItems,
@@ -600,6 +667,7 @@ export function useUsersManagementController({ session, canViewUsuariosGlobal })
     showEditDrawer,
     empresaSeleccionadaNombre,
     loadUsers,
+    loadEmpresasModuloResumen,
     closeCreateModal,
     closeEditDrawer,
     toggleEstado,
