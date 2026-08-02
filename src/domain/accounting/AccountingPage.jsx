@@ -137,12 +137,13 @@ export function AccountingPage({
   const loadCashClosings = useCallback(async () => {
     setCashLoading(true);
     try {
-      const monthRange = getAccountingPeriodRange("month");
+      const fechaDesde = filters.fechaDesde || getAccountingPeriodRange("month").fechaDesde;
+      const fechaHasta = filters.fechaHasta || getAccountingPeriodRange("month").fechaHasta;
       const payload = await api.listarCierresCaja({
         empresaId,
         sucursalId,
-        fechaDesde: monthRange.fechaDesde,
-        fechaHasta: monthRange.fechaHasta,
+        fechaDesde,
+        fechaHasta,
       });
       const rows = Array.isArray(payload?.items)
         ? payload.items
@@ -151,7 +152,8 @@ export function AccountingPage({
           : [];
       setCashHistoryRows(rows
         .map(row => normalizeCashClosingRow(row))
-        .filter(row => row && row.fecha >= monthRange.fechaDesde && row.fecha <= monthRange.fechaHasta));
+        .filter(row => row && row.fecha >= fechaDesde && row.fecha <= fechaHasta)
+        .sort((a, b) => b.fecha.localeCompare(a.fecha)));
     } catch (nextError) {
       setCashHistoryRows([]);
       if (nextError?.status === 404) {
@@ -162,7 +164,7 @@ export function AccountingPage({
     } finally {
       setCashLoading(false);
     }
-  }, [api, empresaId, sucursalId]);
+  }, [api, empresaId, sucursalId, filters.fechaDesde, filters.fechaHasta]);
 
   const loadCashClosingForDate = useCallback(async fecha => {
     const targetFecha = String(fecha || "").slice(0, 10);
@@ -562,6 +564,45 @@ export function AccountingPage({
   const totalEfectivoCaja = roundMoney(baseValue + efectivoValue - gastoValue);
   const guardadoValue = roundMoney(guardadoInputValue);
   const nuevaBaseValue = roundMoney(totalEfectivoCaja - guardadoValue);
+  const cashDashboardTotals = useMemo(() => {
+    if (cashHistoryRows.length === 0) {
+      return {
+        base: baseValue,
+        efectivo: efectivoValue,
+        gasto: gastoValue,
+        totalEfectivo: totalEfectivoCaja,
+        guardado: guardadoValue,
+        nuevaBase: nuevaBaseValue,
+        source: "day",
+      };
+    }
+
+    const totals = cashHistoryRows.reduce((acc, row) => ({
+      base: acc.base + Number(row.base || 0),
+      efectivo: acc.efectivo + Number(row.efectivo || 0),
+      gasto: acc.gasto + Number(row.gasto || 0),
+      totalEfectivo: acc.totalEfectivo + Number(row.totalEfectivo || 0),
+      guardado: acc.guardado + Number(row.guardado || 0),
+      nuevaBase: acc.nuevaBase + Number(row.nuevaBase || 0),
+    }), {
+      base: 0,
+      efectivo: 0,
+      gasto: 0,
+      totalEfectivo: 0,
+      guardado: 0,
+      nuevaBase: 0,
+    });
+
+    return {
+      base: roundMoney(totals.base),
+      efectivo: roundMoney(totals.efectivo),
+      gasto: roundMoney(totals.gasto),
+      totalEfectivo: roundMoney(totals.totalEfectivo),
+      guardado: roundMoney(totals.guardado),
+      nuevaBase: roundMoney(totals.nuevaBase),
+      source: "period",
+    };
+  }, [baseValue, cashHistoryRows, efectivoValue, gastoValue, guardadoValue, nuevaBaseValue, totalEfectivoCaja]);
   const todayCashDate = formatAccountingLocalDate(new Date());
   const selectedCashDate = String(cashForm.fecha || "").slice(0, 10);
   const selectedCashClosingExists = cashHistoryRows.some(row => row.fecha === selectedCashDate);
@@ -761,6 +802,7 @@ export function AccountingPage({
         TotalEfectivo: row.totalEfectivo,
         Guardado: row.guardado,
         NuevaBase: row.nuevaBase,
+        Observacion: row.observacion,
       })),
       `contabilidad-caja-${cashForm.fecha || filters.fechaHasta}.xlsx`,
       "Caja"
@@ -1726,18 +1768,18 @@ export function AccountingPage({
               <div className="accounting-panel-head">
                 <div>
                   <span>Dashboard de caja</span>
-                  <h3>Balance financiero del cierre</h3>
+                  <h3>{cashDashboardTotals.source === "period" ? "Balance financiero del periodo" : "Balance financiero del cierre"}</h3>
                 </div>
                 <Wallet size={22} strokeWidth={2} aria-hidden="true" />
               </div>
               <div className="accounting-cash-kpis">
                 {[
-                  ["Caja inicial", baseValue],
-                  ["Ingresos efectivo", efectivoValue],
-                  ["Gastos", gastoValue],
-                  ["Caja final", totalEfectivoCaja],
-                  ["Guardado", guardadoValue],
-                  ["Nueva base", nuevaBaseValue],
+                  ["Caja inicial", cashDashboardTotals.base],
+                  ["Ingresos efectivo", cashDashboardTotals.efectivo],
+                  ["Gastos", cashDashboardTotals.gasto],
+                  ["Caja final", cashDashboardTotals.totalEfectivo],
+                  ["Guardado", cashDashboardTotals.guardado],
+                  ["Nueva base", cashDashboardTotals.nuevaBase],
                 ].map(([label, value]) => (
                   <article key={label} className="accounting-cash-kpi">
                     <span>{label}</span>
@@ -1745,10 +1787,10 @@ export function AccountingPage({
                   </article>
                 ))}
               </div>
-              <div className={`accounting-cash-balance ${nuevaBaseValue >= 0 ? "is-ok" : "is-risk"}`}>
-                {nuevaBaseValue >= 0 ? <CircleCheck size={18} strokeWidth={2} aria-hidden="true" /> : <CircleAlert size={18} strokeWidth={2} aria-hidden="true" />}
-                <span>{nuevaBaseValue >= 0 ? "Cuadre correcto" : "Diferencia encontrada"}</span>
-                <strong>${formatearCOP(Math.abs(nuevaBaseValue))}</strong>
+              <div className={`accounting-cash-balance ${cashDashboardTotals.nuevaBase >= 0 ? "is-ok" : "is-risk"}`}>
+                {cashDashboardTotals.nuevaBase >= 0 ? <CircleCheck size={18} strokeWidth={2} aria-hidden="true" /> : <CircleAlert size={18} strokeWidth={2} aria-hidden="true" />}
+                <span>{cashDashboardTotals.nuevaBase >= 0 ? "Cuadre correcto" : "Diferencia encontrada"}</span>
+                <strong>${formatearCOP(Math.abs(cashDashboardTotals.nuevaBase))}</strong>
               </div>
             </section>
 
@@ -1814,12 +1856,13 @@ export function AccountingPage({
                     <th>Total_Efectivo</th>
                     <th>Guardado</th>
                     <th>Nueva_Base</th>
+                    <th>Observacion</th>
                   </tr>
                 </thead>
                 <tbody>
                   {cashHistoryRows.length === 0 ? (
                     <tr>
-                      <td colSpan={7}>{cashLoading ? "Cargando cierres de caja..." : "No hay cierres de caja guardados en base de datos."}</td>
+                      <td colSpan={8}>{cashLoading ? "Cargando cierres de caja..." : "No hay cierres de caja guardados en base de datos para el rango filtrado."}</td>
                     </tr>
                   ) : cashHistoryRows.map(row => (
                     <tr key={row.fecha}>
@@ -1830,6 +1873,7 @@ export function AccountingPage({
                       <td>${formatearCOP(row.totalEfectivo)}</td>
                       <td>${formatearCOP(row.guardado)}</td>
                       <td>${formatearCOP(row.nuevaBase)}</td>
+                      <td>{row.observacion || "-"}</td>
                     </tr>
                   ))}
                 </tbody>

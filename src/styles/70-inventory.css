@@ -1922,17 +1922,30 @@
   }
 
   .orders-admin-view.orders-page-view .orders-date-presets {
-    display: grid !important;
-    grid-template-columns: repeat(5, minmax(0, 1fr)) !important;
+    display: flex !important;
+    align-items: stretch !important;
     gap: 8px !important;
-    overflow: visible !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    padding: 0 0 6px !important;
+    scrollbar-width: thin !important;
+    scroll-snap-type: x proximity !important;
   }
 
   .orders-admin-view.orders-page-view .orders-date-preset,
   .orders-admin-view.orders-page-view .orders-date-preset.is-active {
-    min-width: 0 !important;
-    width: 100% !important;
-    padding-inline: 6px !important;
+    flex: 0 0 auto !important;
+    width: auto !important;
+    min-width: max-content !important;
+    max-width: none !important;
+    padding-inline: 14px !important;
+    white-space: nowrap !important;
+    overflow: visible !important;
+    text-overflow: clip !important;
+    scroll-snap-align: start !important;
   }
 
   .orders-admin-view.orders-page-view .orders-page-table-wrap,
@@ -1964,7 +1977,7 @@
   .orders-admin-view.orders-page-view .orders-date-preset,
   .orders-admin-view.orders-page-view .orders-date-preset.is-active {
     font-size: 11px !important;
-    padding-inline: 4px !important;
+    padding-inline: 12px !important;
   }
 }
 /* FINAL MOBILE ORDERS HEADER HEIGHT: keep search fully inside the header panel. */
@@ -2900,5 +2913,345 @@
   .inventory-page-view .inventory-provider-modal {
     padding: 16px 16px 20px;
     border-radius: 14px;
+  }
+}
+
+/* FINAL MOBILE ORDERS HEADER/FILTERS: keep all top actions and date presets reachable. */
+@media (max-width: 760px) {
+  .orders-admin-view.orders-page-view .orders-page-header {
+    grid-template-columns: minmax(0, 1fr) auto !important;
+    grid-template-areas:
+      "title actions"
+      "search search" !important;
+    overflow: visible !important;
+  }
+
+  .orders-admin-view.orders-page-view .orders-header-side {
+    display: contents !important;
+  }
+
+  .orders-admin-view.orders-page-view .orders-page-header .header-actions {
+    grid-area: actions !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: flex-end !important;
+    gap: 6px !important;
+    width: auto !important;
+    min-width: 0 !important;
+    justify-self: end !important;
+  }
+
+  .orders-admin-view.orders-page-view .orders-page-header .orders-header-refresh,
+  .orders-admin-view.orders-page-view .orders-page-header .orders-catalog-link,
+  .orders-admin-view.orders-page-view .orders-page-header .orders-new-order-btn {
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    flex: 0 0 38px !important;
+    width: 38px !important;
+    min-width: 38px !important;
+    height: 38px !important;
+    min-height: 38px !important;
+    padding: 0 !important;
+    border: 1px solid rgba(233, 30, 114, 0.24) !important;
+    border-radius: 11px !important;
+    background: #ffffff !important;
+    color: #e91e72 !important;
+    box-shadow: none !important;
+  }
+
+  .orders-admin-view.orders-page-view .orders-page-header .orders-header-refresh span,
+  .orders-admin-view.orders-page-view .orders-page-header .orders-catalog-link span,
+  .orders-admin-view.orders-page-view .orders-page-header .orders-new-order-btn span,
+  .orders-admin-view.orders-page-view .orders-page-header .orders-new-order-btn svg:last-child {
+    display: none !important;
+  }
+
+  .orders-admin-view.orders-page-view .orders-filter-section {
+    overflow: visible !important;
+  }
+
+  .orders-admin-view.orders-page-view .orders-filter-ribbon {
+    display: block !important;
+    width: 100vw !important;
+    max-width: 100vw !important;
+    padding: 0 8px 8px !important;
+    overflow-x: visible !important;
+    overflow-y: visible !important;
+    box-sizing: border-box !important;
+  }
+
+  .orders-admin-view.orders-page-view .orders-date-presets {
+    display: flex !important;
+    align-items: stretch !important;
+    gap: 8px !important;
+    width: calc(100vw - 16px) !important;
+    max-width: calc(100vw - 16px) !important;
+    min-width: 0 !important;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    padding: 0 0 8px !important;
+    scrollbar-width: thin !important;
+    -webkit-overflow-scrolling: touch !important;
+  }
+
+  .orders-admin-view.orders-page-view .orders-date-preset,
+  .orders-admin-view.orders-page-view .orders-date-preset.is-active {
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    flex: 1 0 auto !important;
+    width: auto !important;
+    min-width: max-content !important;
+    max-width: none !important;
+    height: 40px !important;
+    padding: 0 14px !important;
+    white-space: nowrap !important;
+    overflow: visible !important;
+    text-overflow: clip !important;
+  }
+}
+
+@media (min-width: 520px) and (max-width: 760px) {
+  .orders-admin-view.orders-page-view .orders-date-presets {
+    overflow-x: visible !important;
+  }
+
+  .orders-admin-view.orders-page-view .orders-date-preset,
+  .orders-admin-view.orders-page-view .orders-date-preset.is-active {
+    flex: 1 1 0 !important;
+    min-width: 0 !important;
+    padding: 0 10px !important;
+  }
+}
+
+@media (max-width: 390px) {
+  .orders-admin-view.orders-page-view .orders-page-header .header-actions {
+    gap: 4px !important;
+  }
+
+  .orders-admin-view.orders-page-view .orders-page-header .orders-header-refresh,
+  .orders-admin-view.orders-page-view .orders-page-header .orders-catalog-link,
+  .orders-admin-view.orders-page-view .orders-page-header .orders-new-order-btn {
+    flex-basis: 34px !important;
+    width: 34px !important;
+    min-width: 34px !important;
+    height: 34px !important;
+    min-height: 34px !important;
+  }
+}
+
+/* FINAL MOBILE ORDERS FILTERS: hide manual date range on phones. */
+@media (max-width: 760px) {
+  .orders-admin-view.orders-page-view .orders-filter-date-range,
+  .orders-admin-view.orders-page-view .orders-filter-link {
+    display: none !important;
+  }
+}
+
+.orders-admin-view.orders-page-view .orders-catalog-link {
+  text-decoration: none !important;
+}
+
+.orders-admin-view.orders-page-view .orders-catalog-link.is-disabled {
+  cursor: not-allowed !important;
+  opacity: 0.55 !important;
+}
+
+.orders-admin-view.orders-page-view .orders-empty-state {
+  display: grid !important;
+  justify-items: center !important;
+  align-content: center !important;
+  gap: 8px !important;
+  width: 100% !important;
+  min-height: 260px !important;
+  margin-top: 10px !important;
+  padding: 36px 18px !important;
+  border: 1px dashed #d8e1ee !important;
+  border-radius: 14px !important;
+  background: #ffffff !important;
+  color: #172033 !important;
+  text-align: center !important;
+  box-shadow: 0 14px 36px rgba(15, 23, 42, 0.055) !important;
+}
+
+.orders-admin-view.orders-page-view .orders-empty-state-icon {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 46px !important;
+  height: 46px !important;
+  border-radius: 999px !important;
+  background: #fff1f7 !important;
+  color: #e91e72 !important;
+}
+
+.orders-admin-view.orders-page-view .orders-empty-state strong {
+  display: block !important;
+  font-size: 18px !important;
+  font-weight: 900 !important;
+  line-height: 1.2 !important;
+}
+
+.orders-admin-view.orders-page-view .orders-empty-state > span:not(.orders-empty-state-icon) {
+  display: block !important;
+  max-width: 420px !important;
+  color: #5d6b82 !important;
+  font-size: 13px !important;
+  font-weight: 650 !important;
+  line-height: 1.45 !important;
+}
+
+/* FINAL MOBILE ORDERS ACTION TOOLTIPS: show hidden button labels on hover/focus. */
+@media (max-width: 760px) {
+  .orders-admin-view.orders-page-view .orders-page-header,
+  .orders-admin-view.orders-page-view .orders-header-side,
+  .orders-admin-view.orders-page-view .orders-page-header .header-actions {
+    overflow: visible !important;
+  }
+
+  .orders-admin-view.orders-page-view .orders-page-header .header-actions {
+    z-index: 10100 !important;
+  }
+
+  .orders-admin-view.orders-page-view .orders-page-header .header-actions .orders-header-refresh,
+  .orders-admin-view.orders-page-view .orders-page-header .header-actions .orders-catalog-link,
+  .orders-admin-view.orders-page-view .orders-page-header .header-actions .orders-new-order-btn {
+    position: relative !important;
+    overflow: visible !important;
+  }
+
+  .orders-admin-view.orders-page-view .orders-page-header .header-actions .orders-header-refresh::after,
+  .orders-admin-view.orders-page-view .orders-page-header .header-actions .orders-catalog-link::after,
+  .orders-admin-view.orders-page-view .orders-page-header .header-actions .orders-new-order-btn::after {
+    content: attr(data-tooltip) !important;
+    position: absolute !important;
+    top: calc(100% + 8px) !important;
+    left: 50% !important;
+    z-index: 10101 !important;
+    display: block !important;
+    width: max-content !important;
+    max-width: min(220px, calc(100vw - 24px)) !important;
+    padding: 6px 9px !important;
+    border-radius: 8px !important;
+    background: #172033 !important;
+    color: #ffffff !important;
+    font-size: 11px !important;
+    font-weight: 800 !important;
+    line-height: 1.2 !important;
+    white-space: normal !important;
+    text-align: center !important;
+    box-shadow: 0 12px 26px rgba(15, 23, 42, 0.22) !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
+    transform: translateX(-50%) translateY(-2px) !important;
+    transition: opacity 0.15s ease, transform 0.15s ease !important;
+  }
+
+  .orders-admin-view.orders-page-view .orders-page-header .header-actions .orders-header-refresh:hover::after,
+  .orders-admin-view.orders-page-view .orders-page-header .header-actions .orders-header-refresh:focus-visible::after,
+  .orders-admin-view.orders-page-view .orders-page-header .header-actions .orders-catalog-link:hover::after,
+  .orders-admin-view.orders-page-view .orders-page-header .header-actions .orders-catalog-link:focus-visible::after,
+  .orders-admin-view.orders-page-view .orders-page-header .header-actions .orders-new-order-btn:hover::after,
+  .orders-admin-view.orders-page-view .orders-page-header .header-actions .orders-new-order-btn:focus-visible::after {
+    opacity: 1 !important;
+    transform: translateX(-50%) translateY(0) !important;
+  }
+
+  .orders-admin-view.orders-page-view .orders-page-header .header-actions .orders-header-refresh:first-child::after {
+    left: 0 !important;
+    transform: translateX(0) translateY(-2px) !important;
+  }
+
+  .orders-admin-view.orders-page-view .orders-page-header .header-actions .orders-header-refresh:first-child:hover::after,
+  .orders-admin-view.orders-page-view .orders-page-header .header-actions .orders-header-refresh:first-child:focus-visible::after {
+    transform: translateX(0) translateY(0) !important;
+  }
+
+  .orders-admin-view.orders-page-view .orders-page-header .header-actions .orders-new-order-btn:last-child::after {
+    right: 0 !important;
+    left: auto !important;
+    transform: translateX(0) translateY(-2px) !important;
+  }
+
+  .orders-admin-view.orders-page-view .orders-page-header .header-actions .orders-new-order-btn:last-child:hover::after,
+  .orders-admin-view.orders-page-view .orders-page-header .header-actions .orders-new-order-btn:last-child:focus-visible::after {
+    transform: translateX(0) translateY(0) !important;
+  }
+}
+
+/* FINAL MOBILE ORDERS ROW ACTIONS: use the same anchored menu as desktop/tablet. */
+@media (max-width: 760px) {
+  .orders-admin-view.orders-page-view .orders-mobile-card,
+  .orders-admin-view.orders-page-view .orders-mobile-card-actions,
+  .orders-admin-view.orders-page-view .orders-mobile-card-actions .order-actions-menu {
+    overflow: visible !important;
+  }
+
+  .orders-admin-view.orders-page-view .orders-mobile-card-actions {
+    position: relative !important;
+    z-index: 90 !important;
+  }
+
+  .orders-admin-view.orders-page-view .orders-mobile-card-actions .order-actions-menu {
+    position: relative !important;
+    display: inline-flex !important;
+    z-index: 91 !important;
+  }
+
+  .orders-admin-view.orders-page-view .orders-mobile-card-actions .order-actions-popover,
+  .orders-admin-view.orders-page-view .orders-mobile-card-actions .order-actions-popover.order-actions-popover--open-down {
+    position: absolute !important;
+    top: auto !important;
+    right: 0 !important;
+    bottom: calc(100% + 8px) !important;
+    left: auto !important;
+    z-index: 92 !important;
+    display: grid !important;
+    grid-template-columns: 1fr !important;
+    gap: 0 !important;
+    width: 178px !important;
+    min-width: 178px !important;
+    max-width: min(178px, calc(100vw - 24px)) !important;
+    padding: 8px !important;
+    border: 1px solid #e5eaf2 !important;
+    border-radius: 8px !important;
+    background: #ffffff !important;
+    box-shadow: 0 18px 42px rgba(15, 23, 42, 0.14) !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+    pointer-events: auto !important;
+    transform: none !important;
+  }
+
+  .orders-admin-view.orders-page-view .orders-mobile-card-actions .order-actions-popover::before {
+    content: none !important;
+    display: none !important;
+  }
+
+  .orders-admin-view.orders-page-view .orders-mobile-card-actions .order-actions-popover button,
+  .orders-admin-view.orders-page-view .orders-mobile-card-actions .order-actions-popover a {
+    display: grid !important;
+    grid-template-columns: 18px minmax(0, 1fr) !important;
+    align-items: center !important;
+    gap: 8px !important;
+    width: 100% !important;
+    min-height: 30px !important;
+    padding: 0 8px !important;
+    border: 0 !important;
+    border-radius: 6px !important;
+    background: transparent !important;
+    color: #344054 !important;
+    font-size: 11px !important;
+    font-weight: 800 !important;
+    line-height: 1 !important;
+    text-align: left !important;
+    text-decoration: none !important;
+    white-space: nowrap !important;
+  }
+
+  .orders-admin-view.orders-page-view .orders-mobile-card-actions .order-actions-popover button:hover,
+  .orders-admin-view.orders-page-view .orders-mobile-card-actions .order-actions-popover a:hover {
+    background: #f8fafc !important;
   }
 }

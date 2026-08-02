@@ -1,6 +1,7 @@
-import { PedidoCard } from "./PedidoCard.jsx";
+﻿import { PedidoCard } from "./PedidoCard.jsx";
 
 import { COLUMN_CONFIG, EMPTY_CONTENT } from "./pipelineConfig.jsx";
+
 export function PipelineColumn({ dropStageKey, title, items, onOpen, onDropCard, onDragStart }) {
   const config = COLUMN_CONFIG[dropStageKey] || COLUMN_CONFIG.pedido_inicial;
   const emptyContent = EMPTY_CONTENT[dropStageKey] || EMPTY_CONTENT.pedido_inicial;
@@ -11,7 +12,7 @@ export function PipelineColumn({ dropStageKey, title, items, onOpen, onDropCard,
   const onDrop = event => {
     event.preventDefault();
     const pedidoId = Number(event.dataTransfer.getData("pedidoId"));
-    if (!pedidoId) return;
+    if (!pedidoId || !onDropCard) return;
     onDropCard(pedidoId, dropStageKey);
   };
 
@@ -36,6 +37,7 @@ export function PipelineColumn({ dropStageKey, title, items, onOpen, onDropCard,
           <PedidoCard
             key={item.id_pedido}
             item={item}
+            stage={dropStageKey}
             onOpen={onOpen}
             onDragStart={onDragStart}
           />

@@ -1,11 +1,11 @@
-import { Clock, DollarSign, MapPin, Package2, Store, User, Bike } from "lucide-react";
+﻿import { Clock, DollarSign, MapPin, Package2, Store, User, Bike } from "lucide-react";
 
 import { formatProgress, getTimeStatus, isPickupOrder, PRIORITY_CONFIG } from "./pipelineDomain.js";
 
-export function PedidoCard({ item, onOpen, onDragStart }) {
+export function PedidoCard({ item, stage, onOpen, onDragStart }) {
   const priorityKey = String(item.prioridad || "MEDIA").toUpperCase();
   const priority = PRIORITY_CONFIG[priorityKey] || PRIORITY_CONFIG.MEDIA;
-  const timeStatus = getTimeStatus(item.tiempo_restante_entrega);
+  const timeStatus = getTimeStatus(item.tiempo_restante_entrega, stage, item);
   const progressWidth = formatProgress(item.progreso_porcentaje);
 
   const isPickup = isPickupOrder(item);
@@ -13,17 +13,17 @@ export function PedidoCard({ item, onOpen, onDragStart }) {
   return (
     <article
       className={`pipeline-card ${timeStatus.className}`}
-      draggable
-      onDragStart={event => onDragStart(event, item)}
+      draggable={Boolean(onDragStart)}
+      onDragStart={event => onDragStart?.(event, item)}
       onClick={() => onOpen(item)}
     >
-      {/* Fila 1: Número pedido + Prioridad */}
+      {/* Fila 1: Numero pedido + Prioridad */}
       <header className="pipeline-card-head">
-        <strong className="pipeline-card-order">#{item.numero_pedido || "—"}</strong>
+        <strong className="pipeline-card-order">#{item.numero_pedido || "-"}</strong>
         <span className={`pipeline-priority ${priority.className}`}>{priority.label}</span>
       </header>
 
-      {/* Cliente — peso visual principal */}
+      {/* Cliente - peso visual principal */}
       <p className="pipeline-card-client">{item.cliente_nombre || "Cliente sin nombre"}</p>
 
       {/* Tipo de entrega */}

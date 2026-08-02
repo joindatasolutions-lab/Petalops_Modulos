@@ -1,4 +1,4 @@
-import { todayIsoDateBogota } from "../../shared/utils.js";
+﻿import { todayIsoDateBogota } from "../../shared/utils.js";
 import { PIPELINE_STAGES } from "./pipelineConfig.jsx";
 
 export const PRIORITY_CONFIG = {
@@ -14,15 +14,15 @@ export function normalizePipelineBoard(payload) {
 export function todayIsoDate() { return todayIsoDateBogota(); }
 export function sanitizeUiText(value) {
   return String(value || "")
-    .replaceAll("MÃƒÂ³dulo", "Modulo")
-    .replaceAll("ÃƒÂ¡", "a").replaceAll("ÃƒÂ©", "e")
-    .replaceAll("ÃƒÂ­", "i").replaceAll("ÃƒÂ³", "o")
-    .replaceAll("ÃƒÂº", "u").replaceAll("ÃƒÂ±", "n").replaceAll("Ãƒ'", "N")
+    .replaceAll("MÃƒÆ’Ã‚Â³dulo", "Modulo")
+    .replaceAll("ÃƒÆ’Ã‚Â¡", "a").replaceAll("ÃƒÆ’Ã‚Â©", "e")
+    .replaceAll("ÃƒÆ’Ã‚Â­", "i").replaceAll("ÃƒÆ’Ã‚Â³", "o")
+    .replaceAll("ÃƒÆ’Ã‚Âº", "u").replaceAll("ÃƒÆ’Ã‚Â±", "n").replaceAll("ÃƒÆ’'", "N")
     .trim();
 }
 export function formatHistoryActor(value) {
   const raw = sanitizeUiText(value);
-  return raw ? raw.replace(/\./g, " Â· ") : "-";
+  return raw ? raw.replace(/\./g, " Ã‚Â· ") : "-";
 }
 export function formatHistoryReason(value) { return sanitizeUiText(value) || "-"; }
 export function resolveHistoryTypeLabel(tipoMovimiento) {
@@ -74,7 +74,16 @@ export function applyEstadoFilterValue(value, onChange) {
   onChange("soloEnProduccion", value === "produccion");
   if (value !== "atrasados" && value !== "produccion") onChange("estadoStage", value);
 }
-export function getTimeStatus(tiempoRestante) {
+function isClosedStage(stage, item) {
+  const normalizedStage = String(stage || "").trim().toLowerCase();
+  const normalizedStatus = String(item?.estado || item?.estado_pedido || item?.estadoPedido || "").trim().toLowerCase();
+  return normalizedStage === "entregado" ||
+    normalizedStage === "cancelado" ||
+    normalizedStatus.includes("entregado") ||
+    normalizedStatus.includes("cancelado");
+}
+export function getTimeStatus(tiempoRestante, stage, item) {
+  if (isClosedStage(stage, item)) return { label: "-", className: "is-ontime", icon: null };
   const remaining = Number(tiempoRestante);
   if (!Number.isFinite(remaining)) return { label: "-", className: "is-unknown", icon: null };
   if (remaining < 0) return { label: `Retrasado ${Math.round(Math.abs(remaining))} min`, className: "is-late", icon: "alert" };
@@ -135,3 +144,4 @@ export function normalizeTime(value) {
   const match = String(value || "").trim().match(/^(\d{2}:\d{2})/);
   return match ? match[1] : "";
 }
+

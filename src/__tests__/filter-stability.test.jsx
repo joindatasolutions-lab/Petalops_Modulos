@@ -1,10 +1,12 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { filterAccountingDetailRows } from "../domain/accounting/AccountingPage.jsx";
 import { buildDeliveryAdminQueryPlan, deliveryMatchesSearch } from "../domain/delivery/DeliveryPage.jsx";
 import { filterInventoryItems } from "../domain/inventory/InventoryPage.jsx";
 import { filterNeighborhoodItems, sortNeighborhoods } from "../domain/neighborhoods/NeighborhoodsPage.jsx";
-import { buildOrdersMetrics, extractOrdersPayloadItems, filterOrdersByCreatedDateRange, filterOrdersBySearch, filterOrdersByStatus, isStorePickupOrder, localDateEndParam, localDateStartParam, resolveOrdersPayloadTotal, shouldShowPendingInvoiceAlert } from "../domain/orders-admin/OrdersAdminPage.jsx";
+import { buildOrdersMetrics, extractOrdersPayloadItems, filterOrdersByCreatedDateRange, filterOrdersBySearch, filterOrdersByStatus, isStorePickupOrder, localDateEndParam, localDateStartParam, resolveOrdersPayloadTotal, shouldAutoGenerateInvoiceForCompany, shouldShowPendingInvoiceAlert } from "../domain/orders-admin/OrdersAdminPage.jsx";
+import { buildDetailUpdatePayload, buildNewOrderCheckoutPayload } from "../domain/orders-admin/orderPayloadBuilders.js";
+import { buildEditedOrderFinancialBase, buildOrderFinancialPreview, getOrderFinancialTotal, resolveOrderListTotal } from "../domain/orders-admin/ordersDomain.js";
 import {
   buildVisibleProductionItems,
   catalogCodeCandidates,
@@ -54,6 +56,13 @@ describe("estabilidad de filtros por vista", () => {
     expect(buildOrdersMetrics(rows, 99, "2026-06-25").facturasNoImpresas).toBe(1);
     expect(shouldShowPendingInvoiceAlert(rows[0])).toBe(false);
     expect(shouldShowPendingInvoiceAlert(rows[1])).toBe(true);
+  });
+
+  it("Pedidos: genera factura automaticamente solo para empresas distintas a 3", () => {
+    expect(shouldAutoGenerateInvoiceForCompany(1)).toBe(true);
+    expect(shouldAutoGenerateInvoiceForCompany("2")).toBe(true);
+    expect(shouldAutoGenerateInvoiceForCompany(3)).toBe(false);
+    expect(shouldAutoGenerateInvoiceForCompany("3")).toBe(false);
   });
 
   it("Pedidos: detecta pedidos para recoger en tienda", () => {
@@ -147,6 +156,153 @@ describe("estabilidad de filtros por vista", () => {
     expect(resolveOrdersPayloadTotal(payload, [])).toBe(2);
   });
 
+  it("Pedidos: domicilio obsequiado cobra cero sin perder el valor original", () => {
+    const preview = buildOrderFinancialPreview(
+      { subtotal: 100000, iva: 0, domicilio: 12000 },
+      [],
+      false,
+      0,
+      0,
+      true
+    );
+
+    expect(preview.domicilio).toBe(0);
+    expect(preview.domicilioOriginal).toBe(12000);
+    expect(preview.domicilioObsequiado).toBe(true);
+    expect(preview.total).toBe(100000);
+  });
+
+  it("Pedidos: el modal de edicion recalcula subtotal y total con cantidad/precio editados", () => {
+    const detalle = {
+      financiero: { subtotal: 100000, iva: 0, domicilio: 12000 },
+      productos: [
+        { detalleID: 10, productoID: 99, cantidad: 1, precioUnitario: 100000, subtotal: 100000 },
+      ],
+    };
+
+    const base = buildEditedOrderFinancialBase({
+      detalle,
+      detalleID: 10,
+      cantidad: 2,
+      precio: 90000,
+    });
+    const preview = buildOrderFinancialPreview(base, [], false, 0, 0, false);
+
+    expect(base.subtotal).toBe(180000);
+    expect(preview.total).toBe(192000);
+  });
+
+  it("Pedidos: el payload de edicion conserva precio para arreglos personalizados", () => {
+    const payload = buildDetailUpdatePayload({
+      pedidoId: 77,
+      detalle: { destinatario: {} },
+      edit: {
+        detalleID: 10,
+        productoID: 99,
+        cantidad: 1,
+        precio: 85000,
+        isCustomArrangement: true,
+        barrioNombre: "El Prado",
+      },
+      paymentValidation: { methods: ["Efectivo"], paymentBreakdown: null, cashAmount: 85000 },
+      canalFlora: "WhatsApp",
+      canEditClientIdentity: true,
+    });
+
+    expect(payload.productoPrecio).toBe(85000);
+    expect(payload.metodosPago).toEqual(["Efectivo"]);
+  });
+
+  it("Pedidos: totales guardados no cobran domicilio marcado como obsequio", () => {
+    const financiero = {
+      subtotal: 1,
+      iva: 0,
+      domicilio: 120000,
+      domicilioObsequiado: true,
+      total: 120001,
+    };
+
+    expect(getOrderFinancialTotal(financiero)).toBe(1);
+    expect(resolveOrderListTotal({ financiero })).toBe(1);
+    expect(resolveOrderListTotal({ subtotal: 1, domicilio: 120000, omitirCostoDomicilio: true })).toBe(1);
+  });
+
+  it("Pedidos: checkout manual conserva cliente identificado por telefono", () => {
+    const payload = buildNewOrderCheckoutPayload({
+      empresaId: 3,
+      sucursalId: 1,
+      productoID: 99,
+      form: {
+        clienteID: 55,
+        clienteNombre: "Prueba Join",
+        clienteTelefono: "3001234567",
+        clienteEmail: "joindatasolutions@gmail.com",
+        clienteTipoIdent: "CC",
+        clienteIdentificacion: "1062397422",
+        destinatarioNombre: "Prueba Join",
+        telefonoDestino: "",
+        direccion: "Calle 1",
+        barrioNombre: "Centro",
+        domicilioObsequiado: false,
+        fechaEntrega: "2026-07-27",
+        horaEntrega: "08:00",
+        cantidad: 1,
+        precio: "",
+        mensajeTarjeta: "",
+        firma: "",
+        observacionGeneral: "",
+        metodoPago: "Efectivo",
+        canalFlora: "WhatsApp",
+      },
+    });
+
+    expect(payload.cliente.clienteID).toBe(55);
+    expect(payload.cliente.identificacion).toBe("1062397422");
+    expect(payload.cliente.email).toBe("joindatasolutions@gmail.com");
+  });
+
+  it("Pedidos: checkout manual descuenta domicilio obsequiado al crear pedido", () => {
+    const payload = buildNewOrderCheckoutPayload({
+      empresaId: 3,
+      sucursalId: 1,
+      productoID: 99,
+      form: {
+        clienteNombre: "Prueba Join",
+        clienteTelefono: "3001234567",
+        clienteEmail: "",
+        clienteIdentificacion: "",
+        destinatarioNombre: "Prueba Join",
+        telefonoDestino: "",
+        direccion: "Calle 1",
+        barrioNombre: "Centro",
+        barrioCostoDomicilio: 15000,
+        domicilioObsequiado: true,
+        fechaEntrega: "2026-07-27",
+        horaEntrega: "08:00",
+        cantidad: 1,
+        precio: "300000",
+        mensajeTarjeta: "",
+        firma: "",
+        observacionGeneral: "",
+        metodoPago: "Efectivo",
+        canalFlora: "WhatsApp",
+      },
+    });
+
+    expect(payload.entrega.domicilio).toBe(0);
+    expect(payload.entrega.domicilioOriginal).toBe(15000);
+    expect(payload.entrega.domicilioObsequiado).toBe(true);
+    expect(payload.domicilio).toBe(0);
+    expect(payload.domicilioOriginal).toBe(15000);
+    expect(payload.descuentoDomicilio).toBe(15000);
+    expect(payload.domicilioObsequiado).toBe(true);
+    expect(payload.omitirCostoDomicilio).toBe(true);
+    expect(payload.financiero.domicilio).toBe(0);
+    expect(payload.financiero.domicilioOriginal).toBe(15000);
+    expect(payload.financiero.descuentoDomicilio).toBe(15000);
+    expect(payload.financiero.omitirCostoDomicilio).toBe(true);
+  });
+
   it("Produccion: empresa 3 resuelve imagen por codigo_catalogo antes que codigo_producto", () => {
     const catalogIndex = new Map([
       ["catalog-code:0066", { codigo: "0066", nombre: "Virgen Guadalupe", imageUrl: "/catalogo-0066.png" }],
@@ -194,6 +350,27 @@ describe("estabilidad de filtros por vista", () => {
     expect(grouped.codigoCatalogo).toBe("0066");
     expect(catalogCodeCandidates(grouped)).toEqual(["0066"]);
     expect(product.imageUrl).toBe("/catalogo-0066.png");
+  });
+
+  it("Produccion florista: solo mis asignados acepta coincidencia por nombre cuando falta floristaID", () => {
+    const rows = buildVisibleProductionItems([
+      {
+        pedidoID: 97634,
+        idProduccion: 3085,
+        numeroPedido: 97634,
+        floristaAsignado: "Diego florista",
+        nombreArreglo: "Ramo demo",
+      },
+      {
+        pedidoID: 97635,
+        idProduccion: 3086,
+        numeroPedido: 97635,
+        floristaAsignado: "Otro florista",
+        nombreArreglo: "Ramo externo",
+      },
+    ], null, "", true, true, "Diego Ustariz Florista");
+
+    expect(rows.map(item => item.numeroPedido)).toEqual([97634]);
   });
 
   it("Produccion empresa 3: si codigo_catalogo apunta a otro arreglo, resuelve por nombre exacto", () => {
@@ -403,6 +580,34 @@ describe("estabilidad de filtros por vista", () => {
       { numeroPedido: 96595, nombreArreglo: "Personalizado" },
       new Map()
     )).resolves.toBe("/catalogo-0096.png");
+  });
+
+  it("Produccion: no consulta catalogo al resolver imagen desde pedidos sin permiso de catalogo", async () => {
+    const api = {
+      async listarPedidos() {
+        return {
+          items: [{
+            numeroPedido: 97634,
+            productosDetalle: [{
+              nombreProducto: "Prueba",
+              codigoCatalogo: "CAT-PRUEBA",
+            }],
+          }],
+        };
+      },
+      buscarArreglosCatalogo: vi.fn(async () => ({ items: [] })),
+    };
+
+    await expect(resolvePedidoListProductionImageUrl(
+      api,
+      2,
+      2,
+      { numeroPedido: 97634, nombreArreglo: "Prueba", codigoCatalogo: "CAT-PRUEBA" },
+      new Map(),
+      { canUseCatalogApi: false }
+    )).resolves.toBe("");
+
+    expect(api.buscarArreglosCatalogo).not.toHaveBeenCalled();
   });
 
   it("Produccion: busqueda por pedido o codigo no depende solo del nombre visible", () => {

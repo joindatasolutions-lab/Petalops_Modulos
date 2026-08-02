@@ -1,5 +1,11 @@
 const PEDIDOS_MAX_PAGE_SIZE = 300;
 const LOGIN_TIMEOUT_MS = 30000;
+const PRODUCTION_STATUS_CODE_BY_UI = {
+  Pendiente: "PENDIENTE",
+  EnProduccion: "EN_PROCESO",
+  ParaEntrega: "LISTO",
+  Cancelado: "CANCELADO",
+};
 
 function normalizePedidosDateParam(value) {
   const text = String(value || "").trim();
@@ -216,10 +222,12 @@ export function createApiClient(config) {
       return requestJson("/auth/usuarios/empresas");
     },
 
-    async listarClientes({ empresaId, q = "", soloActivos = false }) {
+    async listarClientes({ empresaId, q = "", celular = "", telefono = "", soloActivos = false }) {
       const params = new URLSearchParams();
       params.set("empresaID", String(empresaId));
       if (q) params.set("q", String(q));
+      if (celular) params.set("celular", String(celular));
+      if (telefono) params.set("telefono", String(telefono));
       if (soloActivos) params.set("soloActivos", "true");
       return requestJson(`/clientes?${params.toString()}`);
     },
@@ -572,6 +580,16 @@ export function createApiClient(config) {
       });
     },
 
+    async crearPedidoManual(payload) {
+      return requestJson("/pedido/manual", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(payload)
+      });
+    },
+
     async actualizarDetallePedidoPipeline({
       pedidoId,
       detalleID,
@@ -599,6 +617,13 @@ export function createApiClient(config) {
       detallePago,
       montoEfectivo,
       omitirRecargoLink,
+      domicilio,
+      costoDomicilio,
+      domicilioOriginal,
+      descuentoDomicilio,
+      domicilioObsequiado,
+      omitirCostoDomicilio,
+      forzarRecalculoFinanciero,
       descuentoMonto,
       descuentoNota,
       saldoFavorMonto,
@@ -636,11 +661,70 @@ export function createApiClient(config) {
           detallePago: Array.isArray(detallePago) ? detallePago : null,
           montoEfectivo: montoEfectivo != null ? Number(montoEfectivo) : null,
           omitirRecargoLink: omitirRecargoLink != null ? Boolean(omitirRecargoLink) : null,
+          domicilio: domicilio != null ? Number(domicilio) : null,
+          costoDomicilio: (costoDomicilio ?? domicilio) != null ? Number(costoDomicilio ?? domicilio) : null,
+          costo_domicilio: (costoDomicilio ?? domicilio) != null ? Number(costoDomicilio ?? domicilio) : null,
+          domicilioOriginal: domicilioOriginal != null ? Number(domicilioOriginal) : null,
+          descuentoDomicilio: descuentoDomicilio != null ? Number(descuentoDomicilio) : null,
+          domicilioObsequiado: domicilioObsequiado != null ? Boolean(domicilioObsequiado) : null,
+          domicilio_obsequiado: domicilioObsequiado != null ? Boolean(domicilioObsequiado) : null,
+          domicilioObsequio: domicilioObsequiado != null ? Boolean(domicilioObsequiado) : null,
+          domicilioGratis: domicilioObsequiado != null ? Boolean(domicilioObsequiado) : null,
+          omitirCostoDomicilio: omitirCostoDomicilio != null ? Boolean(omitirCostoDomicilio) : null,
+          omitir_costo_domicilio: omitirCostoDomicilio != null ? Boolean(omitirCostoDomicilio) : null,
+          forzarRecalculoFinanciero: forzarRecalculoFinanciero != null ? Boolean(forzarRecalculoFinanciero) : null,
           descuentoMonto: descuentoMonto != null ? Number(descuentoMonto) : null,
           descuentoNota: descuentoNota ?? null,
           saldoFavorMonto: saldoFavorMonto != null ? Number(saldoFavorMonto) : null,
           saldoFavorNota: saldoFavorNota ?? null,
           canalFlora: canalFlora ?? null,
+        })
+      });
+    },
+
+    async actualizarFinanzasPedidoPipeline({
+      pedidoId,
+      subtotal,
+      iva,
+      domicilio,
+      costoDomicilio,
+      domicilioOriginal,
+      descuentoDomicilio,
+      recargoLinkMonto,
+      descuentoMonto,
+      saldoFavorMonto,
+      total,
+      domicilioObsequiado,
+      omitirCostoDomicilio,
+    }) {
+      const domicilioValue = domicilio != null ? Number(domicilio) : null;
+      const costoDomicilioValue = (costoDomicilio ?? domicilio) != null ? Number(costoDomicilio ?? domicilio) : null;
+      const flagValue = domicilioObsequiado != null ? Boolean(domicilioObsequiado) : null;
+      const omitValue = omitirCostoDomicilio != null ? Boolean(omitirCostoDomicilio) : null;
+      return requestJson(`/pedido/${pedidoId}/detalle`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          subtotal: subtotal != null ? Number(subtotal) : null,
+          iva: iva != null ? Number(iva) : null,
+          domicilio: domicilioValue,
+          costoDomicilio: costoDomicilioValue,
+          costo_domicilio: costoDomicilioValue,
+          domicilioOriginal: domicilioOriginal != null ? Number(domicilioOriginal) : null,
+          descuentoDomicilio: descuentoDomicilio != null ? Number(descuentoDomicilio) : null,
+          recargoLinkMonto: recargoLinkMonto != null ? Number(recargoLinkMonto) : null,
+          descuentoMonto: descuentoMonto != null ? Number(descuentoMonto) : null,
+          saldoFavorMonto: saldoFavorMonto != null ? Number(saldoFavorMonto) : null,
+          total: total != null ? Number(total) : null,
+          domicilioObsequiado: flagValue,
+          domicilio_obsequiado: flagValue,
+          domicilioObsequio: flagValue,
+          domicilioGratis: flagValue,
+          omitirCostoDomicilio: omitValue,
+          omitir_costo_domicilio: omitValue,
+          forzarRecalculoFinanciero: true,
         })
       });
     },
@@ -798,7 +882,8 @@ export function createApiClient(config) {
       });
     },
 
-    async cambiarEstadoProduccion({ produccionId, nuevoEstado, observacionesInternas }) {
+    async cambiarEstadoProduccion({ produccionId, nuevoEstado, observacionesInternas, usuarioCambio, origenCambio, cambioAdministrativo = false }) {
+      const nuevoEstadoCodigo = PRODUCTION_STATUS_CODE_BY_UI[nuevoEstado] || String(nuevoEstado || "").trim().toUpperCase();
       return requestJson(`/produccion/${produccionId}/estado`, {
         method: "PUT",
         headers: {
@@ -806,7 +891,13 @@ export function createApiClient(config) {
         },
         body: JSON.stringify({
           nuevoEstado,
-          observacionesInternas: observacionesInternas || null
+          nuevoEstadoCodigo,
+          codigoEstadoProduccion: nuevoEstadoCodigo,
+          observacionesInternas: observacionesInternas || null,
+          usuarioCambio: usuarioCambio || null,
+          origenCambio: origenCambio || null,
+          cambioAdministrativo: Boolean(cambioAdministrativo),
+          cambio_administrativo: Boolean(cambioAdministrativo)
         })
       });
     },
