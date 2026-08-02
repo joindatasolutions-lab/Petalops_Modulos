@@ -20,7 +20,7 @@ export const PIPELINE_COLUMNS = [
   { key: "entregado", title: "Entregado", stages: ["entregado"], dropStage: "entregado" },
   { key: "cancelado", title: "Cancelado", stages: ["cancelado"], dropStage: "cancelado" },
 ];
-export const STAGE_TO_ESTADO_ID = { creado: 1, aprobado: 2, pendiente_produccion: 3, en_produccion: 4, listo: 5, en_camino: 5, entregado: 20, cancelado: 6 };
+export const STAGE_TO_ESTADO_ID = { creado: 1, aprobado: 2, cancelado: 6 };
 export const PIPELINE_TABS = [
   { key: "pipeline", label: "Pipeline", icon: ClipboardList },
   { key: "historial", label: "Historial reasignaciones", icon: History },

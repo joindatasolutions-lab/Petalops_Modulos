@@ -151,7 +151,10 @@ export function PipelineOperativo({
 
   const onDropCard = async (pedidoId, stage) => {
     const estadoId = STAGE_TO_ESTADO_ID[stage];
-    if (!estadoId) return;
+    if (!estadoId) {
+      globalThis.alert("Este movimiento se gestiona desde Produccion o Domicilios para mantener la trazabilidad operativa.");
+      return;
+    }
     if (processingPedidoIds.includes(Number(pedidoId))) {
       globalThis.alert("Este pedido ya se esta actualizando. Espera un momento.");
       return;

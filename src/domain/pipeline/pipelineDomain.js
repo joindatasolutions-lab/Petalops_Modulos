@@ -83,7 +83,8 @@ export function getTimeStatus(tiempoRestante) {
 }
 export function formatProgress(progress) { return Math.max(0, Math.min(100, Number(progress || 0))); }
 export function isPickupOrder(item) {
-  const tipoEntrega = String(item?.tipo_entrega || "").toLowerCase();
+  if (item?.es_domicilio === false || item?.esDomicilio === false) return true;
+  const tipoEntrega = String(item?.tipo_entrega || item?.tipoEntrega || "").toLowerCase();
   return tipoEntrega.includes("recog") || tipoEntrega.includes("tienda");
 }
 export function normalizeCatalogItem(raw) {
