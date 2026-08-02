@@ -61,6 +61,8 @@ export function UsersManagementPage({
     clientes: onGoClientes,
     usuarios: onGoUsuarios,
   };
+  const isTenantsPanel = canViewUsuariosGlobal && users.activePanel === "tenants";
+  const isUsuariosPanel = !canViewUsuariosGlobal || users.activePanel === "usuarios";
 
   return (
     <div className={`app-shell ${users.sidebarPinned ? "is-sidebar-pinned" : ""} ${users.sidebarMobileOpen ? "is-sidebar-mobile-open" : ""}`}>
@@ -78,55 +80,78 @@ export function UsersManagementPage({
       <main className="orders-admin-view users-page-view">
         <header className="orders-admin-header orders-page-header users-page-header">
           <div>
-            <button type="button" className="sidebar-trigger" onClick={users.toggleSidebar}>☰ Menú</button>
+            <button type="button" className="sidebar-trigger" onClick={users.toggleSidebar}>Menu</button>
             <h1>Gestion de usuarios</h1>
             <p className="orders-admin-subtitle">Usuario: {users.displayUserName}</p>
           </div>
           <div className="header-actions">
-            <button type="button" className="btn-primary users-create-open-btn" onClick={() => users.setShowCreateModal(true)}>
-              <UserPlus size={18} strokeWidth={2} aria-hidden="true" />
-              Crear usuario
-            </button>
-            <button type="button" className="btn-primary orders-header-refresh" onClick={users.loadUsers} disabled={users.loading}>
+            {canViewUsuariosGlobal && isUsuariosPanel ? (
+              <button type="button" className="btn-secondary users-create-open-btn" onClick={() => users.setActivePanel("tenants")}>
+                <Building2 size={18} strokeWidth={2} aria-hidden="true" />
+                Nuevo tenant
+              </button>
+            ) : null}
+            {isUsuariosPanel ? (
+              <button type="button" className="btn-primary users-create-open-btn" onClick={() => users.setShowCreateModal(true)}>
+                <UserPlus size={18} strokeWidth={2} aria-hidden="true" />
+                Crear usuario
+              </button>
+            ) : null}
+            <button
+              type="button"
+              className="btn-primary orders-header-refresh"
+              onClick={isTenantsPanel ? users.loadEmpresasModuloResumen : users.loadUsers}
+              disabled={users.loading || users.empresasModulesLoading}
+            >
               <RefreshCw size={18} strokeWidth={2} aria-hidden="true" />
-              {users.loading ? "Actualizando..." : "Actualizar"}
+              {users.loading || users.empresasModulesLoading ? "Actualizando..." : "Actualizar"}
             </button>
           </div>
         </header>
 
-                {canViewUsuariosGlobal ? (
+        {canViewUsuariosGlobal ? (
           <nav className="users-section-tabs" aria-label="Secciones de gestion">
-            <button type="button" className={users.activePanel === "tenants" ? "is-active" : ""} onClick={() => users.setActivePanel("tenants")}>
+            <button type="button" className={isTenantsPanel ? "is-active" : ""} onClick={() => users.setActivePanel("tenants")}>
               <Building2 size={16} strokeWidth={2} aria-hidden="true" />
               Tenants
             </button>
-            <button type="button" className={users.activePanel === "usuarios" ? "is-active" : ""} onClick={() => users.setActivePanel("usuarios")}>
+            <button type="button" className={isUsuariosPanel ? "is-active" : ""} onClick={() => users.setActivePanel("usuarios")}>
               <UsersRound size={16} strokeWidth={2} aria-hidden="true" />
               Usuarios
             </button>
           </nav>
         ) : null}
-<UsersFilters
-          canViewUsuariosGlobal={canViewUsuariosGlobal}
-          empresaID={users.empresaID}
-          setEmpresaID={users.setEmpresaID}
-          empresaSeleccionadaNombre={users.empresaSeleccionadaNombre}
-          empresas={users.empresas}
-          sucursalID={users.sucursalID}
-          setSucursalID={users.setSucursalID}
-          sucursales={users.sucursales}
-          estadoFiltro={users.estadoFiltro}
-          setEstadoFiltro={users.setEstadoFiltro}
-          q={users.q}
-          setQ={users.setQ}
-        />
+
+        {isUsuariosPanel ? (
+          <UsersFilters
+            canViewUsuariosGlobal={canViewUsuariosGlobal}
+            empresaID={users.empresaID}
+            setEmpresaID={users.setEmpresaID}
+            empresaSeleccionadaNombre={users.empresaSeleccionadaNombre}
+            empresas={users.empresas}
+            sucursalID={users.sucursalID}
+            setSucursalID={users.setSucursalID}
+            sucursales={users.sucursales}
+            estadoFiltro={users.estadoFiltro}
+            setEstadoFiltro={users.setEstadoFiltro}
+            q={users.q}
+            setQ={users.setQ}
+          />
+        ) : null}
 
         {users.error ? <p className="orders-message">{users.error}</p> : null}
         {users.info ? <p className="orders-message">{users.info}</p> : null}
-        {users.loading ? <p className="orders-message">Cargando usuarios...</p> : null}
+        {users.loading && isUsuariosPanel ? <p className="orders-message">Cargando usuarios...</p> : null}
 
-        <section className="users-grid-layout">
-          {canViewUsuariosGlobal ? (
+        {isTenantsPanel ? (
+          <section className="users-tenants-layout">
+            <TenantCreatePanel
+              form={users.tenantForm}
+              setForm={users.setTenantForm}
+              saving={users.saving}
+              onSubmit={users.submitCreateTenant}
+            />
+
             <CompanyModulesPanel
               empresaID={users.empresaID}
               empresaSeleccionadaNombre={users.empresaSeleccionadaNombre}
@@ -143,21 +168,44 @@ export function UsersManagementPage({
               modulesSaving={users.modulesSaving}
               onSaveModules={users.saveModules}
             />
-          ) : null}
 
-          <UsersTable
-            items={users.items}
-            canViewUsuariosGlobal={canViewUsuariosGlobal}
-            sessionUserID={session?.userID}
-            onEdit={users.startEditUser}
-            onToggleEstado={users.toggleEstado}
-            onDelete={users.deleteUser}
-          />
-
-          {canViewUsuariosGlobal ? (
             <CompanyModulesSummaryTable loading={users.empresasModulesLoading} items={users.empresasModuloResumen} />
-          ) : null}
-        </section>
+          </section>
+        ) : (
+          <section className="users-grid-layout">
+            {canViewUsuariosGlobal ? (
+              <CompanyModulesPanel
+                empresaID={users.empresaID}
+                empresaSeleccionadaNombre={users.empresaSeleccionadaNombre}
+                empresas={users.empresas}
+                setEmpresaID={users.setEmpresaID}
+                modulesLoading={users.modulesLoading}
+                moduleItems={users.moduleItems}
+                onToggleModule={users.toggleModule}
+                showAdvancedModules={users.showAdvancedModules}
+                setShowAdvancedModules={users.setShowAdvancedModules}
+                newModulo={users.newModulo}
+                setNewModulo={users.setNewModulo}
+                onAddModulo={users.addModulo}
+                modulesSaving={users.modulesSaving}
+                onSaveModules={users.saveModules}
+              />
+            ) : null}
+
+            <UsersTable
+              items={users.items}
+              canViewUsuariosGlobal={canViewUsuariosGlobal}
+              sessionUserID={session?.userID}
+              onEdit={users.startEditUser}
+              onToggleEstado={users.toggleEstado}
+              onDelete={users.deleteUser}
+            />
+
+            {canViewUsuariosGlobal ? (
+              <CompanyModulesSummaryTable loading={users.empresasModulesLoading} items={users.empresasModuloResumen} />
+            ) : null}
+          </section>
+        )}
       </main>
 
       {users.showCreateModal ? (
