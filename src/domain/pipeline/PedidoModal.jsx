@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { buildProductoLabel, dedupeCatalogItems, getProductoCodigo, getProductoId, getProductoNombre, normalizeCatalogItem, normalizeTime, toDateInput } from "./pipelineDomain.js";
 
 export function PedidoModal({ item, detail, onClose, api, empresaId, sucursalId, onSaveEdit }) {
   const [isEditing, setIsEditing] = useState(false);
@@ -207,72 +208,3 @@ export function PedidoModal({ item, detail, onClose, api, empresaId, sucursalId,
     </div>
   );
 }
-
-function normalizeCatalogItem(raw) {
-  const id = getProductoId(raw);
-  if (id == null) return null;
-  return {
-    id,
-    codigo: getProductoCodigo(raw),
-    nombre: getProductoNombre(raw),
-  };
-}
-
-function getProductoId(raw) {
-  if (!raw || typeof raw !== "object") return null;
-  const candidates = [raw.productoID, raw.productoId, raw.id_producto, raw.idProducto, raw.id];
-  for (const value of candidates) {
-    if (value == null || value === "") continue;
-    const num = Number(value);
-    if (!Number.isNaN(num)) return num;
-  }
-  return null;
-}
-
-function getProductoCodigo(raw) {
-  if (!raw || typeof raw !== "object") return "";
-  return String(raw.codigoProducto || raw.codigo || raw.sku || "").trim();
-}
-
-function getProductoNombre(raw) {
-  if (!raw || typeof raw !== "object") return "";
-  return String(raw.nombreProducto || raw.nombre || raw.descripcion || "").trim();
-}
-
-function dedupeCatalogItems(items) {
-  const map = new Map();
-  for (const item of items) {
-    if (!item || item.id == null) continue;
-    map.set(String(item.id), item);
-  }
-  return Array.from(map.values());
-}
-
-function buildProductoLabel(producto) {
-  const codigo = String(producto?.codigo || "").trim();
-  const nombre = String(producto?.nombre || "").trim();
-  if (codigo && nombre) return `${codigo} - ${nombre}`;
-  if (nombre) return nombre;
-  if (codigo) return codigo;
-  return "Producto sin nombre";
-}
-
-function toDateInput(value) {
-  const text = String(value || "").trim();
-  if (!text) return "";
-  if (/^\d{4}-\d{2}-\d{2}$/.test(text)) return text;
-  const parsed = new Date(text);
-  if (Number.isNaN(parsed.getTime())) return "";
-  const y = parsed.getFullYear();
-  const m = String(parsed.getMonth() + 1).padStart(2, "0");
-  const d = String(parsed.getDate()).padStart(2, "0");
-  return `${y}-${m}-${d}`;
-}
-
-function normalizeTime(value) {
-  const text = String(value || "").trim();
-  if (!text) return "";
-  const match = text.match(/^(\d{2}:\d{2})/);
-  return match ? match[1] : "";
-}
-

@@ -1,34 +1,12 @@
 import { Bike, Building2, Calendar, Filter, Flower2, Search } from "lucide-react";
 
-const PIPELINE_STATE_OPTIONS = [
-  { value: "", label: "Todos los estados" },
-  { value: "creado", label: "Creado" },
-  { value: "aprobado", label: "Aprobado" },
-  { value: "pendiente_produccion", label: "Pendiente produccion" },
-  { value: "en_produccion", label: "En produccion" },
-  { value: "listo", label: "Listo" },
-  { value: "en_camino", label: "En camino" },
-  { value: "entregado", label: "Entregado" },
-  { value: "cancelado", label: "Cancelado" },
-  { value: "atrasados", label: "Solo atrasados" },
-  { value: "produccion", label: "Pendiente / En produccion" },
-];
+import { PIPELINE_STATE_OPTIONS } from "./pipelineConfig.jsx";
+import { applyEstadoFilterValue, resolveEstadoFiltro } from "./pipelineDomain.js";
 
 export function PipelineFilters({ filters, onChange }) {
-  const estadoFiltro = filters.soloAtrasados
-    ? "atrasados"
-    : filters.soloEnProduccion
-    ? "produccion"
-    : filters.estadoStage || "";
+  const estadoFiltro = resolveEstadoFiltro(filters);
 
-  const onEstadoChange = value => {
-    onChange("estadoStage", "");
-    onChange("soloAtrasados", value === "atrasados");
-    onChange("soloEnProduccion", value === "produccion");
-    if (value !== "atrasados" && value !== "produccion") {
-      onChange("estadoStage", value);
-    }
-  };
+  const onEstadoChange = value => applyEstadoFilterValue(value, onChange);
 
   const onFechaDesdeChange = value => {
     onChange("fechaDesde", value);
