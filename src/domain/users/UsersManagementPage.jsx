@@ -1,9 +1,10 @@
-import { RefreshCw, UserPlus } from "lucide-react";
+import { Building2, RefreshCw, UserPlus, UsersRound } from "lucide-react";
 
 import { AppSidebar } from "../../shared/AppSidebar.jsx";
 import { CompanyModulesPanel } from "./components/CompanyModulesPanel.jsx";
 import { CompanyModulesSummaryTable } from "./components/CompanyModulesSummaryTable.jsx";
 import { CreateUserModal, EditUserModal } from "./components/UserModals.jsx";
+import { TenantCreatePanel } from "./components/TenantCreatePanel.jsx";
 import { UsersFilters } from "./components/UsersFilters.jsx";
 import { UsersTable } from "./components/UsersTable.jsx";
 import { useUsersManagementController } from "./hooks/useUsersManagementController.js";
@@ -78,7 +79,7 @@ export function UsersManagementPage({
         <header className="orders-admin-header orders-page-header users-page-header">
           <div>
             <button type="button" className="sidebar-trigger" onClick={users.toggleSidebar}>☰ Menú</button>
-            <h1>Usuarios</h1>
+            <h1>Gestion de usuarios</h1>
             <p className="orders-admin-subtitle">Usuario: {users.displayUserName}</p>
           </div>
           <div className="header-actions">
@@ -93,7 +94,19 @@ export function UsersManagementPage({
           </div>
         </header>
 
-        <UsersFilters
+                {canViewUsuariosGlobal ? (
+          <nav className="users-section-tabs" aria-label="Secciones de gestion">
+            <button type="button" className={users.activePanel === "tenants" ? "is-active" : ""} onClick={() => users.setActivePanel("tenants")}>
+              <Building2 size={16} strokeWidth={2} aria-hidden="true" />
+              Tenants
+            </button>
+            <button type="button" className={users.activePanel === "usuarios" ? "is-active" : ""} onClick={() => users.setActivePanel("usuarios")}>
+              <UsersRound size={16} strokeWidth={2} aria-hidden="true" />
+              Usuarios
+            </button>
+          </nav>
+        ) : null}
+<UsersFilters
           canViewUsuariosGlobal={canViewUsuariosGlobal}
           empresaID={users.empresaID}
           setEmpresaID={users.setEmpresaID}
