@@ -1,4 +1,4 @@
-﻿import { Clock, DollarSign, MapPin, Package2, Store, User, Bike } from "lucide-react";
+﻿import { DollarSign, MapPin, Package2, Store, User, Bike } from "lucide-react";
 
 import { formatProgress, getTimeStatus, isPickupOrder, PRIORITY_CONFIG } from "./pipelineDomain.js";
 
@@ -65,13 +65,6 @@ export function PedidoCard({ item, stage, onOpen, onDragStart }) {
         </div>
       ) : null}
 
-      {/* Estado tiempo */}
-      {timeStatus.label !== "-" ? (
-        <div className={`pipeline-time-status ${timeStatus.className}`}>
-          <Clock size={11} strokeWidth={2} aria-hidden="true" />
-          <span>{timeStatus.label}</span>
-        </div>
-      ) : null}
 
       {/* Barra de progreso */}
       <div className="pipeline-progress-wrap" title={`Progreso: ${progressWidth}%`}>
@@ -86,3 +79,4 @@ export function PedidoCard({ item, stage, onOpen, onDragStart }) {
     </article>
   );
 }
+
