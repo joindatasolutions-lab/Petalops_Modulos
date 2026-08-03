@@ -18,11 +18,13 @@ export function UserForm({
   const isEdit = mode === "edit";
 
   return (
-    <form className="users-create-form users-create-user-form" onSubmit={onSubmit}>
+    <form className="users-create-form users-create-user-form" onSubmit={onSubmit} autoComplete="off">
       <input
         type="text"
         placeholder="Nombre completo"
         value={form.nombre}
+        name={isEdit ? "edit-user-name" : "new-user-name"}
+        autoComplete="off"
         onChange={event => setForm(current => ({ ...current, nombre: event.target.value }))}
         required
         autoFocus={!isEdit}
@@ -31,6 +33,8 @@ export function UserForm({
         type="text"
         placeholder="Login unico"
         value={form.login}
+        name={isEdit ? "edit-user-login" : "new-user-login"}
+        autoComplete="off"
         onChange={event => setForm(current => ({ ...current, login: event.target.value }))}
         required
       />
@@ -41,6 +45,8 @@ export function UserForm({
             type={passwordVisible ? "text" : "password"}
             placeholder="Nueva contrasena (opcional)"
             value={form.password}
+            name="edit-user-new-password"
+            autoComplete="new-password"
             onChange={event => setForm(current => ({ ...current, password: event.target.value }))}
           />
           <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
@@ -55,7 +61,9 @@ export function UserForm({
           type="password"
           placeholder="Contrasena"
           value={form.password}
-          onChange={event => setForm(current => ({ ...current, password: event.target.value }))}
+          name="new-user-password"
+            autoComplete="new-password"
+            onChange={event => setForm(current => ({ ...current, password: event.target.value }))}
           required
         />
       )}

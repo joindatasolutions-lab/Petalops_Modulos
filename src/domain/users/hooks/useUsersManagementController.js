@@ -92,13 +92,9 @@ export function useUsersManagementController({ session, canViewUsuariosGlobal })
     && editModulosCompatiblesRol.every(modulo => (editForm.modulosAcceso || []).includes(modulo));
 
   const resetForm = useCallback(() => {
-    setForm(current => UserFormModel.initial({
-      ...current,
-      rolID: current.rolID,
-      sucursalID: current.sucursalID,
-      modulosAcceso: modulosCompatiblesRol,
-    }));
-  }, [modulosCompatiblesRol]);
+    setForm(UserFormModel.initial());
+    setShowUserModuleDropdown(false);
+  }, []);
 
   const closeEditDrawer = useCallback(() => {
     setEditingUserId(null);
@@ -111,9 +107,16 @@ export function useUsersManagementController({ session, canViewUsuariosGlobal })
     }));
   }, []);
 
+  const openCreateModal = useCallback(() => {
+    setForm(UserFormModel.initial());
+    setShowUserModuleDropdown(false);
+    setShowCreateModal(true);
+  }, []);
+
   const closeCreateModal = useCallback(() => {
     setShowCreateModal(false);
     setShowUserModuleDropdown(false);
+    setForm(UserFormModel.initial());
   }, []);
 
   const selectedUserModulesCount = (form.modulosAcceso || []).length;
@@ -666,6 +669,7 @@ export function useUsersManagementController({ session, canViewUsuariosGlobal })
     setShowAdvancedModules,
     showCreateModal,
     setShowCreateModal,
+    openCreateModal,
     editingUserId,
     editForm,
     showEditDrawer,
