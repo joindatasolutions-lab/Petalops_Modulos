@@ -4444,3 +4444,38 @@
     align-items: center;
   }
 }
+
+.users-modal-tenant-picker {
+  display: grid;
+  gap: 6px;
+  margin-top: 12px;
+  max-width: min(100%, 520px);
+}
+
+.users-modal-tenant-picker span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #5f293f;
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.users-modal-tenant-picker select {
+  width: 100%;
+  min-width: 0;
+  min-height: 42px;
+  border: 1px solid #dfd8dc;
+  border-radius: 12px;
+  background: #fff;
+  color: #1f2937;
+  padding: 0 12px;
+  font-size: 14px;
+  text-overflow: ellipsis;
+}
+
+@media (max-width: 640px) {
+  .users-modal-tenant-picker {
+    max-width: none;
+  }
+}

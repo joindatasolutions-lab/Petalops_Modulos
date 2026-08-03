@@ -88,7 +88,7 @@ export function UsersManagementPage({
             {canViewUsuariosGlobal && isUsuariosPanel ? (
               <button type="button" className="btn-secondary users-create-open-btn" onClick={() => users.setActivePanel("tenants")}>
                 <Building2 size={18} strokeWidth={2} aria-hidden="true" />
-                Nuevo tenant
+                Crear empresa / tenant
               </button>
             ) : null}
             {isUsuariosPanel ? (
@@ -113,7 +113,7 @@ export function UsersManagementPage({
           <nav className="users-section-tabs" aria-label="Secciones de gestion">
             <button type="button" className={isTenantsPanel ? "is-active" : ""} onClick={() => users.setActivePanel("tenants")}>
               <Building2 size={16} strokeWidth={2} aria-hidden="true" />
-              Tenants
+              Empresas / tenants
             </button>
             <button type="button" className={isUsuariosPanel ? "is-active" : ""} onClick={() => users.setActivePanel("usuarios")}>
               <UsersRound size={16} strokeWidth={2} aria-hidden="true" />
@@ -212,6 +212,8 @@ export function UsersManagementPage({
         <CreateUserModal
           empresaSeleccionadaNombre={users.empresaSeleccionadaNombre}
           empresaID={users.empresaID}
+          empresas={users.empresas}
+          setEmpresaID={users.setEmpresaID}
           canViewUsuariosGlobal={canViewUsuariosGlobal}
           onClose={users.closeCreateModal}
           formProps={users.createFormProps}
