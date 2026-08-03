@@ -92,7 +92,7 @@ export function UsersManagementPage({
               </button>
             ) : null}
             {isUsuariosPanel ? (
-              <button type="button" className="btn-primary users-create-open-btn" onClick={() => users.setShowCreateModal(true)}>
+              <button type="button" className="btn-primary users-create-open-btn" onClick={users.openCreateModal}>
                 <UserPlus size={18} strokeWidth={2} aria-hidden="true" />
                 Crear usuario
               </button>
