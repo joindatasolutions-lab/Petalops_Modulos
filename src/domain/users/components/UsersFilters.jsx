@@ -21,7 +21,7 @@ export function UsersFilters({
           <div className="orders-filter-control">
             <Building2 size={17} strokeWidth={2} aria-hidden="true" />
             <select value={empresaID} onChange={event => setEmpresaID(Number(event.target.value))}>
-              {empresas.map(item => <option key={item.empresaID} value={item.empresaID}>{item.nombre}</option>)}
+              {empresas.map(item => <option key={item.empresaID} value={item.empresaID}>{item.empresaSlug ? `${item.nombre} (ID ${item.empresaID} - ${item.empresaSlug})` : `${item.nombre} (ID ${item.empresaID})`}</option>)}
             </select>
           </div>
         </div>

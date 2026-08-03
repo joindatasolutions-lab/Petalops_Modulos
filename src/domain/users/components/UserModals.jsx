@@ -1,10 +1,12 @@
-import { X } from "lucide-react";
+import { Building2, X } from "lucide-react";
 
 import { UserForm } from "./UserForm.jsx";
 
 export function CreateUserModal({
   empresaSeleccionadaNombre,
   empresaID,
+  empresas = [],
+  setEmpresaID,
   canViewUsuariosGlobal,
   onClose,
   formProps,
@@ -24,6 +26,18 @@ export function CreateUserModal({
             <h3 id="users-create-modal-title">Nuevo usuario</h3>
             <p className="orders-admin-subtitle">Empresa objetivo: <strong>{empresaSeleccionadaNombre}</strong> (ID {empresaID}).</p>
             {canViewUsuariosGlobal ? <p className="orders-admin-subtitle">Esta pantalla crea usuarios, no empresas nuevas.</p> : null}
+            {canViewUsuariosGlobal ? (
+              <label className="users-modal-tenant-picker">
+                <span><Building2 size={15} strokeWidth={2} aria-hidden="true" /> Tenant para el nuevo usuario</span>
+                <select value={empresaID} onChange={event => setEmpresaID?.(Number(event.target.value))}>
+                  {empresas.map(item => (
+                    <option key={item.empresaID} value={item.empresaID}>
+                      {item.empresaSlug ? `${item.nombre} (ID ${item.empresaID} - ${item.empresaSlug})` : `${item.nombre} (ID ${item.empresaID})`}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            ) : null}
           </div>
           <button type="button" className="users-modal-close" onClick={onClose} aria-label="Cerrar crear usuario">
             <X size={18} strokeWidth={2.4} aria-hidden="true" />
@@ -48,7 +62,7 @@ export function EditUserModal({
     <>
       <button
         type="button"
-        aria-label="Cerrar edición de usuario"
+        aria-label="Cerrar edicion de usuario"
         onClick={onClose}
         style={{
           position: "fixed",
@@ -62,7 +76,7 @@ export function EditUserModal({
         }}
       />
       <section
-        aria-label="Panel de edición de usuario"
+        aria-label="Panel de edicion de usuario"
         style={{
           position: "fixed",
           top: "50%",

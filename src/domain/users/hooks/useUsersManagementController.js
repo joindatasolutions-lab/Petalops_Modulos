@@ -26,6 +26,7 @@ export function useUsersManagementController({ session, canViewUsuariosGlobal })
   const [estadoFiltro, setEstadoFiltro] = useState("");
   const [q, setQ] = useState("");
   const [activePanel, setActivePanel] = useState(canViewUsuariosGlobal ? "tenants" : "usuarios");
+  const [showTenantCreatePanel, setShowTenantCreatePanel] = useState(false);
 
   const [items, setItems] = useState([]);
   const [empresas, setEmpresas] = useState([]);
@@ -349,7 +350,8 @@ export function useUsersManagementController({ session, canViewUsuariosGlobal })
         adminPassword: "",
         adminEmail: "",
       });
-      setActivePanel("usuarios");
+      setActivePanel("tenants");
+      setShowTenantCreatePanel(false);
       setInfo(`Tenant ${nombreComercial} creado con admin ${adminLogin}.`);
     } catch (nextError) {
       console.error("Error creando tenant:", nextError);
@@ -635,6 +637,8 @@ export function useUsersManagementController({ session, canViewUsuariosGlobal })
     setActivePanel,
     tenantForm,
     setTenantForm,
+    showTenantCreatePanel,
+    setShowTenantCreatePanel,
     submitCreateTenant,
     empresaID,
     setEmpresaID,

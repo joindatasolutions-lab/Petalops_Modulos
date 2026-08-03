@@ -85,8 +85,8 @@ export function UsersManagementPage({
             <p className="orders-admin-subtitle">Usuario: {users.displayUserName}</p>
           </div>
           <div className="header-actions">
-            {canViewUsuariosGlobal && isUsuariosPanel ? (
-              <button type="button" className="btn-secondary users-create-open-btn" onClick={() => users.setActivePanel("tenants")}>
+            {isTenantsPanel ? (
+              <button type="button" className="btn-primary users-create-open-btn" onClick={() => users.setShowTenantCreatePanel(true)}>
                 <Building2 size={18} strokeWidth={2} aria-hidden="true" />
                 Nuevo tenant
               </button>
@@ -113,7 +113,7 @@ export function UsersManagementPage({
           <nav className="users-section-tabs" aria-label="Secciones de gestion">
             <button type="button" className={isTenantsPanel ? "is-active" : ""} onClick={() => users.setActivePanel("tenants")}>
               <Building2 size={16} strokeWidth={2} aria-hidden="true" />
-              Tenants
+              Empresas / tenants
             </button>
             <button type="button" className={isUsuariosPanel ? "is-active" : ""} onClick={() => users.setActivePanel("usuarios")}>
               <UsersRound size={16} strokeWidth={2} aria-hidden="true" />
@@ -145,12 +145,14 @@ export function UsersManagementPage({
 
         {isTenantsPanel ? (
           <section className="users-tenants-layout">
-            <TenantCreatePanel
-              form={users.tenantForm}
-              setForm={users.setTenantForm}
-              saving={users.saving}
-              onSubmit={users.submitCreateTenant}
-            />
+            {users.showTenantCreatePanel ? (
+              <TenantCreatePanel
+                form={users.tenantForm}
+                setForm={users.setTenantForm}
+                saving={users.saving}
+                onSubmit={users.submitCreateTenant}
+              />
+            ) : null}
 
             <CompanyModulesPanel
               empresaID={users.empresaID}
@@ -172,26 +174,7 @@ export function UsersManagementPage({
             <CompanyModulesSummaryTable loading={users.empresasModulesLoading} items={users.empresasModuloResumen} />
           </section>
         ) : (
-          <section className="users-grid-layout">
-            {canViewUsuariosGlobal ? (
-              <CompanyModulesPanel
-                empresaID={users.empresaID}
-                empresaSeleccionadaNombre={users.empresaSeleccionadaNombre}
-                empresas={users.empresas}
-                setEmpresaID={users.setEmpresaID}
-                modulesLoading={users.modulesLoading}
-                moduleItems={users.moduleItems}
-                onToggleModule={users.toggleModule}
-                showAdvancedModules={users.showAdvancedModules}
-                setShowAdvancedModules={users.setShowAdvancedModules}
-                newModulo={users.newModulo}
-                setNewModulo={users.setNewModulo}
-                onAddModulo={users.addModulo}
-                modulesSaving={users.modulesSaving}
-                onSaveModules={users.saveModules}
-              />
-            ) : null}
-
+          <section className="users-grid-layout users-list-layout">
             <UsersTable
               items={users.items}
               canViewUsuariosGlobal={canViewUsuariosGlobal}
@@ -200,10 +183,6 @@ export function UsersManagementPage({
               onToggleEstado={users.toggleEstado}
               onDelete={users.deleteUser}
             />
-
-            {canViewUsuariosGlobal ? (
-              <CompanyModulesSummaryTable loading={users.empresasModulesLoading} items={users.empresasModuloResumen} />
-            ) : null}
           </section>
         )}
       </main>
@@ -212,6 +191,8 @@ export function UsersManagementPage({
         <CreateUserModal
           empresaSeleccionadaNombre={users.empresaSeleccionadaNombre}
           empresaID={users.empresaID}
+          empresas={users.empresas}
+          setEmpresaID={users.setEmpresaID}
           canViewUsuariosGlobal={canViewUsuariosGlobal}
           onClose={users.closeCreateModal}
           formProps={users.createFormProps}
