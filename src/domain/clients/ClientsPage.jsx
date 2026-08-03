@@ -5,9 +5,11 @@ import { createApiClient } from "../../infrastructure/apiClient.js";
 import { AppSidebar } from "../../shared/AppSidebar.jsx";
 import { useSidebarState } from "../../shared/useSidebarState.js";
 import { todayIsoDateBogota } from "../../shared/utils.js";
+import { buildPaginationItems } from "../orders-admin/ordersDomain.js";
 import { ClientDrawer } from "./ClientDrawer.jsx";
 import { ClientsHeader } from "./ClientsHeader.jsx";
 import { ClientsMetricsView } from "./ClientsMetricsView.jsx";
+import { ClientsPager } from "./ClientsPager.jsx";
 import { ClientsTableView } from "./ClientsTableView.jsx";
 import {
   INITIAL_CLIENT_FORM,
@@ -18,6 +20,8 @@ import {
   clientToForm,
   isEmpresaAdminRole,
 } from "./clientsDomain.js";
+
+const CLIENTS_PAGE_SIZE = 50;
 
 export function ClientsPage({
   session,
@@ -54,11 +58,27 @@ export function ClientsPage({
   const [info, setInfo] = useState("");
   const [items, setItems] = useState([]);
   const [q, setQ] = useState("");
+  const [page, setPage] = useState(1);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [editingClienteId, setEditingClienteId] = useState(null);
   const [form, setForm] = useState(INITIAL_CLIENT_FORM);
   const clientsMenuRef = useRef(null);
   const clientsIntelligence = useMemo(() => buildClientsIntelligence(items), [items]);
+
+  // Paginacion en cliente sobre la lista ya cargada (items completo sigue intacto
+  // para busqueda, metricas y exportacion a Excel).
+  const totalPages = Math.max(1, Math.ceil(items.length / CLIENTS_PAGE_SIZE));
+  const pagerItems = useMemo(() => buildPaginationItems(page, totalPages), [page, totalPages]);
+  const pagedItems = useMemo(
+    () => items.slice((page - 1) * CLIENTS_PAGE_SIZE, page * CLIENTS_PAGE_SIZE),
+    [items, page]
+  );
+  const visibleFrom = items.length > 0 ? (page - 1) * CLIENTS_PAGE_SIZE + 1 : 0;
+  const visibleTo = items.length > 0 ? Math.min(items.length, (page - 1) * CLIENTS_PAGE_SIZE + pagedItems.length) : 0;
+
+  useEffect(() => {
+    setPage(1);
+  }, [items]);
 
   const loadClientes = useCallback(async () => {
     setLoading(true);
@@ -233,7 +253,18 @@ export function ClientsPage({
         {activeView === "metricas" ? (
           <ClientsMetricsView clientsIntelligence={clientsIntelligence} itemsCount={items.length} loading={loading} onExport={exportMetricasExcel} />
         ) : (
-          <ClientsTableView canManageClients={canManageClients} items={items} q={q} onEdit={openEdit} onExport={exportClientesExcel} onSearchChange={setQ} />
+          <>
+            <ClientsTableView canManageClients={canManageClients} items={pagedItems} q={q} onEdit={openEdit} onExport={exportClientesExcel} onSearchChange={setQ} />
+            <ClientsPager
+              total={items.length}
+              visibleFrom={visibleFrom}
+              visibleTo={visibleTo}
+              page={page}
+              pages={totalPages}
+              pagerItems={pagerItems}
+              onPageChange={setPage}
+            />
+          </>
         )}
       </main>
 

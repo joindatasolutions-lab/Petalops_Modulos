@@ -71,3 +71,33 @@ Reduccion:
 
 - Fue necesario ejecutar `npm install` porque `node_modules` estaba incompleto y faltaba `recharts`; no se dejaron cambios en `package.json` ni `package-lock.json`.
 - Quedaron fuera del cambio los archivos sin trackear existentes: `.env` y el archivo `.parquet`.
+
+## Paginacion real de la tabla (50 por pagina)
+
+Motivado por el punto 9 del documento de arquitectura del backend ("sin paginación consistente"): Flora ya tiene 2409 clientes reales, y `ClientsTableView` los renderizaba todos de una sola vez en una tabla plana sin virtualizar.
+
+### Decision de diseno: paginacion en cliente, no en el fetch
+
+Se evaluo hacer paginacion real contra el backend (que ya soporta `page`/`pageSize` desde el punto 9 del backend), pero se opto por paginar **la lista ya cargada en memoria** (`items`) en vez de cambiar la llamada a `api.listarClientes`, porque:
+
+- `clientsIntelligence` (metricas) y `exportClientesExcel`/`exportMetricasExcel` (Excel) necesitan la lista **completa**, no solo la pagina visible. Paginar el fetch hubiera roto ambas funciones (metricas y export solo verian los primeros 50) a menos que se agregara logica adicional para volver a traer todo en esos casos.
+- El backend ya devuelve toda la lista de una empresa en un solo request (acotado a 3000 por defecto, ver `pendientes/Mejoras/paginacion-fase1-clientes-inventario.md` en el repo de la API), asi que no hay ganancia real de red al paginar el fetch todavia.
+
+Con esto, `items` (estado completo) sigue alimentando busqueda, metricas y exportacion exactamente igual que antes. Solo se agrego `pagedItems` (un `slice` de `items`) para lo que se le pasa a `ClientsTableView`.
+
+### Cambios
+
+- `src/domain/clients/ClientsPager.jsx` (nuevo): componente de paginacion, mismo patron visual que `OrdersPager.jsx` (reutiliza las clases CSS ya existentes `records-pager*`, sin CSS nuevo).
+- `src/domain/clients/ClientsPage.jsx`:
+  - Nueva constante `CLIENTS_PAGE_SIZE = 50`.
+  - Nuevo estado `page`, reseteado a 1 cada vez que `items` cambia (nueva busqueda o recarga).
+  - `pagedItems` (slice de `items` para la pagina actual) se pasa a `ClientsTableView` en vez de `items`.
+  - `clientsIntelligence`, `exportClientesExcel`, `exportMetricasExcel` y el conteo en `ClientsMetricsView` siguen usando `items` completo, sin cambios.
+  - Se reutiliza `buildPaginationItems` de `../orders-admin/ordersDomain.js` (funcion pura ya usada por el paginador de pedidos) para los numeros de pagina.
+
+### Validado
+
+- `npm run build`: OK, sin errores de compilacion ni imports rotos.
+- `npm test`: OK, 9 archivos de prueba y 76 pruebas pasaron (nada se rompio).
+- Simulacion en Node de la matematica de paginacion con datos reales: 2409 clientes (Flora) -> 49 paginas, pagina 1 muestra 1-50, ultima pagina muestra 2401-2409 (9 items); 18 clientes (Petalops) -> 1 sola pagina, paginador oculto (`pages <= 1`), comportamiento identico al actual.
+- Busqueda, edicion, creacion y exportacion a Excel no se tocaron — siguen usando la lista completa (`items`), no la pagina visible.
