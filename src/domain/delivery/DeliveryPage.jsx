@@ -158,6 +158,17 @@ const DEFAULT_DELIVERY_FORM = {
   reprogramarPara: "",
 };
 
+const DEFAULT_STATUS_FORM = {
+  estado: "en-ruta",
+  firmaNombre: "",
+  firmaDocumento: "",
+  firmaImagenFile: null,
+  evidenciaFotoFile: null,
+  motivo: "",
+  reprogramarPara: "",
+  observaciones: "",
+};
+
 const DEFAULT_COURIER_FORM = {
   nombre: "",
   telefono: "",
@@ -333,6 +344,63 @@ function isDeliveryAllowedPedidoStatus(item) {
   const status = normalizeStatus(raw).replace(/_/g, "");
   if (!status) return true;
   return status !== "CREADO";
+}
+
+function deliveryProductionStatusValues(item) {
+  const candidates = [
+    item?.estadoProduccion,
+    item?.estado_produccion,
+    item?.estadoProduccionCodigo,
+    item?.estado_produccion_codigo,
+    item?.codigoEstadoProduccion,
+    item?.codigo_estado_produccion,
+    item?.estadoProduccionNombre,
+    item?.estado_produccion_nombre,
+    item?.nombreEstadoProduccion,
+    item?.nombre_estado_produccion,
+    item?.produccion?.estado,
+    item?.produccion?.estadoProduccion,
+    item?.produccion?.estado_produccion,
+    item?.produccion?.estadoProduccionCodigo,
+    item?.produccion?.estado_produccion_codigo,
+  ];
+
+  const nestedProductions = [
+    item?.producciones,
+    item?.produccionItems,
+    item?.produccion_items,
+    item?.itemsProduccion,
+    item?.items_produccion,
+  ];
+
+  for (const list of nestedProductions) {
+    if (!Array.isArray(list)) continue;
+    for (const production of list) {
+      candidates.push(
+        production?.estado,
+        production?.estadoProduccion,
+        production?.estado_produccion,
+        production?.estadoProduccionCodigo,
+        production?.estado_produccion_codigo,
+        production?.codigoEstadoProduccion,
+        production?.codigo_estado_produccion,
+        production?.estadoProduccionNombre,
+        production?.estado_produccion_nombre,
+        production?.nombreEstadoProduccion,
+        production?.nombre_estado_produccion
+      );
+    }
+  }
+
+  return candidates
+    .map(value => compactStatusValue(value))
+    .filter(Boolean);
+}
+
+export function isDeliveryAllowedProductionStatus(item) {
+  const statuses = deliveryProductionStatusValues(item);
+  if (statuses.length === 0) return true;
+  return statuses.every(status => status === "PARAENTREGA");
 }
 
 function isDeliveryTimeLate(item) {
@@ -663,6 +731,170 @@ function deliveryNoveltyLabelForItem(item, index = 0) {
   return "";
 }
 
+function deliveryFirstText(...values) {
+  return values.map(value => String(value || "").trim()).find(Boolean) || "";
+}
+
+function normalizeDeliveryAssetUrl(value) {
+  const text = String(value || "").trim();
+  if (!text) return "";
+  if (/^(https?:)?\/\//i.test(text) || text.startsWith("data:") || text.startsWith("blob:")) return text;
+  const base = String(tenantConfig.apiBaseUrl || "").replace(/\/+$/, "");
+  const path = text.startsWith("/") ? text : `/${text}`;
+  return base ? `${base}${path}` : path;
+}
+
+function deliveryEvidenceUrlFrom(value) {
+  if (!value) return "";
+  if (typeof value === "string") return normalizeDeliveryAssetUrl(value);
+  return normalizeDeliveryAssetUrl(
+    value.url
+    || value.urlEvidencia
+    || value.url_evidencia
+    || value.evidenciaUrl
+    || value.evidencia_url
+    || value.imagenUrl
+    || value.imagen_url
+    || value.fotoUrl
+    || value.foto_url
+    || value.archivoUrl
+    || value.archivo_url
+    || value.fileUrl
+    || value.file_url
+  );
+}
+
+function deliveryEvidenceLabelFrom(value, fallback = "Evidencia") {
+  if (!value || typeof value !== "object") return fallback;
+  return deliveryFirstText(
+    value.tipo,
+    value.tipoEvidencia,
+    value.tipo_evidencia,
+    value.nombre,
+    value.titulo,
+    fallback
+  );
+}
+
+function deliveryEvidenceDateFrom(value) {
+  if (!value || typeof value !== "object") return "";
+  const raw = value.fecha
+    || value.fechaCreacion
+    || value.fecha_creacion
+    || value.createdAt
+    || value.created_at
+    || value.fechaEntrega
+    || value.fecha_entrega;
+  return [formatDateOnly(raw), formatTimeOnly(raw)].filter(Boolean).join(" · ");
+}
+
+function buildDeliveryEvidenceRecords(item) {
+  const records = [];
+  const directEvidence = [
+    ["Firma", item?.firmaImagenUrl || item?.firma_imagen_url || item?.firmaimagenurl || item?.firma || item?.firmaUrl || item?.firma_url],
+    ["Foto de entrega", item?.evidenciaFotoUrl || item?.evidencia_foto_url || item?.fotoEntregaUrl || item?.foto_entrega_url || item?.fotoEvidenciaUrl || item?.foto_evidencia_url],
+    ["Foto", item?.fotoUrl || item?.foto_url || item?.urlFoto || item?.url_foto || item?.foto],
+  ];
+
+  directEvidence.forEach(([label, rawUrl]) => {
+    const url = deliveryEvidenceUrlFrom(rawUrl);
+    if (!url) return;
+    records.push({
+      key: `${label}-${url}`,
+      label,
+      url,
+      date: deliveryDateTimeLabel(item),
+      note: label === "Firma" ? deliveryFirstText(item?.firmaNombre, item?.firma_nombre, item?.recibidoPor, item?.recibido_por) : "",
+    });
+  });
+
+  const nestedSources = [
+    item?.evidencias,
+    item?.evidenciasEntrega,
+    item?.evidencias_entrega,
+    item?.evidenciaFotos,
+    item?.evidencia_fotos,
+    item?.archivosEvidencia,
+    item?.archivos_evidencia,
+  ];
+
+  nestedSources.forEach(source => {
+    if (!Array.isArray(source)) return;
+    source.forEach((evidence, index) => {
+      const url = deliveryEvidenceUrlFrom(evidence);
+      if (!url) return;
+      records.push({
+        key: `${url}-${index}`,
+        label: deliveryEvidenceLabelFrom(evidence, `Evidencia ${index + 1}`),
+        url,
+        date: deliveryEvidenceDateFrom(evidence),
+        note: deliveryFirstText(evidence?.observacion, evidence?.observaciones, evidence?.nota, evidence?.descripcion),
+      });
+    });
+  });
+
+  const unique = new Map();
+  records.forEach(record => {
+    if (!record.url) return;
+    unique.set(`${record.label}-${record.url}`, record);
+  });
+  return Array.from(unique.values());
+}
+
+function buildDeliveryNoveltyRecords(item) {
+  const rows = [];
+  const nestedSources = [
+    item?.novedades,
+    item?.novedadesEntrega,
+    item?.novedades_entrega,
+    item?.historialNovedades,
+    item?.historial_novedades,
+  ];
+
+  nestedSources.forEach(source => {
+    if (!Array.isArray(source)) return;
+    source.forEach((novelty, index) => {
+      const label = formatDeliveryNoveltyLabel(deliveryNoveltyRawLabel(novelty) || novelty?.tipo || novelty?.titulo || "Novedad");
+      const eventDate = novelty?.fecha || novelty?.fechaNovedad || novelty?.fecha_novedad || novelty?.createdAt || novelty?.created_at;
+      rows.push({
+        key: novelty?.idNovedad || novelty?.id_novedad || `${label}-${index}`,
+        label,
+        status: deliveryFirstText(novelty?.estadoNovedad, novelty?.estado_novedad, novelty?.estado, deliveryNoveltyStatusMeta(item).label),
+        observation: deliveryNoveltyObservation(novelty),
+        time: [formatDateOnly(eventDate), formatTimeOnly(eventDate)].filter(Boolean).join(" · "),
+      });
+    });
+  });
+
+  const directLabel = deliveryNoveltyLabelForItem(item);
+  if (directLabel) {
+    rows.unshift({
+      key: `actual-${deliveryItemKey(item) || directLabel}`,
+      label: directLabel,
+      status: deliveryNoveltyStatusMeta(item).label,
+      observation: deliveryNoveltyObservation(item),
+      time: deliveryDateTimeLabel(item),
+    });
+  }
+
+  return rows;
+}
+
+function buildDeliveryEvidenceSummary(item) {
+  return {
+    order: deliveryOrderCodeLabel(item),
+    arrangement: deliveryArrangementName(item) || "Arreglo sin nombre",
+    client: item?.cliente || item?.destinatario || item?.nombreCliente || item?.nombre_cliente || "Cliente sin nombre",
+    courier: courierName(item),
+    status: deliveryStatusMeta(item).label,
+    receivedBy: deliveryFirstText(item?.firmaNombre, item?.firma_nombre, item?.recibidoPor, item?.recibido_por, item?.nombreRecibe, item?.nombre_recibe),
+    receivedDocument: deliveryFirstText(item?.firmaDocumento, item?.firma_documento, item?.documentoRecibe, item?.documento_recibe),
+    observations: deliveryFirstText(item?.observaciones, item?.observacion, item?.notas, item?.mensaje),
+    evidences: buildDeliveryEvidenceRecords(item),
+    novelties: buildDeliveryNoveltyRecords(item),
+  };
+}
+
 function courierInitials(name) {
   const parts = String(name || "D").trim().split(/\s+/).filter(Boolean);
   if (parts.length === 0) return "D";
@@ -774,7 +1006,11 @@ export function isStorePickupDelivery(item) {
 }
 
 function filterDomicilioItems(items) {
-  return (Array.isArray(items) ? items : []).filter(item => !isStorePickupDelivery(item) && isDeliveryAllowedPedidoStatus(item));
+  return (Array.isArray(items) ? items : []).filter(item => (
+    !isStorePickupDelivery(item)
+    && isDeliveryAllowedPedidoStatus(item)
+    && isDeliveryAllowedProductionStatus(item)
+  ));
 }
 
 export function deliveryArrangementName(item) {
@@ -1424,6 +1660,10 @@ export function DeliveryPage({
   const [noveltyResolveError, setNoveltyResolveError] = useState("");
   const [courierSearch, setCourierSearch] = useState("");
   const [openDeliveryActionsKey, setOpenDeliveryActionsKey] = useState("");
+  const [evidenceModalItem, setEvidenceModalItem] = useState(null);
+  const [noveltiesModalItem, setNoveltiesModalItem] = useState(null);
+  const [statusModalItem, setStatusModalItem] = useState(null);
+  const [statusForm, setStatusForm] = useState(DEFAULT_STATUS_FORM);
 
   const [modo, setModo] = useState("admin");
   const [domiciliarioId, setDomiciliarioId] = useState("");
@@ -1464,6 +1704,18 @@ export function DeliveryPage({
   );
 
   const myOrdersGrouped = useMemo(() => partitionMyOrders(myOrdersItems), [myOrdersItems]);
+  const evidenceModalSummary = useMemo(
+    () => evidenceModalItem ? buildDeliveryEvidenceSummary(evidenceModalItem) : null,
+    [evidenceModalItem]
+  );
+  const noveltiesModalSummary = useMemo(
+    () => noveltiesModalItem ? buildDeliveryEvidenceSummary(noveltiesModalItem) : null,
+    [noveltiesModalItem]
+  );
+  const statusModalSummary = useMemo(
+    () => statusModalItem ? buildDeliveryEvidenceSummary(statusModalItem) : null,
+    [statusModalItem]
+  );
   const selectedDeliveryRawStatus = deliveryRawStatus(selectedDeliveryItem);
   const selectedDeliveryState = normalizeStatus(selectedDeliveryRawStatus.code || selectedDeliveryRawStatus.name);
   const currentDomiciliarioId = useMemo(
@@ -2006,6 +2258,87 @@ export function DeliveryPage({
     }
     const msg = encodeURIComponent(item?.mensaje || "Hola, vamos en camino con tu pedido.");
     globalThis.open(`https://wa.me/${phone}?text=${msg}`, "_blank", "noreferrer");
+  };
+
+  const openStatusModal = item => {
+    if (!item) return;
+    setError("");
+    setStatusModalItem(item);
+    setStatusForm(DEFAULT_STATUS_FORM);
+  };
+
+  const closeStatusModal = () => {
+    setStatusModalItem(null);
+    setStatusForm(DEFAULT_STATUS_FORM);
+  };
+
+  const refreshDeliveryListsAfterStatusChange = async () => {
+    await Promise.allSettled([
+      loadAdmin(),
+      loadMyOrders(),
+    ]);
+  };
+
+  const onSaveStatusChange = async () => {
+    if (!statusModalItem?.idEntrega) {
+      setError("No fue posible identificar la entrega para cambiar el estado.");
+      return;
+    }
+
+    const entregaId = statusModalItem.idEntrega;
+    const nextStatus = statusForm.estado;
+    setError("");
+    setBusy(`estado-${entregaId}`);
+
+    try {
+      if (nextStatus === "en-ruta") {
+        await api.marcarEntregaEnRuta({ entregaId, usuarioCambio });
+        setFeedback("Pedido marcado como en ruta.");
+      } else if (nextStatus === "entregado") {
+        if (!statusForm.firmaNombre.trim() || !statusForm.firmaDocumento.trim()) {
+          setError("Completa nombre y documento de quien recibe.");
+          return;
+        }
+        if (!statusForm.firmaImagenFile) {
+          setError("Adjunta la evidencia de firma para marcar entregado.");
+          return;
+        }
+        const coords = await withCoords("marcar el pedido como entregado");
+        await api.marcarEntregaEntregado({
+          entregaId,
+          usuarioCambio,
+          firmaNombre: statusForm.firmaNombre.trim(),
+          firmaDocumento: statusForm.firmaDocumento.trim(),
+          firmaImagenFile: statusForm.firmaImagenFile,
+          evidenciaFotoFile: statusForm.evidenciaFotoFile,
+          latitudEntrega: coords.lat,
+          longitudEntrega: coords.lng,
+          observaciones: statusForm.observaciones.trim(),
+        });
+        setFeedback("Pedido marcado como entregado.");
+      } else if (nextStatus === "no-entregado") {
+        if (!statusForm.motivo.trim()) {
+          setError("Registra el motivo para marcar no entregado.");
+          return;
+        }
+        await api.marcarEntregaNoEntregado({
+          entregaId,
+          usuarioCambio,
+          motivo: statusForm.motivo.trim(),
+          reprogramarPara: toReprogramarIso(statusForm.reprogramarPara),
+          observaciones: statusForm.observaciones.trim(),
+        });
+        setFeedback("Pedido marcado como no entregado.");
+      }
+
+      closeStatusModal();
+      await refreshDeliveryListsAfterStatusChange();
+    } catch (nextError) {
+      console.error("Error cambiando estado de entrega:", nextError);
+      setError(buildActionErrorMessage(nextError, "No fue posible cambiar el estado del pedido."));
+    } finally {
+      clearBusy();
+    }
   };
 
   const onSaveNoveltyDraft = () => {
@@ -3197,14 +3530,14 @@ export function DeliveryPage({
                             </button>
                             {openDeliveryActionsKey === itemKey ? (
                               <div className="orders-row-menu-panel delivery-actions-menu-panel">
-                                <button type="button" className="orders-row-menu-item" onClick={() => { setOpenDeliveryActionsKey(""); handleModeChange("metricas"); }}>
-                                  <Route size={15} /> Ir a metricas
+                                <button type="button" className="orders-row-menu-item" onClick={() => { setOpenDeliveryActionsKey(""); setEvidenceModalItem(item); }}>
+                                  <Eye size={15} /> Evidencias
                                 </button>
-                                <button type="button" className="orders-row-menu-item" onClick={() => { setOpenDeliveryActionsKey(""); handleModeChange("domiciliarios"); }}>
-                                  <UserRound size={15} /> Ir a domiciliarios
+                                <button type="button" className="orders-row-menu-item" onClick={() => { setOpenDeliveryActionsKey(""); setNoveltiesModalItem(item); }}>
+                                  <MessageCircle size={15} /> Novedades
                                 </button>
-                                <button type="button" className="orders-row-menu-item" onClick={() => { setOpenDeliveryActionsKey(""); handleModeChange("novedades"); }}>
-                                  <MessageCircle size={15} /> Ir a novedades
+                                <button type="button" className="orders-row-menu-item" onClick={() => { setOpenDeliveryActionsKey(""); openStatusModal(item); }}>
+                                  <Pencil size={15} /> Estados
                                 </button>
                               </div>
                             ) : null}
@@ -4438,6 +4771,237 @@ export function DeliveryPage({
               </div>
             </article>
           </section>
+        ) : null}
+
+        {evidenceModalItem && evidenceModalSummary ? (
+          <div className="delivery-modal-backdrop" role="presentation" onMouseDown={() => setEvidenceModalItem(null)}>
+            <article className="delivery-evidence-modal" role="dialog" aria-modal="true" aria-label={`Evidencias del pedido ${evidenceModalSummary.order}`} onMouseDown={event => event.stopPropagation()}>
+              <div className="delivery-evidence-modal-head">
+                <div>
+                  <span>Pedido #{evidenceModalSummary.order}</span>
+                  <h4>Evidencias</h4>
+                  <p>{evidenceModalSummary.arrangement}</p>
+                </div>
+                <button type="button" className="delivery-modal-close" onClick={() => setEvidenceModalItem(null)} aria-label="Cerrar modal">
+                  <X size={18} />
+                </button>
+              </div>
+
+              <div className="delivery-evidence-summary">
+                <p><span>Cliente</span><strong>{evidenceModalSummary.client}</strong></p>
+                <p><span>Domiciliario</span><strong>{evidenceModalSummary.courier}</strong></p>
+                <p><span>Estado</span><strong>{evidenceModalSummary.status}</strong></p>
+                <p><span>Recibe</span><strong>{evidenceModalSummary.receivedBy || "-"}</strong></p>
+                <p><span>Documento</span><strong>{evidenceModalSummary.receivedDocument || "-"}</strong></p>
+                <p><span>Observaciones</span><strong>{evidenceModalSummary.observations || "-"}</strong></p>
+              </div>
+
+              <section className="delivery-evidence-section">
+                <div className="delivery-evidence-section-title">
+                  <h5>Evidencias</h5>
+                  <span>{evidenceModalSummary.evidences.length}</span>
+                </div>
+                {evidenceModalSummary.evidences.length === 0 ? (
+                  <p className="delivery-evidence-empty">No hay evidencias registradas para este pedido.</p>
+                ) : (
+                  <div className="delivery-evidence-list">
+                    {evidenceModalSummary.evidences.map(record => (
+                      <a key={record.key} className="delivery-evidence-item" href={record.url} target="_blank" rel="noreferrer">
+                        <span className="delivery-evidence-thumb">
+                          <img src={record.url} alt="" loading="lazy" />
+                        </span>
+                        <span>
+                          <strong>{record.label}</strong>
+                          <small>{record.date || "Sin fecha"}</small>
+                          {record.note ? <em>{record.note}</em> : null}
+                        </span>
+                        <Eye size={16} />
+                      </a>
+                    ))}
+                  </div>
+                )}
+              </section>
+
+            </article>
+          </div>
+        ) : null}
+
+        {noveltiesModalItem && noveltiesModalSummary ? (
+          <div className="delivery-modal-backdrop" role="presentation" onMouseDown={() => setNoveltiesModalItem(null)}>
+            <article className="delivery-evidence-modal" role="dialog" aria-modal="true" aria-label={`Novedades del pedido ${noveltiesModalSummary.order}`} onMouseDown={event => event.stopPropagation()}>
+              <div className="delivery-evidence-modal-head">
+                <div>
+                  <span>Pedido #{noveltiesModalSummary.order}</span>
+                  <h4>Novedades</h4>
+                  <p>{noveltiesModalSummary.arrangement}</p>
+                </div>
+                <button type="button" className="delivery-modal-close" onClick={() => setNoveltiesModalItem(null)} aria-label="Cerrar modal">
+                  <X size={18} />
+                </button>
+              </div>
+
+              <div className="delivery-evidence-summary">
+                <p><span>Cliente</span><strong>{noveltiesModalSummary.client}</strong></p>
+                <p><span>Domiciliario</span><strong>{noveltiesModalSummary.courier}</strong></p>
+                <p><span>Estado</span><strong>{noveltiesModalSummary.status}</strong></p>
+                <p><span>Recibe</span><strong>{noveltiesModalSummary.receivedBy || "-"}</strong></p>
+                <p><span>Documento</span><strong>{noveltiesModalSummary.receivedDocument || "-"}</strong></p>
+                <p><span>Observaciones</span><strong>{noveltiesModalSummary.observations || "-"}</strong></p>
+              </div>
+
+              <section className="delivery-evidence-section">
+                <div className="delivery-evidence-section-title">
+                  <h5>Novedades</h5>
+                  <span>{noveltiesModalSummary.novelties.length}</span>
+                </div>
+                {noveltiesModalSummary.novelties.length === 0 ? (
+                  <p className="delivery-evidence-empty">No hay novedades registradas para este pedido.</p>
+                ) : (
+                  <div className="delivery-novelty-mini-list">
+                    {noveltiesModalSummary.novelties.map(record => (
+                      <article key={record.key} className="delivery-novelty-mini-item">
+                        <div>
+                          <strong>{record.label}</strong>
+                          <span>{record.status || "Sin estado"}</span>
+                        </div>
+                        <p>{record.observation}</p>
+                        <small>{record.time || "Sin fecha"}</small>
+                      </article>
+                    ))}
+                  </div>
+                )}
+              </section>
+            </article>
+          </div>
+        ) : null}
+
+        {statusModalItem && statusModalSummary ? (
+          <div className="delivery-modal-backdrop" role="presentation" onMouseDown={closeStatusModal}>
+            <article className="delivery-evidence-modal delivery-status-modal" role="dialog" aria-modal="true" aria-label={`Cambiar estado del pedido ${statusModalSummary.order}`} onMouseDown={event => event.stopPropagation()}>
+              <div className="delivery-evidence-modal-head">
+                <div>
+                  <span>Pedido #{statusModalSummary.order}</span>
+                  <h4>Estados</h4>
+                  <p>{statusModalSummary.arrangement}</p>
+                </div>
+                <button type="button" className="delivery-modal-close" onClick={closeStatusModal} aria-label="Cerrar modal">
+                  <X size={18} />
+                </button>
+              </div>
+
+              <div className="delivery-evidence-summary">
+                <p><span>Cliente</span><strong>{statusModalSummary.client}</strong></p>
+                <p><span>Domiciliario</span><strong>{statusModalSummary.courier}</strong></p>
+                <p><span>Estado actual</span><strong>{statusModalSummary.status}</strong></p>
+              </div>
+
+              <div className="delivery-status-options" role="radiogroup" aria-label="Nuevo estado del pedido">
+                {[
+                  { key: "en-ruta", label: "En ruta", Icon: Route },
+                  { key: "entregado", label: "Entregado", Icon: CheckCircle2 },
+                  { key: "no-entregado", label: "No entregado", Icon: AlertTriangle },
+                ].map(option => {
+                  const Icon = option.Icon;
+                  const active = statusForm.estado === option.key;
+                  return (
+                    <button
+                      type="button"
+                      key={option.key}
+                      className={active ? "is-active" : ""}
+                      onClick={() => setStatusForm(current => ({ ...current, estado: option.key }))}
+                      aria-pressed={active}
+                    >
+                      <Icon size={17} />
+                      <span>{option.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {statusForm.estado === "entregado" ? (
+                <div className="delivery-status-form">
+                  <label>
+                    <span>Nombre quien recibe *</span>
+                    <input
+                      type="text"
+                      value={statusForm.firmaNombre}
+                      onChange={event => setStatusForm(current => ({ ...current, firmaNombre: event.target.value }))}
+                      placeholder="Nombre completo"
+                    />
+                  </label>
+                  <label>
+                    <span>Documento quien recibe *</span>
+                    <input
+                      type="text"
+                      value={statusForm.firmaDocumento}
+                      onChange={event => setStatusForm(current => ({ ...current, firmaDocumento: event.target.value }))}
+                      placeholder="Documento"
+                    />
+                  </label>
+                  <label>
+                    <span>Evidencia de firma *</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={event => setStatusForm(current => ({ ...current, firmaImagenFile: event.target.files?.[0] ?? null }))}
+                    />
+                  </label>
+                  <label>
+                    <span>Foto entrega</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={event => setStatusForm(current => ({ ...current, evidenciaFotoFile: event.target.files?.[0] ?? null }))}
+                    />
+                  </label>
+                </div>
+              ) : null}
+
+              {statusForm.estado === "no-entregado" ? (
+                <div className="delivery-status-form">
+                  <label className="is-full">
+                    <span>Motivo *</span>
+                    <textarea
+                      rows="3"
+                      value={statusForm.motivo}
+                      onChange={event => setStatusForm(current => ({ ...current, motivo: event.target.value }))}
+                      placeholder="Describe por que no se pudo entregar"
+                    />
+                  </label>
+                  <label className="is-full">
+                    <span>Reprogramar para</span>
+                    <input
+                      type="datetime-local"
+                      value={statusForm.reprogramarPara}
+                      onChange={event => setStatusForm(current => ({ ...current, reprogramarPara: event.target.value }))}
+                    />
+                  </label>
+                </div>
+              ) : null}
+
+              <label className="delivery-status-observation">
+                <span>Observaciones</span>
+                <textarea
+                  rows="3"
+                  value={statusForm.observaciones}
+                  onChange={event => setStatusForm(current => ({ ...current, observaciones: event.target.value }))}
+                  placeholder="Notas internas del cambio"
+                />
+              </label>
+
+              <div className="delivery-novelty-resolve-actions">
+                <button type="button" className="btn-outline" onClick={closeStatusModal}>Cancelar</button>
+                <button
+                  type="button"
+                  className="btn-primary"
+                  onClick={onSaveStatusChange}
+                  disabled={actionKey === `estado-${statusModalItem.idEntrega}`}
+                >
+                  {actionKey === `estado-${statusModalItem.idEntrega}` ? "Guardando..." : "Guardar estado"}
+                </button>
+              </div>
+            </article>
+          </div>
         ) : null}
 
         {resolvingNoveltyRow ? (

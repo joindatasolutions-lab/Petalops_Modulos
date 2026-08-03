@@ -967,6 +967,310 @@ main.orders-admin-view.orders-page-view.delivery-page-view,
   width: 100% !important;
 }
 
+.delivery-page-view .delivery-evidence-modal {
+  display: grid !important;
+  gap: 16px !important;
+  width: min(760px, 100%) !important;
+  max-height: calc(100vh - 56px) !important;
+  margin: 0 !important;
+  padding: 18px !important;
+  border: 1px solid #f0d2de !important;
+  border-radius: 16px !important;
+  background: #ffffff !important;
+  box-shadow: 0 28px 70px rgba(15, 23, 42, 0.22) !important;
+  overflow-y: auto !important;
+}
+
+.delivery-page-view .delivery-evidence-modal-head {
+  display: flex !important;
+  align-items: flex-start !important;
+  justify-content: space-between !important;
+  gap: 16px !important;
+}
+
+.delivery-page-view .delivery-evidence-modal-head span {
+  color: #e91e72 !important;
+  font-size: 12px !important;
+  font-weight: 900 !important;
+  text-transform: uppercase !important;
+}
+
+.delivery-page-view .delivery-evidence-modal-head h4 {
+  margin: 3px 0 0 !important;
+  color: #111827 !important;
+  font-size: 22px !important;
+  line-height: 1.2 !important;
+}
+
+.delivery-page-view .delivery-evidence-modal-head p {
+  margin: 4px 0 0 !important;
+  color: #64748b !important;
+  font-size: 13px !important;
+  font-weight: 700 !important;
+}
+
+.delivery-page-view .delivery-evidence-summary {
+  display: grid !important;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  gap: 10px !important;
+}
+
+.delivery-page-view .delivery-evidence-summary p {
+  display: grid !important;
+  gap: 3px !important;
+  min-width: 0 !important;
+  margin: 0 !important;
+  padding: 11px 12px !important;
+  border: 1px solid #eef1f5 !important;
+  border-radius: 10px !important;
+  background: #fbfdff !important;
+}
+
+.delivery-page-view .delivery-evidence-summary span,
+.delivery-page-view .delivery-evidence-section-title span {
+  color: #64748b !important;
+  font-size: 11px !important;
+  font-weight: 850 !important;
+  text-transform: uppercase !important;
+}
+
+.delivery-page-view .delivery-evidence-summary strong {
+  min-width: 0 !important;
+  overflow: hidden !important;
+  color: #111827 !important;
+  font-size: 13px !important;
+  font-weight: 850 !important;
+  line-height: 1.3 !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+
+.delivery-page-view .delivery-evidence-section {
+  display: grid !important;
+  gap: 10px !important;
+  padding-top: 2px !important;
+}
+
+.delivery-page-view .delivery-evidence-section-title {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 10px !important;
+}
+
+.delivery-page-view .delivery-evidence-section-title h5 {
+  margin: 0 !important;
+  color: #111827 !important;
+  font-size: 16px !important;
+  font-weight: 900 !important;
+}
+
+.delivery-page-view .delivery-evidence-section-title span {
+  display: inline-grid !important;
+  place-items: center !important;
+  min-width: 28px !important;
+  height: 28px !important;
+  border-radius: 999px !important;
+  background: #fff7fb !important;
+  color: #e91e72 !important;
+}
+
+.delivery-page-view .delivery-evidence-empty {
+  margin: 0 !important;
+  padding: 13px !important;
+  border: 1px dashed #dbe3ee !important;
+  border-radius: 10px !important;
+  color: #64748b !important;
+  font-size: 13px !important;
+  font-weight: 700 !important;
+}
+
+.delivery-page-view .delivery-evidence-list,
+.delivery-page-view .delivery-novelty-mini-list {
+  display: grid !important;
+  gap: 9px !important;
+}
+
+.delivery-page-view .delivery-evidence-item {
+  display: grid !important;
+  grid-template-columns: 58px minmax(0, 1fr) 24px !important;
+  align-items: center !important;
+  gap: 12px !important;
+  min-width: 0 !important;
+  padding: 9px !important;
+  border: 1px solid #eef1f5 !important;
+  border-radius: 10px !important;
+  background: #ffffff !important;
+  color: inherit !important;
+  text-decoration: none !important;
+}
+
+.delivery-page-view .delivery-evidence-item:hover {
+  border-color: rgba(217, 54, 122, 0.28) !important;
+  background: #fff7fb !important;
+}
+
+.delivery-page-view .delivery-evidence-thumb {
+  display: grid !important;
+  place-items: center !important;
+  width: 58px !important;
+  height: 58px !important;
+  overflow: hidden !important;
+  border-radius: 8px !important;
+  background: #f8fafc !important;
+}
+
+.delivery-page-view .delivery-evidence-thumb img {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover !important;
+}
+
+.delivery-page-view .delivery-evidence-item > span:not(.delivery-evidence-thumb) {
+  display: grid !important;
+  gap: 3px !important;
+  min-width: 0 !important;
+}
+
+.delivery-page-view .delivery-evidence-item strong,
+.delivery-page-view .delivery-novelty-mini-item strong {
+  color: #111827 !important;
+  font-size: 13px !important;
+  font-weight: 900 !important;
+}
+
+.delivery-page-view .delivery-evidence-item small,
+.delivery-page-view .delivery-novelty-mini-item small {
+  color: #64748b !important;
+  font-size: 12px !important;
+  font-weight: 700 !important;
+}
+
+.delivery-page-view .delivery-evidence-item em {
+  min-width: 0 !important;
+  overflow: hidden !important;
+  color: #475569 !important;
+  font-size: 12px !important;
+  font-style: normal !important;
+  font-weight: 700 !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+
+.delivery-page-view .delivery-evidence-item svg {
+  color: #e91e72 !important;
+}
+
+.delivery-page-view .delivery-novelty-mini-item {
+  display: grid !important;
+  gap: 7px !important;
+  padding: 12px !important;
+  border: 1px solid #eef1f5 !important;
+  border-radius: 10px !important;
+  background: #fbfdff !important;
+}
+
+.delivery-page-view .delivery-novelty-mini-item div {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 10px !important;
+}
+
+.delivery-page-view .delivery-novelty-mini-item span {
+  flex: 0 0 auto !important;
+  padding: 4px 8px !important;
+  border-radius: 999px !important;
+  background: #fff7ed !important;
+  color: #c2410c !important;
+  font-size: 11px !important;
+  font-weight: 850 !important;
+}
+
+.delivery-page-view .delivery-novelty-mini-item p {
+  margin: 0 !important;
+  color: #475569 !important;
+  font-size: 13px !important;
+  font-weight: 700 !important;
+  line-height: 1.45 !important;
+}
+
+.delivery-page-view .delivery-status-modal {
+  width: min(680px, 100%) !important;
+}
+
+.delivery-page-view .delivery-status-options {
+  display: grid !important;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  gap: 10px !important;
+}
+
+.delivery-page-view .delivery-status-options button {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 8px !important;
+  min-height: 44px !important;
+  padding: 10px 12px !important;
+  border: 1px solid #e5e7eb !important;
+  border-radius: 10px !important;
+  background: #ffffff !important;
+  color: #475569 !important;
+  font-size: 13px !important;
+  font-weight: 850 !important;
+  cursor: pointer !important;
+}
+
+.delivery-page-view .delivery-status-options button.is-active {
+  border-color: rgba(217, 54, 122, 0.34) !important;
+  background: #fff7fb !important;
+  color: #e91e72 !important;
+}
+
+.delivery-page-view .delivery-status-form {
+  display: grid !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  gap: 12px !important;
+}
+
+.delivery-page-view .delivery-status-form label,
+.delivery-page-view .delivery-status-observation {
+  display: grid !important;
+  gap: 6px !important;
+  min-width: 0 !important;
+}
+
+.delivery-page-view .delivery-status-form label.is-full {
+  grid-column: 1 / -1 !important;
+}
+
+.delivery-page-view .delivery-status-form span,
+.delivery-page-view .delivery-status-observation span {
+  color: #64748b !important;
+  font-size: 12px !important;
+  font-weight: 850 !important;
+}
+
+.delivery-page-view .delivery-status-form input,
+.delivery-page-view .delivery-status-form textarea,
+.delivery-page-view .delivery-status-observation textarea {
+  width: 100% !important;
+  min-width: 0 !important;
+  padding: 10px 12px !important;
+  border: 1px solid #dbe3ee !important;
+  border-radius: 10px !important;
+  background: #ffffff !important;
+  color: #111827 !important;
+  font-size: 13px !important;
+  font-weight: 700 !important;
+  outline: none !important;
+}
+
+.delivery-page-view .delivery-status-form textarea,
+.delivery-page-view .delivery-status-observation textarea {
+  resize: vertical !important;
+}
+
 .delivery-page-view .delivery-courier-action-buttons {
   display: inline-flex !important;
   align-items: center !important;
@@ -2357,6 +2661,38 @@ main.orders-admin-view.orders-page-view.delivery-page-view,
   .delivery-page-view .delivery-courier-create-modal {
     max-height: calc(100vh - 32px) !important;
     padding: 16px !important;
+  }
+
+  .delivery-page-view .delivery-evidence-modal {
+    max-height: calc(100vh - 32px) !important;
+    padding: 16px !important;
+  }
+
+  .delivery-page-view .delivery-evidence-modal-head {
+    align-items: flex-start !important;
+  }
+
+  .delivery-page-view .delivery-evidence-summary {
+    grid-template-columns: 1fr !important;
+  }
+
+  .delivery-page-view .delivery-evidence-item {
+    grid-template-columns: 52px minmax(0, 1fr) 22px !important;
+  }
+
+  .delivery-page-view .delivery-evidence-thumb {
+    width: 52px !important;
+    height: 52px !important;
+  }
+
+  .delivery-page-view .delivery-novelty-mini-item div {
+    display: grid !important;
+    justify-content: stretch !important;
+  }
+
+  .delivery-page-view .delivery-status-options,
+  .delivery-page-view .delivery-status-form {
+    grid-template-columns: 1fr !important;
   }
 
   .delivery-page-view .delivery-courier-create-modal .delivery-courier-form {

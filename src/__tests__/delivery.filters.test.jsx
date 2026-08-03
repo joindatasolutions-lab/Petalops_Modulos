@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   deliveryArrangementName,
+  isDeliveryAllowedProductionStatus,
   deliveryMatchesSearch,
   deliveryOrderCodeLabel,
   isStorePickupDelivery,
@@ -59,5 +60,28 @@ describe("filtros de domicilios", () => {
     expect(isStorePickupDelivery({ tipoEntrega: "Entrega en tiendas" })).toBe(true);
     expect(isStorePickupDelivery({ direccion: "Recoger En Tienda" })).toBe(true);
     expect(isStorePickupDelivery({ tipoEntrega: "domicilio" })).toBe(false);
+  });
+
+  it("solo permite domicilios con produccion en ParaEntrega cuando el backend envia ese estado", () => {
+    expect(isDeliveryAllowedProductionStatus({ estadoProduccion: "ParaEntrega" })).toBe(true);
+    expect(isDeliveryAllowedProductionStatus({ estado_produccion: "PARA_ENTREGA" })).toBe(true);
+    expect(isDeliveryAllowedProductionStatus({ estadoProduccion: "EnProduccion" })).toBe(false);
+    expect(isDeliveryAllowedProductionStatus({ estadoProduccion: "Pendiente" })).toBe(false);
+  });
+
+  it("valida todas las producciones del pedido antes de mostrarlo en domicilios", () => {
+    expect(isDeliveryAllowedProductionStatus({
+      producciones: [
+        { estado: "ParaEntrega" },
+        { estadoProduccion: "PARA_ENTREGA" },
+      ],
+    })).toBe(true);
+
+    expect(isDeliveryAllowedProductionStatus({
+      producciones: [
+        { estado: "ParaEntrega" },
+        { estadoProduccion: "EnProduccion" },
+      ],
+    })).toBe(false);
   });
 });
