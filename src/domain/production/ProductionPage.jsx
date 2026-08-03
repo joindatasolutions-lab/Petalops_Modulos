@@ -1262,8 +1262,8 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
     [session]
   );
   const visibleSubmenuOptions = useMemo(
-    () => (canManageProductionActions ? SUBMENU_OPTIONS : [{ key: "pedidos", label: "Pedidos" }]),
-    [canManageProductionActions]
+    () => (canViewProduccion ? SUBMENU_OPTIONS : [{ key: "pedidos", label: "Pedidos" }]),
+    [canViewProduccion]
   );
 
   const [fecha, setFecha] = useState(todayIsoDate());
@@ -2805,7 +2805,7 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
           </>
         )}
 
-        {canManageProductionActions && submenu === "disponibilidad" && (
+        {canViewProduccion && submenu === "disponibilidad" && (
           <section className="order-block production-section-card production-availability-panel">
             <div className="production-section-head production-section-head--stack">
               <div>
@@ -2864,7 +2864,7 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
           </section>
         )}
 
-        {canManageProductionActions && submenu === "incapacidad" && (
+        {canViewProduccion && submenu === "incapacidad" && (
           <section className="order-block production-section-card production-incapacity-panel">
             <div className="production-section-head">
               <div>
@@ -2914,7 +2914,7 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
           </section>
         )}
 
-        {canManageProductionActions && submenu === "looker" && (
+        {canViewProduccion && submenu === "looker" && (
           <section className="order-block looker-block" style={{ marginTop: 12 }}>
             <div className="looker-header">
               <h4> Looker Studio</h4>
