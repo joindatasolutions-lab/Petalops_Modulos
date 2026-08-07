@@ -76,6 +76,22 @@ export function normalizeBarrioItem(raw) {
   };
 }
 
+export function extractBarrioItems(payload) {
+  const candidates = [
+    payload,
+    payload?.items,
+    payload?.barrios,
+    payload?.data,
+    payload?.data?.items,
+    payload?.data?.barrios,
+    payload?.result,
+    payload?.result?.items,
+    payload?.result?.barrios,
+  ];
+  const rows = candidates.find(Array.isArray) || [];
+  return rows.map(item => normalizeBarrioItem(item)).filter(Boolean);
+}
+
 export function dedupeBarrioItems(items) {
   const map = new Map();
   for (const item of items) {

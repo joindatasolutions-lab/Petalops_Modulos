@@ -13,6 +13,11 @@ import {
  * arma datos y valida reglas propias del payload.
  */
 
+function textOrNull(...values) {
+  const text = values.map(value => String(value || "").trim()).find(Boolean);
+  return text || null;
+}
+
 export function buildNewOrderCheckoutPayload({
   form,
   empresaId,
@@ -40,6 +45,10 @@ export function buildNewOrderCheckoutPayload({
   }
 
   const horaEntrega = normalizeTime(form.horaEntrega) || "08:00";
+  const notaProduccion = textOrNull(form.nota_produccion, form.notaProduccion, form.productoObservaciones, form.notas);
+  const mensajeTarjeta = textOrNull(form.mensaje_tarjeta, form.mensajeTarjeta);
+  const firmaTarjeta = textOrNull(form.firma_tarjeta, form.firma);
+  const observacionesEntrega = textOrNull(form.observaciones_entrega, form.observacionGeneral);
   const lineItems = Array.isArray(form.productos) ? form.productos : [];
   const productos = lineItems
     .map(item => {
@@ -49,6 +58,10 @@ export function buildNewOrderCheckoutPayload({
         productoID: nextProductoID,
         cantidad: Number(item?.cantidad || 1),
       };
+      const itemNotaProduccion = textOrNull(item?.nota_produccion, item?.notaProduccion, item?.productoObservaciones, item?.notas);
+      if (itemNotaProduccion) {
+        producto.nota_produccion = itemNotaProduccion;
+      }
       const precio = normalizeWholePeso(item?.precio);
       if (Number.isFinite(precio) && precio > 0) {
         producto.productoPrecio = precio;
@@ -83,6 +96,10 @@ export function buildNewOrderCheckoutPayload({
     domicilio_obsequiado: domicilioObsequiado,
     omitirCostoDomicilio: domicilioObsequiado,
     omitir_costo_domicilio: domicilioObsequiado,
+    nota_produccion: notaProduccion,
+    mensaje_tarjeta: mensajeTarjeta,
+    firma_tarjeta: firmaTarjeta,
+    observaciones_entrega: observacionesEntrega,
     cliente: {
       clienteID: form.clienteID != null ? Number(form.clienteID) : null,
       tipoIdent: form.clienteTipoIdent || null,
@@ -106,9 +123,12 @@ export function buildNewOrderCheckoutPayload({
       omitir_costo_domicilio: domicilioObsequiado,
       fechaEntrega: `${form.fechaEntrega}T${horaEntrega}:00`,
       rangoHora: horaEntrega,
-      mensaje: form.mensajeTarjeta || null,
-      firma: form.firma || null,
-      observacionGeneral: form.observacionGeneral || null,
+      mensaje: mensajeTarjeta,
+      mensaje_tarjeta: mensajeTarjeta,
+      firma: firmaTarjeta,
+      firma_tarjeta: firmaTarjeta,
+      observacionGeneral: observacionesEntrega,
+      observaciones_entrega: observacionesEntrega,
     },
     financiero: {
       metodosPago: form.metodoPago ? [form.metodoPago] : null,
@@ -145,6 +165,10 @@ export function buildDuplicateCheckoutPayload({
   const barrioSeleccionado = String(edit.barrioNombre || detalle?.destinatario?.barrio || "").trim() || null;
   const tipoEntrega = normalizeDeliveryType(barrioSeleccionado);
   const domicilioObsequiado = tipoEntrega !== "recogida_en_tienda" && Boolean(edit.domicilioObsequiado);
+  const notaProduccion = textOrNull(edit.nota_produccion, edit.notaProduccion, edit.productoObservaciones, detalle?.nota_produccion, detalle?.notaProduccion);
+  const mensajeTarjeta = textOrNull(edit.mensaje_tarjeta, edit.mensajeTarjeta);
+  const firmaTarjeta = textOrNull(edit.firma_tarjeta, edit.firma);
+  const observacionesEntrega = textOrNull(edit.observaciones_entrega, edit.observacionGeneral);
 
   return {
     empresaID: empresaId,
@@ -152,7 +176,12 @@ export function buildDuplicateCheckoutPayload({
     productos: productos.map((item, index) => ({
       productoID: index === 0 && edit.productoID ? Number(edit.productoID) : Number(item.productoID),
       cantidad: index === 0 ? Number(edit.cantidad || item.cantidad || 1) : Number(item.cantidad || 1),
+      nota_produccion: index === 0 ? notaProduccion : textOrNull(item?.nota_produccion, item?.notaProduccion, item?.notas),
     })),
+    nota_produccion: notaProduccion,
+    mensaje_tarjeta: mensajeTarjeta,
+    firma_tarjeta: firmaTarjeta,
+    observaciones_entrega: observacionesEntrega,
     cliente: {
       tipoIdent: edit.clienteTipoIdent || null,
       identificacion: edit.clienteIdentificacion || null,
@@ -173,9 +202,12 @@ export function buildDuplicateCheckoutPayload({
       longitudDestino: detalle?.destinatario?.longitudDestino ?? null,
       fechaEntrega: `${fechaEntrega}T${horaEntrega}:00`,
       rangoHora: edit.horaEntrega || null,
-      mensaje: edit.mensajeTarjeta || null,
-      firma: edit.firma || null,
-      observacionGeneral: edit.observacionGeneral || null,
+      mensaje: mensajeTarjeta,
+      mensaje_tarjeta: mensajeTarjeta,
+      firma: firmaTarjeta,
+      firma_tarjeta: firmaTarjeta,
+      observacionGeneral: observacionesEntrega,
+      observaciones_entrega: observacionesEntrega,
     },
     financiero: {
       domicilio: domicilioObsequiado ? 0 : null,
@@ -197,14 +229,20 @@ export function buildDetailUpdatePayload({
   const domicilioObsequiado = tipoEntrega !== "recogida_en_tienda" && Boolean(edit.domicilioObsequiado);
   const domicilioOriginal = tipoEntrega === "recogida_en_tienda"
     ? 0
-    : normalizeWholePeso(edit.domicilioOriginal ?? edit.domicilio);
+    : normalizeWholePeso(edit.domicilioOriginal ?? edit.costoDomicilio ?? edit.domicilio);
+  const notaProduccion = textOrNull(edit.nota_produccion, edit.notaProduccion, edit.productoObservaciones);
+  const mensajeTarjeta = textOrNull(edit.mensaje_tarjeta, edit.mensajeTarjeta);
+  const firmaTarjeta = textOrNull(edit.firma_tarjeta, edit.firma);
+  const observacionesEntrega = textOrNull(edit.observaciones_entrega, edit.observacionGeneral);
 
   return {
     pedidoId,
     detalleID: edit.detalleID ? Number(edit.detalleID) : null,
     productoID: edit.productoID ? Number(edit.productoID) : null,
     cantidad: Number(edit.cantidad || 1),
-    productoObservaciones: edit.productoObservaciones,
+    productoObservaciones: notaProduccion,
+    nota_produccion: notaProduccion,
+    notaProduccion: notaProduccion,
     productoPrecio: edit.isCustomArrangement ? normalizeWholePeso(edit.precio) : null,
     fechaEntrega: edit.fechaEntrega,
     horaEntrega: edit.horaEntrega,
@@ -219,9 +257,12 @@ export function buildDetailUpdatePayload({
     barrioNombre: edit.barrioNombre,
     latitudDestino: detalle?.destinatario?.latitudDestino ?? null,
     longitudDestino: detalle?.destinatario?.longitudDestino ?? null,
-    firma: edit.firma,
-    mensajeTarjeta: edit.mensajeTarjeta,
-    observacionGeneral: edit.observacionGeneral,
+    firma: firmaTarjeta,
+    firma_tarjeta: firmaTarjeta,
+    mensajeTarjeta: mensajeTarjeta,
+    mensaje_tarjeta: mensajeTarjeta,
+    observacionGeneral: observacionesEntrega,
+    observaciones_entrega: observacionesEntrega,
     metodosPago: paymentValidation.methods,
     detallePago: paymentValidation.paymentBreakdown,
     montoEfectivo: paymentValidation.cashAmount,

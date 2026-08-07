@@ -19,6 +19,7 @@ import {
   buildProductoLabel,
   dedupeBarrioItems,
   dedupeCatalogItems,
+  extractBarrioItems,
   getProductoId,
   normalizeBarrioItem,
   normalizeCatalogItem,
@@ -442,7 +443,33 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
     const productoId = getProductoId(product);
     const productoCodigo = displayProductCode(product, detailEmpresaId);
     const productoNombre = String(product?.nombreProducto || product?.nombre || "").trim();
-    const productoObservaciones = String(product?.observaciones || "").trim();
+    const productoNotaProduccion = String(
+      product?.notaProduccion
+      || product?.nota_produccion
+      || product?.notasProduccion
+      || product?.notas_produccion
+      || product?.observacionesInternasProduccion
+      || product?.observaciones_internas_produccion
+      || product?.observacionesinternas
+      || product?.notas
+      || product?.observaciones
+      || ""
+    ).trim();
+    const pedidoNotaProduccion = String(
+      detalle?.notaProduccion
+      || detalle?.nota_produccion
+      || detalle?.notasProduccion
+      || detalle?.notas_produccion
+      || detalle?.observacionesInternasProduccion
+      || detalle?.observaciones_internas_produccion
+      || detalle?.observacionesinternas
+      || detalle?.pedido?.notaProduccion
+      || detalle?.pedido?.nota_produccion
+      || detalle?.pedido?.notas
+      || detalle?.notas
+      || ""
+    ).trim();
+    const productoObservaciones = productoNotaProduccion || pedidoNotaProduccion;
     const productoPrecio = normalizeWholePeso(product?.precioUnitario ?? product?.precio ?? product?.subtotal ?? 0);
 
     setDetailEditDetalleID(detalleId != null ? String(detalleId) : "");
@@ -457,15 +484,14 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
       nombre: productoNombre,
       observaciones: productoObservaciones,
     }));
-  }, [detailEmpresaId]);
+  }, [detailEmpresaId, detalle]);
 
   const loadBarrioOptions = useCallback(async (query = "") => {
     const text = String(query || "").trim();
     setDetailEditBarriosLoading(true);
     try {
       const payload = await api.buscarBarrios({ empresaId, sucursalId, q: text });
-      const rows = Array.isArray(payload) ? payload : [];
-      const loaded = rows.map(item => normalizeBarrioItem(item)).filter(Boolean);
+      const loaded = extractBarrioItems(payload);
       setDetailEditBarrios(current => dedupeBarrioItems([
         normalizeBarrioItem({ nombreBarrio: "Recoger en tienda" }),
         normalizeBarrioItem({ nombreBarrio: detailEditBarrioNombre }),
@@ -612,9 +638,9 @@ const messageCard = useMessageCardController({
       normalizeBarrioItem({ nombreBarrio: detalle.destinatario?.barrio }),
     ].filter(Boolean)));
     setDetailEditBarrioDropdownOpen(false);
-    setDetailEditFirma(String(detalle.destinatario?.firma || ""));
-    setDetailEditMensajeTarjeta(String(detalle.destinatario?.mensajeTarjeta || ""));
-    setDetailEditObservacionGeneral(String(detalle.destinatario?.observacionGeneral || ""));
+    setDetailEditFirma(String(detalle.destinatario?.firma_tarjeta || detalle.destinatario?.firmaTarjeta || detalle.destinatario?.firma || ""));
+    setDetailEditMensajeTarjeta(String(detalle.destinatario?.mensaje_tarjeta || detalle.destinatario?.mensajeTarjeta || detalle.destinatario?.mensaje || ""));
+    setDetailEditObservacionGeneral(String(detalle.destinatario?.observaciones_entrega || detalle.destinatario?.observacionesEntrega || detalle.destinatario?.observacionGeneral || ""));
     const initialPaymentMethods = Array.isArray(detalle.financiero?.metodosPago)
       ? detalle.financiero.metodosPago.map(item => String(item))
       : [];
@@ -1293,6 +1319,7 @@ const openNewOrderModal = () => {
     barrioNombre: detailEditBarrioNombre,
     domicilioObsequiado: detailEditDomicilioObsequiado,
     domicilioOriginal: detailEditFinancialPreview?.domicilioOriginal,
+    costoDomicilio: detailEditFinancialPreview?.domicilioOriginal ?? detailEditFinancialPreview?.domicilio ?? null,
     firma: detailEditFirma,
     mensajeTarjeta: detailEditMensajeTarjeta,
     observacionGeneral: detailEditObservacionGeneral,
