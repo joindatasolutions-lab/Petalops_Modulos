@@ -954,6 +954,32 @@ function catalogQueriesFromItems(items, preferCatalogCode = false) {
   return Array.from(queries).slice(0, 16);
 }
 
+// Cuantos items de produccion se resuelven en paralelo como maximo. Cada item puede
+// disparar varias llamadas al backend (catalogo, pedido, pipeline); resolverlos todos
+// a la vez (antes hasta 20) saturaba la instancia de Cloud Run en rafagas de trafico.
+const IMAGE_RESOLUTION_CONCURRENCY = 3;
+
+async function mapWithConcurrencyLimit(items, limit, mapper) {
+  const results = new Array(items.length);
+  let nextIndex = 0;
+
+  async function worker() {
+    while (nextIndex < items.length) {
+      const currentIndex = nextIndex;
+      nextIndex += 1;
+      try {
+        results[currentIndex] = { status: "fulfilled", value: await mapper(items[currentIndex], currentIndex) };
+      } catch (error) {
+        results[currentIndex] = { status: "rejected", reason: error };
+      }
+    }
+  }
+
+  const workerCount = Math.max(1, Math.min(limit, items.length));
+  await Promise.all(Array.from({ length: workerCount }, worker));
+  return results;
+}
+
 async function resolveCatalogImageByProductionCode(api, empresaId, sucursalId, item, catalogIndex = new Map()) {
   const preferCatalogCode = shouldUseCatalogCodeForProduction() || isEmpresaCatalogCode(empresaId);
   const queries = catalogQueriesFromItems([item], preferCatalogCode).slice(0, 6);
@@ -1691,7 +1717,11 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
     if (missingItems.length === 0) return undefined;
 
     let disposed = false;
-    Promise.allSettled(missingItems.map(async item => {
+    // Resuelve de a IMAGE_RESOLUTION_CONCURRENCY items a la vez en vez de los 20 en paralelo:
+    // cada item puede disparar varias llamadas al backend (catalogo, pedido, pipeline), y los
+    // 20 en simultaneo saturaban la misma instancia justo cuando la lista se refresca
+    // (ej. justo despues de cambiar el estado de un pedido).
+    mapWithConcurrencyLimit(missingItems, IMAGE_RESOLUTION_CONCURRENCY, async item => {
       let imageUrl = await resolveCatalogImageByProductionCode(api, empresaId, sucursalId, item, catalogProductIndex);
       if (item?.numeroPedido) {
         try {
@@ -1737,7 +1767,7 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
         cacheKeys: productionImageCacheKeys(item, { preferCatalogCode }),
         imageUrl,
       };
-    })).then(results => {
+    }).then(results => {
       if (disposed) return;
       setProductionProductImages(current => {
         const next = { ...current };
