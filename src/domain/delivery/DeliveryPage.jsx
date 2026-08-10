@@ -2014,6 +2014,21 @@ export function DeliveryPage({
     return coords;
   };
 
+  const optionalCoords = async () => {
+    if (isOffline) {
+      throw new Error("Sin conexión. Revisa internet antes de continuar.");
+    }
+
+    try {
+      const coords = await requestCurrentCoords();
+      setAvailableCoords(coords);
+      return coords;
+    } catch {
+      setAvailableCoords(null);
+      return null;
+    }
+  };
+
   const handleModeChange = async nextMode => {
     setError("");
     setFeedback("");
@@ -2295,15 +2310,7 @@ export function DeliveryPage({
         await api.marcarEntregaEnRuta({ entregaId, usuarioCambio });
         setFeedback("Pedido marcado como en ruta.");
       } else if (nextStatus === "entregado") {
-        if (!statusForm.firmaNombre.trim() || !statusForm.firmaDocumento.trim()) {
-          setError("Completa nombre y documento de quien recibe.");
-          return;
-        }
-        if (!statusForm.firmaImagenFile) {
-          setError("Adjunta la evidencia de firma para marcar entregado.");
-          return;
-        }
-        const coords = await withCoords("marcar el pedido como entregado");
+        const coords = await optionalCoords();
         await api.marcarEntregaEntregado({
           entregaId,
           usuarioCambio,
@@ -2311,8 +2318,8 @@ export function DeliveryPage({
           firmaDocumento: statusForm.firmaDocumento.trim(),
           firmaImagenFile: statusForm.firmaImagenFile,
           evidenciaFotoFile: statusForm.evidenciaFotoFile,
-          latitudEntrega: coords.lat,
-          longitudEntrega: coords.lng,
+          latitudEntrega: coords?.lat,
+          longitudEntrega: coords?.lng,
           observaciones: statusForm.observaciones.trim(),
         });
         setFeedback("Pedido marcado como entregado.");
@@ -2505,18 +2512,10 @@ export function DeliveryPage({
   const onEntregado = async item => {
     const entregaId = item?.idEntrega;
     if (!entregaId) return;
-    if (!deliveryForm.firmaNombre.trim() || !deliveryForm.firmaDocumento.trim()) {
-      setError("Debes completar nombre y documento de quien recibe.");
-      return;
-    }
-    if (!deliveryForm.firmaImagenFile) {
-      setError("Debes adjuntar la evidencia de firma.");
-      return;
-    }
 
     setBusy(`entregar-${entregaId}`);
     try {
-      const coords = await withCoords("confirmar la entrega");
+      const coords = await optionalCoords();
       await api.marcarEntregaEntregado({
         entregaId,
         usuarioCambio,
@@ -2524,8 +2523,8 @@ export function DeliveryPage({
         firmaDocumento: deliveryForm.firmaDocumento.trim(),
         firmaImagenFile: deliveryForm.firmaImagenFile,
         evidenciaFotoFile: deliveryForm.evidenciaFotoFile,
-        latitudEntrega: coords.lat,
-        longitudEntrega: coords.lng,
+        latitudEntrega: coords?.lat,
+        longitudEntrega: coords?.lng,
         observaciones: deliveryForm.observaciones.trim(),
       });
       setFeedback("Entrega confirmada con evidencia.");
@@ -4921,7 +4920,7 @@ export function DeliveryPage({
               {statusForm.estado === "entregado" ? (
                 <div className="delivery-status-form">
                   <label>
-                    <span>Nombre quien recibe *</span>
+                    <span>Nombre quien recibe</span>
                     <input
                       type="text"
                       value={statusForm.firmaNombre}
@@ -4930,7 +4929,7 @@ export function DeliveryPage({
                     />
                   </label>
                   <label>
-                    <span>Documento quien recibe *</span>
+                    <span>Documento quien recibe</span>
                     <input
                       type="text"
                       value={statusForm.firmaDocumento}
@@ -4939,7 +4938,7 @@ export function DeliveryPage({
                     />
                   </label>
                   <label>
-                    <span>Evidencia de firma *</span>
+                    <span>Evidencia de firma</span>
                     <input
                       type="file"
                       accept="image/*"
