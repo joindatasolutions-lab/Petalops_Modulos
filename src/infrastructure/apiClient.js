@@ -1230,8 +1230,8 @@ export function createApiClient(config) {
       } else if (evidenciaFotoUrl) {
         form.append("evidenciaFotoUrl", evidenciaFotoUrl);
       }
-      form.append("latitudEntrega", String(latitudEntrega));
-      form.append("longitudEntrega", String(longitudEntrega));
+      form.append("latitudEntrega", String(latitudEntrega ?? 0));
+      form.append("longitudEntrega", String(longitudEntrega ?? 0));
       form.append("observaciones", observaciones || "");
 
       return requestJson(`/domicilios/${entregaId}/entregado`, {
