@@ -5,7 +5,6 @@ import {
   MapPin,
   Menu,
   Package2,
-  PackageSearch,
   PanelLeftClose,
   PanelLeftOpen,
   Receipt,
@@ -14,7 +13,6 @@ import {
   UsersRound,
   Workflow,
 } from "lucide-react";
-import { createAdminProductsSession } from "./adminProductsSession.js";
 
 const SIDEBAR_SECTIONS = [
   {
@@ -42,7 +40,6 @@ const SIDEBAR_SECTIONS = [
       { key: "contabilidad", label: "Contabilidad", Icon: Receipt, canViewKey: "contabilidad", goKey: "contabilidad" },
       { key: "trazabilidad", label: "Trazabilidad", Icon: Workflow, canViewKey: "trazabilidad", goKey: "trazabilidad" },
       { key: "clientes", label: "Clientes", Icon: UsersRound, canViewKey: "clientes", goKey: "clientes" },
-      { key: "adminProductos", label: "Administrador de productos", Icon: PackageSearch, canViewKey: "adminProductos", goKey: "adminProductos" },
       { key: "usuarios", label: "Gestión usuarios", Icon: ShieldUser, canViewKey: "usuarios", goKey: "usuarios" },
     ],
   },
@@ -61,9 +58,7 @@ export function AppSidebar({
   sessionLabel = "",
 }) {
   const renderNavItem = item => {
-    const canViewItem = item.key === "adminProductos"
-      ? Boolean(permissions?.adminProductos ?? permissions?.catalogo ?? permissions?.inventario ?? permissions?.usuarios)
-      : Boolean(permissions?.[item.canViewKey]);
+    const canViewItem = Boolean(permissions?.[item.canViewKey]);
     if (!canViewItem) return null;
     const isActive = activeKey === item.key;
     const count = Number(badges?.[item.key]);
@@ -78,12 +73,6 @@ export function AppSidebar({
         data-label={item.label}
         onClick={() => {
           closeSidebarMobile?.();
-          if (item.goKey === "adminProductos") {
-            createAdminProductsSession().catch(error => {
-              globalThis.alert?.(error?.message || "No fue posible abrir el administrador de productos.");
-            });
-            return;
-          }
           navigation?.[item.goKey]?.();
         }}
         title={item.label}
