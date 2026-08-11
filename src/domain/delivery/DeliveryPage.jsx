@@ -109,8 +109,8 @@ const DELIVERY_NOVELTY_TYPES = [
   { key: "otra", label: "Otra novedad", tone: "slate", Icon: MessageCircle },
 ];
 const DELIVERY_PERFORMANCE_SORTS = [
-  { value: "tasaEntrega", label: "Tasa de entrega" },
   { value: "entregados", label: "Entregas completadas" },
+  { value: "tasaEntrega", label: "Tasa de entrega" },
   { value: "tiempoPromedio", label: "Tiempo promedio" },
   { value: "menosNovedades", label: "Menos novedades" },
   { value: "menosReasignaciones", label: "Menos reasignaciones" },
@@ -576,6 +576,102 @@ function metricGroupLabel(item) {
 function metricNumber(value) {
   const number = Number(value);
   return Number.isFinite(number) ? number : 0;
+}
+
+function metricIsoDate(date) {
+  if (!(date instanceof Date) || Number.isNaN(date.getTime())) return "";
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function metricDateRangeDays(fechaDesde, fechaHasta) {
+  const start = parseMetricDate(fechaDesde);
+  const end = parseMetricDate(fechaHasta);
+  if (!start || !end) return [];
+
+  const from = start <= end ? start : end;
+  const to = start <= end ? end : start;
+  const cursor = new Date(from.getFullYear(), from.getMonth(), from.getDate());
+  const limit = new Date(to.getFullYear(), to.getMonth(), to.getDate());
+  const dates = [];
+
+  while (cursor <= limit) {
+    dates.push(metricIsoDate(cursor));
+    cursor.setDate(cursor.getDate() + 1);
+  }
+
+  return dates.filter(Boolean);
+}
+
+function countPedidosDisponiblesPayload(data) {
+  const directTotal = [
+    data?.total,
+    data?.count,
+    data?.cantidad,
+    data?.totalItems,
+    data?.total_items,
+    data?.totalPedidos,
+    data?.total_pedidos,
+  ].map(Number).find(value => Number.isFinite(value) && value >= 0);
+  if (directTotal != null) return directTotal;
+  return normalizeDeliveryItemsPayload(data).length;
+}
+
+function performanceDeliveredOrderFromItem(item, index = 0) {
+  const deliveredAt = item?.fechaEntregaReal
+    || item?.fecha_entrega_real
+    || item?.fechaEntrega
+    || item?.fecha_entrega
+    || item?.fecha
+    || item?.fechaEntregaProgramada
+    || item?.fecha_entrega_programada;
+  return {
+    key: item?.idEntrega || item?.id_entrega || item?.idPedido || item?.id_pedido || `${deliveryOrderCodeLabel(item)}-${index}`,
+    raw: item,
+    courierId: deliveryCourierIdValue(item) != null ? String(deliveryCourierIdValue(item)) : "",
+    courierName: String(item?.domiciliario || item?.nombreDomiciliario || item?.nombre_domiciliario || item?.repartidor || "").trim(),
+    orderCode: deliveryOrderCodeLabel(item) || "-",
+    client: String(item?.cliente || item?.nombreCliente || item?.nombre_cliente || item?.destinatario || item?.nombreDestinatario || item?.nombre_destinatario || "Cliente sin nombre").trim(),
+    phone: String(item?.telefono || item?.telefonoCliente || item?.telefono_cliente || item?.telefonoDestino || item?.telefono_destino || item?.celular || "").trim(),
+    address: String(item?.direccion || item?.direccionEntrega || item?.direccion_entrega || item?.direccionDestino || item?.direccion_destino || item?.barrio || "").trim(),
+    date: formatDateOnly(deliveredAt),
+    time: item?.horaEntrega || item?.hora_entrega || item?.hora || formatTimeOnly(deliveredAt),
+    observation: String(item?.observaciones || item?.observacion || item?.nota || "").trim(),
+  };
+}
+
+function performanceCourierIdValue(item) {
+  const candidates = [
+    courierIdValue(item),
+    deliveryCourierIdValue(item),
+    item?.grupoId,
+    item?.grupoID,
+    item?.idGrupo,
+    item?.domiciliario_id,
+    item?.domiciliario?.id,
+    item?.domiciliario?.idDomiciliario,
+    item?.domiciliario?.domiciliarioID,
+    item?.domiciliario?.domiciliarioId,
+  ];
+  for (const value of candidates) {
+    if (value == null || value === "") continue;
+    const parsed = Number(value);
+    if (Number.isFinite(parsed) && parsed > 0) return parsed;
+  }
+  return null;
+}
+
+function performanceOrderMatchesCourier(order, courier) {
+  if (!order || !courier) return false;
+  const courierId = performanceCourierIdValue(courier);
+  const orderId = performanceCourierIdValue(order.raw || order) ?? (order.courierId ? Number(order.courierId) : null);
+  if (courierId != null) return orderId != null && Number(orderId) === Number(courierId);
+
+  const courierNameKey = normalizeSearchText(courier.nombre);
+  const orderCourierName = normalizeSearchText(order.courierName);
+  return Boolean(courierNameKey && orderCourierName) && orderCourierName === courierNameKey;
 }
 
 function parseMetricDate(value) {
@@ -1467,6 +1563,7 @@ function courierIdValue(item) {
     item?.domiciliarioID,
     item?.domiciliarioId,
     item?.domiciliarioid,
+    item?.domiciliario_id,
     item?.id_domiciliario,
     item?.empleadoID,
     item?.empleadoId,
@@ -1488,6 +1585,7 @@ function deliveryCourierIdValue(item) {
     item?.domiciliarioID,
     item?.domiciliarioId,
     item?.domiciliarioid,
+    item?.domiciliario_id,
     item?.idDomiciliario,
     item?.id_domiciliario,
     item?.empleadoID,
@@ -1641,8 +1739,11 @@ export function DeliveryPage({
   const [metricsGroupBy, setMetricsGroupBy] = useState("dia");
   const [metricsDomiciliarioId, setMetricsDomiciliarioId] = useState("");
   const [metricsPayload, setMetricsPayload] = useState(DEFAULT_DELIVERY_METRICS_RESPONSE);
-  const [performanceSort, setPerformanceSort] = useState("tasaEntrega");
+  const [performanceUnassignedCount, setPerformanceUnassignedCount] = useState(0);
+  const [performanceSort, setPerformanceSort] = useState("entregados");
   const [selectedPerformanceCourier, setSelectedPerformanceCourier] = useState(null);
+  const [performanceOrderSearch, setPerformanceOrderSearch] = useState("");
+  const [performanceOrdersLoading, setPerformanceOrdersLoading] = useState(false);
   const [deliverySearch, setDeliverySearch] = useState("");
   const [noveltySearch, setNoveltySearch] = useState("");
   const [noveltyStatusFilter, setNoveltyStatusFilter] = useState("novedades");
@@ -1716,6 +1817,21 @@ export function DeliveryPage({
     () => statusModalItem ? buildDeliveryEvidenceSummary(statusModalItem) : null,
     [statusModalItem]
   );
+  const selectedPerformanceOrders = useMemo(() => {
+    const orders = Array.isArray(selectedPerformanceCourier?.deliveredOrders)
+      ? selectedPerformanceCourier.deliveredOrders
+      : [];
+    const term = normalizeSearchText(performanceOrderSearch);
+    if (!term) return orders;
+    return orders.filter(order => normalizeSearchText([
+      order.orderCode,
+      order.client,
+      order.phone,
+      order.address,
+      order.date,
+      order.time,
+    ].filter(Boolean).join(" ")).includes(term));
+  }, [selectedPerformanceCourier, performanceOrderSearch]);
   const selectedDeliveryRawStatus = deliveryRawStatus(selectedDeliveryItem);
   const selectedDeliveryState = normalizeStatus(selectedDeliveryRawStatus.code || selectedDeliveryRawStatus.name);
   const currentDomiciliarioId = useMemo(
@@ -1731,6 +1847,10 @@ export function DeliveryPage({
   useEffect(() => {
     setOpenDeliveryActionsKey("");
   }, [deliverySearch, filtro, modo, statusFilter]);
+
+  useEffect(() => {
+    setPerformanceOrderSearch("");
+  }, [selectedPerformanceCourier?.key]);
 
   const filteredBarriosItems = useMemo(() => {
     const term = normalizeSearchText(barriosSearch);
@@ -1805,15 +1925,38 @@ export function DeliveryPage({
     setCourierDirectoryItems((Array.isArray(data.items) ? data.items : []).filter(item => !isDeletedCourier(item)));
   }, [api, empresaId, sucursalId, courierSearch, courierStatusFilter]);
 
+  const loadPerformanceUnassignedCount = useCallback(async () => {
+    const dates = metricDateRangeDays(metricsFechaDesde, metricsFechaHasta);
+    if (dates.length === 0) return 0;
+
+    const results = await Promise.allSettled(
+      dates.map(fecha => api.listarPedidosDisponiblesPorFecha({ fecha }))
+    );
+
+    return results.reduce((acc, result) => (
+      result.status === "fulfilled"
+        ? acc + countPedidosDisponiblesPayload(result.value)
+        : acc
+    ), 0);
+  }, [api, metricsFechaDesde, metricsFechaHasta]);
+
   const loadDeliveryMetrics = useCallback(async () => {
-    const data = await api.obtenerMetricasDomicilios({
-      empresaId,
-      sucursalId,
-      fechaDesde: metricsFechaDesde,
-      fechaHasta: metricsFechaHasta,
-      domiciliarioID: metricsDomiciliarioId ? Number(metricsDomiciliarioId) : null,
-      agruparPor: modo === "novedades" ? "novedad" : metricsGroupBy,
-    });
+    const [metricsResult, unassignedResult] = await Promise.allSettled([
+      api.obtenerMetricasDomicilios({
+        empresaId,
+        sucursalId,
+        fechaDesde: metricsFechaDesde,
+        fechaHasta: metricsFechaHasta,
+        domiciliarioID: metricsDomiciliarioId ? Number(metricsDomiciliarioId) : null,
+        agruparPor: modo === "novedades" ? "novedad" : metricsGroupBy,
+      }),
+      loadPerformanceUnassignedCount(),
+    ]);
+
+    if (metricsResult.status !== "fulfilled") throw metricsResult.reason;
+
+    const data = metricsResult.value;
+    setPerformanceUnassignedCount(unassignedResult.status === "fulfilled" ? unassignedResult.value : 0);
     setMetricsPayload({
       ...DEFAULT_DELIVERY_METRICS_RESPONSE,
       ...(data || {}),
@@ -1829,7 +1972,7 @@ export function DeliveryPage({
       porZona: Array.isArray(data?.porZona) ? data.porZona : [],
       novedades: Array.isArray(data?.novedades) ? data.novedades : [],
     });
-  }, [api, empresaId, sucursalId, metricsFechaDesde, metricsFechaHasta, metricsDomiciliarioId, metricsGroupBy, modo]);
+  }, [api, empresaId, sucursalId, metricsFechaDesde, metricsFechaHasta, metricsDomiciliarioId, metricsGroupBy, modo, loadPerformanceUnassignedCount]);
 
   const loadNoveltyDeliveries = useCallback(async () => {
     const data = await api.listarDomiciliosAdmin({
@@ -2246,6 +2389,56 @@ export function DeliveryPage({
       setError(message);
     } finally {
       setCourierSaving(false);
+    }
+  };
+
+  const loadPerformanceCourierDeliveredOrders = useCallback(async courier => {
+    const dates = metricDateRangeDays(metricsFechaDesde, metricsFechaHasta);
+    if (!courier || dates.length === 0) return [];
+    const courierIdValueForRequest = performanceCourierIdValue(courier);
+    const courierId = courierIdValueForRequest != null ? String(courierIdValueForRequest) : "";
+
+    const results = await Promise.allSettled(
+      dates.map(fecha => api.listarDomiciliosAdmin({
+        empresaId,
+        sucursalId,
+        filtro: "entregado",
+        fecha,
+        domiciliarioID: courierId || null,
+        q: courierId ? "" : courier.nombre,
+      }))
+    );
+
+    const rows = results.flatMap(result => (
+      result.status === "fulfilled"
+        ? filterDomicilioItems(normalizeDeliveryItemsPayload(result.value)).filter(item => deliveryStatusMeta(item).key === "entregado")
+        : []
+    ));
+
+    return dedupeDeliveryItems(rows)
+      .map((item, index) => performanceDeliveredOrderFromItem(item, index))
+      .filter(order => performanceOrderMatchesCourier(order, courier));
+  }, [api, empresaId, sucursalId, metricsFechaDesde, metricsFechaHasta]);
+
+  const openPerformanceCourierDetail = async courier => {
+    if (!courier) return;
+    setSelectedPerformanceCourier({ ...courier, deliveredOrders: [] });
+    setPerformanceOrdersLoading(true);
+    try {
+      const deliveredOrders = await loadPerformanceCourierDeliveredOrders(courier);
+      const safeDeliveredOrders = deliveredOrders.length > Number(courier.entregados || 0)
+        ? []
+        : deliveredOrders;
+      setSelectedPerformanceCourier(current => (
+        current?.key === courier.key ? { ...current, deliveredOrders: safeDeliveredOrders } : current
+      ));
+    } catch (nextError) {
+      console.error("Error cargando pedidos entregados del domiciliario:", nextError);
+      setSelectedPerformanceCourier(current => (
+        current?.key === courier.key ? { ...current, deliveredOrders: [] } : current
+      ));
+    } finally {
+      setPerformanceOrdersLoading(false);
     }
   };
 
@@ -3073,9 +3266,12 @@ export function DeliveryPage({
   }, [deliveryMetrics]);
   const deliveryPerformance = useMemo(() => {
     const courierById = new Map();
+    const courierByName = new Map();
     domiciliarios.forEach(item => {
       const id = courierIdValue(item);
       if (id != null) courierById.set(Number(id), item);
+      const nameKey = normalizeSearchText(item?.nombre || item?.nombreDomiciliario || item?.nombre_domiciliario);
+      if (nameKey) courierByName.set(nameKey, item);
     });
     const detailSources = [
       metricsPayload?.items,
@@ -3090,7 +3286,7 @@ export function DeliveryPage({
       metricsPayload?.entregasEntregadas,
     ].filter(Array.isArray);
     const detailRows = detailSources.flat();
-    const deliveredDetailRows = detailRows
+    const metricDeliveredRows = detailRows
       .filter(item => {
         const status = normalizeStatus(
           item?.estadoEntrega
@@ -3103,48 +3299,30 @@ export function DeliveryPage({
         );
         return status === "ENTREGADO" || item?.entregado === true || item?.entregada === true;
       })
-      .map((item, index) => {
-        const courierId = item?.domiciliarioID
-          ?? item?.domiciliarioId
-          ?? item?.idDomiciliario
-          ?? item?.id_domiciliario
-          ?? item?.repartidorID
-          ?? item?.repartidorId
-          ?? null;
-        const courierName = String(item?.domiciliario || item?.nombreDomiciliario || item?.repartidor || "").trim();
-        const orderCode = String(item?.pedido || item?.numeroPedido || item?.numero_pedido || item?.pedidoNumero || item?.codigoPedido || item?.idPedido || item?.idEntrega || "-").trim();
-        const deliveredAt = item?.fechaEntregaReal
-          || item?.fecha_entrega_real
-          || item?.fechaEntrega
-          || item?.fecha_entrega
-          || item?.fecha
-          || item?.fechaEntregaProgramada;
-        return {
-          key: item?.idEntrega || item?.id_entrega || item?.idPedido || `${orderCode}-${index}`,
-          raw: item,
-          courierId: courierId != null ? String(courierId) : "",
-          courierName,
-          orderCode,
-          client: String(item?.cliente || item?.nombreCliente || item?.destinatario || item?.nombreDestinatario || "Cliente sin nombre").trim(),
-          phone: String(item?.telefono || item?.telefonoCliente || item?.telefonoDestino || item?.celular || "").trim(),
-          address: String(item?.direccion || item?.direccionEntrega || item?.direccion_entrega || item?.barrio || "").trim(),
-          date: formatDateOnly(deliveredAt),
-          time: item?.horaEntrega || item?.hora_entrega || item?.hora || formatTimeOnly(deliveredAt),
-          observation: String(item?.observaciones || item?.observacion || item?.nota || "").trim(),
-        };
-      });
+      .map((item, index) => performanceDeliveredOrderFromItem(item, index));
+    const deliveredByKey = new Map();
+    metricDeliveredRows.forEach(item => {
+      if (!item?.key) return;
+      deliveredByKey.set(String(item.key), item);
+    });
+    const deliveredDetailRows = Array.from(deliveredByKey.values());
     const performanceEntries = deliveryMetrics.porDomiciliario
       .map((item, index) => {
-        const id = item?.domiciliarioID ?? item?.idDomiciliario ?? null;
-        const courier = id != null ? courierById.get(Number(id)) : null;
-        const nombre = String(item?.domiciliario || item?.grupo || courier?.nombre || courier?.nombreDomiciliario || "Sin domiciliario").trim();
+        const rawId = performanceCourierIdValue(item);
+        const rawNombre = String(item?.domiciliario || item?.grupo || item?.nombre || item?.nombreDomiciliario || "Sin domiciliario").trim();
+        const matchedCourier = rawId != null
+          ? courierById.get(Number(rawId))
+          : courierByName.get(normalizeSearchText(rawNombre));
+        const id = rawId ?? courierIdValue(matchedCourier);
+        const courier = matchedCourier || (id != null ? courierById.get(Number(id)) : null);
+        const nombre = String(rawNombre || courier?.nombre || courier?.nombreDomiciliario || "Sin domiciliario").trim();
         const photoUrl = courierPhotoUrl(courier) || courierPhotoUrl(item);
         const entregados = metricNumber(item?.entregados);
         const cancelados = metricNumber(item?.cancelados);
         const noEntregados = metricNumber(item?.noEntregados);
         const asignados = Math.max(metricNumber(item?.total || item?.asignados) - cancelados, 0);
         const finalizados = entregados + noEntregados;
-        const tasaEntrega = finalizados > 0 ? (entregados / finalizados) * 100 : metricNumber(item?.tasaEntrega);
+        const tasaEntrega = asignados > 0 ? (entregados / asignados) * 100 : metricNumber(item?.tasaEntrega);
         const novedades = metricNumber(item?.novedades);
         const reasignados = metricNumber(item?.reasignados ?? item?.reasignaciones ?? item?.pedidosReasignados);
         const tiempoPromedio = Number(item?.tiempoPromedioEntregaMin);
@@ -3153,11 +3331,8 @@ export function DeliveryPage({
         const tasaNovedades = metricRatio(novedades, pedidosGestionados);
         const tasaReasignacion = metricRatio(reasignados, asignados);
         const status = deliveryPerformanceStatus({ courier, row: item });
-        const deliveredOrders = deliveredDetailRows.filter(order => {
-          if (id != null && order.courierId) return order.courierId === String(id);
-          if (id == null && !order.courierId) return normalizeSearchText(order.courierName || "Sin domiciliario") === normalizeSearchText(nombre);
-          return normalizeSearchText(order.courierName) === normalizeSearchText(nombre);
-        });
+        const performanceCourier = { id, nombre };
+        const deliveredOrders = deliveredDetailRows.filter(order => performanceOrderMatchesCourier(order, performanceCourier));
         return {
           key: `${id ?? nombre}-${index}`,
           id,
@@ -3192,15 +3367,17 @@ export function DeliveryPage({
     const rows = performanceEntries.filter(item => !isUnassignedPerformanceRow(item));
 
     const sortedRows = [...rows].sort((a, b) => {
-      if (performanceSort === "entregados") return b.entregados - a.entregados || b.tasaEntrega - a.tasaEntrega;
+      const deliveredDiff = b.entregados - a.entregados;
+      if (deliveredDiff !== 0) return deliveredDiff;
+      if (performanceSort === "entregados") return b.tasaEntrega - a.tasaEntrega;
       if (performanceSort === "tiempoPromedio") {
         const aTime = Number.isFinite(a.tiempoPromedio) ? a.tiempoPromedio : Number.POSITIVE_INFINITY;
         const bTime = Number.isFinite(b.tiempoPromedio) ? b.tiempoPromedio : Number.POSITIVE_INFINITY;
         return aTime - bTime || b.tasaEntrega - a.tasaEntrega;
       }
-      if (performanceSort === "menosNovedades") return a.tasaNovedades - b.tasaNovedades || b.entregados - a.entregados;
-      if (performanceSort === "menosReasignaciones") return a.tasaReasignacion - b.tasaReasignacion || b.entregados - a.entregados;
-      return b.tasaEntrega - a.tasaEntrega || b.entregados - a.entregados;
+      if (performanceSort === "menosNovedades") return a.tasaNovedades - b.tasaNovedades || b.tasaEntrega - a.tasaEntrega;
+      if (performanceSort === "menosReasignaciones") return a.tasaReasignacion - b.tasaReasignacion || b.tasaEntrega - a.tasaEntrega;
+      return b.tasaEntrega - a.tasaEntrega;
     });
 
     const totalAsignados = rows.reduce((acc, item) => acc + item.asignados, 0);
@@ -3220,6 +3397,7 @@ export function DeliveryPage({
       novedades: 0,
       reasignados: 0,
     });
+    unassignedSummary.asignados = performanceUnassignedCount;
     const validTimes = rows.map(item => item.tiempoPromedio).filter(value => Number.isFinite(value));
     const averageTime = validTimes.length > 0
       ? validTimes.reduce((acc, value) => acc + value, 0) / validTimes.length
@@ -3240,7 +3418,7 @@ export function DeliveryPage({
         reasignadosPercent: metricRatio(totalReasignados, totalAsignados),
       },
     };
-  }, [deliveryMetrics, domiciliarios, metricsPayload, performanceSort]);
+  }, [deliveryMetrics, domiciliarios, metricsPayload, performanceSort, performanceUnassignedCount]);
   const activeModeLabel = visibleDeliveryViews.find(item => item.value === modo)?.label || "Dispatch";
 
   return (
@@ -4423,7 +4601,7 @@ export function DeliveryPage({
                               <button
                                 type="button"
                                 className="btn-outline delivery-performance-detail"
-                                onClick={() => setSelectedPerformanceCourier(item)}
+                                onClick={() => openPerformanceCourierDetail(item)}
                                 aria-label={`Ver detalle de ${item.nombre}`}
                               >
                                 Ver detalle
@@ -4458,7 +4636,7 @@ export function DeliveryPage({
                         <button
                           type="button"
                           className="btn-outline delivery-performance-detail"
-                          onClick={() => setSelectedPerformanceCourier(item)}
+                          onClick={() => openPerformanceCourierDetail(item)}
                           aria-label={`Ver detalle de ${item.nombre}`}
                         >
                           Ver detalle
@@ -4469,7 +4647,7 @@ export function DeliveryPage({
                   ) : null}
 
                   <div className="delivery-performance-note">
-                    <p><strong>Tasa de entrega:</strong> entregas completadas / pedidos finalizados.</p>
+                    <p><strong>Tasa de entrega:</strong> entregas completadas / pedidos asignados.</p>
                     <p><strong>Tiempo promedio:</strong> tiempo desde asignación hasta entrega.</p>
                     <p><strong>Novedades:</strong> pedidos con novedad / pedidos gestionados.</p>
                     <p><strong>Reasignados:</strong> pedidos reasignados / pedidos asignados.</p>
@@ -4506,19 +4684,34 @@ export function DeliveryPage({
                   <section className="delivery-performance-orders" aria-label={`Pedidos entregados por ${selectedPerformanceCourier.nombre}`}>
                     <div className="delivery-performance-orders-head">
                       <h5>Pedidos entregados por domiciliario</h5>
-                      <span>{selectedPerformanceCourier.deliveredOrders.length} de {selectedPerformanceCourier.entregados}</span>
+                      <span>{performanceOrdersLoading ? "Cargando" : `${selectedPerformanceOrders.length} de ${selectedPerformanceCourier.deliveredOrders.length || selectedPerformanceCourier.entregados}`}</span>
                     </div>
-                    {selectedPerformanceCourier.deliveredOrders.length === 0 ? (
-                      <p className="delivery-performance-modal-note">La fuente de metricas no envio el detalle individual de pedidos entregados para este domiciliario.</p>
+                    <label className="delivery-performance-orders-search">
+                      <Search size={15} aria-hidden="true" />
+                      <input
+                        type="search"
+                        value={performanceOrderSearch}
+                        onChange={event => setPerformanceOrderSearch(event.target.value)}
+                        placeholder="Buscar pedido, cliente, telefono o direccion"
+                      />
+                    </label>
+                    {performanceOrdersLoading ? (
+                      <p className="delivery-performance-modal-note">Cargando pedidos entregados del domiciliario...</p>
+                    ) : selectedPerformanceCourier.deliveredOrders.length === 0 ? (
+                      <p className="delivery-performance-modal-note">No se recibio un listado filtrable de pedidos entregados para este domiciliario.</p>
+                    ) : selectedPerformanceOrders.length === 0 ? (
+                      <p className="delivery-performance-modal-note">No hay pedidos entregados que coincidan con la busqueda.</p>
                     ) : (
                       <div className="delivery-performance-orders-list">
-                        {selectedPerformanceCourier.deliveredOrders.map(order => (
+                        {selectedPerformanceOrders.map(order => (
                           <article key={order.key} className="delivery-performance-order">
                             <div>
                               <strong>Pedido {order.orderCode}</strong>
+                              <span>{order.client}</span>
                               <span>{[order.date, order.time].filter(Boolean).join(" - ") || "-"}</span>
                             </div>
                             <div>
+                              {order.phone ? <span>{order.phone}</span> : null}
                               <span>{order.address || "Sin direccion registrada"}</span>
                             </div>
                           </article>

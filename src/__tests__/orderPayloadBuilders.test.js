@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { buildDetailUpdatePayload } from "../domain/orders-admin/orderPayloadBuilders.js";
+import { buildDetailUpdatePayload, buildDuplicateCheckoutPayload } from "../domain/orders-admin/orderPayloadBuilders.js";
 
 const baseArgs = {
   pedidoId: 77,
@@ -85,5 +85,34 @@ describe("buildDetailUpdatePayload domicilio obsequiado", () => {
     expect(payload.domicilio).toBe(10000);
     expect(payload.costoDomicilio).toBe(10000);
     expect(payload.domicilioOriginal).toBe(10000);
+  });
+
+  it("preserva notas de produccion desde produccion.observacionesinternas al duplicar", () => {
+    const payload = buildDuplicateCheckoutPayload({
+      empresaId: 3,
+      sucursalId: 4,
+      detalle: {
+        sucursalID: 4,
+        productos: [{ productoID: 20, cantidad: 1 }],
+        produccion: { observacionesinternas: "Usar rosas blancas abiertas" },
+        destinatario: {
+          fechaEntrega: "2026-08-11T14:00:00",
+          horaEntrega: "14:00",
+          barrio: "Miramar",
+          nombre: "DIEGO USTARIZ",
+          telefono: "3128896624",
+          direccion: "CALLE 99A",
+        },
+        cliente: { nombre: "Cliente prueba", telefono: "3128896624" },
+      },
+      edit: {
+        fechaEntrega: "2026-08-11",
+        horaEntrega: "14:00",
+        barrioNombre: "Miramar",
+      },
+    });
+
+    expect(payload.nota_produccion).toBe("Usar rosas blancas abiertas");
+    expect(payload.productos[0].nota_produccion).toBe("Usar rosas blancas abiertas");
   });
 });
