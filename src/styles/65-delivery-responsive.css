@@ -2330,6 +2330,34 @@ main.orders-admin-view.orders-page-view.delivery-page-view,
   font-weight: 950 !important;
 }
 
+.delivery-performance-orders-search {
+  display: grid !important;
+  grid-template-columns: 18px minmax(0, 1fr) !important;
+  align-items: center !important;
+  gap: 8px !important;
+  min-height: 38px !important;
+  padding: 0 11px !important;
+  border: 1px solid #e5e7eb !important;
+  border-radius: 10px !important;
+  background: #ffffff !important;
+  color: #64748b !important;
+}
+
+.delivery-performance-orders-search input {
+  width: 100% !important;
+  min-width: 0 !important;
+  border: 0 !important;
+  outline: 0 !important;
+  background: transparent !important;
+  color: #0f172a !important;
+  font-size: 12px !important;
+  font-weight: 850 !important;
+}
+
+.delivery-performance-orders-search input::placeholder {
+  color: #94a3b8 !important;
+}
+
 .delivery-performance-orders-list {
   display: grid !important;
   gap: 8px !important;

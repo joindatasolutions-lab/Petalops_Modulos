@@ -451,6 +451,9 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
       || product?.observacionesInternasProduccion
       || product?.observaciones_internas_produccion
       || product?.observacionesinternas
+      || product?.produccion?.observacionesinternas
+      || product?.produccion?.observacionesInternasProduccion
+      || product?.produccion?.observaciones_internas_produccion
       || product?.notas
       || product?.observaciones
       || ""
@@ -463,6 +466,9 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
       || detalle?.observacionesInternasProduccion
       || detalle?.observaciones_internas_produccion
       || detalle?.observacionesinternas
+      || detalle?.produccion?.observacionesinternas
+      || detalle?.produccion?.observacionesInternasProduccion
+      || detalle?.produccion?.observaciones_internas_produccion
       || detalle?.pedido?.notaProduccion
       || detalle?.pedido?.nota_produccion
       || detalle?.pedido?.notas

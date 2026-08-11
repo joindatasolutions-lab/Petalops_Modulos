@@ -1077,13 +1077,20 @@ export function createApiClient(config) {
       });
     },
 
-    async listarDomiciliosAdmin({ empresaId, sucursalId, filtro = "hoy", fecha, q, incluirCancelado = false }) {
+    async listarDomiciliosAdmin({ empresaId, sucursalId, filtro = "hoy", fecha, q, domiciliarioID, incluirCancelado = false }) {
       const params = new URLSearchParams();
       params.set("empresaID", String(empresaId));
       if (sucursalId != null) params.set("sucursalID", String(sucursalId));
       params.set("filtro", String(filtro));
       if (fecha) params.set("fecha", String(fecha));
       if (q) params.set("q", String(q));
+      if (domiciliarioID != null && String(domiciliarioID).trim()) {
+        params.set("domiciliarioID", String(domiciliarioID));
+        params.set("domiciliarioId", String(domiciliarioID));
+        params.set("domiciliarioid", String(domiciliarioID));
+        params.set("idDomiciliario", String(domiciliarioID));
+        params.set("id_domiciliario", String(domiciliarioID));
+      }
       params.set("incluirCancelado", incluirCancelado ? "true" : "false");
       return requestJson(`/domicilios?${params.toString()}`);
     },
@@ -1132,6 +1139,12 @@ export function createApiClient(config) {
       params.set("limite", String(limit));
       params.set("soloSinAsignar", "true");
       return requestJson(`/domicilios/pedidos-disponibles?${params.toString()}`);
+    },
+
+    async listarPedidosDisponiblesPorFecha({ fecha }) {
+      const params = new URLSearchParams();
+      params.set("fecha", String(fecha));
+      return requestJson(`/pedidos/disponibles?${params.toString()}`);
     },
 
     async tomarEntrega({ entregaId, usuarioCambio, limiteEntregasActivas = 15 }) {

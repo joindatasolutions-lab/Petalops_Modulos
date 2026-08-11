@@ -165,7 +165,15 @@ export function buildDuplicateCheckoutPayload({
   const barrioSeleccionado = String(edit.barrioNombre || detalle?.destinatario?.barrio || "").trim() || null;
   const tipoEntrega = normalizeDeliveryType(barrioSeleccionado);
   const domicilioObsequiado = tipoEntrega !== "recogida_en_tienda" && Boolean(edit.domicilioObsequiado);
-  const notaProduccion = textOrNull(edit.nota_produccion, edit.notaProduccion, edit.productoObservaciones, detalle?.nota_produccion, detalle?.notaProduccion);
+  const notaProduccion = textOrNull(
+    edit.nota_produccion,
+    edit.notaProduccion,
+    edit.productoObservaciones,
+    detalle?.nota_produccion,
+    detalle?.notaProduccion,
+    detalle?.observacionesinternas,
+    detalle?.produccion?.observacionesinternas
+  );
   const mensajeTarjeta = textOrNull(edit.mensaje_tarjeta, edit.mensajeTarjeta);
   const firmaTarjeta = textOrNull(edit.firma_tarjeta, edit.firma);
   const observacionesEntrega = textOrNull(edit.observaciones_entrega, edit.observacionGeneral);
@@ -176,7 +184,7 @@ export function buildDuplicateCheckoutPayload({
     productos: productos.map((item, index) => ({
       productoID: index === 0 && edit.productoID ? Number(edit.productoID) : Number(item.productoID),
       cantidad: index === 0 ? Number(edit.cantidad || item.cantidad || 1) : Number(item.cantidad || 1),
-      nota_produccion: index === 0 ? notaProduccion : textOrNull(item?.nota_produccion, item?.notaProduccion, item?.notas),
+      nota_produccion: index === 0 ? notaProduccion : textOrNull(item?.nota_produccion, item?.notaProduccion, item?.observacionesinternas, item?.produccion?.observacionesinternas, item?.notas),
     })),
     nota_produccion: notaProduccion,
     mensaje_tarjeta: mensajeTarjeta,
