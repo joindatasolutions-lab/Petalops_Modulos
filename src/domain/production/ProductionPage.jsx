@@ -1316,6 +1316,7 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
     pendientesFuturos: 0,
   });
   const productionMetricasRef = useRef(productionMetricas);
+  const loadItemsRequestIdRef = useRef(0);
   const [floristas, setFloristas] = useState([]);
   const [floristasDisponibilidad, setFloristasDisponibilidad] = useState([]);
   const [catalogProducts, setCatalogProducts] = useState([]);
@@ -1530,6 +1531,8 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
   }, []);
 
   const loadItems = useCallback(async () => {
+    const requestId = (loadItemsRequestIdRef.current += 1);
+    const isStaleRequest = () => loadItemsRequestIdRef.current !== requestId;
     setLoading(true);
     setError("");
 
@@ -1647,6 +1650,7 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
           estadosFiltro.some(estadoItem => normalizeStatus(estadoItem) === normalizeStatus(item.estado))
         );
 
+      if (isStaleRequest()) return nextItems;
       setItems(nextItems);
       const metricas = responseMetricas;
       setProductionMetricas({
@@ -1659,12 +1663,13 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
       return nextItems;
     } catch (nextError) {
       console.error("Error cargando producción:", nextError);
+      if (isStaleRequest()) return [];
       setItems([]);
       setProductionMetricas({ pendientesHoy: null, sinAsignar: null, atrasados: null, pendientesFuturos: 0 });
       setError("No fue posible cargar el módulo de producción.");
       return [];
     } finally {
-      setLoading(false);
+      if (!isStaleRequest()) setLoading(false);
     }
   }, [api, fecha, estadosFiltro, activeMetricFilter, empresaId, sucursalId, searchOverridesFilters, busquedaGeneral]);
 
