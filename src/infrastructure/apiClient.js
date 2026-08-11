@@ -1,5 +1,23 @@
 const PEDIDOS_MAX_PAGE_SIZE = 300;
 const LOGIN_TIMEOUT_MS = 30000;
+const NETWORK_ERROR_MESSAGE = "Sin conexión con el servidor. Verifica tu red e intenta de nuevo.";
+const NETWORK_RETRY_DELAYS_MS = [500, 1200];
+
+function isNetworkError(error) {
+  return error instanceof TypeError;
+}
+
+function delay(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+function toNetworkError(originalError) {
+  const error = new Error(NETWORK_ERROR_MESSAGE);
+  error.detail = NETWORK_ERROR_MESSAGE;
+  error.isNetworkError = true;
+  error.cause = originalError;
+  return error;
+}
 const PRODUCTION_STATUS_CODE_BY_UI = {
   Pendiente: "PENDIENTE",
   EnProduccion: "EN_PROCESO",
@@ -64,10 +82,25 @@ export function createApiClient(config) {
       headers.Authorization = `Bearer ${token}`;
     }
 
-    return fetch(`${baseUrl}${path}`, {
-      ...options,
-      headers,
-    });
+    const method = String(options.method || "GET").toUpperCase();
+    const isRetryableRead = method === "GET";
+    const attempts = isRetryableRead ? NETWORK_RETRY_DELAYS_MS.length + 1 : 1;
+
+    let lastError;
+    for (let attempt = 0; attempt < attempts; attempt += 1) {
+      try {
+        return await fetch(`${baseUrl}${path}`, {
+          ...options,
+          headers,
+        });
+      } catch (error) {
+        lastError = error;
+        if (!isNetworkError(error) || attempt === attempts - 1) break;
+        await delay(NETWORK_RETRY_DELAYS_MS[attempt]);
+      }
+    }
+
+    throw isNetworkError(lastError) ? toNetworkError(lastError) : lastError;
   };
 
   const requestJson = async (path, options = {}) => {
@@ -95,7 +128,7 @@ export function createApiClient(config) {
         if (error?.name === "AbortError") {
           throw new Error("No fue posible iniciar sesión. Verifica usuario y contraseña.");
         }
-        throw error;
+        throw isNetworkError(error) ? toNetworkError(error) : error;
       } finally {
         clearTimeout(timeoutId);
       }
