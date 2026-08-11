@@ -1690,7 +1690,6 @@ export function DeliveryPage({
   canViewBarrios,
   canViewInventario,
   canViewContabilidad,
-  canViewTrazabilidad,
   canViewClientesPanel,
   canViewUsuariosPanel,
   onLogout,
@@ -1701,7 +1700,6 @@ export function DeliveryPage({
   onGoBarrios,
   onGoInventario,
   onGoContabilidad,
-  onGoTrazabilidad,
   onGoClientes,
   onGoUsuarios,
 }) {
@@ -3438,7 +3436,6 @@ export function DeliveryPage({
           barrios: canViewBarrios,
           inventario: canViewInventario,
           contabilidad: canViewContabilidad,
-          trazabilidad: canViewTrazabilidad,
           clientes: canViewClientesPanel,
           usuarios: canViewUsuariosPanel,
         }}
@@ -3450,7 +3447,6 @@ export function DeliveryPage({
           barrios: onGoBarrios,
           inventario: onGoInventario,
           contabilidad: onGoContabilidad,
-          trazabilidad: onGoTrazabilidad,
           clientes: onGoClientes,
           usuarios: onGoUsuarios,
         }}

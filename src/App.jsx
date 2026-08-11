@@ -16,7 +16,6 @@ const InventoryPage = lazy(() => import("./domain/inventory/InventoryPage.jsx").
 const OrdersAdminPage = lazy(() => import("./domain/orders-admin/OrdersAdminPage.jsx").then(module => ({ default: module.OrdersAdminPage })));
 const PipelineOperativo = lazy(() => import("./domain/pipeline/PipelineOperativo.jsx").then(module => ({ default: module.PipelineOperativo })));
 const ProductionPage = lazy(() => import("./domain/production/ProductionPage.jsx").then(module => ({ default: module.ProductionPage })));
-const TraceabilityPage = lazy(() => import("./domain/traceability/TraceabilityPage.jsx").then(module => ({ default: module.TraceabilityPage })));
 const UsersManagementPage = lazy(() => import("./domain/users/UsersManagementPage.jsx").then(module => ({ default: module.UsersManagementPage })));
 
 function hasModuleAccess(session, modulo) {
@@ -48,7 +47,6 @@ function canAccessView(session, view) {
   if (view === "barrios") return hasModuleAccess(session, "barrios") || hasModuleAccess(session, "domicilios");
   if (view === "inventario") return hasModuleAccess(session, "inventario");
   if (view === "contabilidad") return hasModuleAccess(session, "contabilidad");
-  if (view === "trazabilidad") return hasModuleAccess(session, "trazabilidad");
   if (view === "clientes") return hasModuleAccess(session, "clientes");
   if (view === "usuarios") return Boolean(session?.esGlobalJoin || isEmpresaAdminRole(session));
   return false;
@@ -63,7 +61,6 @@ function resolveDefaultView(session) {
   if (hasModuleAccess(session, "barrios") || hasModuleAccess(session, "domicilios")) return "barrios";
   if (hasModuleAccess(session, "inventario")) return "inventario";
   if (hasModuleAccess(session, "contabilidad")) return "contabilidad";
-  if (hasModuleAccess(session, "trazabilidad")) return "trazabilidad";
   if (hasModuleAccess(session, "clientes")) return "clientes";
   if (session?.esGlobalJoin || isEmpresaAdminRole(session)) return "usuarios";
   return "pedidos";
@@ -140,7 +137,6 @@ export default function App() {
   const canBarrios = hasModuleAccess(session, "barrios") || canDomicilios;
   const canInventario = hasModuleAccess(session, "inventario");
   const canContabilidad = hasModuleAccess(session, "contabilidad");
-  const canTrazabilidad = hasModuleAccess(session, "trazabilidad");
   const canClientes = hasModuleAccess(session, "clientes");
   const canPipeline = canAccessPipeline(session);
   const canUsuariosGlobal = Boolean(session?.esGlobalJoin);
@@ -160,7 +156,6 @@ export default function App() {
     if (view === "barrios" && !canBarrios) return redirectTo(fallbackView);
     if (view === "inventario" && !canInventario) return redirectTo(fallbackView);
     if (view === "contabilidad" && !canContabilidad) return redirectTo(fallbackView);
-    if (view === "trazabilidad" && !canTrazabilidad) return redirectTo(fallbackView);
     if (view === "clientes" && !canClientes) return redirectTo(fallbackView);
     if (view === "usuarios" && !canUsuariosPanel) return redirectTo(fallbackView);
   }, [
@@ -173,7 +168,6 @@ export default function App() {
     canBarrios,
     canInventario,
     canContabilidad,
-    canTrazabilidad,
     canClientes,
     canUsuariosPanel,
   ]);
@@ -217,7 +211,7 @@ export default function App() {
     return <LoginPage onSubmit={handleLogin} loading={authLoading} error={authError} />;
   }
 
-  if (!canPedidos && !canProduccion && !canDomicilios && !canBarrios && !canInventario && !canContabilidad && !canTrazabilidad && !canClientes && !canUsuariosPanel) {
+  if (!canPedidos && !canProduccion && !canDomicilios && !canBarrios && !canInventario && !canContabilidad && !canClientes && !canUsuariosPanel) {
     return (
       <main className="auth-view">
         <section className="auth-card">
@@ -239,7 +233,6 @@ export default function App() {
     canViewBarrios: canBarrios,
     canViewInventario: canInventario,
     canViewContabilidad: canContabilidad,
-    canViewTrazabilidad: canTrazabilidad,
     canViewClientesPanel: canClientes,
     canViewUsuariosPanel: canUsuariosPanel,
     onGoPipeline: () => canPipeline && setView("pipeline"),
@@ -249,7 +242,6 @@ export default function App() {
     onGoBarrios: () => canBarrios && setView("barrios"),
     onGoInventario: () => canInventario && setView("inventario"),
     onGoContabilidad: () => canContabilidad && setView("contabilidad"),
-    onGoTrazabilidad: () => canTrazabilidad && setView("trazabilidad"),
     onGoClientes: () => canClientes && setView("clientes"),
     onGoUsuarios: () => canUsuariosPanel && setView("usuarios"),
     onLogout: handleLogout,
@@ -263,7 +255,6 @@ export default function App() {
     if (view === "barrios") return <NeighborhoodsPage {...pageProps} />;
     if (view === "inventario") return <InventoryPage {...pageProps} />;
     if (view === "contabilidad") return <AccountingPage {...pageProps} />;
-    if (view === "trazabilidad") return <TraceabilityPage {...pageProps} />;
     if (view === "clientes") return <ClientsPage {...pageProps} />;
 
     return (

@@ -22,7 +22,6 @@ export function UsersManagementPage({
   canViewBarrios,
   canViewInventario,
   canViewContabilidad,
-  canViewTrazabilidad,
   canViewClientesPanel,
   onGoPipeline,
   onGoPedidos,
@@ -31,7 +30,6 @@ export function UsersManagementPage({
   onGoBarrios,
   onGoInventario,
   onGoContabilidad,
-  onGoTrazabilidad,
   onGoClientes,
   onGoUsuarios,
   onLogout,
@@ -45,7 +43,6 @@ export function UsersManagementPage({
     barrios: canViewBarrios,
     inventario: canViewInventario,
     contabilidad: canViewContabilidad,
-    trazabilidad: canViewTrazabilidad,
     clientes: canViewClientesPanel,
     usuarios: true,
   };
@@ -57,7 +54,6 @@ export function UsersManagementPage({
     barrios: onGoBarrios,
     inventario: onGoInventario,
     contabilidad: onGoContabilidad,
-    trazabilidad: onGoTrazabilidad,
     clientes: onGoClientes,
     usuarios: onGoUsuarios,
   };

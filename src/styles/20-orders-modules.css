@@ -1128,8 +1128,8 @@
   color: #8a3d57;
 }
 
-/* Pedidos-style card chrome for "Crear usuario" / "Habilitación comercial de
-   módulos": rounder corners, soft shadow and a bold section-title heading to
+/* Pedidos-style card chrome for "Crear usuario" / "Habilitaciï¿½n comercial de
+   mï¿½dulos": rounder corners, soft shadow and a bold section-title heading to
    match .orders-page-section / .orders-section-title elsewhere on this page. */
 .users-page-view .order-block {
   border-radius: 16px;
@@ -1205,10 +1205,10 @@
   flex: 1 1 160px;
 }
 
-/* Sin color-scheme:light explícito, Edge/Chrome puede pintar el texto nativo
+/* Sin color-scheme:light explï¿½cito, Edge/Chrome puede pintar el texto nativo
    de un <select> cerrado con el color de enlace del tema del sistema (se ve
    azul y subrayado) sin que ninguna propiedad `color` del autor lo controle.
-   Esto también evita que el picker se pinte en modo oscuro si el SO lo está. */
+   Esto tambiï¿½n evita que el picker se pinte en modo oscuro si el SO lo estï¿½. */
 .users-page-view {
   color-scheme: light;
 }
@@ -1235,7 +1235,7 @@
 }
 
 /* El campo de Empresa se renderiza como <input readOnly> (no <select>) para
-   usuarios sin alcance global, y heredaba el fondo rosado genérico de los
+   usuarios sin alcance global, y heredaba el fondo rosado genï¿½rico de los
    inputs normales en vez del blanco que usan Sucursal/Estado, rompiendo la
    consistencia visual de la fila de filtros. */
 .users-filters .orders-filter-control input[readonly] {
@@ -1245,8 +1245,8 @@
 }
 
 /* Los selects/inputs de la fila de filtros truncaban su propio texto
-   ("Todos los estad…", "…o log…") porque el ancho de columna no dejaba
-   espacio suficiente junto al ícono; se permite que el texto respire y,
+   ("Todos los estadï¿½", "ï¿½o logï¿½") porque el ancho de columna no dejaba
+   espacio suficiente junto al ï¿½cono; se permite que el texto respire y,
    si de verdad no cabe, se recorta con elipsis en vez de cortarse a la mitad. */
 .users-filters .orders-filter-control,
 .orders-header-search {
@@ -2925,14 +2925,6 @@
 
 .sidebar-brand-subtitle {
   color: rgba(138, 50, 82, 0.68);
-}
-
-.traceability-view .orders-table-wrap {
-  margin-top: 12px;
-}
-
-.traceability-view .accounting-summary-cards {
-  margin-bottom: 14px;
 }
 
 /* Premium SaaS sidebar */

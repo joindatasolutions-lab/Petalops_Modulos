@@ -134,7 +134,7 @@ function resolveCatalogTenantSlug(session) {
   return String(session?.empresaSlug || "").trim();
 }
 
-export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canViewCatalogo, canViewProduccion, canViewDomicilios, canViewBarrios, canViewInventario, canViewContabilidad, canViewTrazabilidad, canViewClientesPanel, canViewUsuariosPanel, onLogout, onGoPipeline, onGoPedidos, onGoProduccion, onGoDomicilios, onGoBarrios, onGoInventario, onGoContabilidad, onGoTrazabilidad, onGoClientes, onGoUsuarios }) {
+export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canViewCatalogo, canViewProduccion, canViewDomicilios, canViewBarrios, canViewInventario, canViewContabilidad, canViewClientesPanel, canViewUsuariosPanel, onLogout, onGoPipeline, onGoPedidos, onGoProduccion, onGoDomicilios, onGoBarrios, onGoInventario, onGoContabilidad, onGoClientes, onGoUsuarios }) {
   const [filters, setFilters] = useState(initialFilters);
   const [selectedPedidoId, setSelectedPedidoId] = useState(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -1836,7 +1836,6 @@ const ordersOverlayOpen = drawerOpen || newOrderOpen || messageCardOpen || Boole
             barrios: canViewBarrios,
             inventario: canViewInventario,
             contabilidad: canViewContabilidad,
-            trazabilidad: canViewTrazabilidad,
             clientes: canViewClientesPanel,
             usuarios: canViewUsuariosPanel,
           }}
@@ -1848,7 +1847,6 @@ const ordersOverlayOpen = drawerOpen || newOrderOpen || messageCardOpen || Boole
             barrios: onGoBarrios,
             inventario: onGoInventario,
             contabilidad: onGoContabilidad,
-            trazabilidad: onGoTrazabilidad,
             clientes: onGoClientes,
             usuarios: onGoUsuarios,
           }}

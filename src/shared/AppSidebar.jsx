@@ -38,7 +38,6 @@ const SIDEBAR_SECTIONS = [
     label: "ADMINISTRACIÓN",
     items: [
       { key: "contabilidad", label: "Contabilidad", Icon: Receipt, canViewKey: "contabilidad", goKey: "contabilidad" },
-      { key: "trazabilidad", label: "Trazabilidad", Icon: Workflow, canViewKey: "trazabilidad", goKey: "trazabilidad" },
       { key: "clientes", label: "Clientes", Icon: UsersRound, canViewKey: "clientes", goKey: "clientes" },
       { key: "usuarios", label: "Gestión usuarios", Icon: ShieldUser, canViewKey: "usuarios", goKey: "usuarios" },
     ],

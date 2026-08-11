@@ -1272,7 +1272,7 @@ function buildPaginationItems(page, pages) {
   return [1, "ellipsis-start", currentPage - 1, currentPage, currentPage + 1, "ellipsis-end", totalPages];
 }
 
-export function ProductionPage({ session, canViewPipeline, canViewPedidos, canViewCatalogo, canViewProduccion, canViewDomicilios, canViewBarrios, canViewInventario, canViewContabilidad, canViewTrazabilidad, canViewClientesPanel, canViewUsuariosPanel, onLogout, onGoPipeline, onGoPedidos, onGoProduccion, onGoDomicilios, onGoBarrios, onGoInventario, onGoContabilidad, onGoTrazabilidad, onGoClientes, onGoUsuarios }) {
+export function ProductionPage({ session, canViewPipeline, canViewPedidos, canViewCatalogo, canViewProduccion, canViewDomicilios, canViewBarrios, canViewInventario, canViewContabilidad, canViewClientesPanel, canViewUsuariosPanel, onLogout, onGoPipeline, onGoPedidos, onGoProduccion, onGoDomicilios, onGoBarrios, onGoInventario, onGoContabilidad, onGoClientes, onGoUsuarios }) {
   const api = useMemo(() => createApiClient(tenantConfig), []);
   const empresaId = Number(session?.empresaID || tenantConfig.empresaId);
   const sucursalId = Number(session?.sucursalID || tenantConfig.sucursalId);
@@ -2190,7 +2190,6 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
           barrios: canViewBarrios,
           inventario: canViewInventario,
           contabilidad: canViewContabilidad,
-          trazabilidad: canViewTrazabilidad,
           clientes: canViewClientesPanel,
           usuarios: canViewUsuariosPanel,
         }}
@@ -2205,7 +2204,6 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
           barrios: onGoBarrios,
           inventario: onGoInventario,
           contabilidad: onGoContabilidad,
-          trazabilidad: onGoTrazabilidad,
           clientes: onGoClientes,
           usuarios: onGoUsuarios,
         }}
