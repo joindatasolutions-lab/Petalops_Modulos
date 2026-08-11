@@ -1,4 +1,4 @@
-﻿import { useCallback, useEffect, useMemo, useState } from "react";
+﻿import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CheckCircle2, ListChecks, RotateCw, Timer, Truck } from "lucide-react";
 import { tenantConfig } from "../../config/tenantConfig.js";
 import { createApiClient } from "../../infrastructure/apiClient.js";
@@ -41,6 +41,7 @@ export function PipelineOperativo({
   const [auditError, setAuditError] = useState("");
   const [auditData, setAuditData] = useState({ resumen: [], detalle: [], total: 0 });
   const [processingPedidoIds, setProcessingPedidoIds] = useState([]);
+  const loadBoardRequestIdRef = useRef(0);
 
   const empresaId = Number(session?.empresaID || tenantConfig.empresaId);
   const sucursalFromSession = session?.sucursalID != null ? Number(session.sucursalID) : null;
@@ -50,6 +51,8 @@ export function PipelineOperativo({
   const pipelineMetrics = useMemo(() => buildPipelineMetrics(board), [board]);
 
   const loadBoard = useCallback(async () => {
+    const requestId = (loadBoardRequestIdRef.current += 1);
+    const isStaleRequest = () => loadBoardRequestIdRef.current !== requestId;
     setLoading(true);
     setError("");
     try {
@@ -65,11 +68,13 @@ export function PipelineOperativo({
         soloAtrasados: filters.soloAtrasados,
         soloEnProduccion: filters.soloEnProduccion,
       });
+      if (isStaleRequest()) return;
       setBoard(normalizePipelineBoard(data));
     } catch (nextError) {
+      if (isStaleRequest()) return;
       setError(nextError?.message || "No fue posible cargar el pipeline.");
     } finally {
-      setLoading(false);
+      if (!isStaleRequest()) setLoading(false);
     }
   }, [activeSucursalId, api, empresaId, filters]);
 
