@@ -572,6 +572,18 @@ export function nextFloristaStatus(status) {
   return null;
 }
 
+// Espeja las transiciones que el backend realmente permite
+// (petalops.transicion_estado_produccion). El selector manual de "Cambiar
+// estado" mostraba TODOS los estados menos el actual, incluyendo retrocesos
+// invalidos (ej. ParaEntrega -> EnProduccion) que el backend rechaza con 400
+// pero que confundian al usuario (parecia que el pedido "regresaba" de estado).
+export function validNextStatesForManualChange(status) {
+  const normalized = normalizeStatus(status).replace(/_/g, "");
+  if (normalized === "PENDIENTE") return ["EnProduccion", "Cancelado"];
+  if (normalized === "ENPRODUCCION") return ["ParaEntrega", "Cancelado"];
+  return [];
+}
+
 function nextFloristaLabel(status) {
   const next = nextFloristaStatus(status);
   if (next === "EnProduccion") return "Iniciar producción";
@@ -3121,7 +3133,7 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
                           title="Seleccionar nuevo estado"
                         >
                           <option value="">Estado...</option>
-                          {ESTADOS_UI.filter(state => normalizeStatus(state) !== normalizeStatus(selectedItem.estado)).map(state => (
+                          {validNextStatesForManualChange(selectedItem.estado).map(state => (
                             <option key={state} value={state}>{state}</option>
                           ))}
                         </select>
