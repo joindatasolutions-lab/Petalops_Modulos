@@ -1,6 +1,5 @@
 import {
   IconBuildingFactory,
-  IconClipboardData,
   IconEyeCog,
   IconNumbers,
   IconPackages,
@@ -40,8 +39,4 @@ export function UsuariosMenuIcon() {
 
 export function ContabilidadMenuIcon() {
   return <IconNumbers stroke={2} size={20} color="currentColor" />;
-}
-
-export function TrazabilidadMenuIcon() {
-  return <IconClipboardData stroke={2} size={20} color="currentColor" />;
 }

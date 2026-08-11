@@ -124,7 +124,6 @@ describe("ProductionPage recalculo de produccion", () => {
       canViewBarrios: true,
       canViewInventario: true,
       canViewContabilidad: true,
-      canViewTrazabilidad: true,
       canViewClientesPanel: true,
       canViewUsuariosPanel: true,
       onLogout: vi.fn(),
@@ -135,7 +134,6 @@ describe("ProductionPage recalculo de produccion", () => {
       onGoBarrios: vi.fn(),
       onGoInventario: vi.fn(),
       onGoContabilidad: vi.fn(),
-      onGoTrazabilidad: vi.fn(),
       onGoClientes: vi.fn(),
       onGoUsuarios: vi.fn(),
     });
@@ -173,7 +171,6 @@ describe("ProductionPage recalculo de produccion", () => {
       canViewBarrios: true,
       canViewInventario: true,
       canViewContabilidad: true,
-      canViewTrazabilidad: true,
       canViewClientesPanel: true,
       canViewUsuariosPanel: true,
       onLogout: vi.fn(),
@@ -184,7 +181,6 @@ describe("ProductionPage recalculo de produccion", () => {
       onGoBarrios: vi.fn(),
       onGoInventario: vi.fn(),
       onGoContabilidad: vi.fn(),
-      onGoTrazabilidad: vi.fn(),
       onGoClientes: vi.fn(),
       onGoUsuarios: vi.fn(),
     });

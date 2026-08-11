@@ -5,7 +5,6 @@ export const MODULE_HELP = {
   domicilios: "Permite asignar, enrutar y cerrar entregas con evidencia.",
   barrios: "Permite administrar barrios, zonas y costos de domicilio.",
   contabilidad: "Permite revisar resumen de ventas y cierre operativo de caja.",
-  trazabilidad: "Permite revisar aprobaciones y acciones operativas por usuario.",
   catalogo: "Permite consultar productos y referencias comerciales.",
   clientes: "Permite consultar y administrar la base de clientes.",
   inventario: "Permite administrar stock, insumos y movimientos de inventario.",

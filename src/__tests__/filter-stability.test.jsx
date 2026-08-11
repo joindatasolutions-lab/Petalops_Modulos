@@ -28,7 +28,6 @@ import {
   shouldIncludeCanceledProduction,
   shouldShowFloristaStateAction,
 } from "../domain/production/ProductionPage.jsx";
-import { filterByUserText } from "../domain/traceability/TraceabilityPage.jsx";
 import { filterVisibleRoles } from "../domain/users/UsersManagementPage.jsx";
 
 describe("estabilidad de filtros por vista", () => {
@@ -730,17 +729,6 @@ describe("estabilidad de filtros por vista", () => {
     expect(filterAccountingDetailRows(rows, "saldo").map(row => row.pedidoID)).toEqual([2]);
     expect(filterAccountingDetailRows(rows, "cancelados").map(row => row.pedidoID)).toEqual([3]);
     expect(filterAccountingDetailRows(rows, "conNotas").map(row => row.pedidoID)).toEqual([4]);
-  });
-
-  it("Trazabilidad: filtra por usuario, cliente o pedido", () => {
-    const rows = [
-      { usuario: "florista.demo", cliente: "Ana", pedidoID: 96610 },
-      { usuario: "admin", cliente: "Beatriz", pedidoID: 100 },
-    ];
-
-    expect(filterByUserText(rows, "florista")).toEqual([rows[0]]);
-    expect(filterByUserText(rows, "Beatriz")).toEqual([rows[1]]);
-    expect(filterByUserText(rows, "96610")).toEqual([rows[0]]);
   });
 
   it("Barrios: combina estado, zona, costo y busqueda", () => {

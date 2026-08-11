@@ -51,7 +51,6 @@ export function AccountingPage({
   canViewBarrios,
   canViewInventario,
   canViewContabilidad,
-  canViewTrazabilidad,
   canViewClientesPanel,
   canViewUsuariosPanel,
   onGoPipeline,
@@ -61,7 +60,6 @@ export function AccountingPage({
   onGoBarrios,
   onGoInventario,
   onGoContabilidad,
-  onGoTrazabilidad,
   onGoClientes,
   onGoUsuarios,
   onLogout,
@@ -826,7 +824,6 @@ export function AccountingPage({
           barrios: canViewBarrios,
           inventario: canViewInventario,
           contabilidad: canViewContabilidad,
-          trazabilidad: canViewTrazabilidad,
           clientes: canViewClientesPanel,
           usuarios: canViewUsuariosPanel,
         }}
@@ -838,7 +835,6 @@ export function AccountingPage({
           barrios: onGoBarrios,
           inventario: onGoInventario,
           contabilidad: onGoContabilidad,
-          trazabilidad: onGoTrazabilidad,
           clientes: onGoClientes,
           usuarios: onGoUsuarios,
         }}

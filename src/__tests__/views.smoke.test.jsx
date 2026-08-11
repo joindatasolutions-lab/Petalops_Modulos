@@ -11,7 +11,6 @@ import { NeighborhoodsPage } from "../domain/neighborhoods/NeighborhoodsPage.jsx
 import { OrdersAdminPage } from "../domain/orders-admin/OrdersAdminPage.jsx";
 import { PipelineOperativo } from "../domain/pipeline/PipelineOperativo.jsx";
 import { ProductionPage } from "../domain/production/ProductionPage.jsx";
-import { TraceabilityPage } from "../domain/traceability/TraceabilityPage.jsx";
 import { UsersManagementPage } from "../domain/users/UsersManagementPage.jsx";
 
 const noop = () => {};
@@ -33,7 +32,6 @@ const session = {
     "barrios",
     "inventario",
     "contabilidad",
-    "trazabilidad",
     "clientes",
     "usuarios",
   ],
@@ -49,7 +47,6 @@ const pageProps = {
   canViewBarrios: true,
   canViewInventario: true,
   canViewContabilidad: true,
-  canViewTrazabilidad: true,
   canViewClientesPanel: true,
   canViewUsuariosPanel: true,
   canViewUsuariosGlobal: true,
@@ -61,7 +58,6 @@ const pageProps = {
   onGoBarrios: noop,
   onGoInventario: noop,
   onGoContabilidad: noop,
-  onGoTrazabilidad: noop,
   onGoClientes: noop,
   onGoUsuarios: noop,
 };
@@ -75,7 +71,6 @@ const views = [
   ["Barrios", <NeighborhoodsPage {...pageProps} />],
   ["Inventario", <InventoryPage {...pageProps} />],
   ["Contabilidad", <AccountingPage {...pageProps} />],
-  ["Trazabilidad", <TraceabilityPage {...pageProps} />],
   ["Clientes", <ClientsPage {...pageProps} />],
   ["Usuarios", <UsersManagementPage {...pageProps} />],
 ];
