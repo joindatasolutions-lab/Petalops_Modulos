@@ -182,6 +182,360 @@ export function buildPaymentAccountRows(items) {
       return a.cuenta.localeCompare(b.cuenta);
     });
 }
+function firstText(...values) {
+  for (const value of values) {
+    const text = String(value ?? "").trim();
+    if (text) return text;
+  }
+  return "";
+}
+function firstNumber(...values) {
+  for (const value of values) {
+    const number = Number(value);
+    if (Number.isFinite(number) && number > 0) return number;
+  }
+  return 0;
+}
+function uniqueCount(values) {
+  return new Set(values.filter(Boolean).map(value => String(value))).size;
+}
+function normalizeLookupKey(value) {
+  return String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .toLowerCase();
+}
+function statusBucket(value, fallbackCancelado = false) {
+  const status = normalizeStatus(value);
+  if (fallbackCancelado || status === "CANCELADO" || status === "RECHAZADO") return "cancelados";
+  if (["LISTO", "ENTREGADO", "COMPLETADO", "FINALIZADO", "APROBADO"].includes(status)) return "completados";
+  if (["EN_PROCESO", "EN_PRODUCCION", "EN_RUTA", "ASIGNADO"].includes(status)) return "enProceso";
+  return "pendientes";
+}
+export function normalizePersonnelMetricRow(raw, type = "florista") {
+  if (!raw || typeof raw !== "object") return null;
+  const isFlorist = type === "florista";
+  const id = firstNumber(
+    raw.id,
+    raw.empleadoID,
+    raw.empleadoId,
+    raw.empleado_id,
+    isFlorist ? raw.floristaID : raw.domiciliarioID,
+    isFlorist ? raw.floristaId : raw.domiciliarioId,
+    isFlorist ? raw.florista_id : raw.domiciliario_id
+  );
+  const nombre = firstText(
+    raw.nombre,
+    raw.nombreEmpleado,
+    raw.nombre_empleado,
+    raw.empleado,
+    isFlorist ? raw.florista : raw.domiciliario,
+    isFlorist ? raw.nombreFlorista : raw.nombreDomiciliario,
+    isFlorist ? raw.floristaNombre : raw.domiciliarioNombre
+  ) || (isFlorist ? "Sin florista" : "Sin domiciliario");
+  const pedidos = Number(raw.pedidos ?? raw.cantidadPedidos ?? raw.cantidad_pedidos ?? raw.total ?? raw.asignados ?? 0);
+  const arreglos = Number(raw.arreglos ?? raw.unidades ?? raw.unidadesVendidas ?? raw.producciones ?? 0);
+  const entregas = Number(raw.entregas ?? raw.cantidadEntregas ?? raw.cantidad_entregas ?? raw.total ?? raw.asignados ?? raw.entregados ?? 0);
+  const completados = Number(raw.completados ?? raw.listo ?? raw.listos ?? raw.entregadas ?? raw.entregados ?? 0);
+  const pendientes = Number(raw.pendientes ?? raw.pendiente ?? 0);
+  const enProceso = Number(raw.enProceso ?? raw.en_proceso ?? raw.enRuta ?? raw.en_ruta ?? 0);
+  const cancelados = Number(raw.cancelados ?? raw.cancelado ?? raw.noEntregadas ?? raw.noEntregados ?? raw.no_entregadas ?? raw.no_entregados ?? 0);
+  const reprogramadas = Number(raw.reprogramadas ?? raw.reprogramados ?? 0);
+  const reasignaciones = Number(raw.reasignaciones ?? raw.reasignados ?? 0);
+  const totalVendido = roundMoney(raw.totalVendido ?? raw.total_vendido ?? raw.venta ?? raw.totalVenta ?? raw.total_venta ?? 0);
+  const totalDomicilios = roundMoney(raw.totalDomicilios ?? raw.total_domicilios ?? raw.domicilios ?? raw.totalDomicilio ?? raw.costoDomicilioTotal ?? raw.costo_domicilio_total ?? raw.costoTotal ?? 0);
+  const tiempoPromedioMin = roundMoney(raw.tiempoPromedioMin ?? raw.tiempo_promedio_min ?? raw.tiempoPromedio ?? 0);
+  const tipo = firstText(raw.tipo, raw.tipoEmpleado, raw.tipo_empleado, raw.categoria, raw.modalidad) || "Sin tipo";
+  const promedio = isFlorist
+    ? (arreglos > 0 ? roundMoney(totalVendido / arreglos) : 0)
+    : (entregas > 0 ? roundMoney(totalDomicilios / entregas) : 0);
+  return {
+    key: `${type}-${id || nombre.toLowerCase()}`,
+    id: id || null,
+    nombre,
+    pedidos,
+    arreglos,
+    entregas,
+    completados,
+    pendientes,
+    enProceso,
+    cancelados,
+    reprogramadas,
+    reasignaciones,
+    totalVendido,
+    totalDomicilios,
+    tiempoPromedioMin,
+    promedio,
+    tipo,
+    barrios: Array.isArray(raw.barrios) ? raw.barrios : [],
+  };
+}
+export function buildFloristMetricRows(rows) {
+  return (Array.isArray(rows) ? rows : [])
+    .map(row => normalizePersonnelMetricRow(row, "florista"))
+    .filter(Boolean)
+    .sort((a, b) => b.totalVendido - a.totalVendido || b.arreglos - a.arreglos || a.nombre.localeCompare(b.nombre));
+}
+export function buildFloristMetricRowsFromProductionItems(rows) {
+  const grouped = new Map();
+  for (const item of Array.isArray(rows) ? rows : []) {
+    const id = firstNumber(
+      item?.floristaID,
+      item?.floristaId,
+      item?.florista_id,
+      item?.empleadoID,
+      item?.empleadoId,
+      item?.empleado_id,
+      item?.idFlorista,
+      item?.florista?.idFlorista,
+      item?.florista?.id,
+      item?.empleado?.id
+    );
+    const nombre = firstText(
+      item?.floristaAsignado,
+      item?.floristaNombre,
+      item?.nombreFlorista,
+      item?.florista,
+      item?.nombre_florista,
+      item?.empleado,
+      item?.florista?.nombre,
+      item?.empleado?.nombre
+    );
+    if (!id && !nombre) continue;
+    const key = `florista-${id || normalizeLookupKey(nombre)}`;
+    const current = grouped.get(key) || {
+      key,
+      id: id || null,
+      nombre: nombre || "Sin florista",
+      pedidoIds: [],
+      arreglos: 0,
+      totalVendido: 0,
+      completados: 0,
+      pendientes: 0,
+      enProceso: 0,
+      cancelados: 0,
+      tiempoTotalMin: 0,
+      tiempoConteo: 0,
+      reasignaciones: 0,
+      tipo: firstText(item?.tipoFlorista, item?.floristaTipo, item?.florista?.tipo) || "Sin tipo",
+    };
+    current.id = current.id || id || null;
+    current.nombre = current.nombre === "Sin florista" && nombre ? nombre : current.nombre;
+    current.pedidoIds.push(firstText(item?.pedidoID, item?.pedidoId, item?.idPedido, item?.numeroPedido, item?.codigoPedido));
+    current.arreglos += Number(item?.cantidad ?? item?.unidades ?? item?.cantidadProductos ?? 1);
+    current.totalVendido += Number(item?.totalVendido ?? item?.totalVenta ?? item?.subtotal ?? item?.valor ?? item?.precio ?? 0);
+    current[statusBucket(item?.estadoProduccion || item?.estado_produccion || item?.estado)] += 1;
+    const tiempo = Number(item?.tiempoRealMin ?? item?.tiempo_real_min ?? item?.tiempoProduccionMin ?? item?.tiempo_produccion_min ?? 0);
+    if (Number.isFinite(tiempo) && tiempo > 0) {
+      current.tiempoTotalMin += tiempo;
+      current.tiempoConteo += 1;
+    }
+    current.reasignaciones += Number(item?.reasignaciones ?? item?.reasignados ?? 0);
+    grouped.set(key, current);
+  }
+  return Array.from(grouped.values()).map(item => ({
+    key: item.key,
+    id: item.id,
+    nombre: item.nombre,
+    pedidos: uniqueCount(item.pedidoIds),
+    arreglos: roundMoney(item.arreglos),
+    totalVendido: roundMoney(item.totalVendido),
+    completados: item.completados,
+    pendientes: item.pendientes,
+    enProceso: item.enProceso,
+    cancelados: item.cancelados,
+    reasignaciones: item.reasignaciones,
+    tiempoPromedioMin: item.tiempoConteo > 0 ? roundMoney(item.tiempoTotalMin / item.tiempoConteo) : 0,
+    promedio: item.arreglos > 0 ? roundMoney(item.totalVendido / item.arreglos) : 0,
+    tipo: item.tipo,
+  })).sort((a, b) => b.arreglos - a.arreglos || b.totalVendido - a.totalVendido || a.nombre.localeCompare(b.nombre));
+}
+export function enrichFloristMetricRowsWithDirectory(metricRows, directoryRows) {
+  const byId = new Map();
+  const byName = new Map();
+  for (const item of Array.isArray(directoryRows) ? directoryRows : []) {
+    const id = firstNumber(
+      item?.id,
+      item?.idFlorista,
+      item?.floristaID,
+      item?.floristaId,
+      item?.florista_id,
+      item?.empleadoID,
+      item?.empleadoId,
+      item?.empleado_id
+    );
+    const name = firstText(item?.nombre, item?.nombreFlorista, item?.nombre_florista, item?.nombreEmpleado, item?.nombre_empleado);
+    const tipo = firstText(item?.tipo, item?.tipoFlorista, item?.tipo_florista, item?.origen, item?.modalidad);
+    const estado = firstText(item?.estado, item?.estadoFlorista, item?.estado_florista);
+    const normalized = {
+      id: id || null,
+      tipo: tipo ? (tipo.toLowerCase().includes("extern") ? "Externo" : tipo.toLowerCase().includes("intern") ? "Interno" : tipo) : "Sin tipo",
+      estado,
+    };
+    if (id) byId.set(Number(id), normalized);
+    const nameKey = normalizeLookupKey(name);
+    if (nameKey) byName.set(nameKey, normalized);
+  }
+  return (Array.isArray(metricRows) ? metricRows : []).map(row => {
+    const match = (row?.id != null ? byId.get(Number(row.id)) : null) || byName.get(normalizeLookupKey(row?.nombre));
+    if (!match) return row;
+    return {
+      ...row,
+      id: row?.id ?? match.id,
+      tipo: row?.tipo && row.tipo !== "Sin tipo" ? row.tipo : match.tipo,
+      estado: row?.estado || match.estado,
+    };
+  });
+}
+export function buildDeliveryPersonMetricRows(rows) {
+  return (Array.isArray(rows) ? rows : [])
+    .map(row => normalizePersonnelMetricRow(row, "domiciliario"))
+    .filter(Boolean)
+    .sort((a, b) => b.totalDomicilios - a.totalDomicilios || b.entregas - a.entregas || a.nombre.localeCompare(b.nombre));
+}
+export function enrichDeliveryPersonMetricRowsWithDirectory(metricRows, directoryRows) {
+  const byId = new Map();
+  const byName = new Map();
+  for (const item of Array.isArray(directoryRows) ? directoryRows : []) {
+    const id = firstNumber(
+      item?.id,
+      item?.idDomiciliario,
+      item?.domiciliarioID,
+      item?.domiciliarioId,
+      item?.domiciliarioid,
+      item?.domiciliario_id,
+      item?.id_domiciliario,
+      item?.empleadoID,
+      item?.empleadoId,
+      item?.empleado_id
+    );
+    const name = firstText(item?.nombre, item?.nombreDomiciliario, item?.nombre_domiciliario, item?.nombreEmpleado, item?.nombre_empleado);
+    const tipo = firstText(item?.tipo, item?.tipoDomiciliario, item?.tipo_domiciliario, item?.origen, item?.modalidad);
+    if (!tipo) continue;
+    const normalized = {
+      id: id || null,
+      tipo: tipo.toLowerCase().includes("extern") ? "Externo" : tipo.toLowerCase().includes("intern") ? "Interno" : tipo,
+    };
+    if (id) byId.set(Number(id), normalized);
+    const nameKey = normalizeLookupKey(name);
+    if (nameKey) byName.set(nameKey, normalized);
+  }
+  return (Array.isArray(metricRows) ? metricRows : []).map(row => {
+    if (row?.tipo && row.tipo !== "Sin tipo") return row;
+    const match = (row?.id != null ? byId.get(Number(row.id)) : null) || byName.get(normalizeLookupKey(row?.nombre));
+    return match ? { ...row, id: row?.id ?? match.id, tipo: match.tipo } : row;
+  });
+}
+export function buildPersonnelMetricsFromAccountingDetails(rows) {
+  const florists = new Map();
+  const deliveryPeople = new Map();
+  for (const row of Array.isArray(rows) ? rows : []) {
+    const pedidoId = firstText(row.pedidoID, row.pedidoId, row.idPedido, row.numeroPedido, row.codigoPedido);
+    const isCanceled = Boolean(row.cancelado) || ["CANCELADO", "RECHAZADO"].includes(normalizeStatus(row.estado));
+    const totalVenta = roundMoney(row.totalVenta ?? row.total_venta ?? row.total ?? 0);
+    const totalArreglos = roundMoney(row.totalArreglos ?? row.total_arreglos ?? row.subtotalArreglos ?? row.subtotal ?? totalVenta);
+    const totalDomicilios = roundMoney(row.totalDomicilios ?? row.total_domicilios ?? row.domicilio ?? row.costoDomicilio ?? 0);
+
+    const floristaId = firstNumber(row.floristaID, row.floristaId, row.florista_id, row.empleadoFloristaID, row.produccion?.floristaID, row.produccion?.empleado_id);
+    const floristaNombre = firstText(row.floristaAsignado, row.floristaNombre, row.nombreFlorista, row.florista, row.produccion?.floristaAsignado, row.produccion?.nombreFlorista, row.produccion?.empleado);
+    if (floristaId || floristaNombre) {
+      const key = `florista-${floristaId || floristaNombre.toLowerCase()}`;
+      const current = florists.get(key) || {
+        key,
+        id: floristaId || null,
+        nombre: floristaNombre || "Sin florista",
+        pedidoIds: [],
+        arreglos: 0,
+        totalVendido: 0,
+        completados: 0,
+        pendientes: 0,
+        enProceso: 0,
+        cancelados: 0,
+        tiempoTotalMin: 0,
+        tiempoConteo: 0,
+        reasignaciones: 0,
+        tipo: firstText(row.tipoFlorista, row.floristaTipo, row.produccion?.tipoFlorista, row.produccion?.tipo) || "Sin tipo",
+      };
+      current.pedidoIds.push(pedidoId);
+      current.arreglos += Number(row.arreglos ?? row.unidades ?? row.cantidadProductos ?? 1);
+      current.totalVendido += totalArreglos;
+      current[statusBucket(row.estadoProduccion || row.estado_produccion || row.produccion?.estado || row.estado, isCanceled)] += 1;
+      const tiempo = Number(row.tiempoRealMin ?? row.tiempo_real_min ?? row.produccion?.tiempoRealMin ?? row.produccion?.tiempo_real_min ?? 0);
+      if (Number.isFinite(tiempo) && tiempo > 0) {
+        current.tiempoTotalMin += tiempo;
+        current.tiempoConteo += 1;
+      }
+      current.reasignaciones += Number(row.reasignaciones ?? row.produccion?.reasignaciones ?? 0);
+      florists.set(key, current);
+    }
+
+    const domiciliarioId = firstNumber(row.domiciliarioID, row.domiciliarioId, row.domiciliario_id, row.entrega?.domiciliarioID, row.entrega?.domiciliarioid);
+    const domiciliarioNombre = firstText(row.domiciliarioNombre, row.nombreDomiciliario, row.domiciliario, row.entrega?.domiciliarioNombre, row.entrega?.domiciliario);
+    if (domiciliarioId || domiciliarioNombre) {
+      const key = `domiciliario-${domiciliarioId || domiciliarioNombre.toLowerCase()}`;
+      const current = deliveryPeople.get(key) || {
+        key,
+        id: domiciliarioId || null,
+        nombre: domiciliarioNombre || "Sin domiciliario",
+        pedidoIds: [],
+        entregas: 0,
+        totalDomicilios: 0,
+        completados: 0,
+        pendientes: 0,
+        enProceso: 0,
+        cancelados: 0,
+        reprogramadas: 0,
+        tipo: firstText(row.tipoDomiciliario, row.domiciliarioTipo, row.entrega?.tipoDomiciliario, row.entrega?.tipoDomiciliarioNombre, row.entrega?.tipo) || "Sin tipo",
+        barriosMap: new Map(),
+      };
+      current.pedidoIds.push(pedidoId);
+      current.entregas += 1;
+      current.totalDomicilios += totalDomicilios;
+      current[statusBucket(row.estadoEntrega || row.estado_entrega || row.entrega?.estado || row.estado, isCanceled)] += 1;
+      current.reprogramadas += Number(row.reprogramadas ?? row.entrega?.reprogramadas ?? (row.reprogramadaPara || row.entrega?.reprogramadaPara ? 1 : 0));
+      const barrio = firstText(row.barrio, row.barrioNombre, row.entrega?.barrio, row.entrega?.barrioNombre);
+      if (barrio) current.barriosMap.set(barrio, (current.barriosMap.get(barrio) || 0) + 1);
+      deliveryPeople.set(key, current);
+    }
+  }
+
+  const floristaRows = Array.from(florists.values()).map(item => ({
+    key: item.key,
+    id: item.id,
+    nombre: item.nombre,
+    pedidos: uniqueCount(item.pedidoIds),
+    arreglos: roundMoney(item.arreglos),
+    totalVendido: roundMoney(item.totalVendido),
+    completados: item.completados,
+    pendientes: item.pendientes,
+    enProceso: item.enProceso,
+    cancelados: item.cancelados,
+    reasignaciones: item.reasignaciones,
+    tiempoPromedioMin: item.tiempoConteo > 0 ? roundMoney(item.tiempoTotalMin / item.tiempoConteo) : 0,
+    promedio: item.arreglos > 0 ? roundMoney(item.totalVendido / item.arreglos) : 0,
+    tipo: item.tipo,
+  })).sort((a, b) => b.totalVendido - a.totalVendido || b.arreglos - a.arreglos || a.nombre.localeCompare(b.nombre));
+
+  const domiciliarioRows = Array.from(deliveryPeople.values()).map(item => ({
+    key: item.key,
+    id: item.id,
+    nombre: item.nombre,
+    pedidos: uniqueCount(item.pedidoIds),
+    entregas: item.entregas,
+    totalDomicilios: roundMoney(item.totalDomicilios),
+    completados: item.completados,
+    pendientes: item.pendientes,
+    enProceso: item.enProceso,
+    cancelados: item.cancelados,
+    reprogramadas: item.reprogramadas,
+    promedio: item.entregas > 0 ? roundMoney(item.totalDomicilios / item.entregas) : 0,
+    tipo: item.tipo,
+    barrios: Array.from(item.barriosMap.entries()).map(([nombre, entregas]) => ({ nombre, entregas })).sort((a, b) => b.entregas - a.entregas),
+  })).sort((a, b) => b.totalDomicilios - a.totalDomicilios || b.entregas - a.entregas || a.nombre.localeCompare(b.nombre));
+
+  return { floristaRows, domiciliarioRows };
+}
 export function extractPaymentEntries(financiero) {
   const breakdownCandidates = [
     financiero?.detallePago,

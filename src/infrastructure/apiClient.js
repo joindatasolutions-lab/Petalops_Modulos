@@ -1003,6 +1003,15 @@ export function createApiClient(config) {
       return requestJson(`/contabilidad/resumen?${params.toString()}`);
     },
 
+    async obtenerResumenFloristasContabilidad({ empresaId, sucursalId, fechaDesde, fechaHasta }) {
+      const params = new URLSearchParams();
+      params.set("empresaID", String(empresaId));
+      if (sucursalId != null && Number.isFinite(Number(sucursalId))) params.set("sucursalID", String(sucursalId));
+      params.set("fechaDesde", String(fechaDesde));
+      params.set("fechaHasta", String(fechaHasta));
+      return requestJson(`/contabilidad/floristas/resumen?${params.toString()}`);
+    },
+
     async listarCierresCaja({ empresaId, sucursalId, fechaDesde, fechaHasta }) {
       const params = new URLSearchParams();
       params.set("empresaID", String(empresaId));

@@ -5,16 +5,17 @@ import { createApiClient } from "../../infrastructure/apiClient.js";
 import { AppSidebar } from "../../shared/AppSidebar.jsx";
 import { useSidebarState } from "../../shared/useSidebarState.js";
 import { formatearCOP, normalizeStatus } from "../../shared/utils.js";
-import { Activity, BadgeDollarSign, Banknote, BarChart3, Brain, CalendarDays, ChevronDown, CircleAlert, CircleCheck, Columns3, CreditCard, Download, FileSpreadsheet, FileText, Filter, ListChecks, MoreHorizontal, Package, Receipt, RefreshCw, Search, ShoppingCart, Sparkles, Tag, Wallet, XCircle } from "lucide-react";
+import { Activity, BadgeDollarSign, Banknote, BarChart3, Brain, CalendarDays, ChevronDown, CircleAlert, CircleCheck, Columns3, CreditCard, Download, FileSpreadsheet, FileText, Filter, ListChecks, MoreHorizontal, Package, Receipt, RefreshCw, Search, ShoppingCart, Sparkles, Tag, Truck, Users, Wallet, XCircle } from "lucide-react";
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { AccountingRanking, AccountingSalesTooltip, renderBarChartRows } from "./AccountingViewParts.jsx";
-import { buildAccountingRows, buildArrangementRows, buildPaymentAccountRows, fetchOrdersForAccounting, filterAccountingDetailRows, formatAccountingLocalDate, formatAdjustmentNotesForExport, getAccountingPeriodRange, getAdjustmentNoteItems, hasCashClosingData, normalizeCashClosingRow, normalizeCashSummaryRow, parseMoneyInput, roundMoney } from "./accountingDomain.js";
+import { buildAccountingRows, buildArrangementRows, buildDeliveryPersonMetricRows, buildFloristMetricRows, buildPaymentAccountRows, buildPersonnelMetricsFromAccountingDetails, enrichDeliveryPersonMetricRowsWithDirectory, fetchOrdersForAccounting, filterAccountingDetailRows, formatAccountingLocalDate, formatAdjustmentNotesForExport, getAccountingPeriodRange, getAdjustmentNoteItems, hasCashClosingData, normalizeCashClosingRow, normalizeCashSummaryRow, parseMoneyInput, roundMoney } from "./accountingDomain.js";
 export { filterAccountingDetailRows } from "./accountingDomain.js";
 
 const ACCOUNTING_VIEWS = [
   { key: "ventas", label: "Ventas" },
   { key: "detalle", label: "Saldos/Desc." },
   { key: "arreglos", label: "Métricas por arreglo" },
+  { key: "personal", label: "Personal" },
   { key: "cuentas", label: "Cuentas de pago" },
   { key: "caja", label: "Caja" },
 ];
@@ -23,6 +24,7 @@ const ACCOUNTING_VIEW_ICONS = {
   ventas: Receipt,
   detalle: ListChecks,
   arreglos: BarChart3,
+  personal: Users,
   cuentas: CreditCard,
   caja: Wallet,
 };
@@ -66,7 +68,11 @@ export function AccountingPage({
 }) {
   const api = useMemo(() => createApiClient(tenantConfig), []);
   const empresaId = Number(session?.empresaID || tenantConfig.empresaId);
-  const sucursalId = Number(session?.sucursalID || tenantConfig.sucursalId);
+  const sessionSucursalValue = session?.sucursalID ?? session?.sucursalId ?? session?.sucursal_id;
+  const selectedSucursalId = sessionSucursalValue != null && String(sessionSucursalValue).trim() !== ""
+    ? Number(sessionSucursalValue)
+    : null;
+  const sucursalId = Number.isFinite(selectedSucursalId) ? selectedSucursalId : Number(tenantConfig.sucursalId);
   const displayUserName = useMemo(
     () => String(session?.nombre || session?.login || "Usuario").trim() || "Usuario",
     [session]
@@ -74,6 +80,9 @@ export function AccountingPage({
 
   const { sidebarPinned, sidebarMobileOpen, setSidebarMobileOpen, toggleSidebar } = useSidebarState();
   const [activeView, setActiveView] = useState("ventas");
+  const [personnelMode, setPersonnelMode] = useState("domiciliarios");
+  const [personnelTypeFilter, setPersonnelTypeFilter] = useState("todos");
+  const [personnelSearch, setPersonnelSearch] = useState("");
   const [accountingMenuOpen, setAccountingMenuOpen] = useState(false);
   const accountingMenuRef = useRef(null);
   const [filters, setFilters] = useState(() => {
@@ -95,6 +104,8 @@ export function AccountingPage({
   const [orderRows, setOrderRows] = useState([]);
   const [arrangementRows, setArrangementRows] = useState([]);
   const [paymentAccountRows, setPaymentAccountRows] = useState([]);
+  const [floristMetricRows, setFloristMetricRows] = useState([]);
+  const [deliveryPersonMetricRows, setDeliveryPersonMetricRows] = useState([]);
   const [accountingDetailRows, setAccountingDetailRows] = useState([]);
   const [detailFilter, setDetailFilter] = useState("todos");
   const [selectedAccountingCase, setSelectedAccountingCase] = useState(null);
@@ -115,18 +126,84 @@ export function AccountingPage({
       setOrderRows(Array.isArray(payload?.orderRows) ? payload.orderRows : []);
       setArrangementRows(Array.isArray(payload?.arrangementRows) ? payload.arrangementRows : []);
       setPaymentAccountRows(Array.isArray(payload?.paymentAccountRows) ? payload.paymentAccountRows : []);
-      setAccountingDetailRows(Array.isArray(payload?.accountingDetailRows) ? payload.accountingDetailRows : []);
+      const nextDetailRows = Array.isArray(payload?.accountingDetailRows) ? payload.accountingDetailRows : [];
+      const derivedPersonnelRows = buildPersonnelMetricsFromAccountingDetails(nextDetailRows);
+      const nextDeliveryRows = buildDeliveryPersonMetricRows(
+        Array.isArray(payload?.deliveryPersonRows) ? payload.deliveryPersonRows
+          : Array.isArray(payload?.domiciliarioRows) ? payload.domiciliarioRows
+            : Array.isArray(payload?.domiciliarios) ? payload.domiciliarios
+              : []
+      );
+      let resolvedFloristRows = [];
+      let resolvedDeliveryRows = nextDeliveryRows.length > 0 ? nextDeliveryRows : derivedPersonnelRows.domiciliarioRows;
+      try {
+        const floristPayload = await api.obtenerResumenFloristasContabilidad({
+          empresaId,
+          sucursalId: Number.isFinite(selectedSucursalId) ? selectedSucursalId : null,
+          fechaDesde: filters.fechaDesde,
+          fechaHasta: filters.fechaHasta,
+        });
+        const floristRows = Array.isArray(floristPayload?.floristRows) ? floristPayload.floristRows
+          : Array.isArray(floristPayload?.data?.floristRows) ? floristPayload.data.floristRows
+            : [];
+        resolvedFloristRows = buildFloristMetricRows(floristRows);
+      } catch (personnelError) {
+        if (personnelError?.status !== 404) console.warn("Resumen de floristas de contabilidad no disponible:", personnelError);
+      }
+      if (resolvedDeliveryRows.length === 0) {
+        try {
+          const deliveryPayload = await api.obtenerMetricasDomicilios({
+            empresaId,
+            sucursalId,
+            fechaDesde: filters.fechaDesde,
+            fechaHasta: filters.fechaHasta,
+            agruparPor: "domiciliario",
+          });
+          const deliveryRows = Array.isArray(deliveryPayload?.porDomiciliario) ? deliveryPayload.porDomiciliario
+            : Array.isArray(deliveryPayload?.domiciliarios) ? deliveryPayload.domiciliarios
+              : Array.isArray(deliveryPayload?.domiciliarioRows) ? deliveryPayload.domiciliarioRows
+                : Array.isArray(deliveryPayload?.items) ? deliveryPayload.items
+                  : Array.isArray(deliveryPayload) ? deliveryPayload
+                    : [];
+          resolvedDeliveryRows = buildDeliveryPersonMetricRows(deliveryRows);
+        } catch (personnelError) {
+          if (personnelError?.status !== 404) console.warn("Metricas de domiciliarios no disponibles para contabilidad:", personnelError);
+        }
+      }
+      if (resolvedDeliveryRows.length > 0) {
+        try {
+          const courierPayload = await api.listarDomiciliarios({
+            empresaId,
+            sucursalId,
+            soloActivos: false,
+          });
+          const courierRows = Array.isArray(courierPayload?.items) ? courierPayload.items
+            : Array.isArray(courierPayload?.domiciliarios) ? courierPayload.domiciliarios
+              : Array.isArray(courierPayload) ? courierPayload
+                : [];
+          resolvedDeliveryRows = enrichDeliveryPersonMetricRowsWithDirectory(resolvedDeliveryRows, courierRows);
+        } catch (personnelError) {
+          if (personnelError?.status !== 404) console.warn("Directorio de domiciliarios no disponible para contabilidad:", personnelError);
+        }
+      }
+      resolvedFloristRows = resolvedFloristRows.filter(row => row?.id != null || (row?.nombre && row.nombre !== "Sin florista"));
+      resolvedDeliveryRows = resolvedDeliveryRows.filter(row => row?.id != null);
+      setAccountingDetailRows(nextDetailRows);
+      setFloristMetricRows(resolvedFloristRows);
+      setDeliveryPersonMetricRows(resolvedDeliveryRows);
     } catch (nextError) {
       console.error("Error cargando contabilidad:", nextError);
       setOrderRows([]);
       setArrangementRows([]);
       setPaymentAccountRows([]);
+      setFloristMetricRows([]);
+      setDeliveryPersonMetricRows([]);
       setAccountingDetailRows([]);
       setError(nextError?.message || "No fue posible cargar el modulo de contabilidad.");
     } finally {
       setLoading(false);
     }
-  }, [api, empresaId, sucursalId, filters.fechaDesde, filters.fechaHasta]);
+  }, [api, empresaId, selectedSucursalId, sucursalId, filters.fechaDesde, filters.fechaHasta]);
 
   useEffect(() => {
     loadAccountingData();
@@ -436,6 +513,124 @@ export function AccountingPage({
     }), { cuentas: 0, pedidos: 0, recaudo: 0 });
   }, [paymentAccountRows]);
   const topPaymentAccount = paymentAccountRows[0] || null;
+
+  const personnelSummary = useMemo(() => {
+    const floristTotals = floristMetricRows.reduce((acc, item) => ({
+      personas: acc.personas + 1,
+      pedidos: acc.pedidos + Number(item.pedidos || 0),
+      arreglos: acc.arreglos + Number(item.arreglos || 0),
+      totalVendido: acc.totalVendido + Number(item.totalVendido || 0),
+      completados: acc.completados + Number(item.completados || 0),
+      cancelados: acc.cancelados + Number(item.cancelados || 0),
+    }), { personas: 0, pedidos: 0, arreglos: 0, totalVendido: 0, completados: 0, cancelados: 0 });
+    const deliveryTotals = deliveryPersonMetricRows.reduce((acc, item) => ({
+      personas: acc.personas + 1,
+      pedidos: acc.pedidos + Number(item.pedidos || 0),
+      entregas: acc.entregas + Number(item.entregas || 0),
+      totalDomicilios: acc.totalDomicilios + Number(item.totalDomicilios || 0),
+      completados: acc.completados + Number(item.completados || 0),
+      cancelados: acc.cancelados + Number(item.cancelados || 0),
+      reprogramadas: acc.reprogramadas + Number(item.reprogramadas || 0),
+    }), { personas: 0, pedidos: 0, entregas: 0, totalDomicilios: 0, completados: 0, cancelados: 0, reprogramadas: 0 });
+    return {
+      floristas: {
+        ...floristTotals,
+        totalVendido: roundMoney(floristTotals.totalVendido),
+        promedioArreglo: floristTotals.arreglos > 0 ? roundMoney(floristTotals.totalVendido / floristTotals.arreglos) : 0,
+        lider: floristMetricRows[0] || null,
+      },
+      domiciliarios: {
+        ...deliveryTotals,
+        totalDomicilios: roundMoney(deliveryTotals.totalDomicilios),
+        promedioEntrega: deliveryTotals.entregas > 0 ? roundMoney(deliveryTotals.totalDomicilios / deliveryTotals.entregas) : 0,
+        lider: deliveryPersonMetricRows[0] || null,
+      },
+    };
+  }, [deliveryPersonMetricRows, floristMetricRows]);
+
+  const personnelDashboardRows = useMemo(() => {
+    const sourceRows = personnelMode === "floristas" ? floristMetricRows : deliveryPersonMetricRows;
+    const search = personnelSearch.trim().toLowerCase();
+    return sourceRows.filter(item => {
+      const matchesType = personnelTypeFilter === "todos" || String(item.tipo || "Sin tipo") === personnelTypeFilter;
+      const searchable = [
+        item.nombre,
+        item.tipo,
+        item.id,
+        ...(Array.isArray(item.barrios) ? item.barrios.map(barrio => barrio.nombre) : []),
+      ].join(" ").toLowerCase();
+      return matchesType && (!search || searchable.includes(search));
+    });
+  }, [deliveryPersonMetricRows, floristMetricRows, personnelMode, personnelSearch, personnelTypeFilter]);
+
+  const personnelTypeOptions = useMemo(() => {
+    const sourceRows = personnelMode === "floristas" ? floristMetricRows : deliveryPersonMetricRows;
+    return Array.from(new Set(sourceRows.map(item => String(item.tipo || "Sin tipo").trim() || "Sin tipo"))).sort((a, b) => a.localeCompare(b));
+  }, [deliveryPersonMetricRows, floristMetricRows, personnelMode]);
+
+  useEffect(() => {
+    if (personnelTypeFilter === "todos") return;
+    if (!personnelTypeOptions.includes(personnelTypeFilter)) setPersonnelTypeFilter("todos");
+  }, [personnelTypeFilter, personnelTypeOptions]);
+
+  const personnelDashboardSummary = useMemo(() => {
+    const totalRows = personnelMode === "floristas" ? floristMetricRows : deliveryPersonMetricRows;
+    const totals = personnelDashboardRows.reduce((acc, item) => ({
+      personas: acc.personas + 1,
+      pedidos: acc.pedidos + Number(item.pedidos || 0),
+      unidades: acc.unidades + Number(personnelMode === "floristas" ? item.arreglos || 0 : item.entregas || 0),
+      total: acc.total + Number(personnelMode === "floristas" ? item.totalVendido || 0 : item.totalDomicilios || 0),
+      completados: acc.completados + Number(item.completados || 0),
+      enProceso: acc.enProceso + Number(item.enProceso || 0),
+      pendientes: acc.pendientes + Number(item.pendientes || 0),
+      cancelados: acc.cancelados + Number(item.cancelados || 0),
+      reprogramadas: acc.reprogramadas + Number(item.reprogramadas || 0),
+      tiempoTotal: acc.tiempoTotal + Number(item.tiempoPromedioMin || 0),
+      tiempoConteo: acc.tiempoConteo + (Number(item.tiempoPromedioMin || 0) > 0 ? 1 : 0),
+    }), {
+      personas: 0,
+      pedidos: 0,
+      unidades: 0,
+      total: 0,
+      completados: 0,
+      enProceso: 0,
+      pendientes: 0,
+      cancelados: 0,
+      reprogramadas: 0,
+      tiempoTotal: 0,
+      tiempoConteo: 0,
+    });
+    const typeRows = Array.from(personnelDashboardRows.reduce((map, item) => {
+      const tipo = String(item.tipo || "Sin tipo").trim() || "Sin tipo";
+      const current = map.get(tipo) || { key: tipo, label: tipo, value: 0, total: 0 };
+      current.value += Number(personnelMode === "floristas" ? item.arreglos || 0 : item.entregas || 0);
+      current.total += Number(personnelMode === "floristas" ? item.totalVendido || 0 : item.totalDomicilios || 0);
+      map.set(tipo, current);
+      return map;
+    }, new Map()).values()).sort((a, b) => b.value - a.value || b.total - a.total);
+    const dayRows = orderRows.map(row => ({
+      key: row.fecha,
+      label: row.fecha,
+      shortLabel: String(row.fecha || "").slice(5),
+      value: Number(row.cantidadPedidos || 0),
+    })).filter(row => row.value > 0);
+    const leader = [...personnelDashboardRows].sort((a, b) => {
+      const totalA = Number(personnelMode === "floristas" ? a.totalVendido || 0 : a.totalDomicilios || 0);
+      const totalB = Number(personnelMode === "floristas" ? b.totalVendido || 0 : b.totalDomicilios || 0);
+      return totalB - totalA;
+    })[0] || null;
+    return {
+      ...totals,
+      personasDisponibles: totalRows.length,
+      total: roundMoney(totals.total),
+      promedio: totals.unidades > 0 ? roundMoney(totals.total / totals.unidades) : 0,
+      cumplimientoPct: totals.unidades > 0 ? roundMoney((totals.completados / totals.unidades) * 100) : 0,
+      tiempoPromedioMin: totals.tiempoConteo > 0 ? roundMoney(totals.tiempoTotal / totals.tiempoConteo) : 0,
+      typeRows,
+      dayRows,
+      leader,
+    };
+  }, [deliveryPersonMetricRows, floristMetricRows, orderRows, personnelDashboardRows, personnelMode]);
 
   const executiveMetrics = useMemo(() => {
     const ticketPromedio = summaryTotals.cantidadPedidos > 0
@@ -790,6 +985,49 @@ export function AccountingPage({
     );
   };
 
+  const exportPersonal = () => {
+    exportRowsToExcel(
+      [
+        ...floristMetricRows.map(item => ({
+          Tipo: "Florista",
+          Nombre: item.nombre,
+          Pedidos: item.pedidos,
+          Arreglos: item.arreglos,
+          Entregas: "",
+          "Total asociado": item.totalVendido,
+          Promedio: item.promedio,
+          Completados: item.completados,
+          "En proceso": item.enProceso,
+          Pendientes: item.pendientes,
+          Cancelados: item.cancelados,
+          Reprogramadas: "",
+          "Tiempo promedio min": item.tiempoPromedioMin,
+          Reasignaciones: item.reasignaciones,
+          Barrios: "",
+        })),
+        ...deliveryPersonMetricRows.map(item => ({
+          Tipo: "Domiciliario",
+          Nombre: item.nombre,
+          Pedidos: item.pedidos,
+          Arreglos: "",
+          Entregas: item.entregas,
+          "Total asociado": item.totalDomicilios,
+          Promedio: item.promedio,
+          Completados: item.completados,
+          "En proceso": item.enProceso,
+          Pendientes: item.pendientes,
+          Cancelados: item.cancelados,
+          Reprogramadas: item.reprogramadas,
+          "Tiempo promedio min": "",
+          Reasignaciones: "",
+          Barrios: Array.isArray(item.barrios) ? item.barrios.map(barrio => `${barrio.nombre} (${barrio.entregas})`).join(", ") : "",
+        })),
+      ],
+      `contabilidad-personal-${filters.fechaDesde}-${filters.fechaHasta}.xlsx`,
+      "Personal"
+    );
+  };
+
   const exportCaja = () => {
     exportRowsToExcel(
       cashHistoryRows.map(row => ({
@@ -806,6 +1044,15 @@ export function AccountingPage({
       "Caja"
     );
   };
+
+  const activeExportAction = (() => {
+    if (activeView === "detalle") return { onClick: exportDetalleVentas, disabled: filteredAccountingDetailRows.length === 0 };
+    if (activeView === "arreglos") return { onClick: exportArreglos, disabled: selectedArrangementRows.length === 0 };
+    if (activeView === "personal") return { onClick: exportPersonal, disabled: floristMetricRows.length === 0 && deliveryPersonMetricRows.length === 0 };
+    if (activeView === "cuentas") return { onClick: exportCuentas, disabled: paymentAccountRows.length === 0 };
+    if (activeView === "caja") return { onClick: exportCaja, disabled: cashHistoryRows.length === 0 };
+    return { onClick: exportVentas, disabled: orderRows.length === 0 };
+  })();
 
   return (
     <div className={`app-shell ${sidebarPinned ? "is-sidebar-pinned" : ""} ${sidebarMobileOpen ? "is-sidebar-mobile-open" : ""}`}>
@@ -840,7 +1087,7 @@ export function AccountingPage({
         }}
       />
 
-      <main className="orders-admin-view accounting-view accounting-page-view">
+      <main className={`orders-admin-view accounting-view accounting-page-view ${activeView === "personal" ? "is-personal-view" : ""}`}>
         <header className="orders-admin-header orders-page-header accounting-page-header">
           <div className="orders-page-heading">
             <div className="orders-page-breadcrumb" aria-label="Ruta">
@@ -909,6 +1156,7 @@ export function AccountingPage({
                 {loading ? "Actualizando..." : "Actualizar"}
             </button>
           </div>
+          {activeView !== "personal" ? (
           <div className="orders-header-metrics accounting-header-metrics" aria-label="Resumen contabilidad">
             <article className="orders-header-metric-card is-primary">
                 <span className="orders-header-metric-icon" aria-hidden="true"><ShoppingCart size={20} strokeWidth={2} /></span>
@@ -936,6 +1184,7 @@ export function AccountingPage({
                 <span>Ticket prom.</span>
               </article>
             </div>
+          ) : null}
           </div>
         </header>
 
@@ -996,7 +1245,7 @@ export function AccountingPage({
             </details>
           ) : null}
           <div className="accounting-filter-actions">
-            <button type="button" className="btn-outline accounting-export-btn" onClick={exportVentas} disabled={orderRows.length === 0}>
+            <button type="button" className="btn-outline accounting-export-btn" onClick={activeExportAction.onClick} disabled={activeExportAction.disabled}>
               <FileSpreadsheet size={15} strokeWidth={2} aria-hidden="true" />
               Exportar Excel
             </button>
@@ -1636,6 +1885,322 @@ export function AccountingPage({
                       <td>{item.unidades}</td>
                       <td>{item.pedidos}</td>
                       <td>${formatearCOP(item.totalVendido)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </section>
+          </section>
+        ) : null}
+
+        {activeView === "personal" ? (
+          <section className="accounting-personnel-dashboard">
+            <div className="looker-header accounting-arrangements-head">
+              <div>
+                <h4>{personnelMode === "floristas" ? "Metricas de Floristas" : "Metricas de Domiciliarios"}</h4>
+                <p className="orders-admin-subtitle">Control operativo y contable por persona en el periodo filtrado.</p>
+              </div>
+            </div>
+
+            <section className="accounting-personnel-toolbar">
+              <div className="accounting-personnel-segment" aria-label="Tipo de metrica">
+                <button type="button" className={personnelMode === "domiciliarios" ? "is-active" : ""} onClick={() => setPersonnelMode("domiciliarios")}>
+                  <Truck size={16} strokeWidth={2} aria-hidden="true" />
+                  Domiciliarios
+                </button>
+                <button type="button" className={personnelMode === "floristas" ? "is-active" : ""} onClick={() => setPersonnelMode("floristas")}>
+                  <Users size={16} strokeWidth={2} aria-hidden="true" />
+                  Floristas
+                </button>
+              </div>
+              <label>
+                Tipo
+                <select value={personnelTypeFilter} onChange={event => setPersonnelTypeFilter(event.target.value)}>
+                  <option value="todos">Todos</option>
+                  {personnelTypeOptions.map(tipo => (
+                    <option key={tipo} value={tipo}>{tipo}</option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                {personnelMode === "floristas" ? "Florista" : "Domiciliario"}
+                <input
+                  type="search"
+                  value={personnelSearch}
+                  onChange={event => setPersonnelSearch(event.target.value)}
+                  placeholder={personnelMode === "floristas" ? "Buscar florista" : "Buscar domiciliario"}
+                />
+              </label>
+              <button type="button" className="btn-outline" onClick={() => { setPersonnelTypeFilter("todos"); setPersonnelSearch(""); }}>
+                Limpiar
+              </button>
+            </section>
+
+            <section className="accounting-personnel-kpis">
+              {[
+                [personnelMode === "floristas" ? "Total de arreglos" : "Total de domicilios", personnelDashboardSummary.unidades, personnelMode === "floristas" ? "Arreglos realizados" : "Domicilios realizados", personnelMode === "floristas" ? Users : Truck],
+                [personnelMode === "floristas" ? "Pedidos trabajados" : "Pedidos entregados", personnelDashboardSummary.pedidos, "Total de pedidos", Package],
+                [personnelMode === "floristas" ? "Total vendido" : "Total costo en domicilios", `$${formatearCOP(personnelDashboardSummary.total)}`, personnelMode === "floristas" ? "Venta asociada" : "Costo total", Wallet],
+                [personnelMode === "floristas" ? "Promedio por arreglo" : "Costo promedio", `$${formatearCOP(personnelDashboardSummary.promedio)}`, personnelMode === "floristas" ? "Por arreglo" : "Por domicilio", Banknote],
+                [personnelMode === "floristas" ? "Floristas utilizados" : "Domiciliarios utilizados", personnelDashboardSummary.personas, personnelMode === "floristas" ? "Floristas activos" : "Domiciliarios activos", Users],
+              ].map(([label, value, helper, Icon]) => (
+                <article key={label} className="accounting-personnel-kpi">
+                  <span className="accounting-personnel-kpi-icon"><Icon size={20} strokeWidth={2} aria-hidden="true" /></span>
+                  <div>
+                    <span>{label}</span>
+                    <strong>{value}</strong>
+                    <small>{helper}</small>
+                  </div>
+                </article>
+              ))}
+            </section>
+
+            <section className="orders-table-wrap accounting-personnel-list">
+              <div className="accounting-cash-history-head">
+                <div>
+                  <h4>{personnelMode === "floristas" ? "Listado de Floristas" : "Listado de Domicilios"}</h4>
+                  <p className="orders-admin-subtitle">{personnelDashboardRows.length} registros filtrados.</p>
+                </div>
+              </div>
+              <table className="orders-table accounting-table accounting-personnel-table">
+                <thead>
+                  <tr>
+                    <th>ID</th>
+                    <th>{personnelMode === "floristas" ? "Florista" : "Domiciliario"}</th>
+                    <th>Tipo</th>
+                    {personnelMode === "floristas" ? <th>Pedidos</th> : null}
+                    <th>{personnelMode === "floristas" ? "Arreglos" : "Entregas"}</th>
+                    <th>{personnelMode === "floristas" ? "Venta asociada" : "Costo domicilio"}</th>
+                    <th>Promedio</th>
+                    <th>Completados</th>
+                    <th>En proceso</th>
+                    <th>Pendientes</th>
+                    <th>{personnelMode === "floristas" ? "Cancelados" : "No entregados"}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {personnelDashboardRows.length === 0 ? (
+                    <tr>
+                      <td colSpan={11}>No hay metricas para mostrar con estos filtros.</td>
+                    </tr>
+                  ) : personnelDashboardRows.map(item => (
+                    <tr key={item.key}>
+                      <td>{item.id || "-"}</td>
+                      <td><strong>{item.nombre}</strong></td>
+                      <td><span className="order-badge is-aprobado">{item.tipo || "Sin tipo"}</span></td>
+                      {personnelMode === "floristas" ? <td>{item.pedidos}</td> : null}
+                      <td>{personnelMode === "floristas" ? item.arreglos : item.entregas}</td>
+                      <td>${formatearCOP(personnelMode === "floristas" ? item.totalVendido : item.totalDomicilios)}</td>
+                      <td>${formatearCOP(item.promedio)}</td>
+                      <td>{item.completados}</td>
+                      <td>{item.enProceso}</td>
+                      <td>{item.pendientes}</td>
+                      <td>{item.cancelados}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </section>
+
+            <section className="accounting-personnel-bottom-grid">
+              <article className="accounting-chart-card accounting-personnel-totals">
+                <h5>Totales del periodo</h5>
+                <p><span>Pedidos</span><strong>{personnelDashboardSummary.pedidos}</strong></p>
+                <p><span>{personnelMode === "floristas" ? "Arreglos" : "Domicilios"}</span><strong>{personnelDashboardSummary.unidades}</strong></p>
+                <p><span>{personnelMode === "floristas" ? "Venta asociada" : "Total domicilio"}</span><strong>${formatearCOP(personnelDashboardSummary.total)}</strong></p>
+              </article>
+              <article className="accounting-chart-card">
+                <h5>{personnelMode === "floristas" ? "Floristas por tipo" : "Domicilios por tipo"}</h5>
+                {personnelDashboardSummary.typeRows.length === 0 ? <p className="accounting-empty-state">Sin datos.</p> : (
+                  <div className="accounting-bar-list">
+                    {renderBarChartRows(personnelDashboardSummary.typeRows, "value", false, "label")}
+                  </div>
+                )}
+              </article>
+              <article className="accounting-chart-card">
+                <h5>{personnelMode === "floristas" ? "Venta por florista" : "Costo por domiciliario"}</h5>
+                {personnelDashboardRows.length === 0 ? <p className="accounting-empty-state">Sin datos.</p> : (
+                  <div className="accounting-bar-list">
+                    {renderBarChartRows(personnelDashboardRows.slice(0, 6), personnelMode === "floristas" ? "totalVendido" : "totalDomicilios", true, "nombre")}
+                  </div>
+                )}
+              </article>
+              <article className="accounting-chart-card accounting-personnel-indicators">
+                <h5>Indicadores clave</h5>
+                <p><span>Cumplimiento</span><strong>{personnelDashboardSummary.cumplimientoPct}%</strong></p>
+                <p><span>{personnelMode === "floristas" ? "Lider por venta" : "Mayor costo acumulado"}</span><strong>{personnelDashboardSummary.leader?.nombre || "-"}</strong></p>
+                <p><span>{personnelMode === "floristas" ? "Tiempo promedio" : "Reprogramadas"}</span><strong>{personnelMode === "floristas" ? `${personnelDashboardSummary.tiempoPromedioMin} min` : personnelDashboardSummary.reprogramadas}</strong></p>
+              </article>
+            </section>
+          </section>
+        ) : null}
+
+        {false && activeView === "personal" ? (
+          <section className="order-block accounting-arrangements-panel accounting-personnel-panel">
+            <div className="looker-header accounting-arrangements-head">
+              <div>
+                <h4>MÃ©tricas por personal</h4>
+                <p className="orders-admin-subtitle">Ventas asociadas a floristas y domicilios asociados a domiciliarios en el periodo filtrado.</p>
+              </div>
+              <div className="accounting-arrangements-actions">
+                <button type="button" className="btn-outline" onClick={exportPersonal} disabled={floristMetricRows.length === 0 && deliveryPersonMetricRows.length === 0}>
+                  Descargar Excel
+                </button>
+              </div>
+            </div>
+
+            <section className="accounting-summary-cards accounting-summary-cards--personnel">
+              <article className="order-block accounting-stat-card">
+                <span>Floristas activos</span>
+                <strong>{personnelSummary.floristas.personas}</strong>
+              </article>
+              <article className="order-block accounting-stat-card">
+                <span>Arreglos producidos</span>
+                <strong>{personnelSummary.floristas.arreglos}</strong>
+              </article>
+              <article className="order-block accounting-stat-card">
+                <span>Venta por floristas</span>
+                <strong>${formatearCOP(personnelSummary.floristas.totalVendido)}</strong>
+              </article>
+              <article className="order-block accounting-stat-card">
+                <span>Domiciliarios activos</span>
+                <strong>{personnelSummary.domiciliarios.personas}</strong>
+              </article>
+              <article className="order-block accounting-stat-card">
+                <span>Entregas gestionadas</span>
+                <strong>{personnelSummary.domiciliarios.entregas}</strong>
+              </article>
+              <article className="order-block accounting-stat-card">
+                <span>Domicilios asociados</span>
+                <strong>${formatearCOP(personnelSummary.domiciliarios.totalDomicilios)}</strong>
+              </article>
+            </section>
+
+            <section className="accounting-analytics-panel accounting-personnel-ranking-panel">
+              <div className="accounting-panel-head">
+                <div>
+                  <span>Ranking operativo-contable</span>
+                  <h3>Productividad y dinero asociado</h3>
+                </div>
+                <Users size={22} strokeWidth={2} aria-hidden="true" />
+              </div>
+              <div className="accounting-ranking-grid">
+                <AccountingRanking title="Floristas por venta" rows={floristMetricRows.slice(0, 5)} valueField="totalVendido" labelField="nombre" isMoney />
+                <AccountingRanking title="Domiciliarios por domicilio" rows={deliveryPersonMetricRows.slice(0, 5)} valueField="totalDomicilios" labelField="nombre" isMoney />
+              </div>
+            </section>
+
+            <div className="accounting-chart-grid accounting-personnel-grid">
+              <article className="accounting-chart-card">
+                <div className="accounting-personnel-section-head">
+                  <div>
+                    <span>Floristas</span>
+                    <h5>Arreglos, pedidos y ventas</h5>
+                  </div>
+                  <Users size={20} strokeWidth={2} aria-hidden="true" />
+                </div>
+                {floristMetricRows.length === 0 ? (
+                  <p className="accounting-empty-state">No hay datos de floristas para este rango. El backend debe enviar floristaID/nombre en el resumen o detalle contable.</p>
+                ) : (
+                  <div className="accounting-bar-list">
+                    {renderBarChartRows(floristMetricRows.slice(0, 8), "totalVendido", true, "nombre")}
+                  </div>
+                )}
+              </article>
+              <article className="accounting-chart-card">
+                <div className="accounting-personnel-section-head">
+                  <div>
+                    <span>Domiciliarios</span>
+                    <h5>Entregas y recaudo domicilio</h5>
+                  </div>
+                  <Truck size={20} strokeWidth={2} aria-hidden="true" />
+                </div>
+                {deliveryPersonMetricRows.length === 0 ? (
+                  <p className="accounting-empty-state">No hay datos de domiciliarios para este rango. El backend debe enviar domiciliarioID/nombre en el resumen o detalle contable.</p>
+                ) : (
+                  <div className="accounting-bar-list">
+                    {renderBarChartRows(deliveryPersonMetricRows.slice(0, 8), "totalDomicilios", true, "nombre")}
+                  </div>
+                )}
+              </article>
+            </div>
+
+            <section className="orders-table-wrap">
+              <table className="orders-table accounting-table accounting-personnel-table">
+                <thead>
+                  <tr>
+                    <th>Florista</th>
+                    <th>Pedidos</th>
+                    <th>Arreglos</th>
+                    <th>Total vendido</th>
+                    <th>Promedio arreglo</th>
+                    <th>Listos</th>
+                    <th>En proceso</th>
+                    <th>Pendientes</th>
+                    <th>Cancelados</th>
+                    <th>Tiempo prom.</th>
+                    <th>Reasign.</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {floristMetricRows.length === 0 ? (
+                    <tr>
+                      <td colSpan={11}>No hay mÃ©tricas por florista para mostrar.</td>
+                    </tr>
+                  ) : floristMetricRows.map(item => (
+                    <tr key={item.key}>
+                      <td>{item.nombre}</td>
+                      <td>{item.pedidos}</td>
+                      <td>{item.arreglos}</td>
+                      <td>${formatearCOP(item.totalVendido)}</td>
+                      <td>${formatearCOP(item.promedio)}</td>
+                      <td>{item.completados}</td>
+                      <td>{item.enProceso}</td>
+                      <td>{item.pendientes}</td>
+                      <td>{item.cancelados}</td>
+                      <td>{item.tiempoPromedioMin ? `${item.tiempoPromedioMin} min` : "-"}</td>
+                      <td>{item.reasignaciones}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </section>
+
+            <section className="orders-table-wrap">
+              <table className="orders-table accounting-table accounting-personnel-table">
+                <thead>
+                  <tr>
+                    <th>Domiciliario</th>
+                    <th>Pedidos</th>
+                    <th>Entregas</th>
+                    <th>Total domicilios</th>
+                    <th>Promedio entrega</th>
+                    <th>Entregadas</th>
+                    <th>En ruta/asignadas</th>
+                    <th>Pendientes</th>
+                    <th>No entregadas</th>
+                    <th>Reprogramadas</th>
+                    <th>Barrios principales</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {deliveryPersonMetricRows.length === 0 ? (
+                    <tr>
+                      <td colSpan={11}>No hay mÃ©tricas por domiciliario para mostrar.</td>
+                    </tr>
+                  ) : deliveryPersonMetricRows.map(item => (
+                    <tr key={item.key}>
+                      <td>{item.nombre}</td>
+                      <td>{item.pedidos}</td>
+                      <td>{item.entregas}</td>
+                      <td>${formatearCOP(item.totalDomicilios)}</td>
+                      <td>${formatearCOP(item.promedio)}</td>
+                      <td>{item.completados}</td>
+                      <td>{item.enProceso}</td>
+                      <td>{item.pendientes}</td>
+                      <td>{item.cancelados}</td>
+                      <td>{item.reprogramadas}</td>
+                      <td>{Array.isArray(item.barrios) && item.barrios.length > 0 ? item.barrios.slice(0, 3).map(barrio => `${barrio.nombre} (${barrio.entregas})`).join(", ") : "-"}</td>
                     </tr>
                   ))}
                 </tbody>
