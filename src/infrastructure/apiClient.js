@@ -1012,6 +1012,16 @@ export function createApiClient(config) {
       return requestJson(`/contabilidad/floristas/resumen?${params.toString()}`);
     },
 
+    async obtenerPedidosDomiciliarioContabilidad({ empresaId, sucursalId, domiciliarioID, fechaDesde, fechaHasta, estadoEntrega }) {
+      const params = new URLSearchParams();
+      params.set("empresaID", String(empresaId));
+      params.set("sucursalID", String(sucursalId));
+      params.set("fechaDesde", String(fechaDesde));
+      params.set("fechaHasta", String(fechaHasta));
+      if (estadoEntrega) params.set("estadoEntrega", String(estadoEntrega));
+      return requestJson(`/contabilidad/domiciliarios/${domiciliarioID}/pedidos?${params.toString()}`);
+    },
+
     async listarCierresCaja({ empresaId, sucursalId, fechaDesde, fechaHasta }) {
       const params = new URLSearchParams();
       params.set("empresaID", String(empresaId));

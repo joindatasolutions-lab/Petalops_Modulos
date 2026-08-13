@@ -470,6 +470,164 @@
   white-space: nowrap !important;
 }
 
+.accounting-page-view .accounting-delivery-detail-panel {
+  display: grid !important;
+  gap: 14px !important;
+  padding: 18px 20px !important;
+}
+
+.accounting-page-view .accounting-delivery-detail-head {
+  align-items: center !important;
+  border-bottom: 1px solid #eef2f7 !important;
+  display: flex !important;
+  gap: 16px !important;
+  justify-content: space-between !important;
+  margin: 0 !important;
+  padding: 0 0 12px !important;
+}
+
+.accounting-page-view .accounting-delivery-detail-title {
+  display: grid !important;
+  gap: 4px !important;
+  min-width: 0 !important;
+}
+
+.accounting-page-view .accounting-delivery-detail-title > span {
+  color: #d9367a !important;
+  font-size: 11px !important;
+  font-weight: 950 !important;
+  letter-spacing: 0 !important;
+  text-transform: uppercase !important;
+}
+
+.accounting-page-view .accounting-delivery-detail-title h3 {
+  color: #0f172a !important;
+  font-size: 28px !important;
+  font-weight: 950 !important;
+  line-height: 1.05 !important;
+  margin: 0 !important;
+  max-width: 100% !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+
+.accounting-page-view .accounting-delivery-detail-title .orders-admin-subtitle {
+  color: #64748b !important;
+  font-size: 13px !important;
+  font-weight: 800 !important;
+  margin: 0 !important;
+}
+
+.accounting-page-view .accounting-delivery-detail-actions {
+  align-items: center !important;
+  display: flex !important;
+  flex-wrap: wrap !important;
+  gap: 8px !important;
+  justify-content: flex-end !important;
+}
+
+.accounting-page-view .accounting-delivery-detail-actions .btn-outline {
+  align-items: center !important;
+  display: inline-flex !important;
+  gap: 7px !important;
+  justify-content: center !important;
+  min-height: 40px !important;
+}
+
+.accounting-page-view .accounting-delivery-detail-filters {
+  align-items: center !important;
+  background: #f8fafc !important;
+  border: 1px solid #e8edf5 !important;
+  border-radius: 8px !important;
+  display: flex !important;
+  flex-wrap: wrap !important;
+  gap: 6px !important;
+  justify-content: flex-start !important;
+  padding: 6px !important;
+  width: fit-content !important;
+}
+
+.accounting-page-view .accounting-delivery-detail-filters button {
+  background: transparent !important;
+  border: 1px solid transparent !important;
+  border-radius: 7px !important;
+  color: #475569 !important;
+  cursor: pointer !important;
+  font-size: 12px !important;
+  font-weight: 900 !important;
+  min-height: 32px !important;
+  padding: 7px 12px !important;
+}
+
+.accounting-page-view .accounting-delivery-detail-filters button.is-active {
+  background: #ffffff !important;
+  border-color: #f1c7d9 !important;
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.06) !important;
+  color: #c02666 !important;
+}
+
+.accounting-page-view .accounting-delivery-detail-filters button:disabled {
+  cursor: not-allowed !important;
+  opacity: 0.65 !important;
+}
+
+.accounting-page-view .accounting-delivery-detail-kpis {
+  display: grid !important;
+  gap: 8px !important;
+  grid-template-columns: repeat(5, minmax(0, 1fr)) !important;
+  width: 100% !important;
+}
+
+.accounting-page-view .accounting-delivery-detail-kpi {
+  background: #ffffff !important;
+  border: 1px solid #e8edf5 !important;
+  border-left: 4px solid #e73578 !important;
+  border-radius: 8px !important;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.05) !important;
+  display: grid !important;
+  gap: 4px !important;
+  min-width: 0 !important;
+  padding: 11px 12px !important;
+}
+
+.accounting-page-view .accounting-delivery-detail-kpi:nth-child(2) {
+  border-left-color: #16a34a !important;
+}
+
+.accounting-page-view .accounting-delivery-detail-kpi:nth-child(3) {
+  border-left-color: #dc2626 !important;
+}
+
+.accounting-page-view .accounting-delivery-detail-kpi:nth-child(4) {
+  border-left-color: #2563eb !important;
+}
+
+.accounting-page-view .accounting-delivery-detail-kpi:nth-child(5) {
+  border-left-color: #7c3aed !important;
+}
+
+.accounting-page-view .accounting-delivery-detail-kpi span {
+  color: #64748b !important;
+  font-size: 10px !important;
+  font-weight: 950 !important;
+  letter-spacing: 0 !important;
+  text-transform: uppercase !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+
+.accounting-page-view .accounting-delivery-detail-kpi strong {
+  color: #0f172a !important;
+  font-size: 20px !important;
+  font-weight: 950 !important;
+  line-height: 1.05 !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+
 @media (max-width: 1280px) {
   .accounting-page-view .orders-page-header.accounting-page-header {
     grid-template-columns: minmax(0, 1fr) !important;
@@ -529,6 +687,7 @@
 
   .accounting-page-view .accounting-personnel-toolbar,
   .accounting-page-view .accounting-personnel-kpis,
+  .accounting-page-view .accounting-delivery-detail-kpis,
   .accounting-page-view .accounting-personnel-bottom-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
   }
@@ -554,7 +713,35 @@
 
   .accounting-page-view .accounting-personnel-toolbar,
   .accounting-page-view .accounting-personnel-kpis,
+  .accounting-page-view .accounting-delivery-detail-kpis,
   .accounting-page-view .accounting-personnel-bottom-grid {
     grid-template-columns: minmax(0, 1fr) !important;
+  }
+
+  .accounting-page-view .accounting-delivery-detail-head {
+    align-items: flex-start !important;
+    flex-direction: column !important;
+  }
+
+  .accounting-page-view .accounting-delivery-detail-actions {
+    width: 100% !important;
+  }
+
+  .accounting-page-view .accounting-delivery-detail-filters {
+    width: 100% !important;
+  }
+
+  .accounting-page-view .accounting-delivery-detail-filters button {
+    flex: 1 1 0 !important;
+  }
+
+  .accounting-page-view .accounting-delivery-detail-head .btn-outline {
+    flex: 1 1 0 !important;
+    width: 100% !important;
+  }
+
+  .accounting-page-view .accounting-delivery-detail-title h3 {
+    font-size: 23px !important;
+    white-space: normal !important;
   }
 }
