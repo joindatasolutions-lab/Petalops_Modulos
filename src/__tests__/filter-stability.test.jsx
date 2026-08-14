@@ -6,7 +6,7 @@ import { filterInventoryItems } from "../domain/inventory/InventoryPage.jsx";
 import { filterNeighborhoodItems, sortNeighborhoods } from "../domain/neighborhoods/NeighborhoodsPage.jsx";
 import { buildOrdersMetrics, extractOrdersPayloadItems, filterOrdersByCreatedDateRange, filterOrdersBySearch, filterOrdersByStatus, isStorePickupOrder, localDateEndParam, localDateStartParam, resolveOrdersPayloadTotal, shouldAutoGenerateInvoiceForCompany, shouldShowPendingInvoiceAlert } from "../domain/orders-admin/OrdersAdminPage.jsx";
 import { buildDetailUpdatePayload, buildNewOrderCheckoutPayload } from "../domain/orders-admin/orderPayloadBuilders.js";
-import { buildEditedOrderFinancialBase, buildOrderFinancialPreview, getOrderFinancialTotal, resolveOrderListTotal } from "../domain/orders-admin/ordersDomain.js";
+import { buildEditedOrderFinancialBase, buildOrderFinancialPreview, getOrderFinancialTotal, patchOrderItemFromDetail, resolveOrderListTotal } from "../domain/orders-admin/ordersDomain.js";
 import {
   buildVisibleProductionItems,
   catalogCodeCandidates,
@@ -208,6 +208,7 @@ describe("estabilidad de filtros por vista", () => {
       canEditClientIdentity: true,
     });
 
+    expect(payload.precioUnitario).toBe(85000);
     expect(payload.productoPrecio).toBe(85000);
     expect(payload.metodosPago).toEqual(["Efectivo"]);
   });
@@ -224,6 +225,27 @@ describe("estabilidad de filtros por vista", () => {
     expect(getOrderFinancialTotal(financiero)).toBe(1);
     expect(resolveOrderListTotal({ financiero })).toBe(1);
     expect(resolveOrderListTotal({ subtotal: 1, domicilio: 120000, omitirCostoDomicilio: true })).toBe(1);
+  });
+
+  it("Pedidos: actualiza item del listado desde financiero devuelto por detalle", () => {
+    const item = {
+      pedidoID: 97959,
+      estado: "APROBADO",
+      total: 100000,
+      facturaImpresa: true,
+      financiero: { subtotal: 90000, domicilio: 10000, total: 100000, facturaImpresa: true },
+    };
+    const detail = {
+      estado: "APROBADO",
+      financiero: { subtotal: 90000, iva: 0, domicilio: 15000, total: 105000, facturaImpresa: false },
+    };
+
+    const patched = patchOrderItemFromDetail(item, 97959, detail);
+
+    expect(patched.total).toBe(105000);
+    expect(patched.domicilio).toBe(15000);
+    expect(patched.facturaImpresa).toBe(false);
+    expect(patched.financiero.facturaImpresa).toBe(false);
   });
 
   it("Pedidos: checkout manual conserva cliente identificado por telefono", () => {

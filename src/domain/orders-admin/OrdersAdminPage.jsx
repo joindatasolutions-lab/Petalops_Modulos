@@ -55,7 +55,6 @@ import {
   applyDeliveryGiftOverrideToDetail,
   forgetDeliveryGiftOverride,
   getDeliveryFinancialOverride,
-  rememberDeliveryGiftOverride,
 } from "./deliveryGiftOverrides.js";
 
 import {
@@ -74,7 +73,6 @@ import {
   filterOrdersBySearch,
   filterOrdersByStatus,
   filterStorePickupOrders,
-  getOrderFinancialTotal,
   isCashPaymentMethod,
   isCustomArrangement,
   isEmpresaAdminRole,
@@ -87,6 +85,7 @@ import {
   normalizeOrderProducts,
   normalizePaymentMethods,
   normalizeWholePeso,
+  patchOrderItemFromDetail,
   resolveAssignedOrderNumber,
   resolveCatalogProduct,
   resolveFloristaName,
@@ -1055,32 +1054,7 @@ const openNewOrderModal = () => {
   };
 
   const patchOrderListItemFromDetail = (pedidoId, detail) => {
-    if (!pedidoId || !detail || detail.error) return;
-
-    setItems(current => current.map(item => {
-      if (Number(resolveOrderId(item)) !== Number(pedidoId)) return item;
-      const financiero = detail.financiero && typeof detail.financiero === "object" ? detail.financiero : {};
-      const detailTotal = getOrderFinancialTotal(financiero);
-      const nextTotal = detailTotal > 0 ? detailTotal : financiero.total;
-      return {
-        ...item,
-        total: nextTotal ?? item.total,
-        valorTotal: nextTotal ?? item.valorTotal,
-        totalPedido: nextTotal ?? item.totalPedido,
-        subtotal: financiero.subtotal ?? item.subtotal,
-        iva: financiero.iva ?? item.iva,
-        domicilio: financiero.domicilio ?? item.domicilio,
-        recargoLinkMonto: financiero.recargoLinkMonto ?? item.recargoLinkMonto,
-        descuentoMonto: financiero.descuentoMonto ?? item.descuentoMonto,
-        saldoFavorMonto: financiero.saldoFavorMonto ?? item.saldoFavorMonto,
-        domicilioObsequiado: financiero.domicilioObsequiado ?? detail.entrega?.domicilioObsequiado ?? detail.destinatario?.domicilioObsequiado ?? item.domicilioObsequiado,
-        omitirCostoDomicilio: financiero.omitirCostoDomicilio ?? detail.entrega?.omitirCostoDomicilio ?? detail.destinatario?.omitirCostoDomicilio ?? item.omitirCostoDomicilio,
-        financiero: {
-          ...(item.financiero || {}),
-          ...financiero,
-        },
-      };
-    }));
+    setItems(current => current.map(item => patchOrderItemFromDetail(item, pedidoId, detail)));
   };
 
   const updateNewOrderForm = (name, value) => {
@@ -1209,7 +1183,10 @@ const openNewOrderModal = () => {
     setIsEditingDetail(current => {
       const next = !current;
       if (!next) setIsDuplicatingDetail(false);
-      if (next) setDetailEditSubview("edit");
+      if (next) {
+        setDetailEditSubview("edit");
+        void loadBarrioOptions(detailEditBarrioNombre);
+      }
       return next;
     });
   };
@@ -1384,41 +1361,8 @@ const openNewOrderModal = () => {
         setIsDuplicatingDetail(false);
       } else {
         await api.actualizarDetallePedidoPipeline(buildDetailEditApiPayload(selectedPedidoId));
-        const keepGiftedDelivery = normalizeDeliveryType(detailEditBarrioNombre) !== "recogida_en_tienda" && Boolean(detailEditDomicilioObsequiado);
-        const deliveryFinancialPatch = detailEditFinancialPreview
-          ? {
-              subtotal: detailEditFinancialPreview.subtotal,
-              iva: detailEditFinancialPreview.iva,
-              domicilio: keepGiftedDelivery ? detailEditFinancialPreview.domicilioOriginal : detailEditFinancialPreview.domicilio,
-              domicilioOriginal: detailEditFinancialPreview.domicilioOriginal,
-              descuentoDomicilio: keepGiftedDelivery ? detailEditFinancialPreview.domicilioOriginal : 0,
-              recargoLinkMonto: detailEditFinancialPreview.recargoMonto,
-              descuentoMonto: detailEditFinancialPreview.descuentoMonto,
-              saldoFavorMonto: detailEditFinancialPreview.saldoFavorMonto,
-              total: detailEditFinancialPreview.total,
-              domicilioObsequiado: keepGiftedDelivery,
-              omitirCostoDomicilio: keepGiftedDelivery,
-            }
-          : null;
-        if (deliveryFinancialPatch) {
-          rememberDeliveryGiftOverride(selectedPedidoId, deliveryFinancialPatch);
-        } else {
-          forgetDeliveryGiftOverride(selectedPedidoId);
-        }
-        await reloadDrawer({
-          financiero: deliveryFinancialPatch || {
-            domicilioObsequiado: false,
-            omitirCostoDomicilio: false,
-          },
-          entrega: {
-            domicilioObsequiado: keepGiftedDelivery,
-            omitirCostoDomicilio: keepGiftedDelivery,
-          },
-          destinatario: {
-            domicilioObsequiado: keepGiftedDelivery,
-            omitirCostoDomicilio: keepGiftedDelivery,
-          },
-        });
+        forgetDeliveryGiftOverride(selectedPedidoId);
+        await reloadDrawer();
       }
       const hasCashPayment = Number.isFinite(paymentValidation.cashAmount) && paymentValidation.cashAmount > 0;
       if (hasCashPayment && typeof window !== "undefined") {

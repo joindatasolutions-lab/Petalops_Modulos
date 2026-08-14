@@ -17,6 +17,35 @@ import {
  * edicion para reducir la cantidad de props.
  */
 
+function FinancialPreviewSummary({ financialPreview, className = "" }) {
+  if (!financialPreview) return null;
+
+  return (
+    <div className={`order-detail-edit-adjustment-summary${className ? ` ${className}` : ""}`}>
+      <span><span>Subtotal</span><strong>${formatearCOP(financialPreview.subtotal)}</strong></span>
+      <span><span>IVA</span><strong>${formatearCOP(financialPreview.iva)}</strong></span>
+      <span>
+        <span>Domicilio</span>
+        <strong>${formatearCOP(financialPreview.domicilio)}</strong>
+      </span>
+      {financialPreview.domicilioObsequiado && financialPreview.domicilioOriginal > 0 ? (
+        <span><span>Domicilio obsequiado</span><strong>-${formatearCOP(financialPreview.domicilioOriginal)}</strong></span>
+      ) : null}
+      <span><span>Base</span><strong>${formatearCOP(financialPreview.baseTotal)}</strong></span>
+      {financialPreview.recargoMonto > 0 ? (
+        <span><span>Recargo link ({financialPreview.recargoPct}%)</span><strong>+${formatearCOP(financialPreview.recargoMonto)}</strong></span>
+      ) : null}
+      {financialPreview.descuentoMonto > 0 ? (
+        <span><span>Descuento</span><strong>-${formatearCOP(financialPreview.descuentoMonto)}</strong></span>
+      ) : null}
+      {financialPreview.saldoFavorMonto > 0 ? (
+        <span><span>Saldo a favor</span><strong>${formatearCOP(financialPreview.saldoFavorMonto)}</strong></span>
+      ) : null}
+      <span className="is-total"><span>Total ajustado</span><strong>${formatearCOP(financialPreview.total)}</strong></span>
+    </div>
+  );
+}
+
 export function OrderDetailProductSwitcher({
   products,
   selectedDetailId,
@@ -433,13 +462,6 @@ export function OrderDetailDeliverySection({
         <span>Domicilio obsequiado</span>
       </label>
 
-      {financialPreview?.domicilioObsequiado && financialPreview.domicilioOriginal > 0 ? (
-        <div className="order-detail-edit-adjustment-summary order-detail-edit-delivery-summary">
-          <span>Domicilio obsequiado: -${formatearCOP(financialPreview.domicilioOriginal)}</span>
-          <span>Total base + domicilio: ${formatearCOP(financialPreview.baseTotal)}</span>
-          <strong>Total ajustado: ${formatearCOP(financialPreview.total)}</strong>
-        </div>
-      ) : null}
     </>
   );
 }
@@ -640,22 +662,7 @@ export function OrderDetailPaymentSection({
                 placeholder="Razon del saldo a favor"
               />
             </label>
-            <div className="order-detail-edit-adjustment-summary">
-              {financialPreview.domicilioObsequiado && financialPreview.domicilioOriginal > 0 ? (
-                <span>Domicilio obsequiado: -${formatearCOP(financialPreview.domicilioOriginal)}</span>
-              ) : null}
-              <span>Total base + domicilio: ${formatearCOP(financialPreview.baseTotal)}</span>
-              {financialPreview.recargoMonto > 0 ? (
-                <span>Recargo link ({financialPreview.recargoPct}%): +${formatearCOP(financialPreview.recargoMonto)}</span>
-              ) : null}
-              {financialPreview.descuentoMonto > 0 ? (
-                <span>Descuento: -${formatearCOP(financialPreview.descuentoMonto)}</span>
-              ) : null}
-              {financialPreview.saldoFavorMonto > 0 ? (
-                <span>Saldo a favor: ${formatearCOP(financialPreview.saldoFavorMonto)}</span>
-              ) : null}
-              <strong>Total ajustado: ${formatearCOP(financialPreview.total)}</strong>
-            </div>
+            <FinancialPreviewSummary financialPreview={financialPreview} />
           </div>
         </div>
       ) : null}
