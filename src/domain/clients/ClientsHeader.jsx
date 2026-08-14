@@ -1,4 +1,4 @@
-import { BadgeCheck, BarChart3, Cake, ChevronDown, MailCheck, Plus, RefreshCw, UserCheck, UsersRound } from "lucide-react";
+import { BarChart3, ChevronDown, Plus, RefreshCw, UsersRound } from "lucide-react";
 import { CLIENTS_VIEWS } from "./clientsDomain.js";
 const CLIENTS_VIEW_ICONS = {
   clientes: UsersRound,
@@ -6,7 +6,6 @@ const CLIENTS_VIEW_ICONS = {
 };
 export function ClientsHeader({
   activeView,
-  clientsIntelligence,
   clientsMenuOpen,
   clientsMenuRef,
   loading,
@@ -49,7 +48,6 @@ export function ClientsHeader({
             <span>Agregar</span>
           </button>
         </div>
-        {activeView === "metricas" ? <ClientsHeaderMetrics clientsIntelligence={clientsIntelligence} /> : null}
       </div>
     </header>
   );
@@ -72,26 +70,6 @@ function ClientsViewMenu({ activeView, onSelectView }) {
           </button>
         );
       })}
-    </div>
-  );
-}
-function ClientsHeaderMetrics({ clientsIntelligence }) {
-  const cards = [
-    { key: "total", tone: "is-primary", Icon: UsersRound, value: clientsIntelligence.total, label: "Total clientes" },
-    { key: "activos", tone: "is-green", Icon: UserCheck, value: clientsIntelligence.activos, label: "Clientes activos" },
-    { key: "contactabilidad", tone: "is-blue", Icon: MailCheck, value: `${clientsIntelligence.contactabilidadPct}%`, label: "Contactabilidad" },
-    { key: "completitud", tone: "is-purple", Icon: BadgeCheck, value: `${clientsIntelligence.completitudPct}%`, label: "Ficha completa" },
-    { key: "fechas", tone: "is-orange", Icon: Cake, value: clientsIntelligence.cumpleMes + clientsIntelligence.aniversarioMes, label: "Fechas clave" },
-  ];
-  return (
-    <div className="orders-header-metrics clients-header-metrics" aria-label="Metricas de clientes">
-      {cards.map(({ key, tone, Icon, value, label }) => (
-        <article key={key} className={`orders-header-metric-card ${tone}`}>
-          <span className="orders-header-metric-icon" aria-hidden="true"><Icon size={16} strokeWidth={2} /></span>
-          <strong>{value}</strong>
-          <span>{label}</span>
-        </article>
-      ))}
     </div>
   );
 }
