@@ -131,6 +131,124 @@ describe("apiClient.listarPedidos", () => {
     expect(parsed.searchParams.get("soloActivos")).toBe("true");
   });
 
+  it("lista clientes enriquecidos con metricas", async () => {
+    const fetchMock = vi.fn(async () => ({
+      ok: true,
+      json: async () => ({ items: [] }),
+    }));
+    vi.stubGlobal("fetch", fetchMock);
+    vi.stubGlobal("localStorage", {
+      getItem: () => "token-test",
+    });
+
+    const api = createApiClient({ apiBaseUrl: "https://api.test" });
+    await api.listarClientes({
+      empresaId: 3,
+      includeMetrics: true,
+      page: 1,
+      pageSize: 50,
+    });
+
+    const [url] = fetchMock.mock.calls[0];
+    const parsed = new URL(url);
+
+    expect(parsed.pathname).toBe("/clientes");
+    expect(parsed.searchParams.get("empresaID")).toBe("3");
+    expect(parsed.searchParams.get("includeMetrics")).toBe("true");
+    expect(parsed.searchParams.get("page")).toBe("1");
+    expect(parsed.searchParams.get("pageSize")).toBe("50");
+  });
+
+  it("consulta metricas de clientes usando empresa como tenant", async () => {
+    const fetchMock = vi.fn(async () => ({
+      ok: true,
+      json: async () => ({ customers: { total: 0 } }),
+    }));
+    vi.stubGlobal("fetch", fetchMock);
+    vi.stubGlobal("localStorage", {
+      getItem: () => "token-test",
+    });
+
+    const api = createApiClient({ apiBaseUrl: "https://api.test" });
+    await api.obtenerMetricasClientes({
+      tenantId: 3,
+      startDate: "2026-01-01",
+      endDate: "2026-08-14",
+      comparison: true,
+    });
+
+    const [url] = fetchMock.mock.calls[0];
+    const parsed = new URL(url);
+
+    expect(parsed.pathname).toBe("/tenants/3/customers/metrics");
+    expect(parsed.searchParams.get("start_date")).toBe("2026-01-01");
+    expect(parsed.searchParams.get("end_date")).toBe("2026-08-14");
+    expect(parsed.searchParams.get("comparison")).toBe("true");
+  });
+
+  it("consulta clientes por segmento", async () => {
+    const fetchMock = vi.fn(async () => ({
+      ok: true,
+      json: async () => ({ items: [] }),
+    }));
+    vi.stubGlobal("fetch", fetchMock);
+    vi.stubGlobal("localStorage", {
+      getItem: () => "token-test",
+    });
+
+    const api = createApiClient({ apiBaseUrl: "https://api.test" });
+    await api.listarSegmentoClientes({
+      tenantId: 3,
+      segment: "AT_RISK",
+      page: 1,
+      limit: 10,
+      sort: "purchase_count",
+      order: "desc",
+    });
+
+    const [url] = fetchMock.mock.calls[0];
+    const parsed = new URL(url);
+
+    expect(parsed.pathname).toBe("/tenants/3/customers/segments");
+    expect(parsed.searchParams.get("segment")).toBe("AT_RISK");
+    expect(parsed.searchParams.get("limit")).toBe("10");
+    expect(parsed.searchParams.get("sort")).toBe("purchase_count");
+  });
+
+  it("consulta clientes por prioridad comercial", async () => {
+    const fetchMock = vi.fn(async () => ({
+      ok: true,
+      json: async () => ({ items: [] }),
+    }));
+    vi.stubGlobal("fetch", fetchMock);
+    vi.stubGlobal("localStorage", {
+      getItem: () => "token-test",
+    });
+
+    const api = createApiClient({ apiBaseUrl: "https://api.test" });
+    await api.listarPrioridadClientes({
+      tenantId: 3,
+      priority: "P0",
+      page: 1,
+      limit: 10,
+      sort: "commercial_priority",
+      order: "asc",
+      startDate: "2026-01-01",
+      endDate: "2026-08-14",
+    });
+
+    const [url] = fetchMock.mock.calls[0];
+    const parsed = new URL(url);
+
+    expect(parsed.pathname).toBe("/tenants/3/customers/priorities");
+    expect(parsed.searchParams.get("priority")).toBe("P0");
+    expect(parsed.searchParams.get("limit")).toBe("10");
+    expect(parsed.searchParams.get("sort")).toBe("commercial_priority");
+    expect(parsed.searchParams.get("order")).toBe("asc");
+    expect(parsed.searchParams.get("start_date")).toBe("2026-01-01");
+    expect(parsed.searchParams.get("end_date")).toBe("2026-08-14");
+  });
+
   it("envia domicilio obsequiado al actualizar detalle de pedido", async () => {
     const fetchMock = vi.fn(async () => ({
       ok: true,

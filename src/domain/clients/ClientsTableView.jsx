@@ -1,4 +1,6 @@
 import { Download, Search } from "lucide-react";
+import { formatearCOP } from "../../shared/utils.js";
+
 export function ClientsTableView({ canManageClients, items, q, onEdit, onExport, onSearchChange }) {
   return (
     <>
@@ -27,13 +29,13 @@ export function ClientsTableView({ canManageClients, items, q, onEdit, onExport,
         <table className="orders-table users-table clients-table">
           <thead>
             <tr>
-              <th>ID</th><th>Tipo Doc</th><th>Documento</th><th>Nombre</th><th>Indicativo</th><th>Telefono</th>
-              <th>Telefono completo</th><th>Email</th><th>Cumpleanos</th><th>Aniversario</th><th>Estado</th><th>Acciones</th>
+              <th>ID</th><th>Tipo Doc</th><th>Documento</th><th>Nombre</th><th>Telefono</th>
+              <th>Email</th><th>Compras</th><th>Total comprado</th><th>Ultima compra</th><th>Cumpleanos</th><th>Aniversario</th><th>Estado</th><th>Acciones</th>
             </tr>
           </thead>
           <tbody>
             {items.length === 0 ? (
-              <tr><td colSpan={12}>No hay clientes registrados.</td></tr>
+              <tr><td colSpan={13}>No hay clientes registrados.</td></tr>
             ) : items.map(item => <ClientRow key={item.clienteID} item={item} canManageClients={canManageClients} onEdit={onEdit} />)}
           </tbody>
         </table>
@@ -42,16 +44,18 @@ export function ClientsTableView({ canManageClients, items, q, onEdit, onExport,
   );
 }
 function ClientRow({ canManageClients, item, onEdit }) {
+  const metrics = item.metrics || {};
   return (
     <tr>
       <td data-label="ID">{item.clienteID}</td>
       <td data-label="Tipo Doc">{item.tipoIdent || "-"}</td>
       <td data-label="Documento">{item.identificacion || "-"}</td>
       <td data-label="Nombre">{item.nombreCompleto || "-"}</td>
-      <td data-label="Indicativo">{item.indicativo || "-"}</td>
       <td data-label="Telefono">{item.telefono || "-"}</td>
-      <td data-label="Telefono completo">{item.telefonoCompleto || "-"}</td>
       <td data-label="Email">{item.email || "-"}</td>
+      <td data-label="Compras">{metrics.purchase_count ?? metrics.purchaseCount ?? "-"}</td>
+      <td data-label="Total comprado">{metrics.total_spent != null ? `$${formatearCOP(metrics.total_spent)}` : "-"}</td>
+      <td data-label="Ultima compra">{metrics.last_purchase_at || metrics.lastPurchaseAt || "-"}</td>
       <td data-label="Cumpleanos">{item.fechaCumpleanos || "-"}</td>
       <td data-label="Aniversario">{item.fechaAniversario || "-"}</td>
       <td data-label="Estado"><span className={`order-badge ${item.activo ? "is-entregado" : "is-cancelado"}`}>{item.activo ? "Activo" : "Inactivo"}</span></td>

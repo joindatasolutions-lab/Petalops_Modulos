@@ -255,14 +255,74 @@ export function createApiClient(config) {
       return requestJson("/auth/usuarios/empresas");
     },
 
-    async listarClientes({ empresaId, q = "", celular = "", telefono = "", soloActivos = false }) {
+    async listarClientes({ empresaId, q = "", celular = "", telefono = "", soloActivos = false, includeMetrics = false, page = null, pageSize = null }) {
       const params = new URLSearchParams();
       params.set("empresaID", String(empresaId));
       if (q) params.set("q", String(q));
       if (celular) params.set("celular", String(celular));
       if (telefono) params.set("telefono", String(telefono));
       if (soloActivos) params.set("soloActivos", "true");
+      if (includeMetrics) params.set("includeMetrics", "true");
+      if (page != null) params.set("page", String(page));
+      if (pageSize != null) params.set("pageSize", String(pageSize));
       return requestJson(`/clientes?${params.toString()}`);
+    },
+
+    async obtenerMetricasClientes({ tenantId, startDate, endDate, comparison = true }) {
+      const params = new URLSearchParams();
+      if (startDate) params.set("start_date", String(startDate));
+      if (endDate) params.set("end_date", String(endDate));
+      if (comparison != null) params.set("comparison", comparison ? "true" : "false");
+      return requestJson(`/tenants/${tenantId}/customers/metrics?${params.toString()}`);
+    },
+
+    async listarSegmentoClientes({ tenantId, segment = "AT_RISK", page = 1, limit = 10, sort = "purchase_count", order = "desc" }) {
+      const params = new URLSearchParams();
+      if (segment) params.set("segment", String(segment));
+      params.set("page", String(page));
+      params.set("limit", String(limit));
+      params.set("sort", String(sort));
+      params.set("order", String(order));
+      return requestJson(`/tenants/${tenantId}/customers/segments?${params.toString()}`);
+    },
+
+    async listarPrioridadClientes({ tenantId, priority = "P0", page = 1, limit = 10, search = "", sort = "commercial_priority", order = "asc", startDate = "", endDate = "" }) {
+      const params = new URLSearchParams();
+      if (priority) params.set("priority", String(priority));
+      params.set("page", String(page));
+      params.set("limit", String(limit));
+      if (search) params.set("search", String(search));
+      if (sort) params.set("sort", String(sort));
+      if (order) params.set("order", String(order));
+      if (startDate) params.set("start_date", String(startDate));
+      if (endDate) params.set("end_date", String(endDate));
+      return requestJson(`/tenants/${tenantId}/customers/priorities?${params.toString()}`);
+    },
+
+    async listarOportunidadesClientes({ tenantId, days = 30, page = 1, limit = 50, occasion = "" }) {
+      const params = new URLSearchParams();
+      params.set("days", String(days));
+      params.set("page", String(page));
+      params.set("limit", String(limit));
+      if (occasion) params.set("occasion", String(occasion));
+      return requestJson(`/tenants/${tenantId}/customers/opportunities?${params.toString()}`);
+    },
+
+    async obtenerMetricasCliente({ tenantId, customerId }) {
+      return requestJson(`/tenants/${tenantId}/customers/${customerId}/metrics`);
+    },
+
+    async listarInteligenciaClientes({ tenantId, action = "REACTIVATE", risk = "", minHealthScore = null, maxHealthScore = null, page = 1, limit = 50, sort = "customer_health_score", order = "asc" }) {
+      const params = new URLSearchParams();
+      params.set("action", String(action));
+      if (risk) params.set("risk", String(risk));
+      if (minHealthScore != null) params.set("min_health_score", String(minHealthScore));
+      if (maxHealthScore != null) params.set("max_health_score", String(maxHealthScore));
+      params.set("page", String(page));
+      params.set("limit", String(limit));
+      params.set("sort", String(sort));
+      params.set("order", String(order));
+      return requestJson(`/tenants/${tenantId}/customers/intelligence?${params.toString()}`);
     },
 
     async crearCliente({ empresaID, tipoIdent, identificacion, indicativo, nombreCompleto, telefono, telefonoCompleto, email, fechaCumpleanos, fechaAniversario, activo = true }) {
