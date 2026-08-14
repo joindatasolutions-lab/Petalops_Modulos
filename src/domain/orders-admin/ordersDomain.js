@@ -892,6 +892,37 @@ export function resolveOrderListTotal(item) {
   return roundCurrency(subtotal + iva + domicilio + recargo - descuento + saldoFavor);
 }
 
+export function patchOrderItemFromDetail(item, pedidoId, detail) {
+  if (!pedidoId || !detail || detail.error) return item;
+  if (Number(resolveOrderId(item)) !== Number(pedidoId)) return item;
+
+  const financiero = detail.financiero && typeof detail.financiero === "object" ? detail.financiero : {};
+  const detailTotal = getOrderFinancialTotal(financiero);
+  const nextTotal = detailTotal > 0 ? detailTotal : financiero.total;
+  const facturaImpresa = financiero.facturaImpresa ?? detail.facturaImpresa ?? item.facturaImpresa;
+
+  return {
+    ...item,
+    estado: detail.estado ?? item.estado,
+    facturaImpresa,
+    total: nextTotal ?? item.total,
+    valorTotal: nextTotal ?? item.valorTotal,
+    totalPedido: nextTotal ?? item.totalPedido,
+    subtotal: financiero.subtotal ?? item.subtotal,
+    iva: financiero.iva ?? item.iva,
+    domicilio: financiero.domicilio ?? item.domicilio,
+    recargoLinkMonto: financiero.recargoLinkMonto ?? item.recargoLinkMonto,
+    descuentoMonto: financiero.descuentoMonto ?? item.descuentoMonto,
+    saldoFavorMonto: financiero.saldoFavorMonto ?? item.saldoFavorMonto,
+    domicilioObsequiado: financiero.domicilioObsequiado ?? detail.entrega?.domicilioObsequiado ?? detail.destinatario?.domicilioObsequiado ?? item.domicilioObsequiado,
+    omitirCostoDomicilio: financiero.omitirCostoDomicilio ?? detail.entrega?.omitirCostoDomicilio ?? detail.destinatario?.omitirCostoDomicilio ?? item.omitirCostoDomicilio,
+    financiero: {
+      ...(item.financiero || {}),
+      ...financiero,
+    },
+  };
+}
+
 export function extractOrdersPayloadItems(payload) {
   if (Array.isArray(payload)) return payload;
   const candidates = [

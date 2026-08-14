@@ -2241,7 +2241,7 @@ select:focus {
 
 .order-detail-edit-adjustment-summary {
   display: grid;
-  gap: 4px;
+  gap: 6px;
   padding: 10px 12px;
   border: 1px solid #ead9de;
   border-radius: 10px;
@@ -2250,7 +2250,32 @@ select:focus {
   color: #6c5a61;
 }
 
-.order-detail-edit-adjustment-summary strong {
+.order-detail-edit-adjustment-summary > span {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.order-detail-edit-adjustment-summary > span > span {
+  min-width: 0;
+}
+
+.order-detail-edit-adjustment-summary > span > strong {
+  color: #493b42;
+  font-size: 12px;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.order-detail-edit-adjustment-summary > span.is-total {
+  margin-top: 2px;
+  padding-top: 7px;
+  border-top: 1px solid #ead9de;
+  font-weight: 800;
+}
+
+.order-detail-edit-adjustment-summary > span.is-total > strong {
   color: #e91e72;
   font-size: 13px;
 }

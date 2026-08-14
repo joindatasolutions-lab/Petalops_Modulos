@@ -242,6 +242,7 @@ export function buildDetailUpdatePayload({
   const mensajeTarjeta = textOrNull(edit.mensaje_tarjeta, edit.mensajeTarjeta);
   const firmaTarjeta = textOrNull(edit.firma_tarjeta, edit.firma);
   const observacionesEntrega = textOrNull(edit.observaciones_entrega, edit.observacionGeneral);
+  const precioUnitario = edit.isCustomArrangement ? normalizeWholePeso(edit.precio) : null;
 
   return {
     pedidoId,
@@ -251,7 +252,8 @@ export function buildDetailUpdatePayload({
     productoObservaciones: notaProduccion,
     nota_produccion: notaProduccion,
     notaProduccion: notaProduccion,
-    productoPrecio: edit.isCustomArrangement ? normalizeWholePeso(edit.precio) : null,
+    precioUnitario,
+    productoPrecio: precioUnitario,
     fechaEntrega: edit.fechaEntrega,
     horaEntrega: edit.horaEntrega,
     clienteNombre: canEditClientIdentity ? edit.clienteNombre : null,
@@ -297,10 +299,12 @@ export function buildAddDetailProductPayload({
   isCustomArrangement,
   precio,
 }) {
+  const precioUnitario = isCustomArrangement ? normalizeWholePeso(precio) : null;
   return {
     pedidoId,
     productoID: Number(productoID),
     cantidad: Number(cantidad || 1),
-    productoPrecio: isCustomArrangement ? normalizeWholePeso(precio) : null,
+    precioUnitario,
+    productoPrecio: precioUnitario,
   };
 }

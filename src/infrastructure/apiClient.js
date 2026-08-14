@@ -634,6 +634,7 @@ export function createApiClient(config) {
       productoID,
       cantidad,
       productoObservaciones,
+      precioUnitario,
       productoPrecio,
       fechaEntrega,
       horaEntrega,
@@ -668,6 +669,7 @@ export function createApiClient(config) {
       saldoFavorNota,
       canalFlora,
     }) {
+      const unitPrice = precioUnitario ?? productoPrecio;
       return requestJson(`/pedido/${pedidoId}/detalle`, {
         method: "PUT",
         headers: {
@@ -678,7 +680,8 @@ export function createApiClient(config) {
           productoID: productoID != null ? Number(productoID) : null,
           cantidad: cantidad != null ? Number(cantidad) : null,
           productoObservaciones: productoObservaciones ?? null,
-          productoPrecio: productoPrecio != null ? Number(productoPrecio) : null,
+          precioUnitario: unitPrice != null ? Number(unitPrice) : null,
+          productoPrecio: unitPrice != null ? Number(unitPrice) : null,
           fechaEntrega: fechaEntrega || null,
           horaEntrega: horaEntrega || null,
           clienteNombre: clienteNombre ?? null,
@@ -772,8 +775,10 @@ export function createApiClient(config) {
       productoID,
       cantidad,
       productoObservaciones,
+      precioUnitario,
       productoPrecio,
     }) {
+      const unitPrice = precioUnitario ?? productoPrecio;
       return requestJson(`/pedido/${pedidoId}/detalle`, {
         method: "POST",
         headers: {
@@ -783,7 +788,8 @@ export function createApiClient(config) {
           productoID: productoID != null ? Number(productoID) : null,
           cantidad: cantidad != null ? Number(cantidad) : 1,
           productoObservaciones: productoObservaciones ?? null,
-          productoPrecio: productoPrecio != null ? Number(productoPrecio) : null,
+          precioUnitario: unitPrice != null ? Number(unitPrice) : null,
+          productoPrecio: unitPrice != null ? Number(unitPrice) : null,
         })
       });
     },

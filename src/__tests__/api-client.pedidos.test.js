@@ -170,6 +170,39 @@ describe("apiClient.listarPedidos", () => {
     expect(body.forzarRecalculoFinanciero).toBe(true);
   });
 
+  it("envia precioUnitario al editar arreglo personalizado", async () => {
+    const fetchMock = vi.fn(async () => ({
+      ok: true,
+      json: async () => ({ ok: true }),
+    }));
+    vi.stubGlobal("fetch", fetchMock);
+    vi.stubGlobal("localStorage", {
+      getItem: () => "token-test",
+    });
+
+    const api = createApiClient({ apiBaseUrl: "https://api.test" });
+    await api.actualizarDetallePedidoPipeline({
+      pedidoId: 77,
+      detalleID: 10,
+      productoID: 20,
+      precioUnitario: 85000,
+      clienteTipoIdent: "NIT",
+      forzarRecalculoFinanciero: true,
+    });
+
+    const [url, options] = fetchMock.mock.calls[0];
+    const body = JSON.parse(options.body);
+
+    expect(url).toBe("https://api.test/pedido/77/detalle");
+    expect(options.method).toBe("PUT");
+    expect(body.detalleID).toBe(10);
+    expect(body.productoID).toBe(20);
+    expect(body.precioUnitario).toBe(85000);
+    expect(body.productoPrecio).toBe(85000);
+    expect(body.clienteTipoIdent).toBe("NIT");
+    expect(body.forzarRecalculoFinanciero).toBe(true);
+  });
+
   it("sincroniza finanzas recalculadas antes de generar factura", async () => {
     const fetchMock = vi.fn(async () => ({
       ok: true,
