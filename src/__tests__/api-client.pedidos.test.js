@@ -38,6 +38,45 @@ describe("apiClient.listarPedidos", () => {
     expect(parsed.searchParams.get("sinImprimir")).toBe("false");
   });
 
+  it("consulta ventas diarias de contabilidad con tenant dinamico y sucursal opcional", async () => {
+    const fetchMock = vi.fn(async () => ({
+      ok: true,
+      json: async () => ({ orderRows: [], totals: null }),
+    }));
+    vi.stubGlobal("fetch", fetchMock);
+    vi.stubGlobal("localStorage", {
+      getItem: () => "token-test",
+    });
+
+    const api = createApiClient({ apiBaseUrl: "https://api.test" });
+    await api.obtenerVentasDiarioContabilidad({
+      empresaId: 3,
+      sucursalId: 3,
+      fechaDesde: "2026-08-08",
+      fechaHasta: "2026-08-08",
+    });
+    await api.obtenerVentasDiarioContabilidad({
+      empresaId: 7,
+      sucursalId: null,
+      fechaDesde: "2026-08-01",
+      fechaHasta: "2026-08-17",
+    });
+
+    const [firstUrl] = fetchMock.mock.calls[0];
+    const firstParsed = new URL(firstUrl);
+    expect(firstParsed.pathname).toBe("/pedidos/contabilidad/ventas-diario");
+    expect(firstParsed.searchParams.get("empresaID")).toBe("3");
+    expect(firstParsed.searchParams.get("sucursalID")).toBe("3");
+    expect(firstParsed.searchParams.get("fechaDesde")).toBe("2026-08-08");
+    expect(firstParsed.searchParams.get("fechaHasta")).toBe("2026-08-08");
+
+    const [secondUrl] = fetchMock.mock.calls[1];
+    const secondParsed = new URL(secondUrl);
+    expect(secondParsed.pathname).toBe("/pedidos/contabilidad/ventas-diario");
+    expect(secondParsed.searchParams.get("empresaID")).toBe("7");
+    expect(secondParsed.searchParams.has("sucursalID")).toBe(false);
+  });
+
   it("preserva codigo, modulo y request_id en errores estructurados del API", async () => {
     const fetchMock = vi.fn(async () => ({
       ok: false,

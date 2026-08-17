@@ -16,7 +16,6 @@ export function buildSalesExportRows(orderRows) {
   return orderRows.map(row => ({
     Fecha: row.fecha,
     "Pedidos aprobados": row.cantidadPedidos,
-    "Pedidos cancelados": row.pedidosCancelados,
     "Total arreglos": row.totalArreglos,
     "Total domicilios": row.totalDomicilios,
     "Recargos link": row.totalRecargos,

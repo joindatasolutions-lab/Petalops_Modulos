@@ -1,5 +1,38 @@
-import { normalizeStatus } from "../../shared/utils.js";
+import { normalizeStatus, splitDateTimeParts } from "../../shared/utils.js";
 import { getAdjustmentNoteItems, roundMoney } from "./accountingDomain.js";
+
+function isApprovedOrder(row) {
+  return normalizeStatus(row?.estado) === "APROBADO" && !row?.cancelado;
+}
+
+function getAccountingDetailDate(row) {
+  const dateValue = row?.fecha || row?.fechaPedido || row?.fecha_pedido || row?.fechaOperacion || row?.fecha_operacion;
+  return splitDateTimeParts(dateValue).date || String(dateValue || "").slice(0, 10);
+}
+
+export function applyApprovedOrderCountsToRows(orderRows, accountingDetailRows) {
+  const rows = Array.isArray(orderRows) ? orderRows : [];
+  const details = Array.isArray(accountingDetailRows) ? accountingDetailRows : [];
+  if (details.length === 0) {
+    return rows.map(row => ({
+      ...row,
+      cantidadPedidos: Math.max(0, Number(row.cantidadPedidos || 0) - Number(row.pedidosCancelados || 0)),
+    }));
+  }
+
+  const approvedByDate = details.reduce((map, row) => {
+    if (!isApprovedOrder(row)) return map;
+    const fecha = getAccountingDetailDate(row);
+    if (!fecha) return map;
+    map.set(fecha, (map.get(fecha) || 0) + 1);
+    return map;
+  }, new Map());
+
+  return rows.map(row => ({
+    ...row,
+    cantidadPedidos: approvedByDate.get(String(row.fecha || "").slice(0, 10)) || 0,
+  }));
+}
 
 export function buildSummaryTotals(orderRows, accountingDetailRows) {
   const totals = orderRows.reduce((acc, row) => ({
@@ -31,9 +64,7 @@ export function buildSummaryTotals(orderRows, accountingDetailRows) {
     };
   }
 
-  const pedidosAprobados = accountingDetailRows.filter(row => (
-    normalizeStatus(row.estado) === "APROBADO" && !row.cancelado
-  )).length;
+  const pedidosAprobados = accountingDetailRows.filter(isApprovedOrder).length;
   const pedidosCancelados = accountingDetailRows.filter(row => (
     Boolean(row.cancelado) || ["CANCELADO", "RECHAZADO"].includes(normalizeStatus(row.estado))
   )).length;
