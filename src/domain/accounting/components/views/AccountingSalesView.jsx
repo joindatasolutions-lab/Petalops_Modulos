@@ -58,6 +58,7 @@ export function AccountingSalesView({
   personnelTypeFilter,
   personnelTypeOptions,
   salesTrendRows,
+  salesTableTotals,
   saveCashClosing,
   saving,
   selectAllArrangements,
@@ -313,7 +314,6 @@ export function AccountingSalesView({
                   <tr>
                     <th>Fecha</th>
                     <th>Cantidad de pedidos</th>
-                    <th>Cancelados</th>
                     <th>Total $ en arreglos florales</th>
                     <th>Total $ en domicilios</th>
                     <th>Recargos link</th>
@@ -325,13 +325,12 @@ export function AccountingSalesView({
                 <tbody>
                   {orderRows.length === 0 ? (
                     <tr>
-                      <td colSpan={9}>{loading ? "Cargando resumen..." : "No hay ventas para los filtros seleccionados."}</td>
+                      <td colSpan={8}>{loading ? "Cargando resumen..." : "No hay ventas para los filtros seleccionados."}</td>
                     </tr>
                   ) : orderRows.map(row => (
                     <tr key={row.fecha}>
                       <td>{row.fecha}</td>
                       <td>{row.cantidadPedidos}</td>
-                      <td>{row.pedidosCancelados}</td>
                       <td>${formatearCOP(row.totalArreglos)}</td>
                       <td>${formatearCOP(row.totalDomicilios)}</td>
                       <td>${formatearCOP(row.totalRecargos)}</td>
@@ -341,18 +340,17 @@ export function AccountingSalesView({
                     </tr>
                   ))}
                 </tbody>
-                {orderRows.length > 0 ? (
+                {orderRows.length > 0 && salesTableTotals ? (
                   <tfoot>
                     <tr>
-                      <th>Totales</th>
-                      <th>{summaryTotals.cantidadPedidos}</th>
-                      <th>{summaryTotals.pedidosCancelados}</th>
-                      <th>${formatearCOP(summaryTotals.totalArreglos)}</th>
-                      <th>${formatearCOP(summaryTotals.totalDomicilios)}</th>
-                      <th>${formatearCOP(summaryTotals.totalRecargos)}</th>
-                      <th>${formatearCOP(summaryTotals.totalDescuentos)}</th>
-                      <th>${formatearCOP(Number(summaryTotals.totalSaldoFavor || 0))}</th>
-                      <th>${formatearCOP(summaryTotals.totalVenta)}</th>
+                      <th>{salesTableTotals.fecha || "Totales"}</th>
+                      <th>{salesTableTotals.cantidadPedidos}</th>
+                      <th>${formatearCOP(salesTableTotals.totalArreglos)}</th>
+                      <th>${formatearCOP(salesTableTotals.totalDomicilios)}</th>
+                      <th>${formatearCOP(salesTableTotals.totalRecargos)}</th>
+                      <th>${formatearCOP(salesTableTotals.totalDescuentos)}</th>
+                      <th>${formatearCOP(Number(salesTableTotals.totalSaldoFavor || 0))}</th>
+                      <th>${formatearCOP(salesTableTotals.totalVenta)}</th>
                     </tr>
                   </tfoot>
                 ) : null}

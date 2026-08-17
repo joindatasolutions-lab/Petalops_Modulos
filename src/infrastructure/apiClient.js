@@ -1069,6 +1069,15 @@ export function createApiClient(config) {
       return requestJson(`/contabilidad/resumen?${params.toString()}`);
     },
 
+    async obtenerVentasDiarioContabilidad({ empresaId, sucursalId, fechaDesde, fechaHasta }) {
+      const params = new URLSearchParams();
+      params.set("empresaID", String(empresaId));
+      if (sucursalId != null) params.set("sucursalID", String(sucursalId));
+      params.set("fechaDesde", String(fechaDesde));
+      params.set("fechaHasta", String(fechaHasta));
+      return requestJson(`/pedidos/contabilidad/ventas-diario?${params.toString()}`);
+    },
+
     async obtenerResumenFloristasContabilidad({ empresaId, sucursalId, fechaDesde, fechaHasta }) {
       const params = new URLSearchParams();
       params.set("empresaID", String(empresaId));

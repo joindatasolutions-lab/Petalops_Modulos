@@ -6,6 +6,7 @@ import {
   buildPersonnelMetricsFromAccountingDetails,
   enrichDeliveryPersonMetricRowsWithDirectory,
 } from "../accountingDomain.js";
+import { applyApprovedOrderCountsToRows } from "../accountingSelectors.js";
 
 function readArrayPayload(payload, keys) {
   for (const key of keys) {
@@ -18,6 +19,7 @@ export function useAccountingData({ api, empresaId, sucursalId, selectedSucursal
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [orderRows, setOrderRows] = useState([]);
+  const [orderTotals, setOrderTotals] = useState(null);
   const [arrangementRows, setArrangementRows] = useState([]);
   const [paymentAccountRows, setPaymentAccountRows] = useState([]);
   const [floristMetricRows, setFloristMetricRows] = useState([]);
@@ -28,13 +30,20 @@ export function useAccountingData({ api, empresaId, sucursalId, selectedSucursal
     setLoading(true);
     setError("");
     try {
-      const payload = await api.obtenerResumenContabilidad({
-        empresaId,
-        sucursalId,
-        fechaDesde: filters.fechaDesde,
-        fechaHasta: filters.fechaHasta,
-      });
+      const query = { empresaId, sucursalId, fechaDesde: filters.fechaDesde, fechaHasta: filters.fechaHasta };
+      const payload = await api.obtenerResumenContabilidad(query);
       const nextDetailRows = Array.isArray(payload?.accountingDetailRows) ? payload.accountingDetailRows : [];
+      let ventasDiarioPayload = null;
+      try {
+        ventasDiarioPayload = await api.obtenerVentasDiarioContabilidad(query);
+      } catch (ventasError) {
+        if (ventasError?.status !== 404) throw ventasError;
+        console.warn("Resumen diario de ventas no disponible, usando resumen contable existente:", ventasError);
+      }
+      const nextOrderRows = Array.isArray(ventasDiarioPayload?.orderRows) ? ventasDiarioPayload.orderRows : [];
+      const nextOrderTotals = ventasDiarioPayload?.totals && typeof ventasDiarioPayload.totals === "object"
+        ? ventasDiarioPayload.totals
+        : null;
       const derivedPersonnelRows = buildPersonnelMetricsFromAccountingDetails(nextDetailRows);
       const summaryDeliveryRows = readArrayPayload(payload, ["deliveryPersonRows", "domiciliarioRows", "domiciliarios"]);
       const nextDeliveryRows = buildDeliveryPersonMetricRows(summaryDeliveryRows);
@@ -86,7 +95,8 @@ export function useAccountingData({ api, empresaId, sucursalId, selectedSucursal
         }
       }
 
-      setOrderRows(Array.isArray(payload?.orderRows) ? payload.orderRows : []);
+      setOrderRows(nextOrderRows.length > 0 ? nextOrderRows : applyApprovedOrderCountsToRows(payload?.orderRows, nextDetailRows));
+      setOrderTotals(nextOrderTotals);
       setArrangementRows(Array.isArray(payload?.arrangementRows) ? payload.arrangementRows : []);
       setPaymentAccountRows(Array.isArray(payload?.paymentAccountRows) ? payload.paymentAccountRows : []);
       setAccountingDetailRows(nextDetailRows);
@@ -95,6 +105,7 @@ export function useAccountingData({ api, empresaId, sucursalId, selectedSucursal
     } catch (nextError) {
       console.error("Error cargando contabilidad:", nextError);
       setOrderRows([]);
+      setOrderTotals(null);
       setArrangementRows([]);
       setPaymentAccountRows([]);
       setFloristMetricRows([]);
@@ -115,6 +126,7 @@ export function useAccountingData({ api, empresaId, sucursalId, selectedSucursal
     error,
     setError,
     orderRows,
+    orderTotals,
     arrangementRows,
     paymentAccountRows,
     floristMetricRows,

@@ -59,6 +59,7 @@ export function useAccountingController({ session }) {
     error,
     setError,
     orderRows,
+    orderTotals,
     arrangementRows,
     paymentAccountRows,
     floristMetricRows,
@@ -244,6 +245,19 @@ export function useAccountingController({ session }) {
   }, [accountingMenuOpen]);
 
   const summaryTotals = useMemo(() => buildSummaryTotals(orderRows, accountingDetailRows), [orderRows, accountingDetailRows]);
+  const salesTableTotals = useMemo(() => {
+    if (!orderTotals) return null;
+    return {
+      fecha: orderTotals.fecha || "Totales",
+      cantidadPedidos: Number(orderTotals.cantidadPedidos || 0),
+      totalArreglos: Number(orderTotals.totalArreglos || 0),
+      totalDomicilios: Number(orderTotals.totalDomicilios || 0),
+      totalRecargos: Number(orderTotals.totalRecargos || 0),
+      totalDescuentos: Number(orderTotals.totalDescuentos || 0),
+      totalSaldoFavor: Number(orderTotals.totalSaldoFavor || 0),
+      totalVenta: Number(orderTotals.totalVenta || 0),
+    };
+  }, [orderTotals]);
 
   const filteredAccountingDetailRows = useMemo(() => {
     return filterAccountingDetailRows(accountingDetailRows, detailFilter);
@@ -827,6 +841,7 @@ export function useAccountingController({ session }) {
     personnelTypeFilter,
     personnelTypeOptions,
     salesTrendRows,
+    salesTableTotals,
     saveCashClosing,
     saving,
     selectAllArrangements,
