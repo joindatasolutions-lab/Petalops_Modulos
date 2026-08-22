@@ -3054,6 +3054,210 @@
   --orders-bi-color: #dc2626 !important;
 }
 
+.production-page-view .production-day-banner {
+  display: flex !important;
+  align-items: center !important;
+  gap: 14px !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  margin: 0 0 8px !important;
+  padding: 13px 16px !important;
+  border: 1px solid #fbbf24 !important;
+  border-left: 6px solid #f59e0b !important;
+  border-radius: 12px !important;
+  background: linear-gradient(90deg, #fffbeb 0%, #fff7ed 58%, #ffffff 100%) !important;
+  color: #78350f !important;
+  box-shadow: 0 16px 34px rgba(120, 53, 15, 0.12) !important;
+}
+
+.production-page-view .production-day-banner--action {
+  appearance: none !important;
+  cursor: pointer !important;
+  text-align: left !important;
+  transition: transform 140ms ease, box-shadow 140ms ease, border-color 140ms ease, background-color 140ms ease !important;
+}
+
+.production-page-view .production-day-banner--action:hover {
+  border-color: #f59e0b !important;
+  background: linear-gradient(90deg, #fff7d6 0%, #ffedd5 58%, #ffffff 100%) !important;
+  box-shadow: 0 18px 40px rgba(120, 53, 15, 0.16) !important;
+  transform: translateY(-1px) !important;
+}
+
+.production-page-view .production-day-banner--action:focus-visible {
+  outline: 3px solid rgba(245, 158, 11, 0.28) !important;
+  outline-offset: 2px !important;
+}
+
+.production-page-view .orders-page-header.production-page-header .production-day-banner {
+  align-self: stretch !important;
+  margin: -4px 0 0 !important;
+}
+
+.production-page-view .production-day-banner--mobile {
+  display: none !important;
+}
+
+.production-page-view .production-day-banner-icon {
+  flex: 0 0 auto !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 42px !important;
+  height: 42px !important;
+  border-radius: 14px !important;
+  background: #f59e0b !important;
+  color: #ffffff !important;
+  box-shadow: 0 10px 20px rgba(245, 158, 11, 0.24) !important;
+}
+
+.production-page-view .production-day-banner-copy {
+  display: grid !important;
+  gap: 2px !important;
+  min-width: 0 !important;
+  margin: 0 !important;
+  color: #78350f !important;
+  font-size: 13px !important;
+  font-weight: 750 !important;
+  line-height: 1.25 !important;
+}
+
+.production-page-view .production-day-banner-kicker {
+  color: #b45309 !important;
+  font-size: 10px !important;
+  font-weight: 950 !important;
+  letter-spacing: 0 !important;
+  line-height: 1 !important;
+  text-transform: uppercase !important;
+}
+
+.production-page-view .production-day-banner strong {
+  color: #451a03 !important;
+  font-weight: 950 !important;
+  font-size: 15px !important;
+  line-height: 1.18 !important;
+}
+
+.production-page-view .production-day-banner-copy > span:last-child {
+  color: #78350f !important;
+  font-size: 12px !important;
+  font-weight: 800 !important;
+}
+
+.production-page-view .production-florista-reminder-overlay {
+  position: fixed !important;
+  inset: 0 !important;
+  z-index: 140 !important;
+  display: grid !important;
+  place-items: center !important;
+  padding: 24px !important;
+  background: rgba(15, 23, 42, 0.22) !important;
+  backdrop-filter: blur(2px) !important;
+}
+
+.production-page-view .production-florista-reminder {
+  position: relative !important;
+  display: grid !important;
+  justify-items: center !important;
+  gap: 16px !important;
+  width: min(520px, 100%) !important;
+  padding: 28px 28px 24px !important;
+  border: 1px solid #f59e0b !important;
+  border-top: 7px solid #f59e0b !important;
+  border-radius: 18px !important;
+  background: linear-gradient(180deg, #fff7ed 0%, #ffffff 72%) !important;
+  color: #451a03 !important;
+  box-shadow: 0 26px 72px rgba(15, 23, 42, 0.28) !important;
+  text-align: center !important;
+}
+
+.production-page-view .production-florista-reminder-icon {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 64px !important;
+  height: 64px !important;
+  border-radius: 20px !important;
+  background: #f59e0b !important;
+  color: #ffffff !important;
+  box-shadow: 0 14px 30px rgba(245, 158, 11, 0.28) !important;
+}
+
+.production-page-view .production-florista-reminder-copy {
+  display: grid !important;
+  justify-items: center !important;
+  gap: 7px !important;
+  min-width: 0 !important;
+  max-width: 440px !important;
+}
+
+.production-page-view .production-florista-reminder-kicker {
+  color: #b45309 !important;
+  font-size: 11px !important;
+  font-weight: 950 !important;
+  letter-spacing: 0 !important;
+  line-height: 1 !important;
+  text-transform: uppercase !important;
+}
+
+.production-page-view .production-florista-reminder-copy strong {
+  color: #451a03 !important;
+  font-size: 22px !important;
+  font-weight: 950 !important;
+  line-height: 1.08 !important;
+}
+
+.production-page-view .production-florista-reminder-copy span {
+  color: #78350f !important;
+  font-size: 14px !important;
+  font-weight: 800 !important;
+  line-height: 1.4 !important;
+}
+
+.production-page-view .production-florista-reminder-actions {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  flex-wrap: wrap !important;
+  gap: 10px !important;
+  margin-top: 2px !important;
+}
+
+.production-page-view .production-florista-reminder-actions button {
+  min-height: 42px !important;
+  padding: 0 18px !important;
+  border: 1px solid #f59e0b !important;
+  border-radius: 10px !important;
+  background: #f59e0b !important;
+  color: #ffffff !important;
+  font: inherit !important;
+  font-size: 13px !important;
+  font-weight: 900 !important;
+  cursor: pointer !important;
+}
+
+.production-page-view .production-florista-reminder-actions .production-florista-reminder-secondary {
+  background: #ffffff !important;
+  color: #92400e !important;
+}
+
+.production-page-view .production-florista-reminder-close {
+  position: absolute !important;
+  top: 12px !important;
+  right: 12px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 34px !important;
+  height: 34px !important;
+  padding: 0 !important;
+  border: 1px solid #fed7aa !important;
+  border-radius: 999px !important;
+  background: #ffffff !important;
+  color: #92400e !important;
+  cursor: pointer !important;
+}
+
 @media (max-width: 1280px) {
   .production-page-view .orders-page-header.production-page-header {
     grid-template-columns: 1fr !important;
@@ -3079,6 +3283,25 @@
 @media (max-width: 620px) {
   .production-page-view .orders-page-header.production-page-header .production-header-metrics {
     grid-template-columns: 1fr 1fr !important;
+  }
+
+  .production-page-view .production-florista-reminder-overlay {
+    padding: 14px !important;
+  }
+
+  .production-page-view .production-florista-reminder {
+    width: min(420px, 100%) !important;
+    padding: 24px 18px 20px !important;
+  }
+
+  .production-page-view .production-florista-reminder-icon {
+    width: 54px !important;
+    height: 54px !important;
+    border-radius: 18px !important;
+  }
+
+  .production-page-view .production-florista-reminder-copy strong {
+    font-size: 19px !important;
   }
 
   .production-page-view .orders-page-header.production-page-header .orders-header-refresh,
