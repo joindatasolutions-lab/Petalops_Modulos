@@ -61,6 +61,8 @@ const BADGE_CLASS_BY_STATUS = {
   RECHAZADO: "is-rechazado"
 };
 const COLOMBIA_UTC_OFFSET_MINUTES = -5 * 60;
+const FLORISTA_REMINDER_INTERVAL_MS = 60 * 60 * 1000;
+const FLORISTA_REMINDER_VISIBLE_MS = 30 * 1000;
 const PRODUCTION_STATUS_CHIP_CLASS = {
   PENDIENTE: "is-pending",
   ENPRODUCCION: "is-production",
@@ -296,6 +298,19 @@ function productionSelectionKey(item) {
   return `produccion-${Number(item?.idProduccion || 0)}`;
 }
 
+function productionGroupStatusRank(status) {
+  const normalizedStatus = normalizeStatus(status).replace(/_/g, "");
+  if (normalizedStatus === "PENDIENTE") return 1;
+  if (normalizedStatus === "ENPRODUCCION") return 2;
+  if (normalizedStatus === "PARAENTREGA") return 3;
+  if (normalizedStatus === "CANCELADO" || normalizedStatus === "RECHAZADO") return 4;
+  return 5;
+}
+
+function shouldReplaceGroupedProductionStatus(currentStatus, nextStatus) {
+  return productionGroupStatusRank(nextStatus) < productionGroupStatusRank(currentStatus);
+}
+
 export function productionItemMatchesSearch(item, searchValue) {
   const search = normalizeSearchText(searchValue);
   if (!search) return true;
@@ -360,6 +375,7 @@ export function buildVisibleProductionItems(sourceItems, currentFloristaId, busq
     current.cantidadProducciones += 1;
     if (!current.floristaID && item.floristaID) current.floristaID = item.floristaID;
     if (!current.floristaAsignado && item.floristaAsignado) current.floristaAsignado = item.floristaAsignado;
+    if (shouldReplaceGroupedProductionStatus(current.estado, item.estado)) current.estado = item.estado;
     if (!current.observacion && item.observacion) current.observacion = item.observacion;
     if (!current.notasProduccion && item.notasProduccion) current.notasProduccion = item.notasProduccion;
     if (!current.observacionesPersonalizados && item.observacionesPersonalizados) current.observacionesPersonalizados = item.observacionesPersonalizados;
@@ -437,6 +453,10 @@ function isPendingOverdue(item) {
 function matchesProductionMetric(item, metricKey) {
   const normalizedStatus = normalizeStatus(item?.estado).replace(/_/g, "");
   if (metricKey === "pendientesHoy") return normalizedStatus === "PENDIENTE" && resolveProgrammedDate(item) === todayIsoDate();
+  if (metricKey === "pendientesHastaHoy") {
+    const programmedDate = resolveProgrammedDate(item);
+    return ["PENDIENTE", "ENPRODUCCION"].includes(normalizedStatus) && Boolean(programmedDate) && programmedDate <= todayIsoDate();
+  }
   if (metricKey === "sinAsignar") return normalizedStatus === "PENDIENTE" && !hasAssignedFlorista(item);
   if (metricKey === "atrasados") return isPendingOverdue(item);
   if (metricKey === "pendientesFuturos") {
@@ -444,6 +464,50 @@ function matchesProductionMetric(item, metricKey) {
     return normalizedStatus === "PENDIENTE" && Boolean(programmedDate) && programmedDate > todayIsoDate();
   }
   return true;
+}
+
+export function countDueUnfinishedProductionOrders(sourceItems) {
+  const today = todayIsoDate();
+  const finishedStatuses = new Set(["PARAENTREGA", "ENTREGADO", "CANCELADO", "RECHAZADO"]);
+  const pendingOrderKeys = new Set();
+
+  for (const item of Array.isArray(sourceItems) ? sourceItems : []) {
+    const programmedDate = resolveProgrammedDate(item);
+    if (!programmedDate || programmedDate > today) continue;
+    const normalizedStatus = normalizeStatus(item?.estado).replace(/_/g, "");
+    if (finishedStatuses.has(normalizedStatus)) continue;
+    const key = String(item?.pedidoID || item?.numeroPedido || item?.idProduccion || "").trim();
+    if (key) pendingOrderKeys.add(key);
+  }
+
+  return pendingOrderKeys.size;
+}
+
+function ProductionDayBanner({ count, className = "", onClick }) {
+  if (count <= 0) return null;
+  const Wrapper = onClick ? "button" : "section";
+  return (
+    <Wrapper
+      className={`production-day-banner ${onClick ? "production-day-banner--action" : ""} ${className}`.trim()}
+      type={onClick ? "button" : undefined}
+      onClick={onClick}
+      role={onClick ? undefined : "status"}
+      aria-live={onClick ? undefined : "polite"}
+      aria-label={onClick ? `Filtrar ${count} pedidos pendientes de hoy o atrasados` : undefined}
+      title={onClick ? "Ver pedidos pendientes de hoy o atrasados" : undefined}
+    >
+      <span className="production-day-banner-icon" aria-hidden="true">
+        <TriangleAlert size={20} strokeWidth={2.3} />
+      </span>
+      <div className="production-day-banner-copy">
+        <span className="production-day-banner-kicker">Atención de jornada</span>
+        <strong>
+          Tienes {count} {count === 1 ? "pedido pendiente" : "pedidos pendientes"} de hoy o atrasados.
+        </strong>
+        <span>{count === 1 ? "Complétalo" : "Complétalos"} para que puedan continuar al proceso de domicilios.</span>
+      </div>
+    </Wrapper>
+  );
 }
 
 function productionStatusBadgeClass(item) {
@@ -1331,6 +1395,8 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
 
   const [usuarioCambio] = useState(() => String(session?.email || session?.nombre || DEFAULT_USER));
   const [motivoAccion, setMotivoAccion] = useState("");
+  const [dueUnfinishedOrdersCount, setDueUnfinishedOrdersCount] = useState(0);
+  const [floristaReminderVisible, setFloristaReminderVisible] = useState(false);
 
   const [floristaGestionID, setFloristaGestionID] = useState("");
   const [floristaEstado, setFloristaEstado] = useState("Activo");
@@ -1401,6 +1467,10 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
     }
     return session?.nombre || session?.name || "";
   }, [allFloristas, currentFloristaId, ownFloristaDisponibilidad, session]);
+  const reminderFloristaName = useMemo(
+    () => String(currentFloristaName || displayUserName || "Florista").trim() || "Florista",
+    [currentFloristaName, displayUserName]
+  );
   const catalogProductIndex = useMemo(
     () => buildCatalogProductIndex(catalogProducts),
     [catalogProducts]
@@ -1411,9 +1481,15 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
     return itemMatchesCurrentFlorista(item, currentFloristaId, currentFloristaName);
   }, [canFloristaQuickState, currentFloristaId, currentFloristaName]);
 
+  const shouldScopeToCurrentFlorista = !canManageProductionActions && currentFloristaId != null;
+  const effectiveSoloMisAsignados = shouldScopeToCurrentFlorista
+    ? true
+    : (activeMetricFilter ? false : soloMisAsignados);
+  const shouldGroupVisibleItemsByPedido = !activeMetricFilter || activeMetricFilter === "pendientesHastaHoy";
+
   const visibleItems = useMemo(
-    () => buildVisibleProductionItems(items, currentFloristaId, busquedaGeneral, activeMetricFilter ? false : soloMisAsignados, !activeMetricFilter, currentFloristaName),
-    [items, currentFloristaId, currentFloristaName, busquedaGeneral, soloMisAsignados, activeMetricFilter]
+    () => buildVisibleProductionItems(items, currentFloristaId, busquedaGeneral, effectiveSoloMisAsignados, shouldGroupVisibleItemsByPedido, currentFloristaName),
+    [items, currentFloristaId, currentFloristaName, busquedaGeneral, effectiveSoloMisAsignados, shouldGroupVisibleItemsByPedido]
   );
   const searchOverridesFilters = useMemo(
     () => normalizeSearchText(busquedaGeneral).length > 0,
@@ -1453,6 +1529,10 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
       pendientesHoy: {
         label: "Pendientes hoy",
         description: "Pedidos que deben resolverse en la jornada.",
+      },
+      pendientesHastaHoy: {
+        label: "Pendientes hoy y atrasados",
+        description: "Pedidos pendientes con fecha de hoy o de días anteriores.",
       },
       sinAsignar: {
         label: "Pendientes sin asignar",
@@ -1520,6 +1600,17 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
     });
   }, []);
 
+  const focusDuePendingFromBanner = useCallback(() => {
+    setSubmenu("pedidos");
+    setBusquedaGeneral("");
+    setFecha("");
+    setEstadosFiltro(["Pendiente", "EnProduccion"]);
+    setActiveMetricFilter("pendientesHastaHoy");
+    window.requestAnimationFrame(() => {
+      productionListRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  }, []);
+
   const toggleEstadoFiltro = useCallback((estadoItem) => {
     setActiveMetricFilter(null);
     setEstadosFiltro([estadoItem]);
@@ -1539,6 +1630,7 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
     try {
       const shouldIncludeCanceled = shouldIncludeCanceledProduction(estadosFiltro);
       const backendStatusFilter = productionBackendStatusFilter(estadosFiltro);
+      const isDuePendingMetricFilter = activeMetricFilter === "pendientesHastaHoy";
       const expectedMetricCount = activeMetricFilter
         ? Number(productionMetricasRef.current?.[activeMetricFilter] || 0)
         : 0;
@@ -1548,8 +1640,8 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
         fecha: searchOverridesFilters || activeMetricFilter ? undefined : fecha,
         estado: searchOverridesFilters || activeMetricFilter ? undefined : backendStatusFilter,
         q: searchOverridesFilters ? busquedaGeneral : undefined,
-        metricFilter: searchOverridesFilters ? undefined : activeMetricFilter,
-        todasFechas: !searchOverridesFilters && !activeMetricFilter && !fecha,
+        metricFilter: searchOverridesFilters || isDuePendingMetricFilter ? undefined : activeMetricFilter,
+        todasFechas: isDuePendingMetricFilter || (!searchOverridesFilters && !activeMetricFilter && !fecha),
         incluirCancelado: shouldIncludeCanceled,
         autoAsignarPendientesHoy: !activeMetricFilter && !searchOverridesFilters,
       });
@@ -1673,9 +1765,63 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
     }
   }, [api, fecha, estadosFiltro, activeMetricFilter, empresaId, sucursalId, searchOverridesFilters, busquedaGeneral]);
 
+  const loadDueUnfinishedOrdersCount = useCallback(async () => {
+    try {
+      const response = await api.listarProduccion({
+        empresaId,
+        sucursalId,
+        fecha: undefined,
+        estado: undefined,
+        metricFilter: undefined,
+        todasFechas: true,
+        incluirCancelado: false,
+        autoAsignarPendientesHoy: false,
+      });
+      const responseItems = (Array.isArray(response?.items) ? response.items : []).map(normalizeProductionItemStatus);
+      const scopedItems = canManageProductionActions
+        ? responseItems
+        : responseItems.filter(item => itemMatchesCurrentFlorista(item, currentFloristaId, currentFloristaName));
+      const count = countDueUnfinishedProductionOrders(scopedItems);
+      setDueUnfinishedOrdersCount(count);
+      return count;
+    } catch (nextError) {
+      console.warn("No fue posible cargar el banner de pedidos pendientes de hoy o atrasados:", nextError);
+      setDueUnfinishedOrdersCount(0);
+      return 0;
+    }
+  }, [api, canManageProductionActions, currentFloristaId, currentFloristaName, empresaId, sucursalId]);
+
   useEffect(() => {
     void loadItems();
   }, [loadItems]);
+
+  useEffect(() => {
+    void loadDueUnfinishedOrdersCount();
+  }, [loadDueUnfinishedOrdersCount]);
+
+  useEffect(() => {
+    if (canManageProductionActions || dueUnfinishedOrdersCount <= 0) {
+      setFloristaReminderVisible(false);
+      return undefined;
+    }
+
+    const showReminder = () => {
+      setFloristaReminderVisible(true);
+    };
+    const hideReminder = () => {
+      setFloristaReminderVisible(false);
+    };
+
+    const intervalId = window.setInterval(showReminder, FLORISTA_REMINDER_INTERVAL_MS);
+    const visibilityId = floristaReminderVisible
+      ? window.setTimeout(hideReminder, FLORISTA_REMINDER_VISIBLE_MS)
+      : null;
+
+    return () => {
+      window.clearInterval(intervalId);
+      if (visibilityId != null) window.clearTimeout(visibilityId);
+    };
+  }, [canManageProductionActions, dueUnfinishedOrdersCount, floristaReminderVisible]);
 
   useEffect(() => {
     if (!canResolveProductionImages) return undefined;
@@ -1861,7 +2007,7 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
 
 
   const refreshAll = async () => {
-    await Promise.all([loadItems(), loadFloristaData()]);
+    await Promise.all([loadItems(), loadFloristaData(), loadDueUnfinishedOrdersCount()]);
   };
 
   const onChangeSoloMisAsignados = checked => {
@@ -1951,8 +2097,8 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
   };
 
   const refreshAndKeepSelection = async item => {
-    const nextItems = await loadItems();
-    const nextVisible = buildVisibleProductionItems(nextItems, currentFloristaId, busquedaGeneral, soloMisAsignados, true, currentFloristaName);
+    const [nextItems] = await Promise.all([loadItems(), loadDueUnfinishedOrdersCount()]);
+    const nextVisible = buildVisibleProductionItems(nextItems, currentFloristaId, busquedaGeneral, effectiveSoloMisAsignados, true, currentFloristaName);
     const nextSelected = nextVisible.find(candidate => Number(candidate.pedidoID) === Number(item?.pedidoID));
     if (nextSelected) {
       if (assignmentDrawerOpen) {
@@ -2097,7 +2243,7 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
         origenCambio: "panel_produccion_florista",
         cambioAdministrativo: false
       })));
-      await loadItems();
+      await Promise.all([loadItems(), loadDueUnfinishedOrdersCount()]);
     } catch (nextError) {
       console.error("Error cambiando estado rápido de florista:", nextError);
       globalThis.alert(productionActionErrorMessage(nextError, "No fue posible cambiar el estado."));
@@ -2332,6 +2478,7 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
                 <span>Futuros</span>
               </button>
             </div>
+            <ProductionDayBanner count={dueUnfinishedOrdersCount} className="production-day-banner--desktop" onClick={focusDuePendingFromBanner} />
           </div>
         </header>
 
@@ -2352,6 +2499,8 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
                   <RotateCw size={20} strokeWidth={2.2} aria-hidden="true" />
                 </button>
               </div>
+
+              <ProductionDayBanner count={dueUnfinishedOrdersCount} className="production-day-banner--mobile" onClick={focusDuePendingFromBanner} />
 
               <label className="production-mobile-search" aria-label="Buscar producción">
                 <Search size={19} strokeWidth={2} aria-hidden="true" />
@@ -2991,6 +3140,37 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
             </div>
           </section>
         )}
+
+        {!canManageProductionActions && floristaReminderVisible && dueUnfinishedOrdersCount > 0 ? (
+          <div className="production-florista-reminder-overlay" role="presentation">
+            <section className="production-florista-reminder" role="dialog" aria-modal="false" aria-labelledby="production-florista-reminder-title">
+              <button type="button" className="production-florista-reminder-close" onClick={() => setFloristaReminderVisible(false)} aria-label="Cerrar recordatorio">
+                <IconX size={17} stroke={2.4} />
+              </button>
+              <span className="production-florista-reminder-icon" aria-hidden="true">
+                <TriangleAlert size={30} strokeWidth={2.4} />
+              </span>
+              <div className="production-florista-reminder-copy">
+                <span className="production-florista-reminder-kicker">Recordatorio de producción</span>
+                <strong id="production-florista-reminder-title">{reminderFloristaName}, actualiza el estado de tus pedidos.</strong>
+                <span>
+                  Tienes {dueUnfinishedOrdersCount} {dueUnfinishedOrdersCount === 1 ? "pedido pendiente" : "pedidos pendientes"} de hoy o atrasados. Es importante finalizarlos para que puedan continuar al proceso de domicilios.
+                </span>
+              </div>
+              <div className="production-florista-reminder-actions">
+                <button type="button" onClick={() => {
+                  setFloristaReminderVisible(false);
+                  focusDuePendingFromBanner();
+                }}>
+                  Ver pendientes
+                </button>
+                <button type="button" className="production-florista-reminder-secondary" onClick={() => setFloristaReminderVisible(false)}>
+                  Entendido
+                </button>
+              </div>
+            </section>
+          </div>
+        ) : null}
       </main>
 
       <div className={`production-drawer-backdrop ${(drawerOpen || assignmentDrawerOpen) && submenu === "pedidos" ? "open" : ""}`} aria-hidden="true" />
