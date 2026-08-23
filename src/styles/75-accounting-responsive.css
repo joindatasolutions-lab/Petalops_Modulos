@@ -195,6 +195,33 @@
   text-overflow: ellipsis !important;
 }
 
+.accounting-page-view.is-personal-view .orders-page-header.accounting-page-header {
+  grid-template-areas: "heading actions" !important;
+  margin-bottom: 8px !important;
+  padding: 10px 18px 8px !important;
+  gap: 8px 18px !important;
+}
+
+.accounting-page-view.is-personal-view .orders-page-header.accounting-page-header .orders-page-heading {
+  gap: 5px !important;
+}
+
+.accounting-page-view.is-personal-view .orders-page-header.accounting-page-header h1 {
+  font-size: 30px !important;
+}
+
+.accounting-page-view.is-personal-view .orders-page-header.accounting-page-header .orders-page-description {
+  font-size: 13px !important;
+}
+
+.accounting-page-view.is-personal-view .orders-page-header.accounting-page-header .orders-user-pill {
+  margin-top: 2px !important;
+}
+
+.accounting-page-view.is-personal-view .orders-filters.accounting-filters {
+  margin-bottom: 10px !important;
+}
+
 .accounting-page-view .accounting-line-chart {
   display: block !important;
   min-height: 276px !important;
@@ -236,6 +263,371 @@
   font-weight: 800 !important;
 }
 
+.accounting-page-view .accounting-personnel-panel {
+  display: grid !important;
+  gap: 18px !important;
+}
+
+.accounting-page-view .accounting-personnel-dashboard {
+  display: grid !important;
+  gap: 10px !important;
+}
+
+.accounting-page-view.is-personal-view .accounting-personnel-dashboard > .looker-header {
+  margin-bottom: 0 !important;
+  padding: 0 !important;
+}
+
+.accounting-page-view.is-personal-view .accounting-personnel-dashboard > .looker-header h4 {
+  font-size: 17px !important;
+  margin-bottom: 4px !important;
+}
+
+.accounting-page-view.is-personal-view .accounting-personnel-dashboard > .looker-header .orders-admin-subtitle {
+  font-size: 13px !important;
+}
+
+.accounting-page-view .accounting-personnel-toolbar {
+  align-items: end !important;
+  background: #ffffff !important;
+  border: 1px solid #eef2f7 !important;
+  border-radius: 10px !important;
+  display: grid !important;
+  gap: 12px !important;
+  grid-template-columns: auto minmax(150px, 190px) minmax(220px, 1fr) auto !important;
+  padding: 10px 12px !important;
+}
+
+.accounting-page-view .accounting-personnel-toolbar label {
+  color: #334155 !important;
+  display: grid !important;
+  gap: 6px !important;
+  font-size: 11px !important;
+  font-weight: 900 !important;
+}
+
+.accounting-page-view .accounting-personnel-toolbar input,
+.accounting-page-view .accounting-personnel-toolbar select {
+  border: 1px solid #e2e8f0 !important;
+  border-radius: 8px !important;
+  color: #0f172a !important;
+  min-height: 34px !important;
+  padding: 0 11px !important;
+}
+
+.accounting-page-view .accounting-personnel-segment {
+  background: #f8fafc !important;
+  border: 1px solid #e2e8f0 !important;
+  border-radius: 9px !important;
+  display: inline-grid !important;
+  gap: 4px !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  padding: 4px !important;
+}
+
+.accounting-page-view .accounting-personnel-segment button {
+  align-items: center !important;
+  background: transparent !important;
+  border: 0 !important;
+  border-radius: 7px !important;
+  color: #64748b !important;
+  display: inline-flex !important;
+  gap: 7px !important;
+  justify-content: center !important;
+  min-height: 32px !important;
+  padding: 0 12px !important;
+  font-weight: 900 !important;
+}
+
+.accounting-page-view .accounting-personnel-segment button.is-active {
+  background: #e73578 !important;
+  color: #ffffff !important;
+  box-shadow: 0 8px 20px rgba(231, 53, 120, 0.22) !important;
+}
+
+.accounting-page-view .accounting-personnel-kpis {
+  display: grid !important;
+  gap: 8px !important;
+  grid-template-columns: repeat(5, minmax(0, 1fr)) !important;
+}
+
+.accounting-page-view .accounting-personnel-kpi {
+  align-items: center !important;
+  background: #ffffff !important;
+  border: 1px solid #edf1f6 !important;
+  border-radius: 10px !important;
+  box-shadow: 0 10px 26px rgba(15, 23, 42, 0.05) !important;
+  display: grid !important;
+  gap: 10px !important;
+  grid-template-columns: 44px minmax(0, 1fr) !important;
+  min-width: 0 !important;
+  padding: 10px 12px !important;
+}
+
+.accounting-page-view .accounting-personnel-kpi-icon {
+  align-items: center !important;
+  background: #fce7f0 !important;
+  border-radius: 50% !important;
+  color: #e73578 !important;
+  display: inline-flex !important;
+  height: 40px !important;
+  justify-content: center !important;
+  width: 40px !important;
+}
+
+.accounting-page-view .accounting-personnel-kpi:nth-child(even) .accounting-personnel-kpi-icon {
+  background: #dcfce7 !important;
+  color: #2f8f3a !important;
+}
+
+.accounting-page-view .accounting-personnel-kpi span,
+.accounting-page-view .accounting-personnel-kpi small {
+  color: #64748b !important;
+  display: block !important;
+  font-size: 11px !important;
+  font-weight: 800 !important;
+}
+
+.accounting-page-view .accounting-personnel-kpi strong {
+  color: #0f172a !important;
+  display: block !important;
+  font-size: 21px !important;
+  line-height: 1.05 !important;
+  margin: 3px 0 !important;
+}
+
+.accounting-page-view .accounting-personnel-list {
+  background: #ffffff !important;
+  border: 1px solid #eef2f7 !important;
+  border-radius: 10px !important;
+}
+
+.accounting-page-view .accounting-personnel-bottom-grid {
+  display: grid !important;
+  gap: 8px !important;
+  grid-template-columns: 1fr 1.1fr 1.2fr 1fr !important;
+}
+
+.accounting-page-view .accounting-personnel-totals p,
+.accounting-page-view .accounting-personnel-indicators p {
+  align-items: center !important;
+  border-bottom: 1px solid #eef2f7 !important;
+  display: flex !important;
+  gap: 12px !important;
+  justify-content: space-between !important;
+  margin: 0 !important;
+  padding: 10px 0 !important;
+}
+
+.accounting-page-view .accounting-personnel-totals p:last-child,
+.accounting-page-view .accounting-personnel-indicators p:last-child {
+  border-bottom: 0 !important;
+}
+
+.accounting-page-view .accounting-personnel-totals span,
+.accounting-page-view .accounting-personnel-indicators span {
+  color: #64748b !important;
+  font-size: 12px !important;
+  font-weight: 800 !important;
+}
+
+.accounting-page-view .accounting-personnel-totals strong,
+.accounting-page-view .accounting-personnel-indicators strong {
+  color: #0f172a !important;
+  font-size: 13px !important;
+  font-weight: 950 !important;
+  text-align: right !important;
+}
+
+.accounting-page-view .accounting-summary-cards--personnel {
+  grid-template-columns: repeat(6, minmax(0, 1fr)) !important;
+}
+
+.accounting-page-view .accounting-personnel-section-head {
+  align-items: flex-start !important;
+  display: flex !important;
+  gap: 12px !important;
+  justify-content: space-between !important;
+  margin-bottom: 14px !important;
+}
+
+.accounting-page-view .accounting-personnel-section-head span {
+  color: #64748b !important;
+  display: block !important;
+  font-size: 11px !important;
+  font-weight: 900 !important;
+  text-transform: uppercase !important;
+}
+
+.accounting-page-view .accounting-personnel-section-head h5 {
+  color: #0f172a !important;
+  font-size: 16px !important;
+  margin: 3px 0 0 !important;
+}
+
+.accounting-page-view .accounting-personnel-table th,
+.accounting-page-view .accounting-personnel-table td {
+  white-space: nowrap !important;
+}
+
+.accounting-page-view .accounting-delivery-detail-panel {
+  display: grid !important;
+  gap: 14px !important;
+  padding: 18px 20px !important;
+}
+
+.accounting-page-view .accounting-delivery-detail-head {
+  align-items: center !important;
+  border-bottom: 1px solid #eef2f7 !important;
+  display: flex !important;
+  gap: 16px !important;
+  justify-content: space-between !important;
+  margin: 0 !important;
+  padding: 0 0 12px !important;
+}
+
+.accounting-page-view .accounting-delivery-detail-title {
+  display: grid !important;
+  gap: 4px !important;
+  min-width: 0 !important;
+}
+
+.accounting-page-view .accounting-delivery-detail-title > span {
+  color: #d9367a !important;
+  font-size: 11px !important;
+  font-weight: 950 !important;
+  letter-spacing: 0 !important;
+  text-transform: uppercase !important;
+}
+
+.accounting-page-view .accounting-delivery-detail-title h3 {
+  color: #0f172a !important;
+  font-size: 28px !important;
+  font-weight: 950 !important;
+  line-height: 1.05 !important;
+  margin: 0 !important;
+  max-width: 100% !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+
+.accounting-page-view .accounting-delivery-detail-title .orders-admin-subtitle {
+  color: #64748b !important;
+  font-size: 13px !important;
+  font-weight: 800 !important;
+  margin: 0 !important;
+}
+
+.accounting-page-view .accounting-delivery-detail-actions {
+  align-items: center !important;
+  display: flex !important;
+  flex-wrap: wrap !important;
+  gap: 8px !important;
+  justify-content: flex-end !important;
+}
+
+.accounting-page-view .accounting-delivery-detail-actions .btn-outline {
+  align-items: center !important;
+  display: inline-flex !important;
+  gap: 7px !important;
+  justify-content: center !important;
+  min-height: 40px !important;
+}
+
+.accounting-page-view .accounting-delivery-detail-filters {
+  align-items: center !important;
+  background: #f8fafc !important;
+  border: 1px solid #e8edf5 !important;
+  border-radius: 8px !important;
+  display: flex !important;
+  flex-wrap: wrap !important;
+  gap: 6px !important;
+  justify-content: flex-start !important;
+  padding: 6px !important;
+  width: fit-content !important;
+}
+
+.accounting-page-view .accounting-delivery-detail-filters button {
+  background: transparent !important;
+  border: 1px solid transparent !important;
+  border-radius: 7px !important;
+  color: #475569 !important;
+  cursor: pointer !important;
+  font-size: 12px !important;
+  font-weight: 900 !important;
+  min-height: 32px !important;
+  padding: 7px 12px !important;
+}
+
+.accounting-page-view .accounting-delivery-detail-filters button.is-active {
+  background: #ffffff !important;
+  border-color: #f1c7d9 !important;
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.06) !important;
+  color: #c02666 !important;
+}
+
+.accounting-page-view .accounting-delivery-detail-filters button:disabled {
+  cursor: not-allowed !important;
+  opacity: 0.65 !important;
+}
+
+.accounting-page-view .accounting-delivery-detail-kpis {
+  display: grid !important;
+  gap: 8px !important;
+  grid-template-columns: repeat(5, minmax(0, 1fr)) !important;
+  width: 100% !important;
+}
+
+.accounting-page-view .accounting-delivery-detail-kpi {
+  background: #ffffff !important;
+  border: 1px solid #e8edf5 !important;
+  border-left: 4px solid #e73578 !important;
+  border-radius: 8px !important;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.05) !important;
+  display: grid !important;
+  gap: 4px !important;
+  min-width: 0 !important;
+  padding: 11px 12px !important;
+}
+
+.accounting-page-view .accounting-delivery-detail-kpi:nth-child(2) {
+  border-left-color: #16a34a !important;
+}
+
+.accounting-page-view .accounting-delivery-detail-kpi:nth-child(3) {
+  border-left-color: #dc2626 !important;
+}
+
+.accounting-page-view .accounting-delivery-detail-kpi:nth-child(4) {
+  border-left-color: #2563eb !important;
+}
+
+.accounting-page-view .accounting-delivery-detail-kpi:nth-child(5) {
+  border-left-color: #7c3aed !important;
+}
+
+.accounting-page-view .accounting-delivery-detail-kpi span {
+  color: #64748b !important;
+  font-size: 10px !important;
+  font-weight: 950 !important;
+  letter-spacing: 0 !important;
+  text-transform: uppercase !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+
+.accounting-page-view .accounting-delivery-detail-kpi strong {
+  color: #0f172a !important;
+  font-size: 20px !important;
+  font-weight: 950 !important;
+  line-height: 1.05 !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+
 @media (max-width: 1280px) {
   .accounting-page-view .orders-page-header.accounting-page-header {
     grid-template-columns: minmax(0, 1fr) !important;
@@ -243,6 +635,12 @@
       "heading"
       "actions"
       "metrics" !important;
+  }
+
+  .accounting-page-view.is-personal-view .orders-page-header.accounting-page-header {
+    grid-template-areas:
+      "heading"
+      "actions" !important;
   }
 
   .accounting-page-view .orders-page-header.accounting-page-header .orders-page-heading {
@@ -264,6 +662,10 @@
     padding: 14px !important;
   }
 
+  .accounting-page-view.is-personal-view .orders-page-header.accounting-page-header {
+    padding: 10px 12px !important;
+  }
+
   .accounting-page-view .orders-page-header.accounting-page-header .header-actions {
     width: 100% !important;
   }
@@ -276,6 +678,17 @@
 
   .accounting-page-view .orders-page-header.accounting-page-header .accounting-header-metrics,
   .accounting-page-view .orders-page-header.accounting-page-header .orders-header-metrics.accounting-header-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+
+  .accounting-page-view .accounting-summary-cards--personnel {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+
+  .accounting-page-view .accounting-personnel-toolbar,
+  .accounting-page-view .accounting-personnel-kpis,
+  .accounting-page-view .accounting-delivery-detail-kpis,
+  .accounting-page-view .accounting-personnel-bottom-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
   }
 }
@@ -292,5 +705,43 @@
   .accounting-page-view .orders-page-header.accounting-page-header .accounting-header-metrics,
   .accounting-page-view .orders-page-header.accounting-page-header .orders-header-metrics.accounting-header-metrics {
     grid-template-columns: minmax(0, 1fr) !important;
+  }
+
+  .accounting-page-view .accounting-summary-cards--personnel {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+
+  .accounting-page-view .accounting-personnel-toolbar,
+  .accounting-page-view .accounting-personnel-kpis,
+  .accounting-page-view .accounting-delivery-detail-kpis,
+  .accounting-page-view .accounting-personnel-bottom-grid {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+
+  .accounting-page-view .accounting-delivery-detail-head {
+    align-items: flex-start !important;
+    flex-direction: column !important;
+  }
+
+  .accounting-page-view .accounting-delivery-detail-actions {
+    width: 100% !important;
+  }
+
+  .accounting-page-view .accounting-delivery-detail-filters {
+    width: 100% !important;
+  }
+
+  .accounting-page-view .accounting-delivery-detail-filters button {
+    flex: 1 1 0 !important;
+  }
+
+  .accounting-page-view .accounting-delivery-detail-head .btn-outline {
+    flex: 1 1 0 !important;
+    width: 100% !important;
+  }
+
+  .accounting-page-view .accounting-delivery-detail-title h3 {
+    font-size: 23px !important;
+    white-space: normal !important;
   }
 }

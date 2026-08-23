@@ -6,7 +6,9 @@ import { filterInventoryItems } from "../domain/inventory/InventoryPage.jsx";
 import { filterNeighborhoodItems, sortNeighborhoods } from "../domain/neighborhoods/NeighborhoodsPage.jsx";
 import { buildOrdersMetrics, extractOrdersPayloadItems, filterOrdersByCreatedDateRange, filterOrdersBySearch, filterOrdersByStatus, isStorePickupOrder, localDateEndParam, localDateStartParam, resolveOrdersPayloadTotal, shouldAutoGenerateInvoiceForCompany, shouldShowPendingInvoiceAlert } from "../domain/orders-admin/OrdersAdminPage.jsx";
 import { buildDetailUpdatePayload, buildNewOrderCheckoutPayload } from "../domain/orders-admin/orderPayloadBuilders.js";
-import { buildEditedOrderFinancialBase, buildOrderFinancialPreview, getOrderFinancialTotal, resolveOrderListTotal } from "../domain/orders-admin/ordersDomain.js";
+import { buildEditedOrderFinancialBase, buildOrderFinancialPreview, getOrderFinancialTotal, patchOrderItemFromDetail, resolveOrderListTotal } from "../domain/orders-admin/ordersDomain.js";
+import { buildSalesExportRows } from "../domain/accounting/accountingExports.js";
+import { applyApprovedOrderCountsToRows } from "../domain/accounting/accountingSelectors.js";
 import {
   buildVisibleProductionItems,
   catalogCodeCandidates,
@@ -208,6 +210,7 @@ describe("estabilidad de filtros por vista", () => {
       canEditClientIdentity: true,
     });
 
+    expect(payload.precioUnitario).toBe(85000);
     expect(payload.productoPrecio).toBe(85000);
     expect(payload.metodosPago).toEqual(["Efectivo"]);
   });
@@ -224,6 +227,27 @@ describe("estabilidad de filtros por vista", () => {
     expect(getOrderFinancialTotal(financiero)).toBe(1);
     expect(resolveOrderListTotal({ financiero })).toBe(1);
     expect(resolveOrderListTotal({ subtotal: 1, domicilio: 120000, omitirCostoDomicilio: true })).toBe(1);
+  });
+
+  it("Pedidos: actualiza item del listado desde financiero devuelto por detalle", () => {
+    const item = {
+      pedidoID: 97959,
+      estado: "APROBADO",
+      total: 100000,
+      facturaImpresa: true,
+      financiero: { subtotal: 90000, domicilio: 10000, total: 100000, facturaImpresa: true },
+    };
+    const detail = {
+      estado: "APROBADO",
+      financiero: { subtotal: 90000, iva: 0, domicilio: 15000, total: 105000, facturaImpresa: false },
+    };
+
+    const patched = patchOrderItemFromDetail(item, 97959, detail);
+
+    expect(patched.total).toBe(105000);
+    expect(patched.domicilio).toBe(15000);
+    expect(patched.facturaImpresa).toBe(false);
+    expect(patched.financiero.facturaImpresa).toBe(false);
   });
 
   it("Pedidos: checkout manual conserva cliente identificado por telefono", () => {
@@ -729,6 +753,24 @@ describe("estabilidad de filtros por vista", () => {
     expect(filterAccountingDetailRows(rows, "saldo").map(row => row.pedidoID)).toEqual([2]);
     expect(filterAccountingDetailRows(rows, "cancelados").map(row => row.pedidoID)).toEqual([3]);
     expect(filterAccountingDetailRows(rows, "conNotas").map(row => row.pedidoID)).toEqual([4]);
+  });
+
+  it("Contabilidad: auditoria de pedidos cuenta solo aprobados y omite cancelados del listado", () => {
+    const orderRows = [
+      { fecha: "2026-08-16", cantidadPedidos: 3, pedidosCancelados: 1, totalVenta: 100000 },
+    ];
+    const detailRows = [
+      { pedidoID: 1, fecha: "2026-08-16T09:00:00", estado: "APROBADO" },
+      { pedidoID: 2, fechaPedido: "2026-08-16 10:00:00", estado: "Aprobado" },
+      { pedidoID: 3, fecha: "2026-08-16T11:00:00", estado: "CANCELADO" },
+    ];
+
+    const [row] = applyApprovedOrderCountsToRows(orderRows, detailRows);
+    const [exportRow] = buildSalesExportRows([row]);
+
+    expect(row.cantidadPedidos).toBe(2);
+    expect(exportRow["Pedidos aprobados"]).toBe(2);
+    expect(exportRow).not.toHaveProperty("Pedidos cancelados");
   });
 
   it("Barrios: combina estado, zona, costo y busqueda", () => {

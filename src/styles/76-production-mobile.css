@@ -29,7 +29,8 @@
   .production-page-view .orders-filters.production-filters-bar,
   .production-page-view .production-table-wrap.production-table-shell,
   .production-page-view .records-pager.production-records-pager,
-  .production-page-view .production-capsules {
+  .production-page-view .production-capsules,
+  .production-page-view .production-day-banner--desktop {
     display: none !important;
   }
 
@@ -89,6 +90,28 @@
     background: #ffffff;
     color: #d9367a;
     box-shadow: 0 8px 18px rgba(15, 23, 42, 0.05);
+  }
+
+  .production-page-view .production-day-banner--mobile {
+    display: flex !important;
+    margin: 0 !important;
+    padding: 12px !important;
+    border-radius: 9px !important;
+  }
+
+  .production-page-view .production-day-banner--mobile .production-day-banner-icon {
+    width: 36px !important;
+    height: 36px !important;
+    border-radius: 12px !important;
+  }
+
+  .production-page-view .production-day-banner--mobile strong {
+    font-size: 14px !important;
+  }
+
+  .production-page-view .production-day-banner--mobile .production-day-banner-copy > span:last-child {
+    font-size: 12px !important;
+    line-height: 1.25 !important;
   }
 
   .production-mobile-search {

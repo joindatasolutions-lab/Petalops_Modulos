@@ -18,11 +18,11 @@ const PipelineOperativo = lazy(() => import("./domain/pipeline/PipelineOperativo
 const ProductionPage = lazy(() => import("./domain/production/ProductionPage.jsx").then(module => ({ default: module.ProductionPage })));
 const UsersManagementPage = lazy(() => import("./domain/users/UsersManagementPage.jsx").then(module => ({ default: module.UsersManagementPage })));
 
-function hasModuleAccess(session, modulo) {
+export function hasModuleAccess(session, modulo) {
   const name = String(modulo || "").toLowerCase();
   if (!session) return false;
   if (Boolean(session?.esGlobalJoin)) return true;
-  const modulosPlan = new Set(session.modulosActivosPlan || []);
+  const modulosPlan = new Set((session.modulosActivosPlan || []).map(item => String(item || "").toLowerCase()));
   if (!modulosPlan.has(name)) return false;
 
   const permiso = (session.permisos || []).find(item => String(item.modulo || "").toLowerCase() === name);
@@ -34,8 +34,8 @@ function isEmpresaAdminRole(session) {
   return role === "admin" || role === "empresa_admin";
 }
 
-function canAccessPipeline(session) {
-  return Boolean(session?.esGlobalJoin || isEmpresaAdminRole(session));
+export function canAccessPipeline(session) {
+  return Boolean(hasModuleAccess(session, "pipeline") || isEmpresaAdminRole(session));
 }
 
 function canAccessView(session, view) {
@@ -211,7 +211,7 @@ export default function App() {
     return <LoginPage onSubmit={handleLogin} loading={authLoading} error={authError} />;
   }
 
-  if (!canPedidos && !canProduccion && !canDomicilios && !canBarrios && !canInventario && !canContabilidad && !canClientes && !canUsuariosPanel) {
+  if (!canPipeline && !canPedidos && !canProduccion && !canDomicilios && !canBarrios && !canInventario && !canContabilidad && !canClientes && !canUsuariosPanel) {
     return (
       <main className="auth-view">
         <section className="auth-card">
