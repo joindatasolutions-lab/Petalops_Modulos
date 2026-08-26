@@ -92,9 +92,14 @@ export function useUsersManagementController({ session, canViewUsuariosGlobal })
     && editModulosCompatiblesRol.every(modulo => (editForm.modulosAcceso || []).includes(modulo));
 
   const resetForm = useCallback(() => {
-    setForm(UserFormModel.initial());
+    // Arranca con todos los modulos activos de la empresa ya marcados (igual que el boton
+    // "seleccionar todos"), en vez de vacio. Un usuario nuevo creado sin tocar esta lista
+    // termina con una lista blanca parcial en el backend que bloquea en silencio cualquier
+    // modulo no marcado, incluso si el rol si lo permite -- fue justo lo que le paso a un
+    // usuario de Lafiore con el modulo Pipeline.
+    setForm(UserFormModel.initial({ modulosAcceso: modulosActivosEmpresa }));
     setShowUserModuleDropdown(false);
-  }, []);
+  }, [modulosActivosEmpresa]);
 
   const closeEditDrawer = useCallback(() => {
     setEditingUserId(null);
@@ -108,10 +113,13 @@ export function useUsersManagementController({ session, canViewUsuariosGlobal })
   }, []);
 
   const openCreateModal = useCallback(() => {
-    setForm(UserFormModel.initial());
+    // Ver comentario en resetForm: arranca con los modulos activos de la empresa ya
+    // marcados para que un usuario nuevo no quede bloqueado de un modulo que su rol
+    // deberia permitir, solo porque nadie lo marco manualmente al crearlo.
+    setForm(UserFormModel.initial({ modulosAcceso: modulosActivosEmpresa }));
     setShowUserModuleDropdown(false);
     setShowCreateModal(true);
-  }, []);
+  }, [modulosActivosEmpresa]);
 
   const closeCreateModal = useCallback(() => {
     setShowCreateModal(false);
