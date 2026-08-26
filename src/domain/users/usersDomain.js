@@ -22,6 +22,19 @@ export function defaultModulesForRole(role, activeModules) {
   return permitted.filter(modulo => activeSet.has(modulo));
 }
 
+export function defaultModulesForRoles(roles, selectedRoleIDs, activeModules) {
+  const selected = new Set((selectedRoleIDs || []).map(item => String(item)));
+  const activeSet = new Set(activeModules || []);
+  const modules = new Set();
+  (roles || []).forEach(role => {
+    if (!selected.has(String(role?.rolID))) return;
+    (role?.modulosPermitidos || []).forEach(modulo => {
+      if (activeSet.has(modulo)) modules.add(modulo);
+    });
+  });
+  return [...modules].sort();
+}
+
 const ROLE_TYPE_LABELS = [
   { pattern: /admin|administrador/, label: "Admin" },
   { pattern: /florista/, label: "Florista" },
@@ -42,6 +55,7 @@ export class UserFormModel {
       email: "",
       password: "",
       rolID: "",
+      rolesIDs: [],
       sucursalID: "",
       estado: "Activo",
       modulosAcceso: [],
@@ -50,11 +64,13 @@ export class UserFormModel {
   }
 
   static normalizeCreate(form) {
+    const rolesIDs = normalizeRoleIds(form.rolesIDs || form.rolID);
     return {
       nombre: String(form.nombre || "").trim(),
       login: String(form.login || "").trim().toLowerCase(),
       password: String(form.password || ""),
-      rolID: Number(form.rolID),
+      rolID: Number(form.rolID || rolesIDs[0]),
+      rolesIDs,
       sucursalID: Number(form.sucursalID),
       estado: form.estado,
       modulosAcceso: Array.isArray(form.modulosAcceso) ? form.modulosAcceso : [],
@@ -82,6 +98,19 @@ export class UserFormModel {
     if (!Number.isFinite(payload.sucursalID) || payload.sucursalID <= 0) return "Debes seleccionar una sucursal válida.";
     return "";
   }
+}
+
+export function normalizeRoleIds(values) {
+  const source = Array.isArray(values) ? values : [values];
+  const seen = new Set();
+  const result = [];
+  source.forEach(raw => {
+    const value = Number(raw);
+    if (!Number.isFinite(value) || value <= 0 || seen.has(value)) return;
+    seen.add(value);
+    result.push(value);
+  });
+  return result;
 }
 
 export function normalizeRoleKey(roleName) {

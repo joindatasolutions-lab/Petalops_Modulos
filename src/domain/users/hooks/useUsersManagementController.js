@@ -5,7 +5,7 @@ import { createApiClient } from "../../../infrastructure/apiClient.js";
 import { useSidebarState } from "../../../shared/useSidebarState.js";
 import {
   UserFormModel,
-  defaultModulesForRole,
+  defaultModulesForRoles,
   filterVisibleRoles,
   normalizeModuleKey,
   selectedModulesSummary,
@@ -84,27 +84,14 @@ export function useUsersManagementController({ session, canViewUsuariosGlobal })
       .filter(Boolean)
   ), [moduleItems]);
 
-  // "Compatibles con el rol" tiene que ser justo eso: los modulos que el rol SELECCIONADO
-  // permite (permiso_modulo, via modulosPermitidos), acotados a lo activo en la empresa --
-  // no la lista completa de modulos de la empresa. Antes este alias apuntaba directo a
-  // modulosActivosEmpresa, asi que "seleccionar todos" le daba a cualquier rol (ej.
-  // Florista) acceso a modulos que nunca deberia tener (ej. usuarios, contabilidad).
-  const selectedRoleForCreate = useMemo(
-    () => roles.find(item => String(item.rolID) === String(form.rolID)),
-    [roles, form.rolID]
-  );
   const modulosCompatiblesRol = useMemo(
-    () => defaultModulesForRole(selectedRoleForCreate, modulosActivosEmpresa),
-    [selectedRoleForCreate, modulosActivosEmpresa]
+    () => defaultModulesForRoles(roles, form.rolesIDs?.length ? form.rolesIDs : [form.rolID], modulosActivosEmpresa),
+    [roles, form.rolesIDs, form.rolID, modulosActivosEmpresa]
   );
 
-  const selectedRoleForEdit = useMemo(
-    () => roles.find(item => String(item.rolID) === String(editForm.rolID)),
-    [roles, editForm.rolID]
-  );
   const editModulosCompatiblesRol = useMemo(
-    () => defaultModulesForRole(selectedRoleForEdit, modulosActivosEmpresa),
-    [selectedRoleForEdit, modulosActivosEmpresa]
+    () => defaultModulesForRoles(roles, editForm.rolesIDs?.length ? editForm.rolesIDs : [editForm.rolID], modulosActivosEmpresa),
+    [roles, editForm.rolesIDs, editForm.rolID, modulosActivosEmpresa]
   );
 
   const allUserRoleModulesSelected = modulosCompatiblesRol.length > 0
@@ -199,7 +186,8 @@ export function useUsersManagementController({ session, canViewUsuariosGlobal })
         setForm(current => ({
           ...current,
           rolID: String(defaultRole.rolID),
-          modulosAcceso: defaultModulesForRole(defaultRole, modulosActivosEmpresa),
+          rolesIDs: [String(defaultRole.rolID)],
+          modulosAcceso: defaultModulesForRoles(allowed, [defaultRole.rolID], modulosActivosEmpresa),
         }));
       }
     }
@@ -280,9 +268,13 @@ export function useUsersManagementController({ session, canViewUsuariosGlobal })
 
   useEffect(() => {
     if (visibleRoles.length === 0) return;
-    const exists = visibleRoles.some(item => String(item.rolID) === String(form.rolID));
-    if (!exists) setForm(current => ({ ...current, rolID: String(visibleRoles[0].rolID) }));
-  }, [visibleRoles, form.rolID]);
+    const selected = Array.isArray(form.rolesIDs) && form.rolesIDs.length > 0 ? form.rolesIDs : [form.rolID];
+    const validSelected = selected.filter(roleID => visibleRoles.some(item => String(item.rolID) === String(roleID)));
+    if (validSelected.length === 0) {
+      const first = String(visibleRoles[0].rolID);
+      setForm(current => ({ ...current, rolID: first, rolesIDs: [first] }));
+    }
+  }, [visibleRoles, form.rolID, form.rolesIDs]);
 
   useEffect(() => {
     loadEmpresas().catch(() => {});
@@ -410,10 +402,12 @@ export function useUsersManagementController({ session, canViewUsuariosGlobal })
         rolID: payload.rolID,
         sucursalID: payload.sucursalID,
         estado: payload.estado,
+        rolesIDs: payload.rolesIDs,
         modulosAcceso: payload.modulosAcceso,
       });
 
-      const createdRole = visibleRoles.find(item => Number(item.rolID) === Number(payload.rolID));
+      const createdRoles = visibleRoles.filter(item => payload.rolesIDs.includes(Number(item.rolID)));
+      const createdRole = createdRoles.find(item => Number(item.rolID) === Number(payload.rolID));
       setItems(current => ([
         {
           userID: response?.userID,
@@ -424,6 +418,12 @@ export function useUsersManagementController({ session, canViewUsuariosGlobal })
           email: response?.email || "",
           rolID: payload.rolID,
           rol: createdRole?.nombreRol || String(payload.rolID),
+          rolesIDs: payload.rolesIDs,
+          roles: createdRoles.map(item => ({
+            rolID: Number(item.rolID),
+            nombreRol: item.nombreRol,
+            principal: Number(item.rolID) === Number(payload.rolID),
+          })),
           estado: payload.estado,
         },
         ...current.filter(item => Number(item.userID) !== Number(response?.userID)),
@@ -461,6 +461,7 @@ export function useUsersManagementController({ session, canViewUsuariosGlobal })
         rolID: payload.rolID,
         sucursalID: payload.sucursalID,
         estado: payload.estado,
+        rolesIDs: payload.rolesIDs,
         modulosAcceso: payload.modulosAcceso,
       });
       closeEditDrawer();
@@ -506,6 +507,9 @@ export function useUsersManagementController({ session, canViewUsuariosGlobal })
         email: detail.email || "",
         password: "",
         rolID: String(detail.rolID || ""),
+        rolesIDs: Array.isArray(detail.rolesIDs) && detail.rolesIDs.length > 0
+          ? detail.rolesIDs.map(item => String(item))
+          : [String(detail.rolID || "")].filter(Boolean),
         sucursalID: String(detail.sucursalID || ""),
         estado: detail.estado || "Activo",
         modulosAcceso: Array.isArray(detail.modulosAcceso) ? detail.modulosAcceso : [],
@@ -570,6 +574,45 @@ export function useUsersManagementController({ session, canViewUsuariosGlobal })
     setInfo(`Modulo '${normalized}' agregado en borrador. Recuerda guardar.`);
   };
 
+  const toggleUserRoleAccess = roleID => {
+    const normalized = String(roleID);
+    setForm(current => {
+      const currentRoles = Array.isArray(current.rolesIDs) && current.rolesIDs.length > 0
+        ? current.rolesIDs.map(item => String(item))
+        : [String(current.rolID || "")].filter(Boolean);
+      const exists = currentRoles.includes(normalized);
+      const nextRoles = exists
+        ? currentRoles.filter(item => item !== normalized)
+        : [...currentRoles, normalized];
+      const safeRoles = nextRoles.length > 0 ? nextRoles : [normalized];
+      return {
+        ...current,
+        rolID: safeRoles[0],
+        rolesIDs: safeRoles,
+        modulosAcceso: defaultModulesForRoles(visibleRoles, safeRoles, modulosActivosEmpresa),
+      };
+    });
+  };
+
+  const toggleEditUserRoleAccess = roleID => {
+    const normalized = String(roleID);
+    setEditForm(current => {
+      const currentRoles = Array.isArray(current.rolesIDs) && current.rolesIDs.length > 0
+        ? current.rolesIDs.map(item => String(item))
+        : [String(current.rolID || "")].filter(Boolean);
+      const exists = currentRoles.includes(normalized);
+      const nextRoles = exists
+        ? currentRoles.filter(item => item !== normalized)
+        : [...currentRoles, normalized];
+      const safeRoles = nextRoles.length > 0 ? nextRoles : [normalized];
+      return {
+        ...current,
+        rolID: safeRoles[0],
+        rolesIDs: safeRoles,
+      };
+    });
+  };
+
   const toggleUserModuleAccess = modulo => {
     const normalized = normalizeModuleKey(modulo);
     if (!normalized) return;
@@ -618,9 +661,11 @@ export function useUsersManagementController({ session, canViewUsuariosGlobal })
     form,
     setForm,
     visibleRoles,
+    selectedRoleIDs: form.rolesIDs || [],
     modulosActivosEmpresa,
     sucursales,
     saving,
+    onToggleRole: toggleUserRoleAccess,
     onSubmit: submitCreate,
     modulesPicker: {
       summary: userModulesSummary,
@@ -641,11 +686,13 @@ export function useUsersManagementController({ session, canViewUsuariosGlobal })
     form: editForm,
     setForm: setEditForm,
     visibleRoles,
+    selectedRoleIDs: editForm.rolesIDs || [],
     sucursales,
     canViewUsuariosGlobal,
     passwordVisible,
     onTogglePasswordVisible: () => setPasswordVisible(current => !current),
     saving,
+    onToggleRole: toggleEditUserRoleAccess,
     onSubmit: submitEdit,
     modulesPicker: {
       summary: editUserModulesSummary,

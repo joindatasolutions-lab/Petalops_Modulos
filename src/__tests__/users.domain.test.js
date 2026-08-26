@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   UserFormModel,
+  defaultModulesForRoles,
   filterVisibleRoles,
   selectedModulesSummary,
   syncSelectedModules,
@@ -26,6 +27,7 @@ describe("dominio de usuarios", () => {
       login: "  DUSTARIZFL  ",
       password: "secret1",
       rolID: "7",
+      rolesIDs: ["7", "8"],
       sucursalID: "2",
       estado: "Activo",
       modulosAcceso: ["produccion"],
@@ -35,10 +37,24 @@ describe("dominio de usuarios", () => {
       nombre: "Diego Ustariz",
       login: "dustarizfl",
       rolID: 7,
+      rolesIDs: [7, 8],
       sucursalID: 2,
     });
     expect(UserFormModel.validateCreate(payload)).toBe("");
     expect(UserFormModel.validateCreate({ ...payload, password: "123" })).toBe("La contraseña debe tener al menos 6 caracteres.");
+  });
+
+  it("suma los modulos permitidos por multiples roles activos", () => {
+    const roles = [
+      { rolID: 7, nombreRol: "Contabilidad", modulosPermitidos: ["contabilidad"] },
+      { rolID: 8, nombreRol: "Inventarista", modulosPermitidos: ["inventario", "catalogo"] },
+      { rolID: 9, nombreRol: "Florista", modulosPermitidos: ["produccion"] },
+    ];
+
+    expect(defaultModulesForRoles(roles, ["7", "8"], ["contabilidad", "inventario", "pedidos"])).toEqual([
+      "contabilidad",
+      "inventario",
+    ]);
   });
 
   it("mantiene modulos permitidos y repone activos cuando la seleccion queda vacia", () => {
