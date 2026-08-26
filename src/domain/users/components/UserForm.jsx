@@ -1,4 +1,3 @@
-import { defaultModulesForRole } from "../usersDomain.js";
 import { UserModuleAccessPicker } from "./UserModuleAccessPicker.jsx";
 import { UserRolePicker } from "./UserRolePicker.jsx";
 
@@ -7,6 +6,7 @@ export function UserForm({
   form,
   setForm,
   visibleRoles,
+  selectedRoleIDs,
   modulosActivosEmpresa,
   sucursales,
   canViewUsuariosGlobal,
@@ -14,6 +14,7 @@ export function UserForm({
   onTogglePasswordVisible,
   modulesPicker,
   saving,
+  onToggleRole,
   onSubmit,
   onCancel,
 }) {
@@ -73,23 +74,8 @@ export function UserForm({
       <UserRolePicker
         roles={visibleRoles}
         value={form.rolID}
-        onChange={rolID => {
-          // Solo al crear: al elegir un rol, precargar los modulos que ESE rol permite
-          // (acotados a lo activo en la empresa), no todos los de la empresa en bloque --
-          // asi un Florista nunca queda con acceso a modulos que no le corresponden.
-          // En edicion no se toca: no queremos borrar en silencio los modulos que ese
-          // usuario ya tenia configurados solo porque se le cambio el rol.
-          if (isEdit) {
-            setForm(current => ({ ...current, rolID }));
-            return;
-          }
-          const selectedRole = visibleRoles.find(item => String(item.rolID) === String(rolID));
-          setForm(current => ({
-            ...current,
-            rolID,
-            modulosAcceso: defaultModulesForRole(selectedRole, modulosActivosEmpresa),
-          }));
-        }}
+        selectedRoleIDs={selectedRoleIDs}
+        onChange={onToggleRole}
       />
 
       {!canViewUsuariosGlobal && visibleRoles.length === 0 ? (

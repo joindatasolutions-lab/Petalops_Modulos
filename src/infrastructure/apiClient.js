@@ -146,7 +146,7 @@ export function createApiClient(config) {
       return requestJson("/auth/me");
     },
 
-    async crearUsuario({ nombre, login, password, email, rolID, sucursalID, estado = "Activo" }) {
+    async crearUsuario({ nombre, login, password, email, rolID, rolesIDs = null, sucursalID, estado = "Activo" }) {
       return requestJson("/auth/usuarios", {
         method: "POST",
         headers: {
@@ -159,6 +159,7 @@ export function createApiClient(config) {
           password,
           email,
           rolID,
+          rolesIDs,
           sucursalID,
           estado,
         })
@@ -174,7 +175,7 @@ export function createApiClient(config) {
       return requestJson(`/auth/usuarios?${params.toString()}`);
     },
 
-    async crearUsuarioGestion({ empresaID, nombre, login, password, email, rolID, sucursalID, estado = "Activo", modulosAcceso = null }) {
+    async crearUsuarioGestion({ empresaID, nombre, login, password, email, rolID, rolesIDs = null, sucursalID, estado = "Activo", modulosAcceso = null }) {
       return requestJson("/auth/usuarios", {
         method: "POST",
         headers: {
@@ -187,6 +188,7 @@ export function createApiClient(config) {
           password,
           email,
           rolID,
+          rolesIDs,
           sucursalID,
           estado,
           modulosAcceso,
@@ -208,12 +210,13 @@ export function createApiClient(config) {
       return requestJson(`/auth/usuarios/id/${userId}`);
     },
 
-    async actualizarUsuarioGestion({ userId, nombre, login, password = "", email, rolID, sucursalID, estado = "Activo", modulosAcceso = null }) {
+    async actualizarUsuarioGestion({ userId, nombre, login, password = "", email, rolID, rolesIDs = null, sucursalID, estado = "Activo", modulosAcceso = null }) {
       const payload = {
         nombre,
         login,
         email,
         rolID,
+        rolesIDs,
         sucursalID,
         estado,
         modulosAcceso,

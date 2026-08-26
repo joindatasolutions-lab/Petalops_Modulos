@@ -6,6 +6,12 @@ export function UsersTable({
   onToggleEstado,
   onDelete,
 }) {
+  const roleLabel = item => {
+    const roles = Array.isArray(item.roles) && item.roles.length > 0 ? item.roles : [];
+    if (!roles.length) return item.rol;
+    return roles.map(role => role.nombreRol).filter(Boolean).join(", ") || item.rol;
+  };
+
   return (
     <article className="orders-table-wrap users-table-wrap users-table-panel">
       <table className="orders-table users-table">
@@ -29,7 +35,7 @@ export function UsersTable({
               <td data-label="Sucursal">{item.sucursalID}</td>
               <td data-label="Nombre">{item.nombre}</td>
               <td data-label="Login">{item.login}</td>
-              <td data-label="Rol">{item.rol}</td>
+              <td data-label="Rol">{roleLabel(item)}</td>
               <td data-label="Estado">
                 <span className={`order-badge ${String(item.estado).toLowerCase() === "activo" ? "is-entregado" : "is-rechazado"}`}>{item.estado}</span>
               </td>
