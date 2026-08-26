@@ -264,6 +264,7 @@ export function buildDetailUpdatePayload({
     destinatarioNombre: edit.destinatarioNombre,
     telefonoDestino: edit.telefonoDestino,
     direccion: edit.direccion,
+    tipoEntrega,
     barrioNombre: edit.barrioNombre,
     latitudDestino: detalle?.destinatario?.latitudDestino ?? null,
     longitudDestino: detalle?.destinatario?.longitudDestino ?? null,
