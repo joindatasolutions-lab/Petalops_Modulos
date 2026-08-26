@@ -11,6 +11,17 @@ export const MODULE_HELP = {
   usuarios: "Permite acceso al panel de gestion de usuarios.",
 };
 
+// Modulos por defecto para un usuario nuevo/al cambiar de rol: exactamente lo que ESE rol
+// permite (modulosPermitidos, calculado en el backend desde permiso_modulo), acotado a lo
+// que la empresa tiene activo. No usar la lista completa de modulos de la empresa aqui --
+// eso le daria a cualquier rol (ej. Florista) acceso a modulos que nunca deberia tener
+// (ej. usuarios, contabilidad) solo por no haber tocado el formulario.
+export function defaultModulesForRole(role, activeModules) {
+  const permitted = Array.isArray(role?.modulosPermitidos) ? role.modulosPermitidos : [];
+  const activeSet = new Set(activeModules || []);
+  return permitted.filter(modulo => activeSet.has(modulo));
+}
+
 const ROLE_TYPE_LABELS = [
   { pattern: /admin|administrador/, label: "Admin" },
   { pattern: /florista/, label: "Florista" },

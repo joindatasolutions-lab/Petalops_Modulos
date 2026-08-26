@@ -5,6 +5,7 @@ import { createApiClient } from "../../../infrastructure/apiClient.js";
 import { useSidebarState } from "../../../shared/useSidebarState.js";
 import {
   UserFormModel,
+  defaultModulesForRole,
   filterVisibleRoles,
   normalizeModuleKey,
   selectedModulesSummary,
@@ -83,8 +84,28 @@ export function useUsersManagementController({ session, canViewUsuariosGlobal })
       .filter(Boolean)
   ), [moduleItems]);
 
-  const modulosCompatiblesRol = modulosActivosEmpresa;
-  const editModulosCompatiblesRol = modulosActivosEmpresa;
+  // "Compatibles con el rol" tiene que ser justo eso: los modulos que el rol SELECCIONADO
+  // permite (permiso_modulo, via modulosPermitidos), acotados a lo activo en la empresa --
+  // no la lista completa de modulos de la empresa. Antes este alias apuntaba directo a
+  // modulosActivosEmpresa, asi que "seleccionar todos" le daba a cualquier rol (ej.
+  // Florista) acceso a modulos que nunca deberia tener (ej. usuarios, contabilidad).
+  const selectedRoleForCreate = useMemo(
+    () => roles.find(item => String(item.rolID) === String(form.rolID)),
+    [roles, form.rolID]
+  );
+  const modulosCompatiblesRol = useMemo(
+    () => defaultModulesForRole(selectedRoleForCreate, modulosActivosEmpresa),
+    [selectedRoleForCreate, modulosActivosEmpresa]
+  );
+
+  const selectedRoleForEdit = useMemo(
+    () => roles.find(item => String(item.rolID) === String(editForm.rolID)),
+    [roles, editForm.rolID]
+  );
+  const editModulosCompatiblesRol = useMemo(
+    () => defaultModulesForRole(selectedRoleForEdit, modulosActivosEmpresa),
+    [selectedRoleForEdit, modulosActivosEmpresa]
+  );
 
   const allUserRoleModulesSelected = modulosCompatiblesRol.length > 0
     && modulosCompatiblesRol.every(modulo => (form.modulosAcceso || []).includes(modulo));
@@ -92,14 +113,9 @@ export function useUsersManagementController({ session, canViewUsuariosGlobal })
     && editModulosCompatiblesRol.every(modulo => (editForm.modulosAcceso || []).includes(modulo));
 
   const resetForm = useCallback(() => {
-    // Arranca con todos los modulos activos de la empresa ya marcados (igual que el boton
-    // "seleccionar todos"), en vez de vacio. Un usuario nuevo creado sin tocar esta lista
-    // termina con una lista blanca parcial en el backend que bloquea en silencio cualquier
-    // modulo no marcado, incluso si el rol si lo permite -- fue justo lo que le paso a un
-    // usuario de Lafiore con el modulo Pipeline.
-    setForm(UserFormModel.initial({ modulosAcceso: modulosActivosEmpresa }));
+    setForm(UserFormModel.initial());
     setShowUserModuleDropdown(false);
-  }, [modulosActivosEmpresa]);
+  }, []);
 
   const closeEditDrawer = useCallback(() => {
     setEditingUserId(null);
@@ -113,13 +129,10 @@ export function useUsersManagementController({ session, canViewUsuariosGlobal })
   }, []);
 
   const openCreateModal = useCallback(() => {
-    // Ver comentario en resetForm: arranca con los modulos activos de la empresa ya
-    // marcados para que un usuario nuevo no quede bloqueado de un modulo que su rol
-    // deberia permitir, solo porque nadie lo marco manualmente al crearlo.
-    setForm(UserFormModel.initial({ modulosAcceso: modulosActivosEmpresa }));
+    setForm(UserFormModel.initial());
     setShowUserModuleDropdown(false);
     setShowCreateModal(true);
-  }, [modulosActivosEmpresa]);
+  }, []);
 
   const closeCreateModal = useCallback(() => {
     setShowCreateModal(false);
@@ -181,14 +194,21 @@ export function useUsersManagementController({ session, canViewUsuariosGlobal })
 
     if (!form.rolID && nextRoles.length > 0) {
       const allowed = filterVisibleRoles(nextRoles, canViewUsuariosGlobal);
-      if (allowed.length > 0) setForm(current => ({ ...current, rolID: String(allowed[0].rolID) }));
+      if (allowed.length > 0) {
+        const defaultRole = allowed[0];
+        setForm(current => ({
+          ...current,
+          rolID: String(defaultRole.rolID),
+          modulosAcceso: defaultModulesForRole(defaultRole, modulosActivosEmpresa),
+        }));
+      }
     }
     if (!form.sucursalID && nextSuc.length > 0) {
       const first = String(nextSuc[0].sucursalID);
       setForm(current => ({ ...current, sucursalID: first }));
       if (!sucursalID) setSucursalID(first);
     }
-  }, [api, empresaID, form.rolID, form.sucursalID, sucursalID, canViewUsuariosGlobal]);
+  }, [api, empresaID, form.rolID, form.sucursalID, sucursalID, canViewUsuariosGlobal, modulosActivosEmpresa]);
 
   const loadUsers = useCallback(async () => {
     setLoading(true);
@@ -598,6 +618,7 @@ export function useUsersManagementController({ session, canViewUsuariosGlobal })
     form,
     setForm,
     visibleRoles,
+    modulosActivosEmpresa,
     sucursales,
     saving,
     onSubmit: submitCreate,
