@@ -396,6 +396,54 @@ describe("estabilidad de filtros por vista", () => {
     expect(rows.map(item => item.numeroPedido)).toEqual([97634]);
   });
 
+  it("Produccion florista: solo mis asignados domina la busqueda y oculta otros floristas", () => {
+    const rows = buildVisibleProductionItems([
+      {
+        pedidoID: 97634,
+        idProduccion: 3085,
+        numeroPedido: 97634,
+        floristaID: 7,
+        floristaAsignado: "James de la Cruz",
+        cliente: "Cliente propio",
+        nombreArreglo: "Ramo propio",
+      },
+      {
+        pedidoID: 97635,
+        idProduccion: 3086,
+        numeroPedido: 97635,
+        floristaID: 8,
+        floristaAsignado: "Elibeth Salgado",
+        cliente: "Lucila Guarin",
+        nombreArreglo: "Flora Box Mediana 24 Rosas",
+      },
+    ], 7, "Lucila", true, true, "James de la Cruz");
+
+    expect(rows).toHaveLength(0);
+  });
+
+  it("Produccion florista: al desmarcar solo mis asignados muestra pedidos de todos los floristas", () => {
+    const rows = buildVisibleProductionItems([
+      {
+        pedidoID: 97634,
+        idProduccion: 3085,
+        numeroPedido: 97634,
+        floristaID: 7,
+        floristaAsignado: "Diego florista",
+        nombreArreglo: "Ramo demo",
+      },
+      {
+        pedidoID: 97635,
+        idProduccion: 3086,
+        numeroPedido: 97635,
+        floristaID: 8,
+        floristaAsignado: "Otro florista",
+        nombreArreglo: "Ramo externo",
+      },
+    ], 7, "", false, true, "Diego Florista");
+
+    expect(rows.map(item => item.numeroPedido)).toEqual([97634, 97635]);
+  });
+
   it("Produccion empresa 3: si codigo_catalogo apunta a otro arreglo, resuelve por nombre exacto", () => {
     const catalogIndex = new Map([
       ["catalog-code:0057", { codigo: "0057", nombre: "Corazón Mini Rosas", imageUrl: "/corazon-mini-rosas.png" }],
