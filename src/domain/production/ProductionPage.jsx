@@ -335,7 +335,7 @@ export function productionItemMatchesSearch(item, searchValue) {
 export function buildVisibleProductionItems(sourceItems, currentFloristaId, busquedaGeneral, soloMisAsignados, groupByPedido = true, currentFloristaName = "") {
   const search = normalizeSearchText(busquedaGeneral);
   const filtered = sourceItems.filter(item => {
-    if (!search && soloMisAsignados && !itemMatchesCurrentFlorista(item, currentFloristaId, currentFloristaName)) {
+    if (soloMisAsignados && !itemMatchesCurrentFlorista(item, currentFloristaId, currentFloristaName)) {
       return false;
     }
     if (search && !productionItemMatchesSearch(item, search)) return false;
@@ -1481,10 +1481,7 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
     return itemMatchesCurrentFlorista(item, currentFloristaId, currentFloristaName);
   }, [canFloristaQuickState, currentFloristaId, currentFloristaName]);
 
-  const shouldScopeToCurrentFlorista = !canManageProductionActions && currentFloristaId != null;
-  const effectiveSoloMisAsignados = shouldScopeToCurrentFlorista
-    ? true
-    : (activeMetricFilter ? false : soloMisAsignados);
+  const effectiveSoloMisAsignados = soloMisAsignados && currentFloristaId != null;
   const shouldGroupVisibleItemsByPedido = !activeMetricFilter || activeMetricFilter === "pendientesHastaHoy";
 
   const visibleItems = useMemo(
@@ -1605,11 +1602,12 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
     setBusquedaGeneral("");
     setFecha("");
     setEstadosFiltro(["Pendiente", "EnProduccion"]);
+    setSoloMisAsignados(currentFloristaId != null);
     setActiveMetricFilter("pendientesHastaHoy");
     window.requestAnimationFrame(() => {
       productionListRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
     });
-  }, []);
+  }, [currentFloristaId]);
 
   const toggleEstadoFiltro = useCallback((estadoItem) => {
     setActiveMetricFilter(null);
@@ -1778,9 +1776,9 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
         autoAsignarPendientesHoy: false,
       });
       const responseItems = (Array.isArray(response?.items) ? response.items : []).map(normalizeProductionItemStatus);
-      const scopedItems = canManageProductionActions
-        ? responseItems
-        : responseItems.filter(item => itemMatchesCurrentFlorista(item, currentFloristaId, currentFloristaName));
+      const scopedItems = currentFloristaId != null
+        ? responseItems.filter(item => itemMatchesCurrentFlorista(item, currentFloristaId, currentFloristaName))
+        : responseItems;
       const count = countDueUnfinishedProductionOrders(scopedItems);
       setDueUnfinishedOrdersCount(count);
       return count;
@@ -1789,7 +1787,7 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
       setDueUnfinishedOrdersCount(0);
       return 0;
     }
-  }, [api, canManageProductionActions, currentFloristaId, currentFloristaName, empresaId, sucursalId]);
+  }, [api, currentFloristaId, currentFloristaName, empresaId, sucursalId]);
 
   useEffect(() => {
     void loadItems();
@@ -2000,9 +1998,7 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
     if (canManageProductionActions) return;
     if (!currentFloristaId) {
       setSoloMisAsignados(false);
-      return;
     }
-    setSoloMisAsignados(true);
   }, [canManageProductionActions, currentFloristaId]);
 
 
@@ -2011,6 +2007,10 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
   };
 
   const onChangeSoloMisAsignados = checked => {
+    setActiveMetricFilter(null);
+    setBusquedaGeneral("");
+    setFecha("");
+    setEstadosFiltro(ESTADOS_UI);
     setSoloMisAsignados(checked);
   };
 
