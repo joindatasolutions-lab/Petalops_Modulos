@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  buildRegularizeDeliveryPayload,
   deliveryArrangementName,
   isDeliveryAllowedProductionStatus,
   deliveryMatchesSearch,
@@ -83,5 +84,38 @@ describe("filtros de domicilios", () => {
         { estadoProduccion: "EnProduccion" },
       ],
     })).toBe(false);
+  });
+
+  it("arma el payload masivo para regularizar entregas", () => {
+    expect(buildRegularizeDeliveryPayload({
+      fechaEntrega: "2026-08-17",
+      domiciliarioId: "123",
+      motivo: "Pedido entregado fisicamente pero no asignado en el sistema",
+      pedidosText: "98047 10:15\n98051,10:30",
+    })).toEqual({
+      fecha_entrega: "2026-08-17",
+      domiciliario_id: 123,
+      motivo: "Pedido entregado fisicamente pero no asignado en el sistema",
+      pedidos: [
+        { pedido_id: 98047, hora_entrega: "10:15" },
+        { pedido_id: 98051, hora_entrega: "10:30" },
+      ],
+    });
+  });
+
+  it("valida motivo y hora al regularizar entregas", () => {
+    expect(() => buildRegularizeDeliveryPayload({
+      fechaEntrega: "2026-08-17",
+      domiciliarioId: "123",
+      motivo: "corto",
+      pedidosText: "98047 10:15",
+    })).toThrow(/minimo 10/);
+
+    expect(() => buildRegularizeDeliveryPayload({
+      fechaEntrega: "2026-08-17",
+      domiciliarioId: "123",
+      motivo: "Pedido entregado fisicamente",
+      pedidosText: "98047 25:99",
+    })).toThrow(/HH:MM/);
   });
 });

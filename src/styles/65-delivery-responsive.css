@@ -1252,6 +1252,7 @@ main.orders-admin-view.orders-page-view.delivery-page-view,
 }
 
 .delivery-page-view .delivery-status-form input,
+.delivery-page-view .delivery-status-form select,
 .delivery-page-view .delivery-status-form textarea,
 .delivery-page-view .delivery-status-observation textarea {
   width: 100% !important;
@@ -1269,6 +1270,14 @@ main.orders-admin-view.orders-page-view.delivery-page-view,
 .delivery-page-view .delivery-status-form textarea,
 .delivery-page-view .delivery-status-observation textarea {
   resize: vertical !important;
+}
+
+.delivery-page-view .delivery-regularization-hint {
+  margin: 10px 0 0 !important;
+  color: #64748b !important;
+  font-size: 12px !important;
+  font-weight: 800 !important;
+  line-height: 1.45 !important;
 }
 
 .delivery-page-view .delivery-courier-action-buttons {
