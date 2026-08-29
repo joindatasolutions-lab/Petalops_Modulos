@@ -762,8 +762,26 @@ describe("estabilidad de filtros por vista", () => {
     });
 
     expect(queryPlan.fecha).toBeNull();
+    expect(queryPlan.primaryFilter).toBe("todos");
+    expect(queryPlan.useFallbackFilters).toBe(true);
     expect(queryPlan.filtersToFetch).toContain("pendientes");
     expect(queryPlan.filtersToFetch).toContain("enruta");
+  });
+
+  it("Domicilios admin: buscar numero de pedido tiene prioridad sobre filtro de estado", () => {
+    const queryPlan = buildDeliveryAdminQueryPlan({
+      filtro: "hoy",
+      statusFilter: "no-entregado",
+      fechaFiltro: "2026-06-25",
+      deliverySearch: "96610",
+    });
+
+    expect(queryPlan.fecha).toBeNull();
+    expect(queryPlan.primaryFilter).toBe("todos");
+    expect(queryPlan.useFallbackFilters).toBe(true);
+    expect(queryPlan.filtersToFetch).toContain("pendientes");
+    expect(queryPlan.filtersToFetch).toContain("entregado");
+    expect(queryPlan.filtersToFetch).toContain("noentregado");
   });
 
   it("Domicilios: sin busqueda numerica conserva fecha y estado seleccionado", () => {
@@ -775,6 +793,8 @@ describe("estabilidad de filtros por vista", () => {
     });
 
     expect(queryPlan.fecha).toBe("2026-06-25");
+    expect(queryPlan.primaryFilter).toBe("noentregado");
+    expect(queryPlan.useFallbackFilters).toBe(false);
     expect(queryPlan.filtersToFetch).toEqual(["noentregado"]);
     expect(deliveryMatchesSearch({ numero_pedido: 96610, cliente_nombre: "Cliente prueba" }, "cliente")).toBe(true);
   });
