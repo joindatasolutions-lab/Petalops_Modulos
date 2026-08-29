@@ -169,6 +169,13 @@ const DEFAULT_STATUS_FORM = {
   observaciones: "",
 };
 
+const DEFAULT_REGULARIZATION_FORM = {
+  fechaEntrega: todayIso(),
+  domiciliarioId: "",
+  motivo: "Pedido entregado fisicamente pero no asignado en el sistema",
+  pedidosText: "",
+};
+
 const DEFAULT_COURIER_FORM = {
   nombre: "",
   telefono: "",
@@ -191,6 +198,11 @@ const DEFAULT_COURIER_EDIT_FORM = {
 function isPedidosRole(session) {
   const role = String(session?.rol || "").trim().toLowerCase();
   return role.includes("pedido") || role.includes("ventas") || role.includes("comercial");
+}
+
+function isAdminRole(session) {
+  const role = String(session?.rol || "").trim().toLowerCase().replace(/\s+/g, "_");
+  return Boolean(session?.esGlobalJoin) || role === "admin" || role === "empresa_admin" || role === "super_admin";
 }
 
 function todayIso() {
@@ -446,6 +458,53 @@ function normalizeDeliveryClock(value) {
   if (meridiem.startsWith("p") && hours < 12) hours += 12;
   if (meridiem.startsWith("a") && hours === 12) hours = 0;
   return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
+}
+
+function parseRegularizationOrders(text) {
+  return String(text || "")
+    .split(/\r?\n/)
+    .map(line => line.trim())
+    .filter(Boolean)
+    .map(line => {
+      const [pedidoId, horaEntrega] = line.split(/[,\s;]+/).map(value => value.trim()).filter(Boolean);
+      return { pedido_id: Number(pedidoId), hora_entrega: horaEntrega || "" };
+    });
+}
+
+export function buildRegularizeDeliveryPayload(form) {
+  const fechaEntrega = String(form?.fechaEntrega || "").trim();
+  const domiciliarioId = Number(form?.domiciliarioId || 0);
+  const motivo = String(form?.motivo || "").trim();
+  const pedidos = parseRegularizationOrders(form?.pedidosText);
+
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(fechaEntrega)) {
+    throw new Error("Selecciona una fecha de entrega valida.");
+  }
+  if (!Number.isFinite(domiciliarioId) || domiciliarioId <= 0) {
+    throw new Error("Selecciona el domiciliario que realizo la entrega.");
+  }
+  if (motivo.length < 10) {
+    throw new Error("El motivo debe tener minimo 10 caracteres.");
+  }
+  if (pedidos.length === 0) {
+    throw new Error("Agrega al menos un pedido con hora de entrega.");
+  }
+
+  pedidos.forEach((pedido, index) => {
+    if (!Number.isInteger(pedido.pedido_id) || pedido.pedido_id <= 0) {
+      throw new Error(`La linea ${index + 1} debe tener un pedido_id numerico.`);
+    }
+    if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(pedido.hora_entrega)) {
+      throw new Error(`La hora de la linea ${index + 1} debe estar en formato HH:MM.`);
+    }
+  });
+
+  return {
+    fecha_entrega: fechaEntrega,
+    domiciliario_id: domiciliarioId,
+    motivo,
+    pedidos,
+  };
 }
 
 function bogotaDateParts(date = new Date()) {
@@ -1708,6 +1767,7 @@ export function DeliveryPage({
   const sucursalId = Number(session?.sucursalID || tenantConfig.sucursalId);
   const usuarioCambio = String(session?.email || session?.nombre || "admin");
   const pedidosRole = isPedidosRole(session);
+  const adminRole = isAdminRole(session);
   const displayUserName = useMemo(
     () => String(session?.nombre || session?.login || "Usuario").trim() || "Usuario",
     [session]
@@ -1763,6 +1823,9 @@ export function DeliveryPage({
   const [noveltiesModalItem, setNoveltiesModalItem] = useState(null);
   const [statusModalItem, setStatusModalItem] = useState(null);
   const [statusForm, setStatusForm] = useState(DEFAULT_STATUS_FORM);
+  const [regularizationOpen, setRegularizationOpen] = useState(false);
+  const [regularizationForm, setRegularizationForm] = useState(DEFAULT_REGULARIZATION_FORM);
+  const [regularizationError, setRegularizationError] = useState("");
 
   const [modo, setModo] = useState("admin");
   const [domiciliarioId, setDomiciliarioId] = useState("");
@@ -2476,6 +2539,62 @@ export function DeliveryPage({
   const closeStatusModal = () => {
     setStatusModalItem(null);
     setStatusForm(DEFAULT_STATUS_FORM);
+  };
+
+  const openRegularizationModal = () => {
+    if (!adminRole) return;
+    setError("");
+    setRegularizationError("");
+    setRegularizationForm(current => ({
+      ...DEFAULT_REGULARIZATION_FORM,
+      fechaEntrega: fechaFiltro || current.fechaEntrega || todayIso(),
+      domiciliarioId: current.domiciliarioId,
+      motivo: current.motivo || DEFAULT_REGULARIZATION_FORM.motivo,
+    }));
+    setRegularizationOpen(true);
+  };
+
+  const closeRegularizationModal = () => {
+    setRegularizationOpen(false);
+    setRegularizationError("");
+  };
+
+  const updateRegularizationForm = (field, value) => {
+    setRegularizationForm(current => ({ ...current, [field]: value }));
+  };
+
+  const onSaveRegularization = async () => {
+    if (!adminRole) return;
+
+    let payload;
+    try {
+      payload = buildRegularizeDeliveryPayload(regularizationForm);
+    } catch (nextError) {
+      setRegularizationError(nextError?.message || "Revisa los datos de regularizacion.");
+      return;
+    }
+
+    setRegularizationError("");
+    setError("");
+    setBusy("regularizar-entregas");
+    try {
+      const result = await api.regularizarEntregasAdmin(payload);
+      const total = Number(result?.total ?? payload.pedidos.length);
+      setFeedback(`${total} entrega${total === 1 ? "" : "s"} regularizada${total === 1 ? "" : "s"} correctamente.`);
+      setRegularizationForm(current => ({
+        ...DEFAULT_REGULARIZATION_FORM,
+        fechaEntrega: current.fechaEntrega,
+        domiciliarioId: current.domiciliarioId,
+        motivo: current.motivo,
+      }));
+      closeRegularizationModal();
+      await refreshAll();
+    } catch (nextError) {
+      console.error("Error regularizando entregas:", nextError);
+      setRegularizationError(buildActionErrorMessage(nextError, "No fue posible regularizar las entregas."));
+    } finally {
+      clearBusy();
+    }
   };
 
   const refreshDeliveryListsAfterStatusChange = async () => {
@@ -3463,6 +3582,80 @@ export function DeliveryPage({
           </div>
         ) : null}
 
+        {regularizationOpen ? (
+          <div className="delivery-modal-backdrop" role="presentation" onMouseDown={closeRegularizationModal}>
+            <article className="delivery-novelty-resolve-modal delivery-regularization-modal" role="dialog" aria-modal="true" aria-label="Regularizar entregas" onMouseDown={event => event.stopPropagation()}>
+              <div className="delivery-section-head">
+                <div>
+                  <h4>Regularizar entregas</h4>
+                  <span>Registra pedidos entregados fisicamente que no quedaron asignados en el sistema.</span>
+                </div>
+                <button type="button" className="delivery-modal-close" onClick={closeRegularizationModal} aria-label="Cerrar modal">
+                  <X size={18} />
+                </button>
+              </div>
+
+              <div className="delivery-status-form">
+                <label>
+                  <span>Fecha entrega *</span>
+                  <input
+                    type="date"
+                    value={regularizationForm.fechaEntrega}
+                    onChange={event => updateRegularizationForm("fechaEntrega", event.target.value)}
+                  />
+                </label>
+                <label>
+                  <span>Domiciliario *</span>
+                  <select
+                    value={regularizationForm.domiciliarioId}
+                    onChange={event => updateRegularizationForm("domiciliarioId", event.target.value)}
+                  >
+                    <option value="">Selecciona domiciliario</option>
+                    {domiciliarios.map(dom => {
+                      const domId = courierIdValue(dom);
+                      if (domId == null) return null;
+                      return <option key={domId} value={domId}>{dom.nombre || dom.nombreDomiciliario || "Domiciliario"}</option>;
+                    })}
+                  </select>
+                </label>
+                <label className="is-full">
+                  <span>Motivo *</span>
+                  <textarea
+                    rows="3"
+                    value={regularizationForm.motivo}
+                    onChange={event => updateRegularizationForm("motivo", event.target.value)}
+                    placeholder="Motivo de la regularizacion"
+                  />
+                </label>
+                <label className="is-full">
+                  <span>Pedidos y hora *</span>
+                  <textarea
+                    rows="7"
+                    value={regularizationForm.pedidosText}
+                    onChange={event => updateRegularizationForm("pedidosText", event.target.value)}
+                    placeholder={"98047 10:15\n98051 10:30"}
+                  />
+                </label>
+              </div>
+
+              <p className="delivery-regularization-hint">Una linea por pedido. Usa pedido_id y hora_entrega en formato HH:MM; si una linea falla, backend rechaza todo el lote.</p>
+              {regularizationError ? <p className="orders-message delivery-error">{regularizationError}</p> : null}
+
+              <div className="delivery-novelty-resolve-actions">
+                <button type="button" className="btn-outline" onClick={closeRegularizationModal}>Cancelar</button>
+                <button
+                  type="button"
+                  className="btn-primary"
+                  onClick={onSaveRegularization}
+                  disabled={actionKey === "regularizar-entregas"}
+                >
+                  {actionKey === "regularizar-entregas" ? "Regularizando..." : "Regularizar lote"}
+                </button>
+              </div>
+            </article>
+          </div>
+        ) : null}
+
         <header className="orders-admin-header orders-page-header delivery-page-header">
           <div className="orders-page-heading">
             <button type="button" className="sidebar-trigger" onClick={toggleSidebar}>{"\u2630 Men\u00fa"}</button>
@@ -3482,6 +3675,16 @@ export function DeliveryPage({
           </div>
           <div className="orders-header-side">
             <div className="header-actions">
+              {adminRole ? (
+                <button
+                  type="button"
+                  className="btn-outline orders-header-refresh"
+                  onClick={openRegularizationModal}
+                  disabled={loading || Boolean(actionKey)}
+                >
+                  Regularizar entrega
+                </button>
+              ) : null}
               <button type="button" className="btn-primary orders-header-refresh" onClick={refreshAll} disabled={loading || Boolean(actionKey)}>
                 {loading ? "Actualizando..." : "Actualizar"}
               </button>
