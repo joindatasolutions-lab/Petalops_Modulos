@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { tenantConfig } from "../../config/tenantConfig.js";
 import { createApiClient } from "../../infrastructure/apiClient.js";
 import { AppSidebar } from "../../shared/AppSidebar.jsx";
+import { useDebouncedValue } from "../../shared/useDebouncedValue.js";
 import { useSidebarState } from "../../shared/useSidebarState.js";
 import { COLOMBIA_TIME_ZONE, formatDateOnly, formatTimeOnly, normalizeStatus } from "../../shared/utils.js";
 import {
@@ -53,13 +54,15 @@ export function buildDeliveryAdminQueryPlan({ filtro = "hoy", statusFilter = "to
   const backendStatusFilter = DELIVERY_STATUS_BACKEND_FILTER[statusFilter] || null;
   const filtroConsulta = backendStatusFilter || filtro;
   const searchTerm = String(deliverySearch || "").trim();
-  const searchByOrderNumber = /^#?\d{1,10}$/.test(searchTerm);
+  const searchByOrderNumber = deliverySearchIsOrderNumber(searchTerm);
   return {
     fecha: searchByOrderNumber ? null : fechaFiltro,
     q: searchByOrderNumber ? searchTerm : "",
-    filtersToFetch: searchByOrderNumber && statusFilter === "todos"
+    primaryFilter: searchByOrderNumber ? "todos" : filtroConsulta,
+    filtersToFetch: searchByOrderNumber
       ? DELIVERY_SEARCH_BACKEND_FILTERS
       : [filtroConsulta],
+    useFallbackFilters: searchByOrderNumber,
   };
 }
 
@@ -1551,12 +1554,12 @@ function deliveryDateTimeLabel(item) {
   return [date, time && time !== "-" ? time : ""].filter(Boolean).join(" · ") || "-";
 }
 
-function deliverySearchIgnoresDate(deliverySearch) {
+function deliverySearchIsOrderNumber(deliverySearch) {
   return /^#?\d{1,10}$/.test(String(deliverySearch || "").trim());
 }
 
 function deliveryMatchesSelectedDate(item, fechaFiltro, deliverySearch) {
-  if (!fechaFiltro || deliverySearchIgnoresDate(deliverySearch)) return true;
+  if (!fechaFiltro || deliverySearchIsOrderNumber(deliverySearch)) return true;
   const date = deliveryDateLabel(item);
   return !date || date === fechaFiltro;
 }
@@ -1803,6 +1806,7 @@ export function DeliveryPage({
   const [performanceOrderSearch, setPerformanceOrderSearch] = useState("");
   const [performanceOrdersLoading, setPerformanceOrdersLoading] = useState(false);
   const [deliverySearch, setDeliverySearch] = useState("");
+  const debouncedDeliverySearch = useDebouncedValue(deliverySearch, 350);
   const [noveltySearch, setNoveltySearch] = useState("");
   const [noveltyStatusFilter, setNoveltyStatusFilter] = useState("novedades");
   const [noveltyTypeFilter, setNoveltyTypeFilter] = useState("todas");
@@ -2045,13 +2049,26 @@ export function DeliveryPage({
   }, [api, empresaId, sucursalId]);
 
   const loadAdmin = useCallback(async () => {
-    const queryPlan = buildDeliveryAdminQueryPlan({ filtro, statusFilter, fechaFiltro, deliverySearch });
+    const queryPlan = buildDeliveryAdminQueryPlan({ filtro, statusFilter, fechaFiltro, deliverySearch: debouncedDeliverySearch });
     const baseParams = {
       empresaId,
       sucursalId,
       fecha: queryPlan.fecha,
       q: queryPlan.q,
     };
+
+    if (queryPlan.useFallbackFilters) {
+      try {
+        const primaryData = await api.listarDomiciliosAdmin({ ...baseParams, filtro: queryPlan.primaryFilter });
+        const primaryItems = filterDomicilioItems(normalizeDeliveryItemsPayload(primaryData)).filter(item => !isCanceledDeliveryStatus(item));
+        if (primaryItems.length > 0) {
+          setAdminItems(primaryItems);
+          return;
+        }
+      } catch (primaryError) {
+        console.warn("Busqueda rapida de domicilio por pedido no disponible, usando respaldo por estados:", primaryError);
+      }
+    }
 
     const results = await Promise.allSettled(
       queryPlan.filtersToFetch.map(nextFilter => api.listarDomiciliosAdmin({ ...baseParams, filtro: nextFilter }))
@@ -2067,7 +2084,7 @@ export function DeliveryPage({
       }
     }
     setAdminItems(filterDomicilioItems(Array.from(deduped.values())).filter(item => !isCanceledDeliveryStatus(item)));
-  }, [api, empresaId, sucursalId, filtro, fechaFiltro, statusFilter, deliverySearch]);
+  }, [api, empresaId, sucursalId, filtro, fechaFiltro, statusFilter, debouncedDeliverySearch]);
 
   const loadAvailableOrders = useCallback(async coords => {
     const [snapshotResult, availableResult] = await Promise.allSettled([
@@ -2980,27 +2997,30 @@ export function DeliveryPage({
   const availableSummary = availableItems.length
     ? `${availableItems.length} pedidos listos para domicilios`
     : "No hay pedidos disponibles para tomar";
+  const effectiveDeliverySearch = modo === "admin" ? debouncedDeliverySearch : deliverySearch;
+  const adminOrderSearchActive = modo === "admin" && deliverySearchIsOrderNumber(effectiveDeliverySearch);
 
   const dispatchItems = useMemo(() => {
     if (modo === "disponibles") return availableItems;
     if (modo === "mis-pedidos") return myOrdersItems;
+    if (adminOrderSearchActive) return adminItems;
     return visibleAdminItems;
-  }, [modo, availableItems, myOrdersItems, visibleAdminItems]);
+  }, [modo, availableItems, myOrdersItems, adminOrderSearchActive, adminItems, visibleAdminItems]);
 
   const dispatchFilteredBaseItems = useMemo(() => (
     dispatchItems.filter(item => (
-      deliveryMatchesSelectedDate(item, fechaFiltro, deliverySearch)
-      && deliveryMatchesSearch(item, deliverySearch)
+      deliveryMatchesSelectedDate(item, fechaFiltro, effectiveDeliverySearch)
+      && deliveryMatchesSearch(item, effectiveDeliverySearch)
     ))
-  ), [deliverySearch, dispatchItems, fechaFiltro]);
+  ), [effectiveDeliverySearch, dispatchItems, fechaFiltro]);
 
   const filteredDispatchItems = useMemo(() => {
-    const byStatus = statusFilter === "todos"
+    const byStatus = statusFilter === "todos" || adminOrderSearchActive
       ? dispatchFilteredBaseItems
       : dispatchFilteredBaseItems.filter(item => deliveryStatusMeta(item).key === statusFilter);
 
     return byStatus;
-  }, [dispatchFilteredBaseItems, statusFilter]);
+  }, [adminOrderSearchActive, dispatchFilteredBaseItems, statusFilter]);
 
   useEffect(() => {
     const missingItems = filteredDispatchItems
@@ -3712,7 +3732,7 @@ export function DeliveryPage({
             {loading ? <p className="orders-message">Cargando domicilios...</p> : null}
 
             <section className="delivery-current-panel-title" aria-label="Panel actual">
-              <h2>Mis pedidos</h2>
+              <h2>Pedidos</h2>
             </section>
 
             <section className="delivery-dispatch-controls">
