@@ -2670,26 +2670,6 @@
   }
 }
 
-@media (max-width: 640px) {
-  .pipeline-view { padding: 0 12px 12px; gap: 8px; }
-  .orders-filters.pipeline-filters-bar {
-    grid-template-columns: 1fr !important;
-  }
-  .pipeline-metrics-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
-  }
-  .pipeline-board {
-    gap: 10px;
-    scroll-snap-type: x proximity;
-  }
-  .pipeline-column {
-    min-width: min(82vw, 230px);
-    flex-basis: min(82vw, 230px);
-    scroll-snap-align: start;
-  }
-  .pipeline-column-body { min-height: 54vh; }
-}
-
 .pipeline-modal-overlay {
   position: fixed;
   inset: 0;
