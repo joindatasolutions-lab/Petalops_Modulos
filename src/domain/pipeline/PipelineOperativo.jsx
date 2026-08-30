@@ -45,6 +45,7 @@ export function PipelineOperativo({
   const empresaId = Number(session?.empresaID || tenantConfig.empresaId);
   const sucursalFromSession = session?.sucursalID != null ? Number(session.sucursalID) : null;
   const displayUserName = String(session?.nombre || session?.login || "Usuario").trim() || "Usuario";
+  const mobileSessionLabel = displayUserName.replace(/\s+Empresa\s+/i, " · ");
   const activeSucursalId = filters.sucursalID ?? sucursalFromSession;
 
   const pipelineMetrics = useMemo(() => buildPipelineMetrics(board), [board]);
@@ -207,12 +208,22 @@ export function PipelineOperativo({
               <span aria-hidden="true" />
               Sesion activa: {displayUserName}
             </span>
+            <span className="pipeline-mobile-session-label">{mobileSessionLabel}</span>
           </div>
+          <button
+            type="button"
+            className="btn-primary pipeline-mobile-refresh-button"
+            title="Actualizar pipeline"
+            aria-label="Actualizar pipeline"
+            onClick={loadBoard}
+          >
+            <RotateCw size={18} strokeWidth={2} aria-hidden="true" />
+          </button>
           <div className="orders-header-side">
             <div className="header-actions">
               <button
                 type="button"
-                className="btn-primary orders-header-refresh"
+                className="btn-primary orders-header-refresh pipeline-mobile-refresh-action"
                 title="Actualizar pipeline"
                 onClick={loadBoard}
               >

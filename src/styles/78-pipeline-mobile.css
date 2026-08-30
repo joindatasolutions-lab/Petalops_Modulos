@@ -1,0 +1,820 @@
+/* Pipeline mobile-only layout.
+   Scoped to Pipeline so Orders, Production, Delivery, and other modules keep their own rules. */
+
+.pipeline-mobile-advanced-filters,
+.pipeline-mobile-quick-filters,
+.pipeline-mobile-refresh-button,
+.pipeline-mobile-session-label {
+  display: none !important;
+}
+
+@media (max-width: 760px) {
+  .app-shell:has(.orders-admin-view.pipeline-view) .sidebar-mobile-fab {
+    position: fixed !important;
+    top: max(8px, env(safe-area-inset-top)) !important;
+    left: 8px !important;
+    right: auto !important;
+    z-index: 12100 !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    width: 32px !important;
+    min-width: 32px !important;
+    height: 32px !important;
+    min-height: 32px !important;
+    padding: 0 !important;
+  }
+
+  .app-shell > .orders-admin-view.pipeline-view,
+  .orders-admin-view.pipeline-view {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    box-sizing: border-box !important;
+    padding: 12px 16px 16px !important;
+    gap: 10px !important;
+    overflow: visible !important;
+  }
+
+  .orders-admin-view.pipeline-view > * {
+    max-width: 100% !important;
+    min-width: 0 !important;
+    box-sizing: border-box !important;
+  }
+
+  .orders-admin-view.pipeline-view .pipeline-page-header.orders-page-header {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) 40px !important;
+    grid-template-areas:
+      "heading refresh"
+      "metrics metrics" !important;
+    align-items: center !important;
+    column-gap: 8px !important;
+    row-gap: 8px !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    margin: 0 !important;
+    padding: 8px 10px 8px 54px !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    background: #ffffff !important;
+    box-shadow: 0 8px 22px rgba(15, 23, 42, 0.06) !important;
+    box-sizing: border-box !important;
+    overflow: visible !important;
+  }
+
+  .orders-admin-view.pipeline-view .pipeline-page-header .orders-page-heading {
+    grid-area: heading !important;
+    display: block !important;
+    width: auto !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: hidden !important;
+  }
+
+  .orders-admin-view.pipeline-view .pipeline-page-header .orders-page-breadcrumb,
+  .orders-admin-view.pipeline-view .pipeline-page-header .orders-page-description,
+  .orders-admin-view.pipeline-view .pipeline-page-header .orders-user-pill {
+    display: none !important;
+  }
+
+  .orders-admin-view.pipeline-view .pipeline-page-header .orders-page-title-row {
+    display: flex !important;
+    align-items: center !important;
+    min-width: 0 !important;
+    margin: 0 !important;
+  }
+
+  .orders-admin-view.pipeline-view .pipeline-page-header h1 {
+    display: block !important;
+    width: auto !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    margin: 0 !important;
+    color: #111827 !important;
+    font-size: 24px !important;
+    font-weight: 900 !important;
+    line-height: 1.05 !important;
+    letter-spacing: 0 !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+  }
+
+  .orders-admin-view.pipeline-view .pipeline-mobile-session-label {
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 6px !important;
+    width: fit-content !important;
+    max-width: min(160px, 100%) !important;
+    min-width: 0 !important;
+    min-height: 22px !important;
+    margin-top: 4px !important;
+    padding: 3px 9px !important;
+    border-radius: 999px !important;
+    background: #fff1f6 !important;
+    color: #e91e72 !important;
+    font-size: 10px !important;
+    font-weight: 800 !important;
+    line-height: 1.1 !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+    box-sizing: border-box !important;
+  }
+
+  .orders-admin-view.pipeline-view .pipeline-mobile-session-label::before {
+    content: "" !important;
+    width: 7px !important;
+    height: 7px !important;
+    border-radius: 999px !important;
+    background: #22c55e !important;
+    flex: 0 0 auto !important;
+  }
+
+  .orders-admin-view.pipeline-view .pipeline-page-header .orders-header-side {
+    display: none !important;
+    min-width: 0 !important;
+  }
+
+  .orders-admin-view.pipeline-view .pipeline-mobile-refresh-button {
+    grid-area: refresh !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    justify-self: end !important;
+    align-self: start !important;
+    flex: 0 0 auto !important;
+    width: 40px !important;
+    max-width: 40px !important;
+    min-width: 40px !important;
+    min-height: 40px !important;
+    height: 40px !important;
+    gap: 0 !important;
+    padding: 0 !important;
+    border-radius: 10px !important;
+    font-size: 0 !important;
+    font-weight: 900 !important;
+    line-height: 1 !important;
+    white-space: nowrap !important;
+    box-sizing: border-box !important;
+    overflow: visible !important;
+  }
+
+  .orders-admin-view.pipeline-view .pipeline-mobile-refresh-button svg {
+    width: 18px !important;
+    height: 18px !important;
+    flex: 0 0 auto !important;
+  }
+
+  .orders-admin-view.pipeline-view .pipeline-page-header .pipeline-header-metrics {
+    grid-area: metrics !important;
+    display: none !important;
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+    gap: 8px !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: visible !important;
+    box-sizing: border-box !important;
+  }
+
+  .orders-admin-view.pipeline-view .pipeline-page-header .orders-header-metric-card {
+    display: grid !important;
+    grid-template-columns: 26px minmax(0, 1fr) !important;
+    align-items: center !important;
+    column-gap: 8px !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    min-height: 54px !important;
+    padding: 8px !important;
+    border-radius: 10px !important;
+    box-sizing: border-box !important;
+    overflow: hidden !important;
+  }
+
+  .orders-admin-view.pipeline-view .pipeline-page-header .orders-header-metric-icon {
+    width: 26px !important;
+    min-width: 26px !important;
+    height: 26px !important;
+    border-radius: 9px !important;
+  }
+
+  .orders-admin-view.pipeline-view .pipeline-page-header .orders-header-metric-icon svg {
+    width: 14px !important;
+    height: 14px !important;
+  }
+
+  .orders-admin-view.pipeline-view .pipeline-page-header .orders-header-metric-card strong {
+    color: #111827 !important;
+    font-size: 14px !important;
+    line-height: 1 !important;
+  }
+
+  .orders-admin-view.pipeline-view .pipeline-page-header .orders-header-metric-card > span:not(.orders-header-metric-icon) {
+    min-width: 0 !important;
+    font-size: 7px !important;
+    font-weight: 900 !important;
+    line-height: 1.1 !important;
+    text-transform: uppercase !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+  }
+
+  .orders-admin-view.pipeline-view .orders-filters.pipeline-filters-bar {
+    position: relative !important;
+    z-index: 40 !important;
+    display: flex !important;
+    flex-wrap: nowrap !important;
+    align-items: center !important;
+    gap: 8px !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    margin: 0 !important;
+    padding: 8px !important;
+    border: 1px solid #e4ebf3 !important;
+    border-radius: 14px !important;
+    background: #ffffff !important;
+    box-shadow: none !important;
+    box-sizing: border-box !important;
+    overflow-x: auto !important;
+    overflow-y: visible !important;
+    overscroll-behavior-x: contain !important;
+    scrollbar-width: none !important;
+    -webkit-overflow-scrolling: touch !important;
+  }
+
+  .orders-admin-view.pipeline-view .orders-filters.pipeline-filters-bar::-webkit-scrollbar {
+    display: none !important;
+  }
+
+  .orders-admin-view.pipeline-view .orders-filters.pipeline-filters-bar:has(.pipeline-mobile-advanced-filters[open]) {
+    overflow: visible !important;
+    z-index: 12300 !important;
+  }
+
+  .orders-admin-view.pipeline-view .pipeline-desktop-advanced-field,
+  .orders-admin-view.pipeline-view .pipeline-filter-until,
+  .orders-admin-view.pipeline-view .pipeline-filter-state,
+  .orders-admin-view.pipeline-view .orders-filters.pipeline-filters-bar > .filter-field:not(.pipeline-filter-search):not(.pipeline-filter-until):not(.pipeline-desktop-advanced-field):not(.pipeline-filter-state) {
+    display: none !important;
+  }
+
+  .orders-admin-view.pipeline-view .pipeline-filter-search {
+    flex: 1 0 clamp(132px, 42vw, 180px) !important;
+    width: auto !important;
+    max-width: none !important;
+    min-width: 0 !important;
+  }
+
+  .orders-admin-view.pipeline-view .pipeline-mobile-quick-filters {
+    display: contents !important;
+  }
+
+  .orders-admin-view.pipeline-view .pipeline-mobile-advanced-filters {
+    display: block !important;
+    position: static !important;
+    flex: 0 0 92px !important;
+    width: 92px !important;
+    min-width: 92px !important;
+    max-width: 92px !important;
+  }
+
+  .orders-admin-view.pipeline-view .orders-filter-control,
+  .orders-admin-view.pipeline-view .pipeline-mobile-sucursal,
+  .orders-admin-view.pipeline-view .pipeline-mobile-today,
+  .orders-admin-view.pipeline-view .pipeline-mobile-advanced-filters summary {
+    display: flex !important;
+    align-items: center !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    min-height: 44px !important;
+    height: 44px !important;
+    padding: 0 12px !important;
+    border: 1px solid #dfe7f0 !important;
+    border-radius: 12px !important;
+    background: #ffffff !important;
+    color: #b23b67 !important;
+    box-shadow: none !important;
+    box-sizing: border-box !important;
+  }
+
+  .orders-admin-view.pipeline-view .pipeline-mobile-today {
+    flex: 0 0 56px !important;
+    width: 56px !important;
+    min-width: 56px !important;
+    justify-content: center !important;
+    padding-inline: 8px !important;
+  }
+
+  .orders-admin-view.pipeline-view .pipeline-mobile-sucursal {
+    flex: 0 0 122px !important;
+    width: 122px !important;
+    min-width: 122px !important;
+  }
+
+  .orders-admin-view.pipeline-view .pipeline-mobile-advanced-filters summary {
+    width: 92px !important;
+    min-width: 92px !important;
+    justify-content: center !important;
+    gap: 8px !important;
+    list-style: none !important;
+    cursor: pointer !important;
+  }
+
+  .orders-admin-view.pipeline-view .pipeline-mobile-advanced-filters summary::-webkit-details-marker {
+    display: none !important;
+  }
+
+  .orders-admin-view.pipeline-view .orders-filter-control svg,
+  .orders-admin-view.pipeline-view .pipeline-mobile-sucursal svg,
+  .orders-admin-view.pipeline-view .pipeline-mobile-advanced-filters summary svg {
+    width: 17px !important;
+    height: 17px !important;
+    color: #b23b67 !important;
+    flex: 0 0 auto !important;
+  }
+
+  .orders-admin-view.pipeline-view .orders-filter-control input,
+  .orders-admin-view.pipeline-view .orders-filter-control select,
+  .orders-admin-view.pipeline-view .pipeline-mobile-sucursal input {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    min-height: 42px !important;
+    height: 42px !important;
+    padding: 0 0 0 10px !important;
+    border: 0 !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    color: #344054 !important;
+    font-size: 13px !important;
+    font-weight: 850 !important;
+    box-sizing: border-box !important;
+  }
+
+  .orders-admin-view.pipeline-view .orders-filter-control input::placeholder {
+    color: #667085 !important;
+    opacity: 1 !important;
+  }
+
+  .orders-admin-view.pipeline-view .pipeline-mobile-advanced-filters summary span {
+    min-width: 0 !important;
+    color: #344054 !important;
+    font-size: 12px !important;
+    font-weight: 850 !important;
+    line-height: 1 !important;
+    white-space: nowrap !important;
+  }
+
+  .orders-admin-view.pipeline-view .pipeline-mobile-advanced-filters summary strong {
+    display: inline-grid !important;
+    place-items: center !important;
+    min-width: 22px !important;
+    min-height: 22px !important;
+    padding: 2px 6px !important;
+    border-radius: 999px !important;
+    background: #e91e72 !important;
+    color: #ffffff !important;
+    font-size: 11px !important;
+  }
+
+  .orders-admin-view.pipeline-view .pipeline-mobile-advanced-filters-panel {
+    position: absolute !important;
+    top: calc(100% + 8px) !important;
+    right: 8px !important;
+    bottom: auto !important;
+    left: 8px !important;
+    z-index: 12310 !important;
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) !important;
+    gap: 10px !important;
+    width: auto !important;
+    max-width: none !important;
+    max-height: min(58dvh, 520px) !important;
+    margin: 0 !important;
+    padding: 14px 14px calc(14px + env(safe-area-inset-bottom)) !important;
+    border: 1px solid #edf1f5 !important;
+    border-radius: 14px !important;
+    background: #ffffff !important;
+    box-shadow: 0 18px 46px rgba(15, 23, 42, 0.2) !important;
+    overflow-y: auto !important;
+    box-sizing: border-box !important;
+  }
+
+  .orders-admin-view.pipeline-view .pipeline-mobile-sheet-head {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) 44px !important;
+    align-items: start !important;
+    gap: 8px !important;
+    padding-bottom: 4px !important;
+  }
+
+  .orders-admin-view.pipeline-view .pipeline-mobile-sheet-head > div {
+    display: grid !important;
+    gap: 3px !important;
+    min-width: 0 !important;
+  }
+
+  .orders-admin-view.pipeline-view .pipeline-mobile-sheet-head strong {
+    color: #111827 !important;
+    font-size: 18px !important;
+    font-weight: 900 !important;
+  }
+
+  .orders-admin-view.pipeline-view .pipeline-mobile-sheet-head span {
+    color: #667085 !important;
+    font-size: 12px !important;
+    font-weight: 700 !important;
+    line-height: 1.3 !important;
+  }
+
+  .orders-admin-view.pipeline-view .pipeline-mobile-sheet-close {
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    justify-self: end !important;
+    width: 44px !important;
+    min-width: 44px !important;
+    height: 44px !important;
+    min-height: 44px !important;
+    padding: 0 !important;
+    border: 1px solid #edf1f5 !important;
+    border-radius: 12px !important;
+    background: #ffffff !important;
+    color: #b23b67 !important;
+    box-shadow: none !important;
+  }
+
+  .orders-admin-view.pipeline-view .pipeline-clear-advanced,
+  .orders-admin-view.pipeline-view .pipeline-mobile-sheet-done {
+    width: 100% !important;
+    min-height: 46px !important;
+    border-radius: 12px !important;
+    box-sizing: border-box !important;
+  }
+
+  .orders-admin-view.pipeline-view .pipeline-tabs {
+    position: relative !important;
+    z-index: 1 !important;
+    display: flex !important;
+    flex-wrap: nowrap !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    margin: 0 !important;
+    padding: 0 0 4px !important;
+    border-bottom: 1px solid #e4ebf3 !important;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    scrollbar-width: none !important;
+    -webkit-overflow-scrolling: touch !important;
+    box-sizing: border-box !important;
+  }
+
+  .orders-admin-view.pipeline-view .pipeline-tabs::-webkit-scrollbar {
+    display: none !important;
+  }
+
+  .orders-admin-view.pipeline-view .pipeline-tab {
+    flex: 0 0 auto !important;
+    max-width: 72vw !important;
+    min-height: 36px !important;
+    padding: 8px 12px !important;
+    font-size: 11px !important;
+    line-height: 1 !important;
+    white-space: nowrap !important;
+  }
+
+  .orders-admin-view.pipeline-view .pipeline-tab span {
+    min-width: 0 !important;
+    font-size: 0 !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+  }
+
+  .orders-admin-view.pipeline-view .pipeline-tab span::after {
+    font-size: 11px !important;
+  }
+
+  .orders-admin-view.pipeline-view .pipeline-tab:nth-child(1) span::after {
+    content: "Pipeline" !important;
+  }
+
+  .orders-admin-view.pipeline-view .pipeline-tab:nth-child(2) span::after {
+    content: "Reasignaciones" !important;
+  }
+
+  .orders-admin-view.pipeline-view .pipeline-tab:nth-child(3) span::after {
+    content: "Historial" !important;
+  }
+
+  .orders-admin-view.pipeline-view .pipeline-board {
+    position: relative !important;
+    z-index: 1 !important;
+    display: flex !important;
+    flex-wrap: nowrap !important;
+    align-items: stretch !important;
+    gap: 8px !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    margin: 0 !important;
+    padding: 0 10px 2px 0 !important;
+    overflow-x: auto !important;
+    overflow-y: visible !important;
+    overscroll-behavior-x: contain !important;
+    scroll-padding-inline: 0 10px !important;
+    scroll-snap-type: x proximity !important;
+    scroll-behavior: smooth !important;
+    scrollbar-width: thin !important;
+    box-sizing: border-box !important;
+  }
+
+  .orders-admin-view.pipeline-view .pipeline-column {
+    display: grid !important;
+    grid-template-rows: 44px minmax(148px, 1fr) !important;
+    flex: 0 0 calc((100% - 16px) / 3) !important;
+    width: calc((100% - 16px) / 3) !important;
+    max-width: calc((100% - 16px) / 3) !important;
+    min-width: calc((100% - 16px) / 3) !important;
+    gap: 6px !important;
+    scroll-snap-align: start !important;
+    box-sizing: border-box !important;
+  }
+
+  .orders-admin-view.pipeline-view .pipeline-column-head {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) 18px !important;
+    align-items: center !important;
+    gap: 4px !important;
+    min-height: 44px !important;
+    height: 44px !important;
+    padding: 6px !important;
+    border-radius: 7px !important;
+    box-sizing: border-box !important;
+    overflow: hidden !important;
+  }
+
+  .orders-admin-view.pipeline-view .pipeline-column-title {
+    min-width: 0 !important;
+    margin: 0 !important;
+    font-size: 0 !important;
+    line-height: 1.15 !important;
+    letter-spacing: 0 !important;
+    white-space: normal !important;
+    overflow-wrap: anywhere !important;
+  }
+
+  .orders-admin-view.pipeline-view .pipeline-column-title::after {
+    font-size: 10px !important;
+    font-weight: 900 !important;
+    line-height: 1.15 !important;
+  }
+
+  .orders-admin-view.pipeline-view .pipeline-column:nth-child(1) .pipeline-column-title::after {
+    content: "Creado" !important;
+  }
+
+  .orders-admin-view.pipeline-view .pipeline-column:nth-child(2) .pipeline-column-title::after {
+    content: "Producci\00f3n" !important;
+  }
+
+  .orders-admin-view.pipeline-view .pipeline-column:nth-child(3) .pipeline-column-title::after {
+    content: "Listo" !important;
+  }
+
+  .orders-admin-view.pipeline-view .pipeline-column:nth-child(4) .pipeline-column-title::after {
+    content: "En camino" !important;
+  }
+
+  .orders-admin-view.pipeline-view .pipeline-column:nth-child(5) .pipeline-column-title::after {
+    content: "Entregado" !important;
+  }
+
+  .orders-admin-view.pipeline-view .pipeline-column:nth-child(6) .pipeline-column-title::after {
+    content: "Cancelado" !important;
+  }
+
+  .orders-admin-view.pipeline-view .pipeline-column-count {
+    justify-self: end !important;
+    min-width: 18px !important;
+    height: 18px !important;
+    padding: 0 5px !important;
+    font-size: 8px !important;
+  }
+
+  .orders-admin-view.pipeline-view .pipeline-column-body {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    min-height: 148px !important;
+    max-height: none !important;
+    padding: 6px 5px !important;
+    border-radius: 9px !important;
+    gap: 6px !important;
+    box-sizing: border-box !important;
+    overflow-x: visible !important;
+  }
+
+  .orders-admin-view.pipeline-view .pipeline-column-body.is-empty {
+    min-height: 148px !important;
+    place-items: center !important;
+  }
+
+  .orders-admin-view.pipeline-view .pipeline-empty-state {
+    display: grid !important;
+    justify-items: center !important;
+    gap: 5px !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    padding: 6px 4px !important;
+    text-align: center !important;
+    box-sizing: border-box !important;
+  }
+
+  .orders-admin-view.pipeline-view .pipeline-empty-icon {
+    width: 32px !important;
+    height: 32px !important;
+    border-radius: 999px !important;
+  }
+
+  .orders-admin-view.pipeline-view .pipeline-empty-icon svg {
+    width: 18px !important;
+    height: 18px !important;
+  }
+
+  .orders-admin-view.pipeline-view .pipeline-empty-title {
+    font-size: 10px !important;
+    line-height: 1.15 !important;
+  }
+
+  .orders-admin-view.pipeline-view .pipeline-empty-subtitle {
+    display: none !important;
+  }
+
+  .orders-admin-view.pipeline-view .pipeline-card {
+    display: flex !important;
+    flex-direction: column !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    min-height: 72px !important;
+    padding: 7px 6px !important;
+    border-radius: 9px !important;
+    gap: 5px !important;
+    box-sizing: border-box !important;
+  }
+
+  .orders-admin-view.pipeline-view .pipeline-card-head {
+    order: 2 !important;
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) auto !important;
+    align-items: center !important;
+    gap: 4px !important;
+  }
+
+  .orders-admin-view.pipeline-view .pipeline-card-order {
+    min-width: 0 !important;
+    color: #667085 !important;
+    font-size: 9px !important;
+    font-weight: 800 !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+  }
+
+  .orders-admin-view.pipeline-view .pipeline-priority {
+    justify-self: end !important;
+    max-width: 46px !important;
+    padding: 2px 4px !important;
+    border-radius: 999px !important;
+    font-size: 8px !important;
+    line-height: 1 !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+  }
+
+  .orders-admin-view.pipeline-view .pipeline-card-client {
+    order: 1 !important;
+    display: -webkit-box !important;
+    margin: 0 !important;
+    color: #111827 !important;
+    font-size: 11px !important;
+    font-weight: 900 !important;
+    line-height: 1.15 !important;
+    overflow: hidden !important;
+    overflow-wrap: normal !important;
+    text-overflow: ellipsis !important;
+    -webkit-box-orient: vertical !important;
+    -webkit-line-clamp: 2 !important;
+  }
+
+  .orders-admin-view.pipeline-view .pipeline-card-delivery,
+  .orders-admin-view.pipeline-view .pipeline-card-assign,
+  .orders-admin-view.pipeline-view .pipeline-time-status,
+  .orders-admin-view.pipeline-view .pipeline-progress-wrap {
+    display: none !important;
+  }
+
+  .orders-admin-view.pipeline-view .pipeline-card-product {
+    order: 2 !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 3px !important;
+    min-width: 0 !important;
+    color: #667085 !important;
+    font-size: 8.5px !important;
+    font-weight: 800 !important;
+    line-height: 1.15 !important;
+  }
+
+  .orders-admin-view.pipeline-view .pipeline-card-product svg {
+    width: 9px !important;
+    height: 9px !important;
+    flex: 0 0 auto !important;
+  }
+
+  .orders-admin-view.pipeline-view .pipeline-card-product span {
+    min-width: 0 !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+  }
+
+  .orders-admin-view.pipeline-view .pipeline-card-info-row {
+    order: 4 !important;
+    display: block !important;
+  }
+
+  .orders-admin-view.pipeline-view .pipeline-card-value {
+    display: flex !important;
+    align-items: center !important;
+    gap: 2px !important;
+    min-width: 0 !important;
+    color: #15803d !important;
+    font-size: 10px !important;
+    font-weight: 900 !important;
+    line-height: 1.1 !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+  }
+
+  .orders-admin-view.pipeline-view .pipeline-card-value svg {
+    display: none !important;
+  }
+}
+
+@media (max-width: 390px) {
+  .orders-admin-view.pipeline-view .pipeline-page-header.orders-page-header {
+    column-gap: 6px !important;
+  }
+
+  .orders-admin-view.pipeline-view .pipeline-page-header .pipeline-header-metrics {
+    gap: 6px !important;
+  }
+
+  .orders-admin-view.pipeline-view .pipeline-page-header .orders-header-metric-card {
+    grid-template-columns: 22px minmax(0, 1fr) !important;
+    min-height: 48px !important;
+    column-gap: 6px !important;
+    padding: 7px 6px !important;
+  }
+
+  .orders-admin-view.pipeline-view .pipeline-page-header .orders-header-metric-icon {
+    width: 22px !important;
+    min-width: 22px !important;
+    height: 22px !important;
+  }
+
+  .orders-admin-view.pipeline-view .pipeline-page-header .orders-header-metric-card strong {
+    font-size: 12px !important;
+  }
+
+  .orders-admin-view.pipeline-view .pipeline-page-header .orders-header-metric-card > span:not(.orders-header-metric-icon) {
+    font-size: 6px !important;
+  }
+
+  .orders-admin-view.pipeline-view .orders-filter-control,
+  .orders-admin-view.pipeline-view .pipeline-mobile-sucursal,
+  .orders-admin-view.pipeline-view .pipeline-mobile-today,
+  .orders-admin-view.pipeline-view .pipeline-mobile-advanced-filters summary {
+    min-height: 40px !important;
+    height: 40px !important;
+    padding-inline: 10px !important;
+  }
+
+  .orders-admin-view.pipeline-view .pipeline-filter-search {
+    flex-basis: 128px !important;
+  }
+}

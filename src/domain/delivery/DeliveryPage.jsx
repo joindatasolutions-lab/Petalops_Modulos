@@ -17,6 +17,7 @@ import {
   MessageCircle,
   MoreVertical,
   Phone,
+  RotateCw,
   Route,
   Search,
   Truck,
@@ -83,6 +84,21 @@ const DELIVERY_STATUS_FILTERS = [
   { key: "no-entregado", label: "No entregados", icon: AlertTriangle },
   { key: "reprogramado", label: "Reprogramados", icon: Clock3 },
 ];
+const DELIVERY_MOBILE_VIEW_LABELS = {
+  admin: "Pedidos",
+  novedades: "Novedades",
+  metricas: "Metricas",
+  domiciliarios: "Repartidores",
+};
+const DELIVERY_MOBILE_STATUS_LABELS = {
+  todos: "Todos",
+  pendiente: "Pend.",
+  asignado: "Asign.",
+  "en-camino": "Ruta",
+  entregado: "OK",
+  "no-entregado": "Fallidos",
+  reprogramado: "Reprog.",
+};
 const DELIVERY_METRIC_GROUPS = [
   { value: "dia", label: "Día" },
   { value: "mes", label: "Mes" },
@@ -3557,6 +3573,7 @@ export function DeliveryPage({
     };
   }, [deliveryMetrics, domiciliarios, metricsPayload, performanceSort, performanceUnassignedCount]);
   const activeModeLabel = visibleDeliveryViews.find(item => item.value === modo)?.label || "Dispatch";
+  const mobileSessionLabel = displayUserName.replace(/\s+Empresa\s+/i, " · ");
 
   return (
     <div className={`app-shell ${sidebarPinned ? "is-sidebar-pinned" : ""} ${sidebarMobileOpen ? "is-sidebar-mobile-open" : ""}`}>
@@ -3676,7 +3693,215 @@ export function DeliveryPage({
           </div>
         ) : null}
 
-        <header className="orders-admin-header orders-page-header delivery-page-header">
+        <section className="delivery-mobile-workspace" aria-label="Domicilios móvil">
+          <div className="delivery-mobile-hero">
+            <button type="button" className="delivery-mobile-menu" onClick={toggleSidebar} aria-label="Abrir menú">
+              ☰
+            </button>
+            <div className="delivery-mobile-title">
+              <h1>Domicilios</h1>
+              <span>{mobileSessionLabel}</span>
+            </div>
+            <button type="button" className="delivery-mobile-refresh" onClick={refreshAll} disabled={loading || Boolean(actionKey)} aria-label="Actualizar domicilios">
+              <RotateCw size={16} strokeWidth={2.3} aria-hidden="true" />
+              <span>{loading ? "..." : "Actualizar"}</span>
+            </button>
+          </div>
+
+          <div className={`delivery-mobile-signal ${isOffline ? "is-offline" : "is-online"}`}>
+            <span>{isOffline ? "Sin internet" : availableCoords ? "GPS activo" : "Operacion en linea"}</span>
+          </div>
+
+          <nav className="delivery-mobile-tabs" aria-label="Submenu domicilios móvil">
+            {visibleDeliveryViews.map(item => (
+              <button
+                key={`mobile-${item.value}`}
+                type="button"
+                className={modo === item.value ? "is-active" : ""}
+                onClick={() => handleModeChange(item.value)}
+                disabled={loading || Boolean(actionKey)}
+              >
+                {DELIVERY_MOBILE_VIEW_LABELS[item.value] || item.label}
+              </button>
+            ))}
+          </nav>
+
+          {modo === "admin" ? (
+            <>
+              {error ? <p className="delivery-mobile-message is-error">{error}</p> : null}
+              {loading ? <p className="delivery-mobile-message">Cargando domicilios...</p> : null}
+
+              <section className="delivery-mobile-filters" aria-label="Filtros móviles de domicilios">
+                <label className="delivery-mobile-search">
+                  <Search size={16} strokeWidth={2.2} aria-hidden="true" />
+                  <input
+                    type="search"
+                    value={deliverySearch}
+                    onChange={event => setDeliverySearch(event.target.value)}
+                    placeholder="Pedido, cliente..."
+                    aria-label="Buscar domicilio"
+                  />
+                </label>
+                <button type="button" className="delivery-mobile-filter-icon" aria-label="Filtros">
+                  ☷
+                </button>
+                <select
+                  value={modo}
+                  onChange={event => handleModeChange(event.target.value)}
+                  aria-label="Modulo de domicilios"
+                >
+                  {visibleDeliveryViews.map(item => (
+                    <option key={`mobile-view-select-${item.value}`} value={item.value}>
+                      {DELIVERY_MOBILE_VIEW_LABELS[item.value] || item.label}
+                    </option>
+                  ))}
+                </select>
+                <select
+                  value={filtro}
+                  onChange={event => {
+                    setFiltro(event.target.value);
+                    setStatusFilter("todos");
+                  }}
+                  aria-label="Filtro de fecha"
+                >
+                  {FILTROS.map(item => <option key={`mobile-${item.value}`} value={item.value}>{item.label}</option>)}
+                </select>
+                <input
+                  type="date"
+                  value={fechaFiltro}
+                  onChange={event => setFechaFiltro(event.target.value)}
+                  aria-label="Fecha de domicilio"
+                />
+                {adminRole ? (
+                  <button type="button" className="delivery-mobile-regularize" onClick={openRegularizationModal} disabled={loading || Boolean(actionKey)}>
+                    Regularizar
+                  </button>
+                ) : null}
+              </section>
+
+              {modo === "admin" && currentDomiciliarioId != null ? (
+                <label className="delivery-mobile-toggle">
+                  <input
+                    type="checkbox"
+                    checked={soloMisAsignados}
+                    onChange={event => onChangeSoloMisAsignados(event.target.checked)}
+                  />
+                  <span>Solo mis asignados</span>
+                </label>
+              ) : null}
+
+              <section className="delivery-mobile-list" aria-label="Listado móvil de domicilios">
+                <div className="delivery-mobile-summary">
+                  <strong>{filteredDispatchItems.length} activos</strong>
+                  <span>{isOffline ? "Sin internet" : availableCoords ? "GPS activo" : "En linea"}</span>
+                </div>
+                {filteredDispatchItems.length === 0 ? (
+                  <p className="delivery-mobile-empty">No hay domicilios para estos filtros.</p>
+                ) : filteredDispatchItems.map(item => {
+                  const meta = deliveryStatusMeta(item);
+                  const timeLate = isDeliveryTimeLate(item);
+                  const itemKey = deliveryItemKey(item);
+                  const payment = deliveryPaymentMeta(item);
+                  const address = deliveryAddressParts(item);
+                  const imageUrl = resolveDeliveryImageUrl(item, catalogProductIndex) || deliveryProductImages[itemKey] || "";
+                  const arrangementName = deliveryArrangementName(item) || deliveryProductNames[itemKey] || "";
+                  return (
+                    <article
+                      key={`delivery-mobile-${item.idEntrega || item.numeroPedido}`}
+                      className={`delivery-mobile-card is-${meta.tone}${timeLate ? " is-late" : ""}`}
+                      onClick={() => openDeliveryDetail(item)}
+                    >
+                      <div className="delivery-mobile-card-main">
+                        <div className="delivery-mobile-thumb" aria-hidden="true">
+                          {imageUrl ? <img src={imageUrl} alt="" loading="lazy" /> : <Truck size={18} strokeWidth={2.2} />}
+                        </div>
+                        <div className="delivery-mobile-card-copy">
+                          <div className="delivery-mobile-card-top">
+                            <span>#{deliveryOrderCodeLabel(item)}</span>
+                            {isSurpriseDelivery(item) ? <strong>Urgente</strong> : null}
+                          </div>
+                          <h3>{item.cliente || item.destinatario || "Cliente sin nombre"}</h3>
+                          <p>{arrangementName || "Producto sin nombre"}</p>
+                          <p className="delivery-mobile-address">{address.primary || "Direccion sin registrar"}</p>
+                          <small>{deliveryDateTimeLabel(item)}</small>
+                        </div>
+                        <span className={`delivery-mobile-state is-${meta.tone}`}>{meta.label}</span>
+                      </div>
+
+                      <div className="delivery-mobile-card-meta">
+                        <span>{courierName(item)}</span>
+                        <span className={`is-${payment.tone}`}>{payment.label}</span>
+                        {timeLate ? <strong>{deliveryRemainingLabel(item)}</strong> : null}
+                      </div>
+
+                      <div className="delivery-mobile-actions" onClick={event => event.stopPropagation()}>
+                        <select
+                          value=""
+                          onChange={event => {
+                            const nextDomiciliarioId = event.target.value;
+                            if (!nextDomiciliarioId) return;
+                            onAsignar(item, nextDomiciliarioId);
+                          }}
+                          disabled={actionKey === `asignar-${item.idEntrega}` || domiciliarios.length === 0}
+                          aria-label={deliveryCourierIdValue(item) ? "Reasignar domiciliario" : "Asignar domiciliario"}
+                        >
+                          <option value="">
+                            {actionKey === `asignar-${item.idEntrega}`
+                              ? "Guardando..."
+                              : deliveryCourierIdValue(item)
+                                ? "Reasignar"
+                                : "Asignar"}
+                          </option>
+                          {domiciliarios.map(dom => {
+                            const domId = courierIdValue(dom);
+                            if (domId == null) return null;
+                            const activeCount = courierActiveOrders(dom, adminItems);
+                            return (
+                              <option key={`mobile-dom-${domId}`} value={domId}>
+                                {dom.nombre || dom.nombreDomiciliario || "Domiciliario"} ({activeCount})
+                              </option>
+                            );
+                          })}
+                        </select>
+                        <button type="button" onClick={() => openMaps(item)} aria-label="Abrir mapa">
+                          <MapPin size={16} strokeWidth={2.2} />
+                        </button>
+                        <button type="button" onClick={() => openWhatsApp(item)} aria-label="WhatsApp cliente">
+                          <Phone size={16} strokeWidth={2.2} />
+                        </button>
+                        <div className="delivery-mobile-more">
+                          <button
+                            type="button"
+                            aria-label="Mas opciones"
+                            aria-expanded={openDeliveryActionsKey === itemKey}
+                            onClick={() => setOpenDeliveryActionsKey(current => current === itemKey ? "" : itemKey)}
+                          >
+                            <MoreVertical size={17} />
+                          </button>
+                          {openDeliveryActionsKey === itemKey ? (
+                            <div className="delivery-mobile-menu-panel">
+                              <button type="button" onClick={() => { setOpenDeliveryActionsKey(""); setEvidenceModalItem(item); }}>
+                                <Eye size={15} /> Evidencias
+                              </button>
+                              <button type="button" onClick={() => { setOpenDeliveryActionsKey(""); setNoveltiesModalItem(item); }}>
+                                <MessageCircle size={15} /> Novedades
+                              </button>
+                              <button type="button" onClick={() => { setOpenDeliveryActionsKey(""); openStatusModal(item); }}>
+                                <Pencil size={15} /> Estados
+                              </button>
+                            </div>
+                          ) : null}
+                        </div>
+                      </div>
+                    </article>
+                  );
+                })}
+              </section>
+            </>
+          ) : null}
+        </section>
+
+        <header className="orders-admin-header orders-page-header delivery-page-header delivery-desktop-only">
           <div className="orders-page-heading">
             <button type="button" className="sidebar-trigger" onClick={toggleSidebar}>{"\u2630 Men\u00fa"}</button>
             <div className="orders-page-breadcrumb" aria-label="Ruta">
@@ -3712,7 +3937,7 @@ export function DeliveryPage({
           </div>
         </header>
 
-        <section className="inventory-header-tabs" aria-label="Submenu domicilios">
+        <section className="inventory-header-tabs delivery-desktop-only" aria-label="Submenu domicilios">
           {visibleDeliveryViews.map(item => (
             <button
               key={item.value}
@@ -3727,7 +3952,7 @@ export function DeliveryPage({
         </section>
 
         {modo === "admin" ? (
-          <>
+          <div className="delivery-desktop-admin-panel">
             {error ? <p className="orders-message delivery-error">{error}</p> : null}
             {loading ? <p className="orders-message">Cargando domicilios...</p> : null}
 
@@ -3946,7 +4171,7 @@ export function DeliveryPage({
               </aside>
 
             </section>
-          </>
+          </div>
         ) : null}
 
         {false && modo !== "barrios" ? (
