@@ -5,32 +5,32 @@ export const MODULES = [
     label: "Flores",
     categoria: "Flores",
     icon: Flower2,
-    subcategorias: ["Rosas", "Girasoles", "Hortensias", "Claveles", "Follaje", "Otras"],
-    unidades: ["Tallo", "Paquete", "Unidad"],
+    subcategorias: ["Rosas", "Follajes", "Tropicales", "Hortensias", "Lirios", "Orquideas", "Otro"],
+    unidades: ["Tallo", "Paquete", "Ramo", "Unidad"],
   },
   {
     key: "bases",
     label: "Bases",
     categoria: "Bases",
     icon: Boxes,
-    subcategorias: ["Box", "Madera", "Vidrio", "Cerámica", "Otros"],
-    unidades: ["Unidad"],
+    subcategorias: ["Box", "Madera", "Vidrio", "Ceramica", "Canasta", "Florero", "Otros"],
+    unidades: ["Unidad", "Caja", "Paquete"],
   },
   {
     key: "materiales",
     label: "Materiales",
     categoria: "Materiales",
     icon: Layers,
-    subcategorias: ["Cintas", "Papeles", "Celofán", "Moños", "Yute", "Oasis", "Plástico", "Frascos", "Insumos Operativos", "Otros"],
-    unidades: ["Rollo", "Unidad", "Paquete", "Pliego", "Caja", "Bloque"],
+    subcategorias: ["Cintas", "Papel", "Celofan", "Monos", "Yute", "Oasis", "Plastico", "Frascos", "Etiquetas", "Tarjetas", "Insumos operativos", "Otros"],
+    unidades: ["Metro", "Rollo", "Unidad", "Paquete", "Caja", "Bolsa", "Frasco", "Kilogramo"],
   },
   {
     key: "adicionales",
     label: "Adicionales",
     categoria: "Adicionales",
     icon: Gift,
-    subcategorias: ["Chocolates", "Vinos", "Peluches", "Toppers", "Otros"],
-    unidades: ["Unidad", "Caja"],
+    subcategorias: ["Chocolates", "Peluche", "Vino", "Topper", "Otro"],
+    unidades: ["Unidad", "Caja", "Paquete", "Botella", "Bolsa", "Kit"],
   },
   {
     key: "arreglos",
@@ -68,12 +68,21 @@ export const initialProveedorForm = {
 export const COLOR_OPTIONS = [
   "", "Rojo", "Rosado", "Blanco", "Amarillo", "Naranja",
   "Lila", "Morado", "Azul", "Verde", "Dorado", "Plateado", "Multicolor",
-  "Beige", "Café", "Gris", "Negro", "Transparente",
+  "Beige", "Cafe", "Gris", "Negro", "Transparente",
 ];
-export const MOVIMIENTO_TIPO_OPTIONS = ["Entrada", "Salida", "Ajuste", "Pérdida"];
+export const MOVIMIENTO_TIPO_OPTIONS = ["Compra", "Entrada", "Salida", "Ajuste", "Daño", "Pérdida"];
 export const INVENTORY_STATUS_CLASS = {
   DISPONIBLE: "is-entregado",
   BAJO_STOCK: "is-pendiente",
   AGOTADO: "is-rechazado",
   INACTIVO: "is-cancelado",
 };
+export const MOTIVOS_DANO_BY_MODULE = {
+  flores: ["Marchita", "Mal estado al recibir", "Daño por transporte", "Daño en produccion", "Plaga", "Regalo", "Otro"],
+  bases: ["Rota", "Quebrada", "Golpe transporte", "Defecto de fabrica", "Otro"],
+  materiales: ["Mojado", "Roto", "Manchado", "Deteriorado", "Quebrado", "Dañado"],
+  adicionales: ["Vencimiento", "Chocolate vencido", "Botella rota", "Peluche manchado", "Otro"],
+};
+
+export const MOTIVOS_SALIDA = ["Venta", "Produccion", "Muestra", "Consumo interno", "Regalo"];
+export const MOTIVOS_AJUSTE = ["Conteo fisico", "Error anterior", "Producto encontrado", "Producto extraviado"];

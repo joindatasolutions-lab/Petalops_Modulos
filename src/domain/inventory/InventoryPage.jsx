@@ -37,7 +37,7 @@ import {
   UtensilsCrossed,
   X,
 } from "lucide-react";
-import { COLOR_OPTIONS, MODULES, MOVIMIENTO_TIPO_OPTIONS, initialProveedorForm } from "./inventoryConfig.jsx";
+import { COLOR_OPTIONS, MODULES, MOTIVOS_AJUSTE, MOTIVOS_DANO_BY_MODULE, MOTIVOS_SALIDA, MOVIMIENTO_TIPO_OPTIONS, initialProveedorForm } from "./inventoryConfig.jsx";
 import { buildBasesMetrics, buildCategorySummary, buildCreateItemPayload, buildCriticalItems, buildExpiryAlerts, buildInventoryMetrics, buildLastMovementByItem, buildProveedorForm, buildProveedorPayload, buildRecetaResumen, buildSimulacionPedido, buildTopSellers, filterInventoryItems, inventoryRowClass, isExpired, isNearExpiry, lastMovementLabelForItem, rotationLevel, statusClass, stockLevel } from "./inventoryDomain.js";
 export { filterInventoryItems } from "./inventoryDomain.js";
 
@@ -86,6 +86,12 @@ export function InventoryPage({
   const [proveedorFiltro, setProveedorFiltro] = useState("");
   const [stockFiltro, setStockFiltro] = useState("");
   const [tipoMovimientoFiltro, setTipoMovimientoFiltro] = useState("");
+  const [moduloMovimientoFiltro, setModuloMovimientoFiltro] = useState("");
+  const [fechaMovimientoDesde, setFechaMovimientoDesde] = useState("");
+  const [fechaMovimientoHasta, setFechaMovimientoHasta] = useState("");
+  const [estadoMovimientoFiltro, setEstadoMovimientoFiltro] = useState("Registrado");
+  const [serverMetrics, setServerMetrics] = useState(null);
+  const [movementMetrics, setMovementMetrics] = useState(null);
 
   // ── Formularios ──
   const moduloConfig = useMemo(() => MODULES.find(m => m.key === moduloActivo), [moduloActivo]);
@@ -109,7 +115,49 @@ export function InventoryPage({
   }), [moduloConfig]);
 
   const [createForm, setCreateForm] = useState(initialCreateForm);
-  const [stockForm, setStockForm] = useState({ inventarioID: "", tipoMovimiento: "Entrada", cantidad: "1", stockObjetivo: "", motivo: "" });
+  const initialStockForm = useMemo(() => ({
+    inventarioID: "",
+    tipoMovimiento: "Compra",
+    cantidad: "1",
+    stockObjetivo: "",
+    motivo: "",
+    fecha: "",
+    proveedorID: "",
+    numeroFactura: "",
+    responsable: displayUserName,
+    unidad: moduloConfig?.unidades?.[0] || "Unidad",
+    precioUnitario: "",
+    fechaVencimiento: "",
+    evidenciaUrl: "",
+    pedidoReferencia: "",
+    observaciones: "",
+  }), [displayUserName, moduloConfig]);
+  const [stockForm, setStockForm] = useState(initialStockForm);
+  const stockItemsForSelector = moduloActivo === "movimientos" ? allItems : items;
+  const selectedStockItem = useMemo(() => stockItemsForSelector.find(item => String(item.inventarioID) === String(stockForm.inventarioID)) || null, [stockItemsForSelector, stockForm.inventarioID]);
+  const selectedStockModuleKey = useMemo(() => {
+    const categoria = String(selectedStockItem?.categoria || moduloConfig?.categoria || "").toLowerCase();
+    return MODULES.find(mod => mod.categoria && mod.categoria.toLowerCase() === categoria)?.key || moduloActivo;
+  }, [moduloActivo, moduloConfig, selectedStockItem]);
+  const currentMovementMotivos = useMemo(() => {
+    if (stockForm.tipoMovimiento === "Daño" || stockForm.tipoMovimiento === "Pérdida") return MOTIVOS_DANO_BY_MODULE[selectedStockModuleKey] || MOTIVOS_DANO_BY_MODULE.flores;
+    if (stockForm.tipoMovimiento === "Salida") return MOTIVOS_SALIDA;
+    if (stockForm.tipoMovimiento === "Ajuste") return MOTIVOS_AJUSTE;
+    return [];
+  }, [selectedStockModuleKey, stockForm.tipoMovimiento]);
+  const startStockMovement = useCallback((item = null, tipoMovimiento = "Compra") => {
+    setOpenInventoryMenuId(null);
+    setStockForm({
+      ...initialStockForm,
+      inventarioID: item?.inventarioID ? String(item.inventarioID) : "",
+      tipoMovimiento,
+      cantidad: "1",
+      unidad: item?.unidadMedida || initialStockForm.unidad,
+      proveedorID: item?.proveedorID ? String(item.proveedorID) : "",
+      precioUnitario: item?.valorUnitario != null ? String(item.valorUnitario) : "",
+    });
+    setVistaActiva("ajustar");
+  }, [initialStockForm]);
   const initialRecetaForm = {
     nombre: "",
     descripcion: "",
@@ -162,7 +210,17 @@ export function InventoryPage({
     }));
   }, [moduloConfig]);
 
-  const inventoryMetrics = useMemo(() => buildInventoryMetrics(items, movimientos), [items, movimientos]);
+  const localInventoryMetrics = useMemo(() => buildInventoryMetrics(items, movimientos), [items, movimientos]);
+
+  const inventoryMetrics = useMemo(() => ({
+    stockTotal: serverMetrics?.totalReferencias ?? localInventoryMetrics.stockTotal,
+    valorInventario: serverMetrics?.valorInventario ?? localInventoryMetrics.valorInventario,
+    entradasHoy: movementMetrics?.entradas ?? localInventoryMetrics.entradasHoy,
+    salidasHoy: movementMetrics?.salidas ?? localInventoryMetrics.salidasHoy,
+    bajoStock: serverMetrics?.stockBajo ?? localInventoryMetrics.bajoStock,
+    agotados: serverMetrics?.agotados ?? localInventoryMetrics.agotados,
+    porVencer: serverMetrics?.porVencer ?? 0,
+  }), [localInventoryMetrics, movementMetrics, serverMetrics]);
 
   const basesMetrics = useMemo(() => buildBasesMetrics(items, movimientos, proveedores), [items, movimientos, proveedores]);
 
@@ -180,10 +238,7 @@ export function InventoryPage({
 
   const lastMovementForItem = useCallback(item => lastMovementLabelForItem(item, lastMovementByItem), [lastMovementByItem]);
 
-  const movimientosFiltrados = useMemo(() => {
-    if (!tipoMovimientoFiltro) return movimientos;
-    return movimientos.filter(m => m.tipoMovimiento === tipoMovimientoFiltro);
-  }, [movimientos, tipoMovimientoFiltro]);
+  const movimientosFiltrados = useMemo(() => movimientos, [movimientos]);
 
   // ── Arreglos: costo de producción, capacidad de fabricación y componente
   // limitante, calculados en el navegador cruzando la receta con el stock
@@ -238,12 +293,41 @@ export function InventoryPage({
     } catch { setAllItems([]); }
   }, [api, empresaId]);
 
+  const loadInventarioMetricas = useCallback(async () => {
+    const cat = MODULES.find(m => m.key === moduloActivo)?.categoria;
+    if (!cat) { setServerMetrics(null); return; }
+    try {
+      const data = await api.obtenerMetricasInventario({ empresaId, categoria: cat, diasVencimiento: 7 });
+      setServerMetrics(data || null);
+    } catch { setServerMetrics(null); }
+  }, [api, empresaId, moduloActivo]);
+
+  const loadMovimientosMetricas = useCallback(async () => {
+    try {
+      const data = await api.obtenerMetricasMovimientosInventario({
+        empresaId,
+        modulo: moduloMovimientoFiltro || null,
+        fechaDesde: fechaMovimientoDesde || null,
+        fechaHasta: fechaMovimientoHasta || null,
+      });
+      setMovementMetrics(data || null);
+    } catch { setMovementMetrics(null); }
+  }, [api, empresaId, fechaMovimientoDesde, fechaMovimientoHasta, moduloMovimientoFiltro]);
+
   const loadMovimientos = useCallback(async () => {
     try {
-      const data = await api.listarMovimientosInventario({ empresaId });
+      const data = await api.listarMovimientosInventario({
+        empresaId,
+        tipo: tipoMovimientoFiltro || null,
+        modulo: moduloActivo === "movimientos" ? (moduloMovimientoFiltro || null) : null,
+        fechaDesde: moduloActivo === "movimientos" ? (fechaMovimientoDesde || null) : null,
+        fechaHasta: moduloActivo === "movimientos" ? (fechaMovimientoHasta || null) : null,
+        estado: moduloActivo === "movimientos" ? (estadoMovimientoFiltro || null) : null,
+        q: moduloActivo === "movimientos" ? (q || null) : null,
+      });
       setMovimientos(Array.isArray(data.items) ? data.items : []);
     } catch { setMovimientos([]); }
-  }, [api, empresaId]);
+  }, [api, empresaId, estadoMovimientoFiltro, fechaMovimientoDesde, fechaMovimientoHasta, moduloActivo, moduloMovimientoFiltro, q, tipoMovimientoFiltro]);
 
   const loadRecetas = useCallback(async () => {
     try {
@@ -281,7 +365,9 @@ export function InventoryPage({
   }, [api, empresaId, sucursalId]);
 
   useEffect(() => { loadProveedores().catch(() => {}); }, [loadProveedores]);
+  useEffect(() => { loadInventarioMetricas().catch(() => {}); }, [loadInventarioMetricas]);
   useEffect(() => { loadMovimientos().catch(() => {}); }, [loadMovimientos]);
+  useEffect(() => { loadMovimientosMetricas().catch(() => {}); }, [loadMovimientosMetricas]);
 
   useEffect(() => {
     if (moduloActivo !== "arreglos" || vistaActiva !== "crear" || recetaForm.productoModo !== "vincular") return undefined;
@@ -301,6 +387,7 @@ export function InventoryPage({
 
   const refreshAll = () => {
     loadInventario().catch(() => {});
+    loadInventarioMetricas().catch(() => {});
     loadMovimientos().catch(() => {});
     if (moduloActivo === "arreglos") { loadRecetas().catch(() => {}); loadAllItems().catch(() => {}); }
     if (moduloActivo === "movimientos") loadAllItems().catch(() => {});
@@ -376,30 +463,64 @@ export function InventoryPage({
   const submitStock = async event => {
     event.preventDefault();
     if (!stockForm.inventarioID) { setError("Selecciona un item."); return; }
+    const cantidad = Number(stockForm.cantidad || 0);
+    const motivo = String(stockForm.motivo || stockForm.observaciones || "").trim();
+    const fechaMovimiento = stockForm.fecha ? `${stockForm.fecha}T00:00:00` : null;
+    if (stockForm.tipoMovimiento !== "Ajuste" && cantidad <= 0) { setError("Indica una cantidad mayor a cero."); return; }
+    if (["Salida", "Ajuste", "Daño", "Pérdida"].includes(stockForm.tipoMovimiento) && !motivo) { setError("Indica el motivo del movimiento."); return; }
     setSavingStock(true);
     setError("");
     setInfo("");
     try {
-      await api.ajustarStockInventario({
-        inventarioId: Number(stockForm.inventarioID),
-        payload: {
-          tipoMovimiento: stockForm.tipoMovimiento,
-          cantidad: Number(stockForm.cantidad || 0),
-          stockObjetivo: stockForm.tipoMovimiento === "Ajuste" ? Number(stockForm.stockObjetivo || 0) : null,
-          motivo: String(stockForm.motivo || "").trim(),
-        },
-      });
-      setStockForm({ inventarioID: "", tipoMovimiento: "Entrada", cantidad: "1", stockObjetivo: "", motivo: "" });
+      if (stockForm.tipoMovimiento === "Compra") {
+        await api.registrarCompraInventario({
+          inventarioID: Number(stockForm.inventarioID),
+          cantidad,
+          fecha: fechaMovimiento,
+          proveedorID: stockForm.proveedorID ? Number(stockForm.proveedorID) : null,
+          numeroFactura: String(stockForm.numeroFactura || "").trim() || null,
+          responsable: String(stockForm.responsable || "").trim() || null,
+          unidad: String(stockForm.unidad || selectedStockItem?.unidadMedida || "").trim() || null,
+          precioUnitario: stockForm.precioUnitario !== "" ? Number(stockForm.precioUnitario) : null,
+          fechaVencimiento: stockForm.fechaVencimiento || null,
+          observaciones: String(stockForm.observaciones || "").trim() || null,
+        });
+      } else if (stockForm.tipoMovimiento === "Daño" || stockForm.tipoMovimiento === "Pérdida") {
+        await api.registrarDanoInventario({
+          inventarioID: Number(stockForm.inventarioID),
+          cantidad,
+          fecha: fechaMovimiento,
+          motivo,
+          responsable: String(stockForm.responsable || "").trim() || null,
+          unidad: String(stockForm.unidad || selectedStockItem?.unidadMedida || "").trim() || null,
+          evidenciaUrl: String(stockForm.evidenciaUrl || "").trim() || null,
+          pedidoReferencia: String(stockForm.pedidoReferencia || "").trim() || null,
+          observaciones: String(stockForm.observaciones || "").trim() || null,
+        });
+      } else {
+        await api.ajustarStockInventario({
+          inventarioId: Number(stockForm.inventarioID),
+          payload: {
+            tipoMovimiento: stockForm.tipoMovimiento,
+            cantidad,
+            stockObjetivo: stockForm.tipoMovimiento === "Ajuste" ? Number(stockForm.stockObjetivo || 0) : null,
+            motivo,
+          },
+        });
+      }
+      setStockForm(initialStockForm);
       if (moduloActivo === "movimientos") {
         await loadAllItems();
       } else {
         await loadInventario();
       }
+      await loadInventarioMetricas();
       await loadMovimientos();
+      await loadMovimientosMetricas();
       setInfo("Movimiento registrado.");
       setVistaActiva("lista");
     } catch (nextError) {
-      setError(nextError?.message || "No fue posible ajustar stock.");
+      setError(nextError?.message || "No fue posible registrar movimiento.");
     } finally {
       setSavingStock(false);
     }
@@ -412,6 +533,33 @@ export function InventoryPage({
       setInfo(`${item.nombre} ${item.activo ? "desactivado" : "activado"}.`);
     } catch (nextError) {
       setError(nextError?.message || "No fue posible actualizar estado.");
+    }
+  };
+
+  const descargarMovimientoPdf = async item => {
+    try {
+      const blob = await api.descargarMovimientoInventarioPdf({ movimientoId: item.movimientoID });
+      const url = URL.createObjectURL(blob);
+      window.open(url, "_blank", "noopener,noreferrer");
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+    } catch (nextError) {
+      setError(nextError?.message || "No fue posible abrir el PDF del movimiento.");
+    }
+  };
+
+  const anularMovimiento = async item => {
+    if (item.estado === "Anulado") return;
+    const motivo = window.prompt(`Motivo de anulacion para ${item.referencia || `MOV-${item.movimientoID}`}`);
+    if (!motivo || !motivo.trim()) return;
+    try {
+      await api.anularMovimientoInventario({ movimientoId: item.movimientoID, motivo: motivo.trim() });
+      await loadInventario();
+      await loadAllItems();
+      await loadMovimientos();
+      await loadMovimientosMetricas();
+      setInfo("Movimiento anulado y stock reversado.");
+    } catch (nextError) {
+      setError(nextError?.message || "No fue posible anular el movimiento.");
     }
   };
 
@@ -829,14 +977,10 @@ export function InventoryPage({
                                 <div className="inventory-row-menu-panel">
                                   <button type="button" onClick={() => { setOpenInventoryMenuId(null); setInfo(`${item.nombre} | Código: ${item.codigo} | Cat: ${item.categoria}${item.subcategoria ? ` / ${item.subcategoria}` : ""}`); }}><Eye size={15} strokeWidth={2} /> Ver detalle</button>
                                   <button type="button" onClick={() => { setOpenInventoryMenuId(null); setInfo(`Edición próximamente: ${item.nombre}`); }}><Pencil size={15} strokeWidth={2} /> Editar</button>
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      setOpenInventoryMenuId(null);
-                                      setStockForm(f => ({ ...f, inventarioID: String(item.inventarioID) }));
-                                      setVistaActiva("ajustar");
-                                    }}
-                                  ><RotateCcw size={15} strokeWidth={2} /> Ajustar stock</button>
+                                  <button type="button" onClick={() => startStockMovement(item, "Compra")}><Truck size={15} strokeWidth={2} /> Registrar compra</button>
+                                  <button type="button" onClick={() => startStockMovement(item, "Salida")}><ArrowUpFromLine size={15} strokeWidth={2} /> Registrar salida</button>
+                                  <button type="button" onClick={() => startStockMovement(item, "Daño")}><CircleX size={15} strokeWidth={2} /> Registrar daño</button>
+                                  <button type="button" onClick={() => startStockMovement(item, "Ajuste")}><RotateCcw size={15} strokeWidth={2} /> Ajustar stock</button>
                                   <button type="button" onClick={() => { setOpenInventoryMenuId(null); cambiarModulo("movimientos"); }}><Archive size={15} strokeWidth={2} /> Ver movimientos</button>
                                   <button type="button" onClick={() => { setOpenInventoryMenuId(null); toggleActivo(item); }}><CircleX size={15} strokeWidth={2} /> {item.activo ? "Desactivar" : "Activar"}</button>
                                 </div>
@@ -1074,50 +1218,56 @@ export function InventoryPage({
         {(moduloConfig?.categoria || moduloActivo === "movimientos") && vistaActiva === "ajustar" ? (
           <section className="inventory-grid-layout inventory-single-layout">
             <article className="order-block inventory-panel inventory-form-panel">
-              <h4>{moduloActivo === "movimientos" ? "Registrar movimiento" : `Ajustar stock — ${moduloLabel}`}</h4>
-              <form className="users-create-form" onSubmit={submitStock}>
-                <label className="inventory-field">
+              <h4>{stockForm.tipoMovimiento === "Compra" ? "Registrar compra" : stockForm.tipoMovimiento === "Daño" ? "Registrar daño" : stockForm.tipoMovimiento === "Salida" ? "Registrar salida" : stockForm.tipoMovimiento === "Ajuste" ? "Ajustar stock" : "Registrar movimiento"}</h4>
+              <form className="users-create-form inventory-movement-form" onSubmit={submitStock}>
+                <label className="inventory-field inventory-field-wide">
                   <span>Insumo</span>
-                  <select value={stockForm.inventarioID} onChange={e => setStockForm(f => ({ ...f, inventarioID: e.target.value }))} required>
+                  <select value={stockForm.inventarioID} onChange={e => setStockForm(f => {
+                    const item = stockItemsForSelector.find(option => String(option.inventarioID) === String(e.target.value));
+                    return { ...f, inventarioID: e.target.value, unidad: item?.unidadMedida || f.unidad, proveedorID: item?.proveedorID ? String(item.proveedorID) : f.proveedorID, precioUnitario: item?.valorUnitario != null ? String(item.valorUnitario) : f.precioUnitario };
+                  })} required>
                     <option value="">Selecciona item</option>
                     {moduloActivo === "movimientos" ? (
                       MODULES.filter(mod => mod.categoria).map(mod => (
                         <optgroup key={mod.key} label={mod.label}>
                           {allItems
                             .filter(item => String(item.categoria || "").toLowerCase() === mod.categoria.toLowerCase())
-                            .map(item => <option key={item.inventarioID} value={item.inventarioID}>{item.codigo} — {item.nombre}</option>)}
+                            .map(item => <option key={item.inventarioID} value={item.inventarioID}>{item.codigo} - {item.nombre}</option>)}
                         </optgroup>
                       ))
                     ) : (
-                      items.map(item => <option key={item.inventarioID} value={item.inventarioID}>{item.codigo} — {item.nombre}</option>)
+                      items.map(item => <option key={item.inventarioID} value={item.inventarioID}>{item.codigo} - {item.nombre}</option>)
                     )}
                   </select>
                 </label>
-                <label className="inventory-field">
-                  <span>Tipo de movimiento</span>
-                  <select value={stockForm.tipoMovimiento} onChange={e => setStockForm(f => ({ ...f, tipoMovimiento: e.target.value }))}>
-                    {MOVIMIENTO_TIPO_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}
-                  </select>
-                </label>
+                <label className="inventory-field"><span>Tipo de movimiento</span><select value={stockForm.tipoMovimiento} onChange={e => setStockForm(f => ({ ...f, tipoMovimiento: e.target.value, motivo: "" }))}>{MOVIMIENTO_TIPO_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}</select></label>
+                <label className="inventory-field"><span>Fecha</span><input type="date" value={stockForm.fecha} onChange={e => setStockForm(f => ({ ...f, fecha: e.target.value }))} /></label>
+                <label className="inventory-field"><span>Responsable</span><input value={stockForm.responsable} onChange={e => setStockForm(f => ({ ...f, responsable: e.target.value }))} /></label>
+                <label className="inventory-field"><span>Unidad</span><input value={stockForm.unidad} onChange={e => setStockForm(f => ({ ...f, unidad: e.target.value }))} /></label>
                 {stockForm.tipoMovimiento === "Ajuste" ? (
-                  <label className="inventory-field">
-                    <span>Stock objetivo</span>
-                    <input type="number" min="0" step="0.01" value={stockForm.stockObjetivo} onChange={e => setStockForm(f => ({ ...f, stockObjetivo: e.target.value }))} required />
-                  </label>
+                  <label className="inventory-field"><span>Stock objetivo</span><input type="number" min="0" step="0.01" value={stockForm.stockObjetivo} onChange={e => setStockForm(f => ({ ...f, stockObjetivo: e.target.value }))} required /></label>
                 ) : (
-                  <label className="inventory-field">
-                    <span>Cantidad</span>
-                    <input type="number" min="0.01" step="0.01" value={stockForm.cantidad} onChange={e => setStockForm(f => ({ ...f, cantidad: e.target.value }))} required />
-                  </label>
+                  <label className="inventory-field"><span>Cantidad</span><input type="number" min="0.01" step="0.01" value={stockForm.cantidad} onChange={e => setStockForm(f => ({ ...f, cantidad: e.target.value }))} required /></label>
                 )}
-                <label className="inventory-field">
-                  <span>Motivo</span>
-                  <textarea className="inventory-textarea" placeholder="Motivo del movimiento" value={stockForm.motivo} onChange={e => setStockForm(f => ({ ...f, motivo: e.target.value }))} required />
-                </label>
-                <div className="order-actions">
-                  <button type="submit" className="btn-primary" disabled={savingStock}>{savingStock ? "Aplicando..." : "Guardar movimiento"}</button>
-                  <button type="button" className="btn-outline" onClick={() => setVistaActiva("lista")}>Cancelar</button>
-                </div>
+                {stockForm.tipoMovimiento === "Compra" ? (
+                  <>
+                    <label className="inventory-field"><span>Proveedor</span><select value={stockForm.proveedorID} onChange={e => setStockForm(f => ({ ...f, proveedorID: e.target.value }))}><option value="">Sin proveedor</option>{proveedores.map(proveedor => <option key={proveedor.idProveedor} value={proveedor.idProveedor}>{proveedor.codigoProveedor ? `${proveedor.codigoProveedor} - ` : ""}{proveedor.nombre}</option>)}</select></label>
+                    <label className="inventory-field"><span>Factura</span><input value={stockForm.numeroFactura} onChange={e => setStockForm(f => ({ ...f, numeroFactura: e.target.value }))} /></label>
+                    <label className="inventory-field"><span>Precio unitario</span><input type="number" min="0" step="0.01" value={stockForm.precioUnitario} onChange={e => setStockForm(f => ({ ...f, precioUnitario: e.target.value }))} /></label>
+                    <label className="inventory-field"><span>Vencimiento</span><input type="date" value={stockForm.fechaVencimiento} onChange={e => setStockForm(f => ({ ...f, fechaVencimiento: e.target.value }))} /></label>
+                  </>
+                ) : null}
+                {currentMovementMotivos.length ? (
+                  <label className="inventory-field"><span>Motivo</span><select value={stockForm.motivo} onChange={e => setStockForm(f => ({ ...f, motivo: e.target.value }))} required><option value="">Selecciona motivo</option>{currentMovementMotivos.map(motivo => <option key={motivo} value={motivo}>{motivo}</option>)}</select></label>
+                ) : null}
+                {(stockForm.tipoMovimiento === "Daño" || stockForm.tipoMovimiento === "Pérdida") ? (
+                  <>
+                    <label className="inventory-field"><span>Evidencia URL</span><input value={stockForm.evidenciaUrl} onChange={e => setStockForm(f => ({ ...f, evidenciaUrl: e.target.value }))} /></label>
+                    <label className="inventory-field"><span>Pedido/ref.</span><input value={stockForm.pedidoReferencia} onChange={e => setStockForm(f => ({ ...f, pedidoReferencia: e.target.value }))} /></label>
+                  </>
+                ) : null}
+                <label className="inventory-field inventory-field-wide"><span>Observaciones</span><textarea className="inventory-textarea" placeholder="Detalle del movimiento" value={stockForm.observaciones} onChange={e => setStockForm(f => ({ ...f, observaciones: e.target.value }))} /></label>
+                <div className="order-actions inventory-field-wide"><button type="submit" className="btn-primary" disabled={savingStock}>{savingStock ? "Aplicando..." : "Guardar movimiento"}</button><button type="button" className="btn-outline" onClick={() => { setStockForm(initialStockForm); setVistaActiva("lista"); }}>Cancelar</button></div>
               </form>
             </article>
           </section>
@@ -1460,35 +1610,38 @@ export function InventoryPage({
                   <span>{movimientosFiltrados.length} registros</span>
                 </div>
                 <div className="inventory-movements-actions">
-                  <button
-                    type="button"
-                    className="btn-outline inventory-movement-quick-btn is-entrada"
-                    onClick={() => { setStockForm(f => ({ ...f, inventarioID: "", tipoMovimiento: "Entrada", cantidad: "1", stockObjetivo: "", motivo: "" })); setVistaActiva("ajustar"); }}
-                  >
-                    <ArrowDownToLine size={15} strokeWidth={2} aria-hidden="true" />
-                    <span>Registrar entrada</span>
+                  <button type="button" className="btn-outline inventory-movement-quick-btn is-entrada" onClick={() => startStockMovement(null, "Compra")}>
+                    <Truck size={15} strokeWidth={2} aria-hidden="true" />
+                    <span>Registrar compra</span>
                   </button>
-                  <button
-                    type="button"
-                    className="btn-outline inventory-movement-quick-btn is-salida"
-                    onClick={() => { setStockForm(f => ({ ...f, inventarioID: "", tipoMovimiento: "Salida", cantidad: "1", stockObjetivo: "", motivo: "" })); setVistaActiva("ajustar"); }}
-                  >
+                  <button type="button" className="btn-outline inventory-movement-quick-btn is-salida" onClick={() => startStockMovement(null, "Salida")}>
                     <ArrowUpFromLine size={15} strokeWidth={2} aria-hidden="true" />
                     <span>Registrar salida</span>
                   </button>
-                  <button
-                    type="button"
-                    className="btn-outline inventory-movement-quick-btn is-ajuste"
-                    onClick={() => { setStockForm(f => ({ ...f, inventarioID: "", tipoMovimiento: "Ajuste", cantidad: "1", stockObjetivo: "", motivo: "" })); setVistaActiva("ajustar"); }}
-                  >
+                  <button type="button" className="btn-outline inventory-movement-quick-btn is-ajuste" onClick={() => startStockMovement(null, "Ajuste")}>
                     <RotateCcw size={15} strokeWidth={2} aria-hidden="true" />
                     <span>Registrar ajuste</span>
                   </button>
+                  <button type="button" className="btn-outline inventory-movement-quick-btn is-dano" onClick={() => startStockMovement(null, "Daño")}>
+                    <CircleX size={15} strokeWidth={2} aria-hidden="true" />
+                    <span>Registrar daño</span>
+                  </button>
                 </div>
                 <div className="inventory-movements-filters">
+                  <select value={moduloMovimientoFiltro} onChange={e => setModuloMovimientoFiltro(e.target.value)} className="inventory-movement-type-select">
+                    <option value="">Todos los módulos</option>
+                    {MODULES.filter(mod => mod.categoria).map(mod => <option key={mod.key} value={mod.key}>{mod.label}</option>)}
+                  </select>
                   <select value={tipoMovimientoFiltro} onChange={e => setTipoMovimientoFiltro(e.target.value)} className="inventory-movement-type-select">
                     <option value="">Todos los tipos</option>
                     {MOVIMIENTO_TIPO_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}
+                  </select>
+                  <input type="date" value={fechaMovimientoDesde} onChange={e => setFechaMovimientoDesde(e.target.value)} aria-label="Fecha desde" />
+                  <input type="date" value={fechaMovimientoHasta} onChange={e => setFechaMovimientoHasta(e.target.value)} aria-label="Fecha hasta" />
+                  <select value={estadoMovimientoFiltro} onChange={e => setEstadoMovimientoFiltro(e.target.value)} className="inventory-movement-type-select">
+                    <option value="Registrado">Registrados</option>
+                    <option value="">Todos los estados</option>
+                    <option value="Anulado">Anulados</option>
                   </select>
                 </div>
               </div>
@@ -1497,34 +1650,48 @@ export function InventoryPage({
                   <tr>
                     <th>Fecha</th>
                     <th>Producto</th>
+                    <th>Categoría</th>
                     <th>Tipo</th>
                     <th>Cantidad</th>
+                    <th>Unidad</th>
                     <th>Motivo</th>
+                    <th>Referencia</th>
+                    <th>Estado</th>
                     <th>Usuario</th>
+                    <th>Acciones</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {movimientosFiltrados.map(item => (
-                    <tr key={item.movimientoID}>
-                      <td data-label="Fecha">{String(item.fecha || "").replace("T", " ").slice(0, 16)}</td>
-                      <td data-label="Producto">
-                        <div className="inventory-product-cell">
-                          <strong>{item.nombre}</strong>
-                          <span>{item.codigo}</span>
-                        </div>
-                      </td>
-                      <td data-label="Tipo">
-                        <span className={`order-badge ${item.tipoMovimiento === "Entrada" ? "is-entregado" : item.tipoMovimiento === "Salida" ? "is-pendiente" : item.tipoMovimiento === "Pérdida" ? "is-rechazado" : "is-cancelado"}`}>
-                          {item.tipoMovimiento}
-                        </span>
-                      </td>
-                      <td data-label="Cantidad">{Number(item.cantidad || 0)}</td>
-                      <td data-label="Motivo">{item.motivo || "-"}</td>
-                      <td data-label="Usuario">{item.usuarioID || "-"}</td>
-                    </tr>
-                  ))}
+                  {movimientosFiltrados.map(item => {
+                    const movimientoTipo = String(item.tipoMovimiento || "");
+                    const badgeClass = movimientoTipo === "Entrada" || movimientoTipo === "Compra" ? "is-entregado" : movimientoTipo === "Salida" ? "is-pendiente" : movimientoTipo === "Daño" || movimientoTipo === "Pérdida" ? "is-rechazado" : "is-cancelado";
+                    return (
+                      <tr key={item.movimientoID}>
+                        <td data-label="Fecha">{String(item.fecha || "").replace("T", " ").slice(0, 16)}</td>
+                        <td data-label="Producto"><div className="inventory-product-cell"><strong>{item.nombre}</strong><span>{item.codigo}</span></div></td>
+                        <td data-label="Categoría">{item.categoria || "-"}</td>
+                        <td data-label="Tipo"><span className={`order-badge ${badgeClass}`}>{item.tipoMovimiento}</span></td>
+                        <td data-label="Cantidad">{Number(item.cantidad || 0)}</td>
+                        <td data-label="Unidad">{item.unidadMedida || "-"}</td>
+                        <td data-label="Motivo">{item.motivo || "-"}</td>
+                        <td data-label="Referencia">{item.referencia || "-"}</td>
+                        <td data-label="Estado"><span className={`order-badge ${item.estado === "Anulado" ? "is-cancelado" : "is-entregado"}`}>{item.estado || "Registrado"}</span></td>
+                        <td data-label="Usuario">{item.usuarioID || "-"}</td>
+                        <td data-label="Acciones">
+                          <div className="inventory-row-actions">
+                            <button type="button" className="btn-outline inventory-icon-action" title="Imprimir movimiento" onClick={() => descargarMovimientoPdf(item)}>
+                              <Eye size={14} strokeWidth={2} aria-hidden="true" />
+                            </button>
+                            <button type="button" className="btn-outline inventory-icon-action" title="Anular movimiento" disabled={item.estado === "Anulado"} onClick={() => anularMovimiento(item)}>
+                              <CircleX size={14} strokeWidth={2} aria-hidden="true" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
                   {movimientosFiltrados.length === 0 ? (
-                    <tr><td colSpan="6" className="inventory-empty-note">Sin movimientos.</td></tr>
+                    <tr><td colSpan="11" className="inventory-empty-note">Sin movimientos.</td></tr>
                   ) : null}
                 </tbody>
               </table>

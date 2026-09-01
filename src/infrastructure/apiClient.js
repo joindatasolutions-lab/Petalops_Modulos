@@ -425,6 +425,17 @@ export function createApiClient(config) {
       return requestJson(`/inventario?${params.toString()}`);
     },
 
+    async obtenerMetricasInventario({ empresaId, categoria, diasVencimiento = 7 }) {
+      const params = new URLSearchParams();
+      params.set("empresaID", String(empresaId));
+      if (categoria) params.set("categoria", String(categoria));
+      params.set("diasVencimiento", String(diasVencimiento));
+      return requestJson(`/inventario/metricas?${params.toString()}`);
+    },
+
+    async listarCategoriasInventario() {
+      return requestJson("/inventario/categorias");
+    },
     async crearItemInventario(payload) {
       return requestJson("/inventario", {
         method: "POST",
@@ -465,13 +476,62 @@ export function createApiClient(config) {
       });
     },
 
-    async listarMovimientosInventario({ empresaId, inventarioId, tipo, q }) {
+    async registrarCompraInventario(payload) {
+      return requestJson("/inventario/compras", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(payload)
+      });
+    },
+
+    async registrarDanoInventario(payload) {
+      return requestJson("/inventario/danos", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(payload)
+      });
+    },
+
+    async anularMovimientoInventario({ movimientoId, motivo }) {
+      return requestJson(`/inventario/movimientos/${movimientoId}/anular`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ motivo })
+      });
+    },
+
+    async descargarMovimientoInventarioPdf({ movimientoId }) {
+      const response = await authFetch(`/inventario/movimientos/${movimientoId}/pdf`);
+      if (!response.ok) throw await toHttpError(response);
+      return response.blob();
+    },
+    async listarMovimientosInventario({ empresaId, inventarioId, tipo, modulo, fechaDesde, fechaHasta, usuarioId, estado, q }) {
       const params = new URLSearchParams();
       params.set("empresaID", String(empresaId));
       if (inventarioId != null) params.set("inventarioID", String(inventarioId));
       if (tipo) params.set("tipo", String(tipo));
+      if (modulo) params.set("modulo", String(modulo));
+      if (fechaDesde) params.set("fechaDesde", String(fechaDesde));
+      if (fechaHasta) params.set("fechaHasta", String(fechaHasta));
+      if (usuarioId != null) params.set("usuarioID", String(usuarioId));
+      if (estado) params.set("estado", String(estado));
       if (q) params.set("q", String(q));
       return requestJson(`/inventario/movimientos?${params.toString()}`);
+    },
+
+    async obtenerMetricasMovimientosInventario({ empresaId, modulo, fechaDesde, fechaHasta }) {
+      const params = new URLSearchParams();
+      params.set("empresaID", String(empresaId));
+      if (modulo) params.set("modulo", String(modulo));
+      if (fechaDesde) params.set("fechaDesde", String(fechaDesde));
+      if (fechaHasta) params.set("fechaHasta", String(fechaHasta));
+      return requestJson(`/inventario/movimientos/metricas?${params.toString()}`);
     },
 
     async listarProveedoresInventario({ empresaId, q }) {
@@ -603,6 +663,12 @@ export function createApiClient(config) {
 
     async cambiarEstadoPedidoPipeline({ pedidoId, nuevoEstadoId }) {
       return requestJson(`/pedido/${pedidoId}/estado/${nuevoEstadoId}`, {
+        method: "PUT"
+      });
+    },
+
+    async finalizarPedidoRecogidaTienda(pedidoId) {
+      return requestJson(`/pedido/${pedidoId}/finalizar`, {
         method: "PUT"
       });
     },

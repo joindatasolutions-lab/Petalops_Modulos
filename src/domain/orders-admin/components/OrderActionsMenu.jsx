@@ -1,5 +1,5 @@
 import { IconCheck, IconX } from "@tabler/icons-react";
-import { Eye, Mail, MessageCircle, MoreVertical, Receipt } from "lucide-react";
+import { Eye, Mail, MessageCircle, MoreVertical, PackageCheck, Receipt } from "lucide-react";
 
 import { canInvoiceStatus } from "../ordersUiRules.js";
 
@@ -23,6 +23,7 @@ export function OrderActionsMenu({
   canCancelAction,
   canDownloadInvoice,
   canViewMessageCard,
+  canFinalizeAction,
   onToggle,
   onClose,
   onOpenDetail,
@@ -30,6 +31,7 @@ export function OrderActionsMenu({
   onReject,
   onDownloadInvoice,
   onOpenMessageCard,
+  onFinalize,
 }) {
   const closeAndRun = action => {
     onClose();
@@ -66,6 +68,12 @@ export function OrderActionsMenu({
               <IconX size={14} stroke={2.1} />
               <span>Cancelar</span>
             </button>
+            {canFinalizeAction && (
+              <button type="button" role="menuitem" className="is-finish" onClick={() => closeAndRun(() => onFinalize(pedidoId))} title="Finalizar recogida en tienda">
+                <PackageCheck size={14} strokeWidth={2.1} />
+                <span>Finalizar</span>
+              </button>
+            )}
             <a href={`https://wa.me/${waPhone}`} target="_blank" rel="noreferrer" role="menuitem" className="is-whatsapp" onClick={onClose}>
               <MessageCircle size={14} strokeWidth={2} />
               <span>Enviar WhatsApp</span>

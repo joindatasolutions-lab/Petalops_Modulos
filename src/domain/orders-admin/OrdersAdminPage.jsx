@@ -935,6 +935,37 @@ const messageCard = useMessageCardController({
     }
   };
 
+  const finalizeOrder = async pedidoId => {
+    const item = items.find(current => Number(resolveOrderId(current)) === Number(pedidoId));
+    const fallbackNumber = resolveAssignedOrderNumber(null, null, null, item);
+    try {
+      const response = await api.finalizarPedidoRecogidaTienda(pedidoId);
+      clearOrdersCache();
+      const refreshed = await loadOrders(true);
+      await loadTodaySalesSummary();
+      if (Number(selectedPedidoId) === Number(pedidoId)) {
+        await reloadDrawer();
+      }
+      const refreshedItem = (Array.isArray(refreshed?.items) ? refreshed.items : [])
+        .find(current => Number(resolveOrderId(current)) === Number(pedidoId));
+      const orderNumber = resolveAssignedOrderNumber(response, response?.pedido, response?.data, refreshedItem, item) || fallbackNumber;
+      setOrderNotification({
+        tone: "success",
+        title: "Pedido finalizado",
+        message: orderNumber
+          ? `El pedido #${orderNumber} quedo finalizado y ya se vera como entregado en el pipeline.`
+          : "El pedido quedo finalizado y ya se vera como entregado en el pipeline.",
+      });
+    } catch (nextError) {
+      console.error("Error finalizando pedido:", nextError);
+      setOrderNotification({
+        tone: "danger",
+        title: "No se puede finalizar",
+        message: nextError?.detail || nextError?.message || "Para finalizar este pedido, produccion debe estar en estado ParaEntrega.",
+      });
+    }
+  };
+
   const downloadInvoice = async (pedidoId, options = {}) => {
     const { refreshAfter = true } = options;
     if (!pedidoId) {
@@ -1156,6 +1187,16 @@ const openNewOrderModal = () => {
   const onSaveNewOrder = async () => {
     if (newOrderSaving) return;
     setNewOrderError("");
+
+    if (paymentFieldConfig && !String(newOrderForm.metodoPago || "").trim()) {
+      setNewOrderError(`${paymentFieldConfig.titulo || "Metodo de pago"} es obligatorio.`);
+      return;
+    }
+    if (salesChannelFieldConfig && !String(newOrderForm.canalFlora || "").trim()) {
+      setNewOrderError(`${salesChannelFieldConfig.titulo || "Canal de venta"} es obligatorio.`);
+      return;
+    }
+
     setNewOrderSaving(true);
     try {
       const hydratedForm = await hydrateNewOrderClientByPhone(newOrderForm.clienteTelefono);
@@ -1840,6 +1881,7 @@ const ordersOverlayOpen = drawerOpen || newOrderOpen || messageCardOpen || Boole
             openDetail={openDetail}
             approveOrder={approveOrder}
             rejectOrder={rejectOrder}
+            finalizeOrder={finalizeOrder}
             downloadInvoice={downloadInvoice}
             openMessageCard={openMessageCard}
           />
