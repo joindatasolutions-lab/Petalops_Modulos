@@ -7,11 +7,15 @@ import {
   UserFormModel,
   defaultModulesForRoles,
   filterVisibleRoles,
+  normalizeTenantSlug,
   normalizeModuleKey,
   selectedModulesSummary,
   sameStringList,
   syncSelectedModules,
+  validateTenantSlug,
 } from "../usersDomain.js";
+
+const TENANT_S3_CREATE_ERROR_MESSAGE = "No fue posible crear la estructura de archivos del tenant en S3. Intenta nuevamente o contacta soporte.";
 
 export function useUsersManagementController({ session, canViewUsuariosGlobal }) {
   const api = useMemo(() => createApiClient(tenantConfig), []);
@@ -336,10 +340,16 @@ export function useUsersManagementController({ session, canViewUsuariosGlobal })
     event.preventDefault();
     if (!canViewUsuariosGlobal) return;
     const nombreComercial = String(tenantForm.nombreComercial || "").trim();
+    const slug = normalizeTenantSlug(tenantForm.slug);
     const adminLogin = String(tenantForm.adminLogin || "").trim().toLowerCase();
     const adminPassword = String(tenantForm.adminPassword || "");
     if (nombreComercial.length < 3) {
       setError("El nombre comercial del tenant debe tener al menos 3 caracteres.");
+      return;
+    }
+    const slugError = validateTenantSlug(slug);
+    if (slugError) {
+      setError(slugError);
       return;
     }
     if (adminLogin.length < 3 || adminPassword.length < 6) {
@@ -352,7 +362,7 @@ export function useUsersManagementController({ session, canViewUsuariosGlobal })
     try {
       const response = await api.crearEmpresaGestion({
         nombreComercial,
-        slug: tenantForm.slug,
+        slug,
         planID: Number(tenantForm.planID || 1),
         estado: tenantForm.estado || "Activo",
         sucursalNombre: tenantForm.sucursalNombre,
@@ -363,6 +373,7 @@ export function useUsersManagementController({ session, canViewUsuariosGlobal })
       await loadEmpresas();
       await loadEmpresasModuloResumen();
       if (response?.empresaID) setEmpresaID(Number(response.empresaID));
+      const assetsPrefix = String(response?.assetsPrefix || "").trim();
       setTenantForm({
         nombreComercial: "",
         slug: "",
@@ -375,10 +386,13 @@ export function useUsersManagementController({ session, canViewUsuariosGlobal })
       });
       setActivePanel("tenants");
       setShowTenantCreatePanel(false);
-      setInfo(`Tenant ${nombreComercial} creado con admin ${adminLogin}.`);
+      setInfo(assetsPrefix
+        ? `Tenant ${nombreComercial} creado con admin ${adminLogin}. Assets: ${assetsPrefix}`
+        : `Tenant ${nombreComercial} creado con admin ${adminLogin}.`);
     } catch (nextError) {
       console.error("Error creando tenant:", nextError);
-      setError(nextError?.message || "No fue posible crear el tenant.");
+      const isS3CreateError = Number(nextError?.status) === 502 && nextError?.code === "AUTH_EMPRESA_CREATE_S3_ERROR";
+      setError(isS3CreateError ? TENANT_S3_CREATE_ERROR_MESSAGE : (nextError?.message || "No fue posible crear el tenant."));
     } finally {
       setSaving(false);
     }

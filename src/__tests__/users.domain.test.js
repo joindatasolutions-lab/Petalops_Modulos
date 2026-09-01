@@ -4,8 +4,10 @@ import {
   UserFormModel,
   defaultModulesForRoles,
   filterVisibleRoles,
+  normalizeTenantSlug,
   selectedModulesSummary,
   syncSelectedModules,
+  validateTenantSlug,
 } from "../domain/users/usersDomain.js";
 
 describe("dominio de usuarios", () => {
@@ -78,5 +80,15 @@ describe("dominio de usuarios", () => {
       selectedCount: 8,
       hasRole: true,
     })).toBe("Todos los modulos activos");
+  });
+
+  it("normaliza y valida slug de tenant para prefijo de assets", () => {
+    expect(normalizeTenantSlug("  La Fiore Casa de Flores  ")).toBe("la-fiore-casa-de-flores");
+    expect(normalizeTenantSlug("Jardin & Cafe")).toBe("jardin-cafe");
+
+    expect(validateTenantSlug("lafiore")).toBe("");
+    expect(validateTenantSlug("la-fiore")).toBe("");
+    expect(validateTenantSlug("la")).toBe("El slug catalogo debe tener al menos 3 caracteres.");
+    expect(validateTenantSlug("-lafiore")).toBe("El slug catalogo solo puede usar letras minusculas, numeros y guiones, sin guiones al inicio o al final.");
   });
 });
