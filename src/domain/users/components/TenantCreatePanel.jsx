@@ -1,5 +1,7 @@
 import { Building2, KeyRound, Store, UserCog } from "lucide-react";
 
+import { normalizeTenantSlug } from "../usersDomain.js";
+
 export function TenantCreatePanel({ form, setForm, saving, onSubmit }) {
   const update = (field, value) => setForm(current => ({ ...current, [field]: value }));
 
@@ -20,7 +22,17 @@ export function TenantCreatePanel({ form, setForm, saving, onSubmit }) {
         </label>
         <label>
           <span>Slug catalogo</span>
-          <input value={form.slug} onChange={event => update("slug", event.target.value)} placeholder="lafiore" minLength={3} />
+          <input
+            value={form.slug}
+            onChange={event => update("slug", event.target.value)}
+            onBlur={event => update("slug", normalizeTenantSlug(event.target.value))}
+            placeholder="lafiore"
+            required
+            minLength={3}
+            maxLength={63}
+            pattern="[a-z0-9][a-z0-9-]*[a-z0-9]"
+            title="Usa letras minusculas, numeros y guiones; sin guiones al inicio o al final."
+          />
         </label>
         <label>
           <span>Plan</span>
