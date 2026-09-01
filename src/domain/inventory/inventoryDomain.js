@@ -20,10 +20,9 @@ export function isSameMonthAsToday(value) { return String(value || "").slice(0, 
 export function stockLevel(item) {
   const stock = Number(item?.stockActual || 0);
   const minimum = Math.max(Number(item?.stockMinimo || 0), 1);
-  if (stock <= 0) return { key: "critical", label: "Crítico", percent: 8, className: "is-critical" };
-  if (stock <= minimum) return { key: "critical", label: "Crítico", percent: 18, className: "is-critical" };
-  if (stock <= minimum * 2.5) return { key: "medium", label: "Medio", percent: 52, className: "is-medium" };
-  return { key: "healthy", label: "Saludable", percent: 92, className: "is-healthy" };
+  if (stock <= 0) return { key: "out", label: "Sin stock", percent: 8, className: "is-critical", alert: "Bloquear salidas y comprar" };
+  if (stock <= minimum) return { key: "low", label: "Stock bajo", percent: 34, className: "is-medium", alert: "Generar compra" };
+  return { key: "high", label: "Stock alto", percent: 92, className: "is-healthy", alert: "Sin alerta" };
 }
 export function rotationLevel(item) {
   const stock = Number(item?.stockActual || 0);
@@ -55,10 +54,14 @@ export function isExpired(fechaVencimiento) {
   if (!fechaVencimiento) return false;
   return new Date(fechaVencimiento).getTime() < Date.now();
 }
-export function filterInventoryItems(items, { stockFiltro = "", subcategoriaFiltro = "" } = {}) {
+export function filterInventoryItems(items, { stockFiltro = "", subcategoriaFiltro = "", metricFilter = "" } = {}) {
   return (Array.isArray(items) ? items : []).filter(item => {
-    if (stockFiltro && stockLevel(item).key !== stockFiltro) return false;
+    const level = stockLevel(item);
+    if (stockFiltro && level.key !== stockFiltro) return false;
     if (subcategoriaFiltro && String(item.subcategoria || "").toLowerCase() !== subcategoriaFiltro.toLowerCase()) return false;
+    if (metricFilter === "bajoStock" && level.key !== "low") return false;
+    if (metricFilter === "agotados" && level.key !== "out") return false;
+    if (metricFilter === "porVencer" && !(isExpired(item.fechaVencimiento) || isNearExpiry(item.fechaVencimiento))) return false;
     return true;
   });
 }
@@ -68,8 +71,9 @@ export function buildInventoryMetrics(items, movimientos) {
     valorInventario: items.reduce((sum, item) => sum + (Number(item.stockActual || 0) * Number(item.valorUnitario || 0)), 0),
     entradasHoy: movimientos.filter(m => isTodayDate(m.fecha) && normalizeStatus(m.tipoMovimiento) === "ENTRADA").length,
     salidasHoy: movimientos.filter(m => isTodayDate(m.fecha) && normalizeStatus(m.tipoMovimiento) === "SALIDA").length,
-    bajoStock: items.filter(item => normalizeStatus(item?.estadoStock) === "BAJO_STOCK").length,
-    agotados: items.filter(item => normalizeStatus(item?.estadoStock) === "AGOTADO").length,
+    bajoStock: items.filter(item => stockLevel(item).key === "low").length,
+    agotados: items.filter(item => stockLevel(item).key === "out").length,
+    porVencer: items.filter(item => item.fechaVencimiento && (isExpired(item.fechaVencimiento) || isNearExpiry(item.fechaVencimiento))).length,
   };
 }
 export function buildBasesMetrics(items, movimientos, proveedores) {
@@ -77,8 +81,8 @@ export function buildBasesMetrics(items, movimientos, proveedores) {
   const proveedorIdsEnBases = new Set(items.map(item => item.proveedorID).filter(id => id != null));
   return {
     totalBases: items.length,
-    stockBajo: items.filter(item => normalizeStatus(item?.estadoStock) === "BAJO_STOCK").length,
-    agotadas: items.filter(item => normalizeStatus(item?.estadoStock) === "AGOTADO").length,
+    stockBajo: items.filter(item => stockLevel(item).key === "low").length,
+    agotadas: items.filter(item => stockLevel(item).key === "out").length,
     comprasEsteMes: movimientos.filter(mov => normalizeStatus(mov?.tipoMovimiento) === "ENTRADA" && basesInventarioIds.has(mov?.inventarioID) && isSameMonthAsToday(mov?.fecha)).length,
     proveedoresActivos: proveedores.filter(p => proveedorIdsEnBases.has(p.idProveedor) && p.activo).length,
   };
@@ -93,7 +97,7 @@ export function buildCategorySummary(items) {
   return Array.from(byKey.entries()).map(([label, cantidad]) => ({ label, cantidad, percent: Math.round((cantidad / totalStock) * 100) })).sort((a, b) => b.cantidad - a.cantidad).slice(0, 6);
 }
 export function buildCriticalItems(items) {
-  return items.filter(item => ["critical", "medium"].includes(stockLevel(item).key)).sort((a, b) => Number(a.stockActual || 0) - Number(b.stockActual || 0)).slice(0, 5);
+  return items.filter(item => ["out", "low"].includes(stockLevel(item).key)).sort((a, b) => Number(a.stockActual || 0) - Number(b.stockActual || 0)).slice(0, 5);
 }
 export function buildExpiryAlerts(items) {
   return items.filter(item => item.fechaVencimiento && (isExpired(item.fechaVencimiento) || isNearExpiry(item.fechaVencimiento)));

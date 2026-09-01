@@ -85,6 +85,10 @@ export function InventoryPage({
   const [estadoFiltro, setEstadoFiltro] = useState("");
   const [proveedorFiltro, setProveedorFiltro] = useState("");
   const [stockFiltro, setStockFiltro] = useState("");
+  const [metricFilter, setMetricFilter] = useState("");
+  const [detailModalItem, setDetailModalItem] = useState(null);
+  const [editingInventoryId, setEditingInventoryId] = useState(null);
+  const scanGuardRef = useRef({ code: "", at: 0 });
   const [tipoMovimientoFiltro, setTipoMovimientoFiltro] = useState("");
   const [moduloMovimientoFiltro, setModuloMovimientoFiltro] = useState("");
   const [fechaMovimientoDesde, setFechaMovimientoDesde] = useState("");
@@ -130,9 +134,14 @@ export function InventoryPage({
     fechaVencimiento: "",
     evidenciaUrl: "",
     pedidoReferencia: "",
+    codigoEscaneado: "",
+    descuento: "0",
+    impuestos: "0",
+    estadoRecibido: "Bueno",
     observaciones: "",
   }), [displayUserName, moduloConfig]);
   const [stockForm, setStockForm] = useState(initialStockForm);
+  const [purchaseExtraLines, setPurchaseExtraLines] = useState([]);
   const stockItemsForSelector = moduloActivo === "movimientos" ? allItems : items;
   const selectedStockItem = useMemo(() => stockItemsForSelector.find(item => String(item.inventarioID) === String(stockForm.inventarioID)) || null, [stockItemsForSelector, stockForm.inventarioID]);
   const selectedStockModuleKey = useMemo(() => {
@@ -145,19 +154,83 @@ export function InventoryPage({
     if (stockForm.tipoMovimiento === "Ajuste") return MOTIVOS_AJUSTE;
     return [];
   }, [selectedStockModuleKey, stockForm.tipoMovimiento]);
+  const resolveItemByCode = useCallback(code => {
+    const normalized = String(code || "").trim().toLowerCase();
+    if (!normalized) return null;
+    return (stockItemsForSelector.length ? stockItemsForSelector : allItems)
+      .find(item => String(item.codigo || "").trim().toLowerCase() === normalized) || null;
+  }, [allItems, stockItemsForSelector]);
+
+  const buildStockFormForItem = useCallback((item = null, tipoMovimiento = "Compra") => ({
+    ...initialStockForm,
+    inventarioID: item?.inventarioID ? String(item.inventarioID) : "",
+    tipoMovimiento,
+    cantidad: "1",
+    unidad: item?.unidadMedida || initialStockForm.unidad,
+    proveedorID: item?.proveedorID ? String(item.proveedorID) : "",
+    precioUnitario: item?.valorUnitario != null ? String(item.valorUnitario) : "",
+    codigoEscaneado: item?.codigo || "",
+  }), [initialStockForm]);
+
   const startStockMovement = useCallback((item = null, tipoMovimiento = "Compra") => {
     setOpenInventoryMenuId(null);
-    setStockForm({
-      ...initialStockForm,
-      inventarioID: item?.inventarioID ? String(item.inventarioID) : "",
-      tipoMovimiento,
-      cantidad: "1",
-      unidad: item?.unidadMedida || initialStockForm.unidad,
-      proveedorID: item?.proveedorID ? String(item.proveedorID) : "",
-      precioUnitario: item?.valorUnitario != null ? String(item.valorUnitario) : "",
-    });
+    setPurchaseExtraLines([]);
+    setStockForm(buildStockFormForItem(item, tipoMovimiento));
     setVistaActiva("ajustar");
-  }, [initialStockForm]);
+  }, [buildStockFormForItem]);
+
+  const closeStockModal = useCallback(() => {
+    const shouldConfirm = stockForm.inventarioID || stockForm.codigoEscaneado || stockForm.observaciones;
+    if (shouldConfirm && !window.confirm("Hay informacion sin guardar. Deseas descartar y cerrar?")) return;
+    setPurchaseExtraLines([]);
+    setStockForm(initialStockForm);
+    setVistaActiva("lista");
+  }, [initialStockForm, stockForm.codigoEscaneado, stockForm.inventarioID, stockForm.observaciones]);
+
+  const applyScannedCodeToStockForm = useCallback(code => {
+    const normalized = String(code || "").trim();
+    if (!normalized) return;
+    const now = Date.now();
+    if (scanGuardRef.current.code === normalized && now - scanGuardRef.current.at < 900) return;
+    scanGuardRef.current = { code: normalized, at: now };
+    const item = resolveItemByCode(normalized);
+    if (!item) {
+      setError(`No se encontro un item con codigo ${normalized}.`);
+      return;
+    }
+    setError("");
+    setStockForm(current => ({
+      ...current,
+      inventarioID: String(item.inventarioID),
+      codigoEscaneado: item.codigo || normalized,
+      unidad: item.unidadMedida || current.unidad,
+      proveedorID: item.proveedorID ? String(item.proveedorID) : current.proveedorID,
+      precioUnitario: item.valorUnitario != null ? String(item.valorUnitario) : current.precioUnitario,
+    }));
+  }, [resolveItemByCode]);
+
+
+  const addPurchaseLine = useCallback(() => {
+    setPurchaseExtraLines(current => [
+      ...current,
+      {
+        id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+        inventarioID: "",
+        cantidad: "1",
+        unidad: initialStockForm.unidad,
+        precioUnitario: "",
+        fechaVencimiento: "",
+      },
+    ]);
+  }, [initialStockForm.unidad]);
+
+  const updatePurchaseLine = useCallback((lineId, changes) => {
+    setPurchaseExtraLines(current => current.map(line => (line.id === lineId ? { ...line, ...changes } : line)));
+  }, []);
+
+  const removePurchaseLine = useCallback(lineId => {
+    setPurchaseExtraLines(current => current.filter(line => line.id !== lineId));
+  }, []);
   const initialRecetaForm = {
     nombre: "",
     descripcion: "",
@@ -193,6 +266,7 @@ export function InventoryPage({
     setEstadoFiltro("");
     setProveedorFiltro("");
     setStockFiltro("");
+    setMetricFilter("");
     setTipoMovimientoFiltro("");
     setError("");
     setInfo("");
@@ -224,7 +298,7 @@ export function InventoryPage({
 
   const basesMetrics = useMemo(() => buildBasesMetrics(items, movimientos, proveedores), [items, movimientos, proveedores]);
 
-  const visibleItems = useMemo(() => filterInventoryItems(items, { stockFiltro, subcategoriaFiltro }), [items, stockFiltro, subcategoriaFiltro]);
+  const visibleItems = useMemo(() => filterInventoryItems(items, { stockFiltro, subcategoriaFiltro, metricFilter }), [items, metricFilter, stockFiltro, subcategoriaFiltro]);
 
   const categorySummary = useMemo(() => buildCategorySummary(items), [items]);
 
@@ -400,11 +474,17 @@ export function InventoryPage({
     setError("");
     setInfo("");
     try {
-      await api.crearItemInventario(buildCreateItemPayload(createForm, empresaId, moduloActivo));
+      if (editingInventoryId) {
+        const { stockActual, activo, ...payload } = buildCreateItemPayload(createForm, empresaId, moduloActivo);
+        await api.actualizarItemInventario({ inventarioId: editingInventoryId, payload });
+      } else {
+        await api.crearItemInventario(buildCreateItemPayload(createForm, empresaId, moduloActivo));
+      }
+      setEditingInventoryId(null);
       setCreateForm(initialCreateForm);
       await loadInventario();
       await loadMovimientos();
-      setInfo("Item creado correctamente.");
+      setInfo(editingInventoryId ? "Item actualizado correctamente." : "Item creado correctamente.");
       setVistaActiva("lista");
     } catch (nextError) {
       setError(nextError?.message || "No fue posible crear item.");
@@ -473,18 +553,40 @@ export function InventoryPage({
     setInfo("");
     try {
       if (stockForm.tipoMovimiento === "Compra") {
-        await api.registrarCompraInventario({
-          inventarioID: Number(stockForm.inventarioID),
-          cantidad,
+        const commonPurchasePayload = {
           fecha: fechaMovimiento,
           proveedorID: stockForm.proveedorID ? Number(stockForm.proveedorID) : null,
           numeroFactura: String(stockForm.numeroFactura || "").trim() || null,
           responsable: String(stockForm.responsable || "").trim() || null,
-          unidad: String(stockForm.unidad || selectedStockItem?.unidadMedida || "").trim() || null,
-          precioUnitario: stockForm.precioUnitario !== "" ? Number(stockForm.precioUnitario) : null,
-          fechaVencimiento: stockForm.fechaVencimiento || null,
+          estadoRecibido: String(stockForm.estadoRecibido || "").trim() || null,
           observaciones: String(stockForm.observaciones || "").trim() || null,
-        });
+        };
+        const purchaseLines = [
+          {
+            inventarioID: Number(stockForm.inventarioID),
+            cantidad,
+            unidad: String(stockForm.unidad || selectedStockItem?.unidadMedida || "").trim() || null,
+            precioUnitario: stockForm.precioUnitario !== "" ? Number(stockForm.precioUnitario) : null,
+            fechaVencimiento: stockForm.fechaVencimiento || null,
+          },
+          ...purchaseExtraLines.map(line => {
+            const lineItem = stockItemsForSelector.find(item => String(item.inventarioID) === String(line.inventarioID));
+            return {
+              inventarioID: Number(line.inventarioID),
+              cantidad: Number(line.cantidad || 0),
+              unidad: String(line.unidad || lineItem?.unidadMedida || "").trim() || null,
+              precioUnitario: line.precioUnitario !== "" ? Number(line.precioUnitario) : null,
+              fechaVencimiento: line.fechaVencimiento || null,
+            };
+          }),
+        ];
+        if (purchaseLines.some(line => !line.inventarioID || line.cantidad <= 0)) {
+          setError("Cada flor de la compra debe tener item y cantidad mayor a cero.");
+          return;
+        }
+        for (const line of purchaseLines) {
+          await api.registrarCompraInventario({ ...commonPurchasePayload, ...line });
+        }
       } else if (stockForm.tipoMovimiento === "Daño" || stockForm.tipoMovimiento === "Pérdida") {
         await api.registrarDanoInventario({
           inventarioID: Number(stockForm.inventarioID),
@@ -508,6 +610,7 @@ export function InventoryPage({
           },
         });
       }
+      setPurchaseExtraLines([]);
       setStockForm(initialStockForm);
       if (moduloActivo === "movimientos") {
         await loadAllItems();
@@ -524,6 +627,29 @@ export function InventoryPage({
     } finally {
       setSavingStock(false);
     }
+  };
+
+  const openEditInventory = item => {
+    setOpenInventoryMenuId(null);
+    setEditingInventoryId(item.inventarioID);
+    setCreateForm({
+      codigo: item.codigo || "",
+      nombre: item.nombre || "",
+      categoria: item.categoria || moduloConfig?.categoria || "Flores",
+      subcategoria: item.subcategoria || "",
+      color: item.color || "",
+      descripcion: item.descripcion || "",
+      tamano: item.tamano || "",
+      unidadMedida: item.unidadMedida || moduloConfig?.unidades?.[0] || "Unidad",
+      fechaVencimiento: item.fechaVencimiento ? String(item.fechaVencimiento).slice(0, 10) : "",
+      marca: item.marca || "",
+      precioVenta: item.precioVenta != null ? String(item.precioVenta) : "0",
+      proveedorID: item.proveedorID ? String(item.proveedorID) : "",
+      stockActual: item.stockActual != null ? String(item.stockActual) : "0",
+      stockMinimo: item.stockMinimo != null ? String(item.stockMinimo) : "0",
+      valorUnitario: item.valorUnitario != null ? String(item.valorUnitario) : "0",
+    });
+    setVistaActiva("crear");
   };
 
   const toggleActivo = async item => {
@@ -718,6 +844,14 @@ export function InventoryPage({
                   <span>Cancelar</span>
                 </button>
               ) : null}
+              {moduloConfig?.categoria && vistaActiva === "lista" ? (
+                <>
+                  <button type="button" className="btn-outline inventory-header-action" onClick={() => startStockMovement(null, "Compra")}><Truck size={18} strokeWidth={2} aria-hidden="true" /><span>Registrar compra</span></button>
+                  <button type="button" className="btn-outline inventory-header-action" onClick={() => startStockMovement(null, "Salida")}><ArrowUpFromLine size={18} strokeWidth={2} aria-hidden="true" /><span>Registrar salida</span></button>
+                  <button type="button" className="btn-outline inventory-header-action" onClick={() => startStockMovement(null, "Daño")}><CircleX size={18} strokeWidth={2} aria-hidden="true" /><span>Registrar daño</span></button>
+                  <button type="button" className="btn-outline inventory-header-action" onClick={() => startStockMovement(null, "Ajuste")}><RotateCcw size={18} strokeWidth={2} aria-hidden="true" /><span>Ajustar stock</span></button>
+                </>
+              ) : null}
               <button type="button" className="btn-primary inventory-refresh-btn" onClick={refreshAll}>
                 <RefreshCw size={18} strokeWidth={2} aria-hidden="true" />
                 <span>Actualizar</span>
@@ -774,16 +908,23 @@ export function InventoryPage({
                 <strong>{inventoryMetrics.salidasHoy}</strong>
                 <span>Salidas hoy</span>
               </article>
-              <article className="orders-header-metric-card is-blue">
+              <button type="button" className={`orders-header-metric-card is-blue is-clickable${metricFilter === "bajoStock" ? " is-active" : ""}`} onClick={() => inventoryMetrics.bajoStock > 0 && setMetricFilter(metricFilter === "bajoStock" ? "" : "bajoStock")} disabled={inventoryMetrics.bajoStock <= 0}>
                 <span className="orders-header-metric-icon" aria-hidden="true"><TriangleAlert size={18} strokeWidth={2} /></span>
                 <strong>{inventoryMetrics.bajoStock}</strong>
-                <span>Bajo stock</span>
-              </article>
-              <article className="orders-header-metric-card is-orange">
+                <span>Stock bajo</span>
+              </button>
+              <button type="button" className={`orders-header-metric-card is-orange is-clickable${metricFilter === "agotados" ? " is-active" : ""}`} onClick={() => inventoryMetrics.agotados > 0 && setMetricFilter(metricFilter === "agotados" ? "" : "agotados")} disabled={inventoryMetrics.agotados <= 0}>
                 <span className="orders-header-metric-icon" aria-hidden="true"><CircleX size={18} strokeWidth={2} /></span>
                 <strong>{inventoryMetrics.agotados}</strong>
-                <span>Agotados</span>
-              </article>
+                <span>Sin stock</span>
+              </button>
+              {moduloActivo === "flores" ? (
+                <button type="button" className={`orders-header-metric-card is-pink is-clickable${metricFilter === "porVencer" ? " is-active" : ""}`} onClick={() => inventoryMetrics.porVencer > 0 && setMetricFilter(metricFilter === "porVencer" ? "" : "porVencer")} disabled={inventoryMetrics.porVencer <= 0}>
+                  <span className="orders-header-metric-icon" aria-hidden="true"><TriangleAlert size={18} strokeWidth={2} /></span>
+                  <strong>{inventoryMetrics.porVencer}</strong>
+                  <span>Por vencer</span>
+                </button>
+              ) : null}
             </div>
           )}
         </header>
@@ -861,9 +1002,9 @@ export function InventoryPage({
                   <SlidersHorizontal size={17} strokeWidth={2} />
                   <select value={stockFiltro} onChange={e => setStockFiltro(e.target.value)}>
                     <option value="">Todos</option>
-                    <option value="healthy">Saludable</option>
-                    <option value="medium">Medio</option>
-                    <option value="critical">Crítico</option>
+                    <option value="high">Stock alto</option>
+                    <option value="low">Stock bajo</option>
+                    <option value="out">Sin stock</option>
                   </select>
                 </div>
               </div>
@@ -878,8 +1019,8 @@ export function InventoryPage({
                       <tr>
                         <th>Código</th>
                         <th>{(moduloActivo === "bases" || moduloActivo === "materiales") ? "Producto" : "Nombre"}</th>
-                        {moduloActivo !== "flores" ? <th>Categoría</th> : null}
-                        {moduloActivo === "materiales" ? <th>Subcategoría</th> : null}
+                        <th>Categoría</th>
+                        <th>Subcategoría</th>
                         {(moduloActivo === "bases" || moduloActivo === "materiales") ? <th>Tamaño</th> : null}
                         {moduloActivo !== "adicionales" ? <th>Color</th> : null}
                         {moduloActivo === "adicionales" ? <th>Marca</th> : null}
@@ -910,12 +1051,8 @@ export function InventoryPage({
                                 {item.subcategoria ? <span className="inventory-subcategoria-badge">{item.subcategoria}</span> : null}
                               </div>
                             </td>
-                            {moduloActivo !== "flores" ? (
-                              <td data-label="Categoría">{item.subcategoria || item.categoria || "-"}</td>
-                            ) : null}
-                            {moduloActivo === "materiales" ? (
-                              <td data-label="Subcategoría">{item.descripcion || "-"}</td>
-                            ) : null}
+                            <td data-label="Categoría">{item.categoria || "-"}</td>
+                            <td data-label="Subcategoría">{item.subcategoria || "-"}</td>
                             {(moduloActivo === "bases" || moduloActivo === "materiales") ? (
                               <td data-label="Tamaño">{item.tamano || "-"}</td>
                             ) : null}
@@ -975,8 +1112,8 @@ export function InventoryPage({
                                   <EllipsisVertical size={18} strokeWidth={2} />
                                 </summary>
                                 <div className="inventory-row-menu-panel">
-                                  <button type="button" onClick={() => { setOpenInventoryMenuId(null); setInfo(`${item.nombre} | Código: ${item.codigo} | Cat: ${item.categoria}${item.subcategoria ? ` / ${item.subcategoria}` : ""}`); }}><Eye size={15} strokeWidth={2} /> Ver detalle</button>
-                                  <button type="button" onClick={() => { setOpenInventoryMenuId(null); setInfo(`Edición próximamente: ${item.nombre}`); }}><Pencil size={15} strokeWidth={2} /> Editar</button>
+                                  <button type="button" onClick={() => { setOpenInventoryMenuId(null); setDetailModalItem(item); }}><Eye size={15} strokeWidth={2} /> Ver detalle</button>
+                                  <button type="button" onClick={() => openEditInventory(item)}><Pencil size={15} strokeWidth={2} /> Editar</button>
                                   <button type="button" onClick={() => startStockMovement(item, "Compra")}><Truck size={15} strokeWidth={2} /> Registrar compra</button>
                                   <button type="button" onClick={() => startStockMovement(item, "Salida")}><ArrowUpFromLine size={15} strokeWidth={2} /> Registrar salida</button>
                                   <button type="button" onClick={() => startStockMovement(item, "Daño")}><CircleX size={15} strokeWidth={2} /> Registrar daño</button>
@@ -1110,7 +1247,7 @@ export function InventoryPage({
         {moduloConfig?.categoria && vistaActiva === "crear" ? (
           <section className="inventory-grid-layout inventory-single-layout">
             <article className="order-block inventory-panel inventory-form-panel">
-              <h4><PackagePlus size={18} strokeWidth={2} /> Nuevo {moduloLabel === "Flores" ? "Flor / Follaje" : moduloLabel}</h4>
+              <h4><PackagePlus size={18} strokeWidth={2} /> {editingInventoryId ? "Editar" : "Nuevo"} {moduloLabel === "Flores" ? "Flor / Follaje" : moduloLabel}</h4>
               <form className="users-create-form" onSubmit={submitCreate}>
                 <div className="inventory-two-cols">
                   <label className="inventory-field">
@@ -1206,8 +1343,8 @@ export function InventoryPage({
                   ) : null}
                 </div>
                 <div className="order-actions">
-                  <button type="submit" className="btn-primary" disabled={creating}>{creating ? "Guardando..." : `Crear ${moduloLabel}`}</button>
-                  <button type="button" className="btn-outline" onClick={() => setVistaActiva("lista")} disabled={creating}>Cancelar</button>
+                  <button type="submit" className="btn-primary" disabled={creating}>{creating ? "Guardando..." : editingInventoryId ? "Guardar cambios" : `Crear ${moduloLabel}`}</button>
+                  <button type="button" className="btn-outline" onClick={() => { setEditingInventoryId(null); setVistaActiva("lista"); }} disabled={creating}>Cancelar</button>
                 </div>
               </form>
             </article>
@@ -1216,10 +1353,21 @@ export function InventoryPage({
 
         {/* ════════ VISTA AJUSTAR STOCK / REGISTRAR MOVIMIENTO ════════ */}
         {(moduloConfig?.categoria || moduloActivo === "movimientos") && vistaActiva === "ajustar" ? (
-          <section className="inventory-grid-layout inventory-single-layout">
+          <div className="inventory-provider-modal-overlay inventory-movement-modal-overlay" role="dialog" aria-modal="true">
+          <section className="inventory-grid-layout inventory-single-layout inventory-movement-modal">
             <article className="order-block inventory-panel inventory-form-panel">
-              <h4>{stockForm.tipoMovimiento === "Compra" ? "Registrar compra" : stockForm.tipoMovimiento === "Daño" ? "Registrar daño" : stockForm.tipoMovimiento === "Salida" ? "Registrar salida" : stockForm.tipoMovimiento === "Ajuste" ? "Ajustar stock" : "Registrar movimiento"}</h4>
+              <div className="inventory-provider-modal-head"><h4>{stockForm.tipoMovimiento === "Compra" ? "Registrar compra" : stockForm.tipoMovimiento === "Daño" ? "Registrar daño" : stockForm.tipoMovimiento === "Salida" ? "Registrar salida" : stockForm.tipoMovimiento === "Ajuste" ? "Ajustar stock" : "Registrar movimiento"}</h4><button type="button" className="btn-outline inventory-provider-modal-close" onClick={closeStockModal} aria-label="Cerrar"><X size={18} strokeWidth={2.2} /></button></div>
               <form className="users-create-form inventory-movement-form" onSubmit={submitStock}>
+                <section className="inventory-movement-section inventory-field-wide">
+                  <h5><ShoppingCart size={16} strokeWidth={2.2} /> Información de la Compra</h5>
+                  <div className="inventory-two-cols">
+                        <label className="inventory-field"><span>Proveedor *</span><select value={stockForm.proveedorID} onChange={e => setStockForm(f => ({ ...f, proveedorID: e.target.value }))} required={stockForm.tipoMovimiento === "Compra"}><option value="">Selecciona proveedor</option>{proveedores.map(proveedor => <option key={proveedor.idProveedor} value={proveedor.idProveedor}>{proveedor.codigoProveedor ? `${proveedor.codigoProveedor} - ` : ""}{proveedor.nombre}</option>)}</select></label>
+                    <label className="inventory-field"><span>Número de factura</span><input value={stockForm.numeroFactura} onChange={e => setStockForm(f => ({ ...f, numeroFactura: e.target.value }))} /></label>
+                      </div>
+                </section>
+                <section className="inventory-movement-section inventory-field-wide">
+                  <h5><Flower2 size={16} strokeWidth={2.2} /> Detalle del movimiento</h5>
+                  <label className="inventory-field inventory-field-wide"><span>Código</span><input value={stockForm.codigoEscaneado} onChange={e => setStockForm(f => ({ ...f, codigoEscaneado: e.target.value }))} onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); applyScannedCodeToStockForm(stockForm.codigoEscaneado); } }} onBlur={() => stockForm.codigoEscaneado && applyScannedCodeToStockForm(stockForm.codigoEscaneado)} placeholder="Escanea o escribe el codigo" /></label>
                 <label className="inventory-field inventory-field-wide">
                   <span>Insumo</span>
                   <select value={stockForm.inventarioID} onChange={e => setStockForm(f => {
@@ -1251,14 +1399,41 @@ export function InventoryPage({
                 )}
                 {stockForm.tipoMovimiento === "Compra" ? (
                   <>
-                    <label className="inventory-field"><span>Proveedor</span><select value={stockForm.proveedorID} onChange={e => setStockForm(f => ({ ...f, proveedorID: e.target.value }))}><option value="">Sin proveedor</option>{proveedores.map(proveedor => <option key={proveedor.idProveedor} value={proveedor.idProveedor}>{proveedor.codigoProveedor ? `${proveedor.codigoProveedor} - ` : ""}{proveedor.nombre}</option>)}</select></label>
-                    <label className="inventory-field"><span>Factura</span><input value={stockForm.numeroFactura} onChange={e => setStockForm(f => ({ ...f, numeroFactura: e.target.value }))} /></label>
                     <label className="inventory-field"><span>Precio unitario</span><input type="number" min="0" step="0.01" value={stockForm.precioUnitario} onChange={e => setStockForm(f => ({ ...f, precioUnitario: e.target.value }))} /></label>
+                    <label className="inventory-field"><span>Precio total</span><input value={formatearCOP(Number(stockForm.cantidad || 0) * Number(stockForm.precioUnitario || 0))} readOnly /></label>
+                    <label className="inventory-field"><span>Estado recibido</span><select value={stockForm.estadoRecibido} onChange={e => setStockForm(f => ({ ...f, estadoRecibido: e.target.value }))}><option>Bueno</option><option>Regular</option><option>Malo</option></select></label>
                     <label className="inventory-field"><span>Vencimiento</span><input type="date" value={stockForm.fechaVencimiento} onChange={e => setStockForm(f => ({ ...f, fechaVencimiento: e.target.value }))} /></label>
+                    {purchaseExtraLines.map((line, lineIndex) => {
+                      const lineItem = stockItemsForSelector.find(option => String(option.inventarioID) === String(line.inventarioID));
+                      return (
+                        <div key={line.id} className="inventory-purchase-line inventory-field-wide">
+                          <div className="inventory-purchase-line-head">
+                            <strong>Flor adicional {lineIndex + 1}</strong>
+                            <button type="button" className="btn-outline inventory-provider-modal-close" onClick={() => removePurchaseLine(line.id)} aria-label="Quitar flor"><X size={15} strokeWidth={2.2} /></button>
+                          </div>
+                          <div className="inventory-two-cols">
+                            <label className="inventory-field"><span>Flor *</span><select value={line.inventarioID} onChange={e => {
+                              const item = stockItemsForSelector.find(option => String(option.inventarioID) === String(e.target.value));
+                              updatePurchaseLine(line.id, {
+                                inventarioID: e.target.value,
+                                unidad: item?.unidadMedida || line.unidad,
+                                precioUnitario: item?.valorUnitario != null ? String(item.valorUnitario) : line.precioUnitario,
+                              });
+                            }} required><option value="">Selecciona item</option>{stockItemsForSelector.map(option => <option key={option.inventarioID} value={option.inventarioID}>{option.codigo} - {option.nombre}</option>)}</select></label>
+                            <label className="inventory-field"><span>Cantidad *</span><input type="number" min="0.01" step="0.01" value={line.cantidad} onChange={e => updatePurchaseLine(line.id, { cantidad: e.target.value })} required /></label>
+                            <label className="inventory-field"><span>Unidad</span><input value={line.unidad} onChange={e => updatePurchaseLine(line.id, { unidad: e.target.value })} /></label>
+                            <label className="inventory-field"><span>Precio unitario</span><input type="number" min="0" step="0.01" value={line.precioUnitario} onChange={e => updatePurchaseLine(line.id, { precioUnitario: e.target.value })} /></label>
+                            <label className="inventory-field"><span>Precio total</span><input value={formatearCOP(Number(line.cantidad || 0) * Number(line.precioUnitario || 0))} readOnly /></label>
+                            <label className="inventory-field"><span>Vencimiento</span><input type="date" value={line.fechaVencimiento} onChange={e => updatePurchaseLine(line.id, { fechaVencimiento: e.target.value })} /></label>
+                          </div>
+                        </div>
+                      );
+                    })}
+                    <button type="button" className="btn-outline inventory-add-purchase-line inventory-field-wide" onClick={addPurchaseLine}>Agregar otra flor</button>
                   </>
                 ) : null}
                 {currentMovementMotivos.length ? (
-                  <label className="inventory-field"><span>Motivo</span><select value={stockForm.motivo} onChange={e => setStockForm(f => ({ ...f, motivo: e.target.value }))} required><option value="">Selecciona motivo</option>{currentMovementMotivos.map(motivo => <option key={motivo} value={motivo}>{motivo}</option>)}</select></label>
+                  <section className="inventory-movement-section inventory-field-wide"><h5><Tag size={16} strokeWidth={2.2} /> Motivo</h5><div className="inventory-reason-grid">{currentMovementMotivos.map(motivo => <button key={motivo} type="button" className={`inventory-reason-chip${stockForm.motivo === motivo ? " is-selected" : ""}`} onClick={() => setStockForm(f => ({ ...f, motivo }))}>{motivo}</button>)}</div></section>
                 ) : null}
                 {(stockForm.tipoMovimiento === "Daño" || stockForm.tipoMovimiento === "Pérdida") ? (
                   <>
@@ -1266,16 +1441,30 @@ export function InventoryPage({
                     <label className="inventory-field"><span>Pedido/ref.</span><input value={stockForm.pedidoReferencia} onChange={e => setStockForm(f => ({ ...f, pedidoReferencia: e.target.value }))} /></label>
                   </>
                 ) : null}
-                <label className="inventory-field inventory-field-wide"><span>Observaciones</span><textarea className="inventory-textarea" placeholder="Detalle del movimiento" value={stockForm.observaciones} onChange={e => setStockForm(f => ({ ...f, observaciones: e.target.value }))} /></label>
-                <div className="order-actions inventory-field-wide"><button type="submit" className="btn-primary" disabled={savingStock}>{savingStock ? "Aplicando..." : "Guardar movimiento"}</button><button type="button" className="btn-outline" onClick={() => { setStockForm(initialStockForm); setVistaActiva("lista"); }}>Cancelar</button></div>
+                <label className="inventory-field inventory-field-wide"><span>Observaciones</span><textarea className="inventory-textarea" placeholder="Detalle del movimiento" value={stockForm.observaciones} onChange={e => setStockForm(f => ({ ...f, observaciones: e.target.value }))} /></label></section>
+                {stockForm.tipoMovimiento === "Compra" ? <section className="inventory-movement-section inventory-purchase-summary"><h5><Calculator size={16} strokeWidth={2.2} /> Resumen de compra</h5><div><span>Subtotal</span><strong>${formatearCOP(Number(stockForm.cantidad || 0) * Number(stockForm.precioUnitario || 0) + purchaseExtraLines.reduce((sum, line) => sum + (Number(line.cantidad || 0) * Number(line.precioUnitario || 0)), 0))}</strong></div><label><span>Descuento</span><input type="number" min="0" step="0.01" value={stockForm.descuento} onChange={e => setStockForm(f => ({ ...f, descuento: e.target.value }))} /></label><label><span>Impuestos</span><input type="number" min="0" step="0.01" value={stockForm.impuestos} onChange={e => setStockForm(f => ({ ...f, impuestos: e.target.value }))} /></label><div className="is-total"><span>Total a pagar</span><strong>${formatearCOP(Math.max(0, Number(stockForm.cantidad || 0) * Number(stockForm.precioUnitario || 0) + purchaseExtraLines.reduce((sum, line) => sum + (Number(line.cantidad || 0) * Number(line.precioUnitario || 0)), 0) - Number(stockForm.descuento || 0) + Number(stockForm.impuestos || 0)))}</strong></div></section> : null}
+                <div className="order-actions inventory-field-wide"><button type="button" className="btn-outline" onClick={closeStockModal}>Cancelar</button><button type="submit" className="btn-primary" disabled={savingStock}>{savingStock ? "Aplicando..." : stockForm.tipoMovimiento === "Compra" ? "Registrar Compra" : stockForm.tipoMovimiento === "Daño" ? "Registrar Daño" : "Guardar movimiento"}</button></div>
               </form>
             </article>
           </section>
+          </div>
         ) : null}
 
         {/* ════════════════════════════
             MÓDULO: ARREGLOS / RECETAS
         ════════════════════════════ */}
+        {detailModalItem ? (
+          <div className="inventory-provider-modal-overlay" role="dialog" aria-modal="true">
+            <article className="inventory-provider-modal inventory-detail-modal">
+              <div className="inventory-provider-modal-head"><h4>{detailModalItem.nombre}</h4><button type="button" className="btn-outline inventory-provider-modal-close" onClick={() => setDetailModalItem(null)} aria-label="Cerrar"><X size={18} strokeWidth={2.2} /></button></div>
+              <div className="inventory-detail-grid">
+                <span>Código<strong>{detailModalItem.codigo}</strong></span><span>Categoría<strong>{detailModalItem.categoria || "-"}</strong></span><span>Subcategoría<strong>{detailModalItem.subcategoria || "-"}</strong></span><span>Stock<strong>{Number(detailModalItem.stockActual || 0)} {detailModalItem.unidadMedida || ""}</strong></span><span>Estado<strong>{detailModalItem.estadoStock || "-"}</strong></span><span>Proveedor<strong>{detailModalItem.proveedor || "-"}</strong></span><span>Vence<strong>{detailModalItem.fechaVencimiento ? String(detailModalItem.fechaVencimiento).slice(0, 10) : "-"}</strong></span><span>Valor<strong>${formatearCOP(detailModalItem.valorUnitario || 0)}</strong></span>
+              </div>
+            </article>
+          </div>
+        ) : null}
+
+
         {moduloActivo === "arreglos" && vistaActiva === "lista" ? (
           <section className="inventory-grid-layout inventory-arreglos-layout">
             <article className="orders-table-wrap users-table-wrap users-table-panel inventory-arreglos-panel">
