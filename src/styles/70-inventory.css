@@ -2261,6 +2261,28 @@
   }
 }
 
+.inventory-page-view .inventory-row-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.inventory-page-view .inventory-icon-action {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+}
+
+.inventory-page-view .inventory-icon-action:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
 @media (max-width: 640px) {
   .inventory-page-view .orders-header-metrics.inventory-header-metrics {
     grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
@@ -3253,5 +3275,50 @@
   .orders-admin-view.orders-page-view .orders-mobile-card-actions .order-actions-popover button:hover,
   .orders-admin-view.orders-page-view .orders-mobile-card-actions .order-actions-popover a:hover {
     background: #f8fafc !important;
+  }
+}
+
+.inventory-movement-form {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 14px;
+  align-items: start;
+}
+
+.inventory-movement-form .inventory-field-wide {
+  grid-column: 1 / -1;
+}
+
+.inventory-movements-filters {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+  width: min(100%, 920px);
+}
+
+.inventory-movements-filters input,
+.inventory-movements-filters select {
+  min-height: 38px;
+  width: 100%;
+  border: 1px solid #d8e1ee;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #1f2937;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  padding: 0 10px;
+}
+
+.inventory-movement-quick-btn.is-dano {
+  border-color: #fecaca;
+  color: #b42318;
+  background: #fff7f7;
+}
+
+@media (max-width: 720px) {
+  .inventory-movement-form,
+  .inventory-movements-filters {
+    grid-template-columns: 1fr;
   }
 }

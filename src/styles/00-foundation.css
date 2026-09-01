@@ -2280,6 +2280,46 @@ select:focus {
   font-size: 13px;
 }
 
+
+.order-detail-edit-payment-grid.compact .order-detail-edit-money-field,
+.order-detail-edit-payment-grid.compact .order-detail-edit-note-field,
+.order-detail-edit-payment-grid.compact .order-detail-edit-financial-preview {
+  grid-column: 1 / -1;
+}
+
+.order-detail-edit-payment-grid.compact .order-detail-edit-money-field {
+  max-width: 220px;
+}
+
+.order-detail-edit-payment-grid.compact .order-detail-edit-note-field textarea {
+  min-height: 72px;
+}
+
+.order-detail-edit-financial-preview {
+  grid-template-columns: repeat(2, minmax(170px, 1fr));
+  gap: 8px 14px;
+  padding: 14px 16px;
+  width: 100%;
+}
+
+.order-detail-edit-financial-preview > span {
+  min-width: 0;
+}
+
+.order-detail-edit-financial-preview > span.is-total {
+  grid-column: 1 / -1;
+}
+
+@media (max-width: 560px) {
+  .order-detail-edit-financial-preview {
+    grid-template-columns: 1fr;
+  }
+
+  .order-detail-edit-payment-grid.compact .order-detail-edit-money-field {
+    max-width: none;
+  }
+}
+
 .order-detail-edit-delivery-summary {
   margin-top: -2px;
 }

@@ -620,7 +620,7 @@ export function OrderDetailPaymentSection({
           ) : null}
 
           <div className="order-detail-edit-payment-grid compact">
-            <label className="order-detail-edit-label">
+            <label className="order-detail-edit-label order-detail-edit-money-field">
               Descuento
               <input
                 type="text"
@@ -632,7 +632,7 @@ export function OrderDetailPaymentSection({
                 placeholder="0"
               />
             </label>
-            <label className="order-detail-edit-label">
+            <label className="order-detail-edit-label order-detail-edit-note-field">
               Nota descuento
               <textarea
                 rows={2}
@@ -641,7 +641,7 @@ export function OrderDetailPaymentSection({
                 placeholder="Razon del descuento"
               />
             </label>
-            <label className="order-detail-edit-label">
+            <label className="order-detail-edit-label order-detail-edit-money-field">
               Saldo a favor
               <input
                 type="text"
@@ -653,7 +653,7 @@ export function OrderDetailPaymentSection({
                 placeholder="0"
               />
             </label>
-            <label className="order-detail-edit-label">
+            <label className="order-detail-edit-label order-detail-edit-note-field">
               Nota saldo a favor
               <textarea
                 rows={2}
@@ -662,7 +662,7 @@ export function OrderDetailPaymentSection({
                 placeholder="Razon del saldo a favor"
               />
             </label>
-            <FinancialPreviewSummary financialPreview={financialPreview} />
+            <FinancialPreviewSummary financialPreview={financialPreview} className="order-detail-edit-financial-preview" />
           </div>
         </div>
       ) : null}

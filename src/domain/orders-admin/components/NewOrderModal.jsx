@@ -361,21 +361,44 @@ export function NewOrderModal({
               </section>
 
               <section className="orders-new-order-section">
+                <h3>Pago</h3>
+                <div className="order-detail-edit-grid">
+                  {paymentFieldConfig ? (
+                    <label className="order-detail-edit-label">
+                      {paymentFieldConfig.titulo || "Metodo de pago"}
+                      <select
+                        required
+                        value={newOrderForm.metodoPago}
+                        onChange={event => updateNewOrderForm("metodoPago", event.target.value)}
+                      >
+                        <option value="">Seleccionar</option>
+                        {(Array.isArray(paymentFieldOptions) ? paymentFieldOptions : []).map(option => <option key={option} value={option}>{option}</option>)}
+                      </select>
+                    </label>
+                  ) : null}
+                  {salesChannelFieldConfig ? (
+                    <label className="order-detail-edit-label">
+                      {salesChannelFieldConfig.titulo || "Canal de venta"}
+                      <select
+                        required
+                        value={newOrderForm.canalFlora}
+                        onChange={event => updateNewOrderForm("canalFlora", event.target.value)}
+                      >
+                        <option value="">Seleccionar</option>
+                        {(Array.isArray(salesChannelFieldConfig.opciones) ? salesChannelFieldConfig.opciones : []).map(option => <option key={option} value={option}>{option}</option>)}
+                      </select>
+                    </label>
+                  ) : null}
+                </div>
+              </section>
+
+              <section className="orders-new-order-section">
                 <h3>Mensaje</h3>
                 <div className="order-detail-edit-grid">
                   <label className="order-detail-edit-label">
                     Firma
                     <input type="text" value={newOrderForm.firma} onChange={event => updateNewOrderForm("firma", event.target.value)} placeholder="De parte de..." />
                   </label>
-                  {salesChannelFieldConfig ? (
-                    <label className="order-detail-edit-label">
-                      {salesChannelFieldConfig.titulo || "Canal"}
-                      <select value={newOrderForm.canalFlora} onChange={event => updateNewOrderForm("canalFlora", event.target.value)}>
-                        <option value="">Seleccionar</option>
-                        {(Array.isArray(salesChannelFieldConfig.opciones) ? salesChannelFieldConfig.opciones : []).map(option => <option key={option} value={option}>{option}</option>)}
-                      </select>
-                    </label>
-                  ) : null}
                 </div>
                 <label className="order-detail-edit-label">
                   Mensaje tarjeta

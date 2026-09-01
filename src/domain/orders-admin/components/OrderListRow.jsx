@@ -9,6 +9,7 @@ import {
   resolveOrderListTotal,
   resolveOrderProductSummary,
   shouldShowPendingInvoiceAlert,
+  isStorePickupOrder,
 } from "../ordersDomain.js";
 import { canInvoiceStatus, canMessageCardStatus, isPendingStatus, statusBadgeClass } from "../ordersUiRules.js";
 import { OrderActionsMenu } from "./OrderActionsMenu.jsx";
@@ -33,6 +34,7 @@ export function OrderListRow({
   openDetail,
   approveOrder,
   rejectOrder,
+  finalizeOrder,
   downloadInvoice,
   openMessageCard,
 }) {
@@ -53,6 +55,7 @@ export function OrderListRow({
       : "Aprobar pedido";
   const canDownloadInvoice = Boolean(pedidoId) && canInvoiceStatus(item.estado);
   const canViewMessageCard = canMessageCardStatus(item.estado);
+  const canFinalizeAction = Boolean(pedidoId) && isStorePickupOrder(item) && canInvoiceStatus(item.estado);
   const { date: fechaPedido, time: horaPedido } = splitDateTimeParts(item.fecha_pedido || item.fechaPedido);
   const { time: horaCreacion } = splitDateTimeParts(item.created_at || item.createdAt);
   const horaRegistroPedido = horaPedido || item.horaPedido || item.hora_pedido || item.hora || horaCreacion;
@@ -127,6 +130,7 @@ export function OrderListRow({
             canCancelAction={canCancelAction}
             canDownloadInvoice={canDownloadInvoice}
             canViewMessageCard={canViewMessageCard}
+            canFinalizeAction={canFinalizeAction}
             onToggle={() => setOpenOrderActionsId(current => current === pedidoId ? null : pedidoId)}
             onClose={() => setOpenOrderActionsId(null)}
             onOpenDetail={openDetail}
@@ -134,6 +138,7 @@ export function OrderListRow({
             onReject={rejectOrder}
             onDownloadInvoice={downloadInvoice}
             onOpenMessageCard={openMessageCard}
+            onFinalize={finalizeOrder}
           />
         </article>
       </td>
@@ -191,6 +196,7 @@ export function OrderListRow({
           canCancelAction={canCancelAction}
           canDownloadInvoice={canDownloadInvoice}
           canViewMessageCard={canViewMessageCard}
+          canFinalizeAction={canFinalizeAction}
           onToggle={() => setOpenOrderActionsId(current => current === pedidoId ? null : pedidoId)}
           onClose={() => setOpenOrderActionsId(null)}
           onOpenDetail={openDetail}
@@ -198,6 +204,7 @@ export function OrderListRow({
           onReject={rejectOrder}
           onDownloadInvoice={downloadInvoice}
           onOpenMessageCard={openMessageCard}
+          onFinalize={finalizeOrder}
         />
       </td>
     </tr>

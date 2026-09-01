@@ -11,3 +11,5 @@ pnpm-debug.log*
 *.zip
 *.log
 vite-dev.err
+*.parquet
+.env

@@ -24,6 +24,7 @@ export function OrdersListSection({
   openDetail,
   approveOrder,
   rejectOrder,
+  finalizeOrder,
   downloadInvoice,
   openMessageCard,
 }) {
@@ -97,6 +98,7 @@ export function OrdersListSection({
                   openDetail={openDetail}
                   approveOrder={approveOrder}
                   rejectOrder={rejectOrder}
+                  finalizeOrder={finalizeOrder}
                   downloadInvoice={downloadInvoice}
                   openMessageCard={openMessageCard}
                 />

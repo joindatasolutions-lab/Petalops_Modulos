@@ -5292,6 +5292,10 @@
   color: #e11d48 !important;
 }
 
+.orders-page-table-wrap .orders-table.orders-list-table .order-actions-popover .is-finish svg {
+  color: #0f9f6e !important;
+}
+
 .orders-page-table-wrap .orders-table.orders-list-table .order-actions-popover .is-whatsapp svg {
   color: #16a34a !important;
 }
