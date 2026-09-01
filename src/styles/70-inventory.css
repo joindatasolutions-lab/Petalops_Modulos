@@ -3322,3 +3322,194 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* INVENTARIO PARTE 2: indicadores filtrables y modales de movimientos */
+.inventory-page-view .orders-header-metric-card.is-clickable {
+  border: 1px solid rgba(226, 232, 240, 0.95) !important;
+  cursor: pointer !important;
+  text-align: left !important;
+}
+
+.inventory-page-view .orders-header-metric-card.is-clickable:disabled {
+  cursor: default !important;
+  opacity: 0.68 !important;
+}
+
+.inventory-page-view .orders-header-metric-card.is-clickable.is-active {
+  border-color: rgba(233, 30, 114, 0.42) !important;
+  box-shadow: 0 0 0 4px rgba(233, 30, 114, 0.08), 0 16px 36px rgba(15, 23, 42, 0.08) !important;
+}
+
+.inventory-page-view .orders-header-metric-card.is-pink {
+  --orders-bi-color: #e91e72 !important;
+}
+
+.inventory-page-view .inventory-movement-modal-overlay {
+  align-items: start !important;
+  overflow-y: auto !important;
+}
+
+.inventory-page-view .inventory-movement-modal {
+  width: min(1040px, 100%) !important;
+  max-height: none !important;
+}
+
+.inventory-page-view .inventory-movement-modal .inventory-form-panel {
+  width: 100% !important;
+  border-radius: 18px !important;
+  background: #ffffff !important;
+}
+
+.inventory-page-view .inventory-movement-form {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1.3fr) minmax(260px, 0.7fr) !important;
+  gap: 14px !important;
+}
+
+.inventory-page-view .inventory-movement-section {
+  display: grid !important;
+  gap: 12px !important;
+  padding: 14px !important;
+  border: 1px solid #eef2f7 !important;
+  border-radius: 14px !important;
+  background: #fff !important;
+}
+
+.inventory-page-view .inventory-movement-section h5 {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  margin: 0 !important;
+  color: #e91e72 !important;
+  font-size: 13px !important;
+  font-weight: 900 !important;
+}
+
+
+.inventory-page-view .inventory-purchase-line {
+  display: grid !important;
+  gap: 10px !important;
+  padding: 12px !important;
+  border: 1px solid #eef2f7 !important;
+  border-radius: 12px !important;
+  background: #fbfdff !important;
+}
+
+.inventory-page-view .inventory-purchase-line-head {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 10px !important;
+}
+
+.inventory-page-view .inventory-purchase-line-head strong {
+  color: #334155 !important;
+  font-size: 12px !important;
+  font-weight: 900 !important;
+}
+
+.inventory-page-view .inventory-add-purchase-line {
+  justify-content: center !important;
+  min-height: 38px !important;
+}
+
+.inventory-page-view .inventory-purchase-summary {
+  grid-column: 2 !important;
+  grid-row: span 3 !important;
+  align-self: start !important;
+}
+
+.inventory-page-view .inventory-purchase-summary > div,
+.inventory-page-view .inventory-purchase-summary label {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) minmax(96px, auto) !important;
+  align-items: center !important;
+  gap: 10px !important;
+  min-height: 38px !important;
+  margin: 0 !important;
+  color: #64748b !important;
+  font-size: 12px !important;
+  font-weight: 800 !important;
+}
+
+.inventory-page-view .inventory-purchase-summary input {
+  width: 100% !important;
+  min-width: 0 !important;
+  height: 36px !important;
+  border: 1px solid #e5e7eb !important;
+  border-radius: 10px !important;
+  padding: 0 10px !important;
+  text-align: right !important;
+}
+
+.inventory-page-view .inventory-purchase-summary strong {
+  color: #111827 !important;
+  font-weight: 900 !important;
+  text-align: right !important;
+}
+
+.inventory-page-view .inventory-purchase-summary .is-total {
+  padding-top: 10px !important;
+  border-top: 1px solid #eef2f7 !important;
+}
+
+.inventory-page-view .inventory-reason-grid {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  gap: 8px !important;
+}
+
+.inventory-page-view .inventory-reason-chip {
+  min-height: 34px !important;
+  padding: 0 12px !important;
+  border: 1px solid #e8edf4 !important;
+  border-radius: 999px !important;
+  background: #ffffff !important;
+  color: #334155 !important;
+  font-size: 12px !important;
+  font-weight: 850 !important;
+}
+
+.inventory-page-view .inventory-reason-chip.is-selected {
+  border-color: rgba(233, 30, 114, 0.42) !important;
+  background: #fff1f7 !important;
+  color: #be185d !important;
+}
+
+.inventory-page-view .inventory-detail-modal {
+  width: min(720px, 100%) !important;
+}
+
+.inventory-page-view .inventory-detail-grid {
+  display: grid !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  gap: 10px !important;
+}
+
+.inventory-page-view .inventory-detail-grid span {
+  display: grid !important;
+  gap: 4px !important;
+  padding: 12px !important;
+  border: 1px solid #eef2f7 !important;
+  border-radius: 12px !important;
+  color: #64748b !important;
+  font-size: 11px !important;
+  font-weight: 850 !important;
+}
+
+.inventory-page-view .inventory-detail-grid strong {
+  color: #111827 !important;
+  font-size: 13px !important;
+}
+
+@media (max-width: 760px) {
+  .inventory-page-view .inventory-movement-form,
+  .inventory-page-view .inventory-detail-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .inventory-page-view .inventory-purchase-summary {
+    grid-column: auto !important;
+    grid-row: auto !important;
+  }
+}
