@@ -3932,6 +3932,7 @@ export function DeliveryPage({
               ) : null}
               <button type="button" className="btn-primary orders-header-refresh" onClick={refreshAll} disabled={loading || Boolean(actionKey)}>
                 {loading ? "Actualizando..." : "Actualizar"}
+                <RotateCw size={16} strokeWidth={2.2} aria-hidden="true" />
               </button>
             </div>
           </div>

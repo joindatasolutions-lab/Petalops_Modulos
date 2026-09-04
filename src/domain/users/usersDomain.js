@@ -113,22 +113,26 @@ export function normalizeRoleIds(values) {
   return result;
 }
 
-export function normalizeTenantSlug(value) {
+export function buildSlug(value) {
   return String(value || "")
     .trim()
     .toLowerCase()
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
-    .replace(/\s+/g, "-")
-    .replace(/[^a-z0-9-]/g, "")
+    .replace(/[^a-z0-9-]+/g, "-")
     .replace(/-+/g, "-")
-    .replace(/^-|-$/g, "");
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 80);
+}
+
+export function normalizeTenantSlug(value) {
+  return buildSlug(value);
 }
 
 export function validateTenantSlug(slug) {
   if (!slug) return "El slug catalogo es obligatorio para crear la carpeta del tenant.";
   if (slug.length < 3) return "El slug catalogo debe tener al menos 3 caracteres.";
-  if (slug.length > 63) return "El slug catalogo no puede superar 63 caracteres.";
+  if (slug.length > 80) return "El slug catalogo no puede superar 80 caracteres.";
   if (!/^[a-z0-9][a-z0-9-]*[a-z0-9]$/.test(slug)) {
     return "El slug catalogo solo puede usar letras minusculas, numeros y guiones, sin guiones al inicio o al final.";
   }
