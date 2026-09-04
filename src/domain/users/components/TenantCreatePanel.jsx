@@ -41,7 +41,7 @@ export function TenantCreatePanel({ form, setForm, saving, onSubmit }) {
             required
             minLength={3}
             maxLength={80}
-            pattern="[a-z0-9][a-z0-9-]*[a-z0-9]"
+            pattern="[a-z0-9](?:[a-z0-9-]{1,78}[a-z0-9])?"
             title="Usa solo letras minusculas, numeros y guiones; sin espacios. Longitud de 3 a 80 caracteres."
           />
         </label>
