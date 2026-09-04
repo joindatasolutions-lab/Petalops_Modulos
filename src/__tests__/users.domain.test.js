@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   UserFormModel,
+  buildSlug,
   defaultModulesForRoles,
   filterVisibleRoles,
   normalizeTenantSlug,
@@ -85,10 +86,13 @@ describe("dominio de usuarios", () => {
   it("normaliza y valida slug de tenant para prefijo de assets", () => {
     expect(normalizeTenantSlug("  La Fiore Casa de Flores  ")).toBe("la-fiore-casa-de-flores");
     expect(normalizeTenantSlug("Jardin & Cafe")).toBe("jardin-cafe");
+    expect(buildSlug("FlorMar Caribe")).toBe("flormar-caribe");
+    expect(buildSlug("a".repeat(90))).toHaveLength(80);
 
     expect(validateTenantSlug("lafiore")).toBe("");
     expect(validateTenantSlug("la-fiore")).toBe("");
     expect(validateTenantSlug("la")).toBe("El slug catalogo debe tener al menos 3 caracteres.");
+    expect(validateTenantSlug("a".repeat(81))).toBe("El slug catalogo no puede superar 80 caracteres.");
     expect(validateTenantSlug("-lafiore")).toBe("El slug catalogo solo puede usar letras minusculas, numeros y guiones, sin guiones al inicio o al final.");
   });
 });

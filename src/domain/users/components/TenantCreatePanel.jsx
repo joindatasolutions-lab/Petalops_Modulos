@@ -1,9 +1,20 @@
 import { Building2, KeyRound, Store, UserCog } from "lucide-react";
 
-import { normalizeTenantSlug } from "../usersDomain.js";
+import { buildSlug, normalizeTenantSlug } from "../usersDomain.js";
 
 export function TenantCreatePanel({ form, setForm, saving, onSubmit }) {
   const update = (field, value) => setForm(current => ({ ...current, [field]: value }));
+  const updateNombreComercial = value => {
+    setForm(current => {
+      const previousSuggestedSlug = buildSlug(current.nombreComercial);
+      const shouldSuggestSlug = !current.slug || current.slug === previousSuggestedSlug;
+      return {
+        ...current,
+        nombreComercial: value,
+        slug: shouldSuggestSlug ? buildSlug(value) : current.slug,
+      };
+    });
+  };
 
   return (
     <article className="order-block users-create-block users-top-panel users-tenant-create-panel">
@@ -18,20 +29,20 @@ export function TenantCreatePanel({ form, setForm, saving, onSubmit }) {
       <form className="users-create-form users-tenant-form" onSubmit={onSubmit}>
         <label>
           <span>Nombre comercial</span>
-          <input value={form.nombreComercial} onChange={event => update("nombreComercial", event.target.value)} placeholder="La Fiore Casa de Flores" required minLength={3} />
+          <input value={form.nombreComercial} onChange={event => updateNombreComercial(event.target.value)} placeholder="La Fiore Casa de Flores" required minLength={3} />
         </label>
         <label>
           <span>Slug catalogo</span>
           <input
             value={form.slug}
-            onChange={event => update("slug", event.target.value)}
+            onChange={event => update("slug", buildSlug(event.target.value))}
             onBlur={event => update("slug", normalizeTenantSlug(event.target.value))}
-            placeholder="lafiore"
+            placeholder="flormar-caribe"
             required
             minLength={3}
-            maxLength={63}
+            maxLength={80}
             pattern="[a-z0-9][a-z0-9-]*[a-z0-9]"
-            title="Usa letras minusculas, numeros y guiones; sin guiones al inicio o al final."
+            title="Usa solo letras minusculas, numeros y guiones; sin espacios. Longitud de 3 a 80 caracteres."
           />
         </label>
         <label>

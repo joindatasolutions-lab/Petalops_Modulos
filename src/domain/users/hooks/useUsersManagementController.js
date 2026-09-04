@@ -16,6 +16,8 @@ import {
 } from "../usersDomain.js";
 
 const TENANT_S3_CREATE_ERROR_MESSAGE = "No fue posible crear la estructura de archivos del tenant en S3. Intenta nuevamente o contacta soporte.";
+const TENANT_CONFLICT_ERROR_MESSAGE = "Ya existe una empresa con ese nombre o slug.";
+const TENANT_INVALID_ERROR_MESSAGE = "Revisa el nombre, slug y datos del admin del tenant.";
 
 export function useUsersManagementController({ session, canViewUsuariosGlobal }) {
   const api = useMemo(() => createApiClient(tenantConfig), []);
@@ -392,7 +394,15 @@ export function useUsersManagementController({ session, canViewUsuariosGlobal })
     } catch (nextError) {
       console.error("Error creando tenant:", nextError);
       const isS3CreateError = Number(nextError?.status) === 502 && nextError?.code === "AUTH_EMPRESA_CREATE_S3_ERROR";
-      setError(isS3CreateError ? TENANT_S3_CREATE_ERROR_MESSAGE : (nextError?.message || "No fue posible crear el tenant."));
+      if (isS3CreateError) {
+        setError(TENANT_S3_CREATE_ERROR_MESSAGE);
+      } else if (Number(nextError?.status) === 409) {
+        setError(nextError?.detail || TENANT_CONFLICT_ERROR_MESSAGE);
+      } else if (Number(nextError?.status) === 400) {
+        setError(nextError?.detail || TENANT_INVALID_ERROR_MESSAGE);
+      } else {
+        setError(nextError?.message || "No fue posible crear el tenant.");
+      }
     } finally {
       setSaving(false);
     }

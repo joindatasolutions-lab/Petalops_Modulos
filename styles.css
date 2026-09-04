@@ -9,4 +9,5 @@
 @import "./src/styles/65-delivery-responsive.css";
 @import "./src/styles/75-accounting-responsive.css";
 @import "./src/styles/77-clients-responsive.css";
+@import "./src/styles/80-delivery-desktop-tablet.css";
 @import "./production-mobile.css";
