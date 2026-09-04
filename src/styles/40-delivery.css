@@ -3133,7 +3133,11 @@
   display: none !important;
 }
 
-.clients-page-view .orders-drawer.clients-drawer {
+/* El drawer se renderiza como hermano de .clients-page-view (fuera del <main>),
+   por eso NO se usa ese ancestro como prefijo: si no, la regla no aplicaba y el
+   drawer caia al z-index base (50), quedando por debajo del backdrop (12990) que
+   lo tapaba e interceptaba los clics. */
+.orders-drawer.clients-drawer {
   width: min(560px, 100vw) !important;
   right: -560px !important;
   z-index: 13000 !important;
@@ -3159,7 +3163,7 @@
   pointer-events: auto;
 }
 
-.clients-page-view .orders-drawer.clients-drawer.open {
+.orders-drawer.clients-drawer.open {
   right: 0 !important;
 }
 
