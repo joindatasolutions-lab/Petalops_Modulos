@@ -9,6 +9,11 @@ export const MODULE_HELP = {
   clientes: "Permite consultar y administrar la base de clientes.",
   inventario: "Permite administrar stock, insumos y movimientos de inventario.",
   usuarios: "Permite acceso al panel de gestion de usuarios.",
+  notificaciones_whatsapp: "Permite activar el envio automatico de notificaciones WhatsApp.",
+};
+
+export const MODULE_LABELS = {
+  notificaciones_whatsapp: "Notificaciones WhatsApp",
 };
 
 // Modulos por defecto para un usuario nuevo/al cambiar de rol: exactamente lo que ESE rol
@@ -157,6 +162,11 @@ export function filterVisibleRoles(roles, canViewUsuariosGlobal = false) {
 
 export function normalizeModuleKey(module) {
   return String(module || "").trim().toLowerCase();
+}
+
+export function moduleDisplayName(module) {
+  const normalized = normalizeModuleKey(module);
+  return MODULE_LABELS[normalized] || module;
 }
 
 export function selectedModulesSummary({

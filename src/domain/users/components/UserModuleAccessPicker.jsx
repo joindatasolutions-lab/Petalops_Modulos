@@ -1,3 +1,5 @@
+import { moduleDisplayName } from "../usersDomain.js";
+
 export function UserModuleAccessPicker({
   summary,
   isOpen,
@@ -45,6 +47,7 @@ export function UserModuleAccessPicker({
             {configuredModules.map(modulo => {
               const checked = selectedModules.includes(modulo);
               const activeForEmpresa = activeModules.includes(modulo);
+              const label = moduleDisplayName(modulo);
               return (
                 <label
                   key={modulo}
@@ -56,7 +59,7 @@ export function UserModuleAccessPicker({
                     disabled={!activeForEmpresa}
                     onChange={() => onToggleModule(modulo)}
                   />
-                  <span>{modulo}{!activeForEmpresa ? " (inactivo en la empresa)" : ""}</span>
+                  <span>{label}{!activeForEmpresa ? " (inactivo en la empresa)" : ""}</span>
                 </label>
               );
             })}

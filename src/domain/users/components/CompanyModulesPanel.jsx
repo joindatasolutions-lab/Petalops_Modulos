@@ -1,4 +1,4 @@
-import { MODULE_HELP } from "../usersDomain.js";
+import { MODULE_HELP, moduleDisplayName } from "../usersDomain.js";
 
 export function CompanyModulesPanel({
   empresaID,
@@ -36,14 +36,16 @@ export function CompanyModulesPanel({
       {modulesLoading ? <p className="orders-message">Cargando modulos...</p> : null}
       {!modulesLoading && moduleItems.length === 0 ? <p className="orders-message">No hay modulos configurables.</p> : null}
       <div className="users-create-form users-modulos-form" style={{ gap: 10 }}>
-        {moduleItems.map(item => (
+        {moduleItems.map(item => {
+          const label = moduleDisplayName(item.modulo);
+          return (
           <div key={item.modulo} className="users-modulo-item">
             <div className="users-modulo-head">
               <div>
-                <strong>{item.modulo}</strong>
+                <strong>{label}</strong>
                 <p className="users-modulo-help">{MODULE_HELP[item.modulo] || "Modulo personalizado para habilitacion comercial."}</p>
               </div>
-              <label className="users-switch" title={`Activar o desactivar ${item.modulo}`}>
+              <label className="users-switch" title={`Activar o desactivar ${label}`}>
                 <input
                   type="checkbox"
                   checked={Boolean(item.activo)}
@@ -53,7 +55,8 @@ export function CompanyModulesPanel({
               </label>
             </div>
           </div>
-        ))}
+          );
+        })}
 
         <button type="button" className="btn-outline" onClick={() => setShowAdvancedModules(current => !current)}>
           {showAdvancedModules ? "Ocultar configuracion avanzada" : "Mostrar configuracion avanzada"}
