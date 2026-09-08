@@ -1184,6 +1184,40 @@
   font-size: 14px;
 }
 
+.users-password-field {
+  position: relative;
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.users-page-view .users-password-field input {
+  width: 100%;
+  padding-right: 48px;
+}
+
+.users-password-toggle {
+  position: absolute;
+  right: 6px;
+  width: 36px;
+  height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: #667085;
+  cursor: pointer;
+}
+
+.users-password-toggle:hover,
+.users-password-toggle:focus-visible {
+  background: #f6e9f0;
+  color: #db2777;
+  outline: none;
+}
+
 .users-page-view .users-create-form .btn-primary {
   border-radius: 12px;
   min-height: 46px;

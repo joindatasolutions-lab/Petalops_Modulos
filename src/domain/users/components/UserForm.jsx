@@ -1,3 +1,5 @@
+import { Eye, EyeOff } from "lucide-react";
+
 import { UserModuleAccessPicker } from "./UserModuleAccessPicker.jsx";
 import { UserRolePicker } from "./UserRolePicker.jsx";
 
@@ -19,6 +21,9 @@ export function UserForm({
   onCancel,
 }) {
   const isEdit = mode === "edit";
+  const passwordToggleLabel = isEdit
+    ? (passwordVisible ? "Ocultar nueva contrasena" : "Mostrar nueva contrasena")
+    : (passwordVisible ? "Ocultar contrasena" : "Mostrar contrasena");
 
   return (
     <form className="users-create-form users-create-user-form" onSubmit={onSubmit} autoComplete="off">
@@ -44,31 +49,50 @@ export function UserForm({
 
       {isEdit ? (
         <div style={{ display: "grid", gap: 8 }}>
-          <input
-            type={passwordVisible ? "text" : "password"}
-            placeholder="Nueva contrasena (opcional)"
-            value={form.password}
-            name="edit-user-new-password"
-            autoComplete="new-password"
-            onChange={event => setForm(current => ({ ...current, password: event.target.value }))}
-          />
-          <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-            <button type="button" className="btn-outline" onClick={onTogglePasswordVisible}>
-              {passwordVisible ? "Ocultar nueva contraseña" : "Mostrar nueva contraseña"}
+          <div className="users-password-field">
+            <input
+              type={passwordVisible ? "text" : "password"}
+              placeholder="Nueva contrasena (opcional)"
+              value={form.password}
+              name="edit-user-new-password"
+              autoComplete="new-password"
+              onChange={event => setForm(current => ({ ...current, password: event.target.value }))}
+            />
+            <button
+              type="button"
+              className="users-password-toggle"
+              onClick={onTogglePasswordVisible}
+              aria-label={passwordToggleLabel}
+              title={passwordToggleLabel}
+            >
+              {passwordVisible ? <EyeOff size={18} strokeWidth={2} /> : <Eye size={18} strokeWidth={2} />}
             </button>
-            <span className="orders-admin-subtitle">La contraseña actual no se puede ver porque se guarda cifrada; aquí solo puedes escribir y revisar una nueva.</span>
           </div>
+          <span className="orders-admin-subtitle">
+            La contrasena actual no se puede ver porque se guarda cifrada; aqui solo puedes escribir y revisar una nueva.
+          </span>
         </div>
       ) : (
-        <input
-          type="password"
-          placeholder="Contrasena"
-          value={form.password}
-          name="new-user-password"
+        <div className="users-password-field">
+          <input
+            type={passwordVisible ? "text" : "password"}
+            placeholder="Contrasena"
+            value={form.password}
+            name="new-user-password"
             autoComplete="new-password"
             onChange={event => setForm(current => ({ ...current, password: event.target.value }))}
-          required
-        />
+            required
+          />
+          <button
+            type="button"
+            className="users-password-toggle"
+            onClick={onTogglePasswordVisible}
+            aria-label={passwordToggleLabel}
+            title={passwordToggleLabel}
+          >
+            {passwordVisible ? <EyeOff size={18} strokeWidth={2} /> : <Eye size={18} strokeWidth={2} />}
+          </button>
+        </div>
       )}
 
       <UserRolePicker
@@ -95,7 +119,7 @@ export function UserForm({
 
       <div className={isEdit ? "" : "users-modal-actions"} style={isEdit ? { display: "flex", gap: 10, flexWrap: "wrap" } : undefined}>
         <button type="button" className="btn-outline" onClick={onCancel}>
-          {isEdit ? "Cancelar edición" : "Cancelar"}
+          {isEdit ? "Cancelar edicion" : "Cancelar"}
         </button>
         <button type="submit" className="btn-primary" disabled={saving || visibleRoles.length === 0}>
           {saving ? "Guardando..." : (isEdit ? "Guardar cambios" : "Crear usuario")}
