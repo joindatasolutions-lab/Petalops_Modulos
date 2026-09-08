@@ -417,16 +417,18 @@
 
   .delivery-page-view .delivery-card-order {
     display: grid !important;
-    grid-template-columns: 72px minmax(0, 1fr) !important;
+    grid-template-columns: 58px minmax(0, 1fr) !important;
     align-items: center !important;
     border-left: 0 !important;
     gap: 12px !important;
   }
 
   .delivery-page-view .delivery-card-topline {
+    grid-column: 2 !important;
     display: flex !important;
     align-items: center !important;
     gap: 8px !important;
+    min-width: 0 !important;
   }
 
   .delivery-page-view .delivery-card-topline > strong {
@@ -442,6 +444,17 @@
     font-size: 13px !important;
     font-weight: 950 !important;
     line-height: 1.25 !important;
+    min-width: 0 !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+  }
+
+  .delivery-page-view .delivery-card-product-name {
+    grid-column: 2 !important;
+    display: -webkit-box !important;
+    white-space: normal !important;
+    -webkit-box-orient: vertical !important;
+    -webkit-line-clamp: 2 !important;
   }
 
   .delivery-page-view .delivery-card-section > span,
@@ -455,10 +468,21 @@
     line-height: 1.25 !important;
   }
 
+  .delivery-page-view .delivery-card-time {
+    grid-column: 2 !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 5px !important;
+    min-width: 0 !important;
+  }
+
   .delivery-page-view .delivery-product-thumb {
+    grid-column: 1 !important;
     grid-row: 1 / span 3 !important;
-    width: 72px !important;
-    height: 72px !important;
+    width: 58px !important;
+    height: 58px !important;
+    min-width: 58px !important;
+    max-width: 58px !important;
     border-radius: 8px !important;
   }
 
