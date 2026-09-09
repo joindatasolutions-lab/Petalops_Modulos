@@ -56,12 +56,15 @@ export function PaymentMethodModal({
   empresas = [],
   setEmpresaID,
   canViewUsuariosGlobal,
+  editingItem,
   form,
   setForm,
   saving,
   onSubmit,
   onClose,
 }) {
+  const isEdit = Boolean(editingItem);
+
   return (
     <div className="users-modal-backdrop" role="presentation" onMouseDown={onClose}>
       <section
@@ -74,9 +77,9 @@ export function PaymentMethodModal({
         <header className="users-modal-head">
           <div>
             <p className="orders-admin-subtitle">Metodos de pago</p>
-            <h3 id="users-payment-method-modal-title">Crear metodo de pago</h3>
+            <h3 id="users-payment-method-modal-title">{isEdit ? "Editar metodo de pago" : "Crear metodo de pago"}</h3>
             <p className="orders-admin-subtitle">Empresa objetivo: <strong>{empresaSeleccionadaNombre}</strong> (ID {empresaID}).</p>
-            {canViewUsuariosGlobal ? (
+            {canViewUsuariosGlobal && !isEdit ? (
               <label className="users-modal-tenant-picker">
                 <span><Building2 size={15} strokeWidth={2} aria-hidden="true" /> Tenant para el metodo de pago</span>
                 <select value={empresaID} onChange={event => setEmpresaID?.(Number(event.target.value))}>
@@ -117,7 +120,7 @@ export function PaymentMethodModal({
           <div className="users-modal-actions">
             <button type="button" className="btn-outline" onClick={onClose}>Cancelar</button>
             <button type="submit" className="btn-primary" disabled={saving}>
-              {saving ? "Guardando..." : "Crear metodo de pago"}
+              {saving ? "Guardando..." : (isEdit ? "Guardar cambios" : "Crear metodo de pago")}
             </button>
           </div>
         </form>

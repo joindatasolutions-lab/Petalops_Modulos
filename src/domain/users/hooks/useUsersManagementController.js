@@ -56,6 +56,9 @@ export function useUsersManagementController({ session, canViewUsuariosGlobal })
   const [showPaymentMethodModal, setShowPaymentMethodModal] = useState(false);
   const [paymentMethodForm, setPaymentMethodForm] = useState({ nombre: "" });
   const [paymentMethodSaving, setPaymentMethodSaving] = useState(false);
+  const [paymentMethodEditing, setPaymentMethodEditing] = useState(null);
+  const [paymentMethods, setPaymentMethods] = useState([]);
+  const [paymentMethodsLoading, setPaymentMethodsLoading] = useState(false);
   const [editingUserId, setEditingUserId] = useState(null);
   const [passwordVisible, setPasswordVisible] = useState(false);
   const [editForm, setEditForm] = useState(UserFormModel.initial());
@@ -137,12 +140,14 @@ export function useUsersManagementController({ session, canViewUsuariosGlobal })
   }, []);
 
   const openPaymentMethodModal = useCallback(() => {
+    setPaymentMethodEditing(null);
     setPaymentMethodForm({ nombre: "" });
     setShowPaymentMethodModal(true);
   }, []);
 
   const closePaymentMethodModal = useCallback(() => {
     setShowPaymentMethodModal(false);
+    setPaymentMethodEditing(null);
     setPaymentMethodForm({ nombre: "" });
   }, []);
 
@@ -266,6 +271,26 @@ export function useUsersManagementController({ session, canViewUsuariosGlobal })
     }
   }, [api, empresaID]);
 
+  const loadPaymentMethods = useCallback(async () => {
+    const targetEmpresaID = Number(empresaID);
+    if (!Number.isFinite(targetEmpresaID) || targetEmpresaID <= 0) {
+      setPaymentMethods([]);
+      return;
+    }
+    setPaymentMethodsLoading(true);
+    setError("");
+    try {
+      const data = await api.listarMetodosPagoEmpresa({ empresaId: targetEmpresaID });
+      setPaymentMethods(Array.isArray(data.items) ? data.items : []);
+    } catch (nextError) {
+      console.error("Error cargando metodos de pago:", nextError);
+      setPaymentMethods([]);
+      setError(nextError?.message || "No fue posible cargar metodos de pago.");
+    } finally {
+      setPaymentMethodsLoading(false);
+    }
+  }, [api, empresaID]);
+
   const loadEmpresasModuloResumen = useCallback(async () => {
     if (!canViewUsuariosGlobal) return;
     setEmpresasModulesLoading(true);
@@ -310,6 +335,10 @@ export function useUsersManagementController({ session, canViewUsuariosGlobal })
   useEffect(() => {
     loadModules().catch(() => {});
   }, [loadModules]);
+
+  useEffect(() => {
+    loadPaymentMethods().catch(() => {});
+  }, [loadPaymentMethods]);
 
   useEffect(() => {
     setForm(current => {
@@ -376,15 +405,50 @@ export function useUsersManagementController({ session, canViewUsuariosGlobal })
     setError("");
     setInfo("");
     try {
-      const response = await api.crearMetodoPagoEmpresa({
-        empresaId: targetEmpresaID,
-        nombre,
-      });
+      const response = paymentMethodEditing
+        ? await api.actualizarMetodoPagoEmpresa({
+            empresaId: targetEmpresaID,
+            itemId: paymentMethodEditing.id,
+            nombre,
+          })
+        : await api.crearMetodoPagoEmpresa({
+            empresaId: targetEmpresaID,
+            nombre,
+          });
       closePaymentMethodModal();
-      setInfo(`Metodo de pago ${response?.nombre || nombre} creado para ${empresaSeleccionadaNombre}.`);
+      await loadPaymentMethods();
+      setInfo(`Metodo de pago ${response?.nombre || nombre} ${paymentMethodEditing ? "actualizado" : "creado"} para ${empresaSeleccionadaNombre}.`);
     } catch (nextError) {
       console.error("Error creando metodo de pago:", nextError);
-      setError(nextError?.message || "No fue posible crear el metodo de pago.");
+      setError(nextError?.message || "No fue posible guardar el metodo de pago.");
+    } finally {
+      setPaymentMethodSaving(false);
+    }
+  };
+
+  const editPaymentMethod = item => {
+    setPaymentMethodEditing(item);
+    setPaymentMethodForm({ nombre: item?.nombre || "" });
+    setShowPaymentMethodModal(true);
+  };
+
+  const togglePaymentMethodActive = async item => {
+    const targetEmpresaID = Number(empresaID);
+    if (!item?.id || !Number.isFinite(targetEmpresaID) || targetEmpresaID <= 0) return;
+    setPaymentMethodSaving(true);
+    setError("");
+    setInfo("");
+    try {
+      await api.actualizarMetodoPagoEmpresa({
+        empresaId: targetEmpresaID,
+        itemId: item.id,
+        activo: !Boolean(item.activo),
+      });
+      await loadPaymentMethods();
+      setInfo(`Metodo de pago ${item.nombre} ${item.activo ? "inactivado" : "activado"} para ${empresaSeleccionadaNombre}.`);
+    } catch (nextError) {
+      console.error("Error actualizando metodo de pago:", nextError);
+      setError(nextError?.message || "No fue posible actualizar el metodo de pago.");
     } finally {
       setPaymentMethodSaving(false);
     }
@@ -826,6 +890,9 @@ export function useUsersManagementController({ session, canViewUsuariosGlobal })
     paymentMethodForm,
     setPaymentMethodForm,
     paymentMethodSaving,
+    paymentMethodEditing,
+    paymentMethods,
+    paymentMethodsLoading,
     openCreateModal,
     openPaymentMethodModal,
     editingUserId,
@@ -833,6 +900,7 @@ export function useUsersManagementController({ session, canViewUsuariosGlobal })
     showEditDrawer,
     empresaSeleccionadaNombre,
     loadUsers,
+    loadPaymentMethods,
     loadEmpresasModuloResumen,
     closeCreateModal,
     closePaymentMethodModal,
@@ -844,6 +912,8 @@ export function useUsersManagementController({ session, canViewUsuariosGlobal })
     saveModules,
     addModulo,
     submitCreatePaymentMethod,
+    editPaymentMethod,
+    togglePaymentMethodActive,
     createFormProps,
     editFormProps,
   };

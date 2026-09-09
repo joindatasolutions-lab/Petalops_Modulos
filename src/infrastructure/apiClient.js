@@ -405,6 +405,24 @@ export function createApiClient(config) {
       });
     },
 
+    async listarMetodosPagoEmpresa({ empresaId }) {
+      return requestJson(`/configuracion/empresas/${empresaId}/metodos-pago`);
+    },
+
+    async actualizarMetodoPagoEmpresa({ empresaId, itemId, nombre, activo, orden }) {
+      const payload = {};
+      if (nombre !== undefined) payload.nombre = nombre;
+      if (activo !== undefined) payload.activo = activo;
+      if (orden !== undefined) payload.orden = orden;
+      return requestJson(`/configuracion/empresas/${empresaId}/metodos-pago/${itemId}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(payload)
+      });
+    },
+
     async listarModulosEmpresaGestion({ empresaId }) {
       const params = new URLSearchParams();
       params.set("empresaID", String(empresaId));
