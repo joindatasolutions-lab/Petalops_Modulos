@@ -755,6 +755,45 @@
   margin: 0;
 }
 
+.users-payment-layout {
+  display: grid;
+  gap: 16px;
+}
+
+.users-payment-panel-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.users-payment-panel-head h4 {
+  margin: 0 0 6px;
+}
+
+.users-payment-company-form {
+  margin-top: 14px;
+}
+
+.users-payment-method-name,
+.users-payment-method-actions {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  flex-wrap: wrap;
+}
+
+.users-payment-method-name svg {
+  color: #d81b60;
+}
+
+.users-payment-method-actions .btn-outline {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  width: auto;
+}
+
 .users-role-picker {
   display: grid;
   gap: 7px;
@@ -1702,6 +1741,16 @@
   .header-actions {
     width: 100%;
     justify-content: stretch;
+  }
+
+  .users-payment-panel-head {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .users-payment-panel-head .btn-primary,
+  .users-payment-method-actions .btn-outline {
+    width: 100%;
   }
 
   .header-actions .btn-primary,

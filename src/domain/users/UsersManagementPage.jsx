@@ -3,6 +3,7 @@ import { Building2, CreditCard, RefreshCw, UserPlus, UsersRound } from "lucide-r
 import { AppSidebar } from "../../shared/AppSidebar.jsx";
 import { CompanyModulesPanel } from "./components/CompanyModulesPanel.jsx";
 import { CompanyModulesSummaryTable } from "./components/CompanyModulesSummaryTable.jsx";
+import { PaymentMethodsPanel } from "./components/PaymentMethodsPanel.jsx";
 import { CreateUserModal, EditUserModal, PaymentMethodModal } from "./components/UserModals.jsx";
 import { TenantCreatePanel } from "./components/TenantCreatePanel.jsx";
 import { UsersFilters } from "./components/UsersFilters.jsx";
@@ -58,7 +59,8 @@ export function UsersManagementPage({
     usuarios: onGoUsuarios,
   };
   const isTenantsPanel = canViewUsuariosGlobal && users.activePanel === "tenants";
-  const isUsuariosPanel = !canViewUsuariosGlobal || users.activePanel === "usuarios";
+  const isPaymentMethodsPanel = users.activePanel === "paymentMethods";
+  const isUsuariosPanel = !isPaymentMethodsPanel && (!canViewUsuariosGlobal || users.activePanel === "usuarios");
 
   return (
     <div className={`app-shell ${users.sidebarPinned ? "is-sidebar-pinned" : ""} ${users.sidebarMobileOpen ? "is-sidebar-mobile-open" : ""}`}>
@@ -88,41 +90,39 @@ export function UsersManagementPage({
               </button>
             ) : null}
             {isUsuariosPanel ? (
-              <>
-                <button type="button" className="btn-primary users-create-open-btn" onClick={users.openPaymentMethodModal}>
-                  <CreditCard size={18} strokeWidth={2} aria-hidden="true" />
-                  Crear metodo de pago
-                </button>
-                <button type="button" className="btn-primary users-create-open-btn" onClick={users.openCreateModal}>
-                  <UserPlus size={18} strokeWidth={2} aria-hidden="true" />
-                  Crear usuario
-                </button>
-              </>
+              <button type="button" className="btn-primary users-create-open-btn" onClick={users.openCreateModal}>
+                <UserPlus size={18} strokeWidth={2} aria-hidden="true" />
+                Crear usuario
+              </button>
             ) : null}
             <button
               type="button"
               className="btn-primary orders-header-refresh"
-              onClick={isTenantsPanel ? users.loadEmpresasModuloResumen : users.loadUsers}
-              disabled={users.loading || users.empresasModulesLoading}
+              onClick={isTenantsPanel ? users.loadEmpresasModuloResumen : (isPaymentMethodsPanel ? users.loadPaymentMethods : users.loadUsers)}
+              disabled={users.loading || users.empresasModulesLoading || users.paymentMethodsLoading}
             >
               <RefreshCw size={18} strokeWidth={2} aria-hidden="true" />
-              {users.loading || users.empresasModulesLoading ? "Actualizando..." : "Actualizar"}
+              {users.loading || users.empresasModulesLoading || users.paymentMethodsLoading ? "Actualizando..." : "Actualizar"}
             </button>
           </div>
         </header>
 
-        {canViewUsuariosGlobal ? (
-          <nav className="users-section-tabs" aria-label="Secciones de gestion">
+        <nav className="users-section-tabs" aria-label="Secciones de gestion">
+          {canViewUsuariosGlobal ? (
             <button type="button" className={isTenantsPanel ? "is-active" : ""} onClick={() => users.setActivePanel("tenants")}>
               <Building2 size={16} strokeWidth={2} aria-hidden="true" />
               Empresas / tenants
             </button>
-            <button type="button" className={isUsuariosPanel ? "is-active" : ""} onClick={() => users.setActivePanel("usuarios")}>
-              <UsersRound size={16} strokeWidth={2} aria-hidden="true" />
-              Usuarios
-            </button>
-          </nav>
-        ) : null}
+          ) : null}
+          <button type="button" className={isUsuariosPanel ? "is-active" : ""} onClick={() => users.setActivePanel("usuarios")}>
+            <UsersRound size={16} strokeWidth={2} aria-hidden="true" />
+            Usuarios
+          </button>
+          <button type="button" className={isPaymentMethodsPanel ? "is-active" : ""} onClick={() => users.setActivePanel("paymentMethods")}>
+            <CreditCard size={16} strokeWidth={2} aria-hidden="true" />
+            Metodos de pago
+          </button>
+        </nav>
 
         {isUsuariosPanel ? (
           <UsersFilters
@@ -175,6 +175,20 @@ export function UsersManagementPage({
 
             <CompanyModulesSummaryTable loading={users.empresasModulesLoading} items={users.empresasModuloResumen} />
           </section>
+        ) : isPaymentMethodsPanel ? (
+          <PaymentMethodsPanel
+            empresaID={users.empresaID}
+            empresaSeleccionadaNombre={users.empresaSeleccionadaNombre}
+            empresas={users.empresas}
+            setEmpresaID={users.setEmpresaID}
+            canViewUsuariosGlobal={canViewUsuariosGlobal}
+            loading={users.paymentMethodsLoading}
+            items={users.paymentMethods}
+            saving={users.paymentMethodSaving}
+            onCreate={users.openPaymentMethodModal}
+            onEdit={users.editPaymentMethod}
+            onToggleActive={users.togglePaymentMethodActive}
+          />
         ) : (
           <section className="users-grid-layout users-list-layout">
             <UsersTable
@@ -208,6 +222,7 @@ export function UsersManagementPage({
           empresas={users.empresas}
           setEmpresaID={users.setEmpresaID}
           canViewUsuariosGlobal={canViewUsuariosGlobal}
+          editingItem={users.paymentMethodEditing}
           form={users.paymentMethodForm}
           setForm={users.setPaymentMethodForm}
           saving={users.paymentMethodSaving}
