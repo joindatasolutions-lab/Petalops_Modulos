@@ -481,10 +481,11 @@ export function createApiClient(config) {
       return requestJson(`/configuracion/empresas/${empresaId}/asignacion`);
     },
 
-    async actualizarConfiguracionAsignacion({ empresaId, asignacionProduccionActiva, asignacionDomicilioActiva }) {
+    async actualizarConfiguracionAsignacion({ empresaId, asignacionProduccionActiva, asignacionDomicilioActiva, autoAsignacionProduccionActiva }) {
       const payload = {};
       if (asignacionProduccionActiva !== undefined) payload.asignacionProduccionActiva = asignacionProduccionActiva;
       if (asignacionDomicilioActiva !== undefined) payload.asignacionDomicilioActiva = asignacionDomicilioActiva;
+      if (autoAsignacionProduccionActiva !== undefined) payload.autoAsignacionProduccionActiva = autoAsignacionProduccionActiva;
       return requestJson(`/configuracion/empresas/${empresaId}/asignacion`, {
         method: "PUT",
         headers: {

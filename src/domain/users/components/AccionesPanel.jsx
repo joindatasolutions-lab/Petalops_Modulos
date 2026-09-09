@@ -1,4 +1,4 @@
-import { Factory, Truck } from "lucide-react";
+import { Factory, Truck, Zap } from "lucide-react";
 
 function AsignacionToggleCard({ icon, title, description, checked, disabled, onToggle }) {
   return (
@@ -28,8 +28,10 @@ export function AccionesPanel({
   saving,
   asignacionProduccionActiva,
   asignacionDomicilioActiva,
+  autoAsignacionProduccionActiva,
   onToggleProduccion,
   onToggleDomicilio,
+  onToggleAutoAsignacionProduccion,
 }) {
   return (
     <section className="users-payment-layout">
@@ -74,6 +76,14 @@ export function AccionesPanel({
           checked={asignacionDomicilioActiva}
           disabled={saving || loading}
           onToggle={onToggleDomicilio}
+        />
+        <AsignacionToggleCard
+          icon={<Zap size={18} strokeWidth={2} />}
+          title="Autoasignacion automatica"
+          description="El sistema le asigna florista automaticamente a los pedidos pendientes de hoy cada vez que se abre el modulo de Produccion, sin que nadie haga clic en Asignar."
+          checked={autoAsignacionProduccionActiva}
+          disabled={saving || loading}
+          onToggle={onToggleAutoAsignacionProduccion}
         />
       </div>
     </section>

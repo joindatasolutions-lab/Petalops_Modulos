@@ -259,8 +259,10 @@ export function UsersManagementPage({
             saving={users.asignacionSaving}
             asignacionProduccionActiva={users.asignacionConfig.asignacionProduccionActiva}
             asignacionDomicilioActiva={users.asignacionConfig.asignacionDomicilioActiva}
+            autoAsignacionProduccionActiva={users.asignacionConfig.autoAsignacionProduccionActiva}
             onToggleProduccion={users.toggleAsignacionProduccion}
             onToggleDomicilio={users.toggleAsignacionDomicilio}
+            onToggleAutoAsignacionProduccion={users.toggleAutoAsignacionProduccion}
           />
         ) : (
           <section className="users-grid-layout users-list-layout">

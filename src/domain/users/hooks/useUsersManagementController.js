@@ -105,7 +105,7 @@ export function useUsersManagementController({ session, canViewUsuariosGlobal })
   const [paymentMethodEditing, setPaymentMethodEditing] = useState(null);
   const [paymentMethods, setPaymentMethods] = useState([]);
   const [paymentMethodsLoading, setPaymentMethodsLoading] = useState(false);
-  const [asignacionConfig, setAsignacionConfig] = useState({ asignacionProduccionActiva: true, asignacionDomicilioActiva: true });
+  const [asignacionConfig, setAsignacionConfig] = useState({ asignacionProduccionActiva: true, asignacionDomicilioActiva: true, autoAsignacionProduccionActiva: true });
   const [asignacionLoading, setAsignacionLoading] = useState(false);
   const [asignacionSaving, setAsignacionSaving] = useState(false);
   const [editingUserId, setEditingUserId] = useState(null);
@@ -417,7 +417,7 @@ export function useUsersManagementController({ session, canViewUsuariosGlobal })
   const loadAsignacionConfig = useCallback(async () => {
     const targetEmpresaID = Number(empresaID);
     if (!Number.isFinite(targetEmpresaID) || targetEmpresaID <= 0) {
-      setAsignacionConfig({ asignacionProduccionActiva: true, asignacionDomicilioActiva: true });
+      setAsignacionConfig({ asignacionProduccionActiva: true, asignacionDomicilioActiva: true, autoAsignacionProduccionActiva: true });
       return;
     }
     setAsignacionLoading(true);
@@ -427,6 +427,7 @@ export function useUsersManagementController({ session, canViewUsuariosGlobal })
       setAsignacionConfig({
         asignacionProduccionActiva: Boolean(data.asignacionProduccionActiva),
         asignacionDomicilioActiva: Boolean(data.asignacionDomicilioActiva),
+        autoAsignacionProduccionActiva: Boolean(data.autoAsignacionProduccionActiva),
       });
     } catch (nextError) {
       console.error("Error cargando configuracion de asignacion:", nextError);
@@ -447,6 +448,7 @@ export function useUsersManagementController({ session, canViewUsuariosGlobal })
       setAsignacionConfig({
         asignacionProduccionActiva: Boolean(data.asignacionProduccionActiva),
         asignacionDomicilioActiva: Boolean(data.asignacionDomicilioActiva),
+        autoAsignacionProduccionActiva: Boolean(data.autoAsignacionProduccionActiva),
       });
     } catch (nextError) {
       console.error("Error actualizando asignacion de produccion:", nextError);
@@ -467,10 +469,32 @@ export function useUsersManagementController({ session, canViewUsuariosGlobal })
       setAsignacionConfig({
         asignacionProduccionActiva: Boolean(data.asignacionProduccionActiva),
         asignacionDomicilioActiva: Boolean(data.asignacionDomicilioActiva),
+        autoAsignacionProduccionActiva: Boolean(data.autoAsignacionProduccionActiva),
       });
     } catch (nextError) {
       console.error("Error actualizando asignacion de domicilio:", nextError);
       setError(nextError?.message || "No fue posible actualizar la asignacion de domicilio.");
+    } finally {
+      setAsignacionSaving(false);
+    }
+  };
+
+  const toggleAutoAsignacionProduccion = async () => {
+    const targetEmpresaID = Number(empresaID);
+    if (!Number.isFinite(targetEmpresaID) || targetEmpresaID <= 0) return;
+    setAsignacionSaving(true);
+    setError("");
+    try {
+      const nextValue = !asignacionConfig.autoAsignacionProduccionActiva;
+      const data = await api.actualizarConfiguracionAsignacion({ empresaId: targetEmpresaID, autoAsignacionProduccionActiva: nextValue });
+      setAsignacionConfig({
+        asignacionProduccionActiva: Boolean(data.asignacionProduccionActiva),
+        asignacionDomicilioActiva: Boolean(data.asignacionDomicilioActiva),
+        autoAsignacionProduccionActiva: Boolean(data.autoAsignacionProduccionActiva),
+      });
+    } catch (nextError) {
+      console.error("Error actualizando autoasignacion automatica de produccion:", nextError);
+      setError(nextError?.message || "No fue posible actualizar la autoasignacion automatica.");
     } finally {
       setAsignacionSaving(false);
     }
@@ -1166,6 +1190,7 @@ export function useUsersManagementController({ session, canViewUsuariosGlobal })
     togglePaymentMethodActive,
     toggleAsignacionProduccion,
     toggleAsignacionDomicilio,
+    toggleAutoAsignacionProduccion,
     createFormProps,
     editFormProps,
   };
