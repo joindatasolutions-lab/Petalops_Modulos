@@ -22,6 +22,23 @@ export function defaultModulesForRole(role, activeModules) {
   return permitted.filter(modulo => activeSet.has(modulo));
 }
 
+// Fuentes disponibles para el tema de cada empresa (columna tema.fuente_familia). El valor
+// completo (stack de CSS font-family) se guarda tal cual, igual que el default historico
+// "Segoe UI, Tahoma, Geneva, Verdana, sans-serif" -- asi el catalogo web que lee esta tabla
+// no necesita ningun cambio, solo recibe un string de font-family distinto.
+// Las familias web (Montserrat, Cormorant, Poppins, Playfair Display, Lora) se cargan via
+// Google Fonts en index.html para que el <option> se vea realmente en esa tipografia.
+export const FONT_OPTIONS = [
+  { label: "Segoe UI (predeterminado)", value: "Segoe UI, Tahoma, Geneva, Verdana, sans-serif" },
+  { label: "Montserrat", value: "Montserrat, sans-serif" },
+  { label: "Cormorant", value: "Cormorant, serif" },
+  { label: "Poppins", value: "Poppins, sans-serif" },
+  { label: "Playfair Display", value: "Playfair Display, serif" },
+  { label: "Lora", value: "Lora, serif" },
+];
+
+export const DEFAULT_FONT_FAMILY = FONT_OPTIONS[0].value;
+
 export function defaultModulesForRoles(roles, selectedRoleIDs, activeModules) {
   const selected = new Set((selectedRoleIDs || []).map(item => String(item)));
   const activeSet = new Set(activeModules || []);

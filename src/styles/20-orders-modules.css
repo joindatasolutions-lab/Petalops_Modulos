@@ -4552,9 +4552,117 @@
   border: 1px solid rgba(233, 30, 114, 0.16);
 }
 
-.users-tenant-form {
+.users-tenant-form,
+.users-theme-form {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
+}
+
+.users-tenant-section-title {
+  grid-column: 1 / -1;
+  margin: 6px 0 -2px;
+  font-size: 12px;
+  font-weight: 850;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #8f2e56;
+  border-top: 1px dashed rgba(233, 30, 114, 0.18);
+  padding-top: 12px;
+}
+
+.users-theme-divider {
+  height: 1px;
+  background: rgba(233, 30, 114, 0.14);
+  margin: 20px 0;
+}
+
+.users-color-field {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.users-color-field span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #5f293f;
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.users-color-field-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.users-color-field-row input[type="color"] {
+  width: 42px;
+  height: 38px;
+  padding: 2px;
+  border-radius: 8px;
+  border: 1px solid rgba(233, 30, 114, 0.24);
+  cursor: pointer;
+  background: none;
+}
+
+.users-color-hex-input {
+  flex: 1;
+  min-width: 0;
+  font-family: "SFMono-Regular", Consolas, monospace;
+  text-transform: uppercase;
+}
+
+.users-color-swatch {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  flex: 0 0 26px;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+}
+
+.users-theme-preview {
+  grid-column: 1 / -1;
+}
+
+.users-theme-preview-label {
+  font-size: 12px;
+  font-weight: 850;
+  color: #5f293f;
+  margin-bottom: 8px;
+}
+
+.users-theme-preview-card {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding: 16px;
+  border-radius: 14px;
+  border: 2px solid;
+  background: #fffdf9;
+}
+
+.users-theme-preview-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 8px 16px;
+  border-radius: 999px;
+  color: #fff;
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.users-theme-preview-badge-secondary {
+  opacity: 0.92;
+}
+
+.users-theme-preview-card p {
+  flex-basis: 100%;
+  margin: 4px 0 0;
+  font-size: 16px;
 }
 
 .users-tenant-form label {

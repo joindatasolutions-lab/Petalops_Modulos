@@ -3,6 +3,7 @@ import { Building2, CreditCard, RefreshCw, UserPlus, UsersRound } from "lucide-r
 import { AppSidebar } from "../../shared/AppSidebar.jsx";
 import { CompanyModulesPanel } from "./components/CompanyModulesPanel.jsx";
 import { CompanyModulesSummaryTable } from "./components/CompanyModulesSummaryTable.jsx";
+import { CompanyProfilePanel } from "./components/CompanyProfilePanel.jsx";
 import { PaymentMethodsPanel } from "./components/PaymentMethodsPanel.jsx";
 import { CreateUserModal, EditUserModal, PaymentMethodModal } from "./components/UserModals.jsx";
 import { TenantCreatePanel } from "./components/TenantCreatePanel.jsx";
@@ -155,6 +156,22 @@ export function UsersManagementPage({
                 onSubmit={users.submitCreateTenant}
               />
             ) : null}
+
+            <CompanyProfilePanel
+              empresaID={users.empresaID}
+              empresaSeleccionadaNombre={users.empresaSeleccionadaNombre}
+              empresas={users.empresas}
+              setEmpresaID={users.setEmpresaID}
+              loading={users.companyProfileLoading}
+              profileForm={users.companyProfileForm}
+              setProfileForm={users.setCompanyProfileForm}
+              profileSaving={users.companyProfileSaving}
+              onSaveProfile={users.saveCompanyProfile}
+              themeForm={users.companyThemeForm}
+              setThemeForm={users.setCompanyThemeForm}
+              themeSaving={users.companyThemeSaving}
+              onSaveTheme={users.saveCompanyTheme}
+            />
 
             <CompanyModulesPanel
               empresaID={users.empresaID}

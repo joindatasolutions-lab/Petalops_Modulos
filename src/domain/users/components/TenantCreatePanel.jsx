@@ -72,9 +72,48 @@ export function TenantCreatePanel({ form, setForm, saving, onSubmit }) {
           <input type="password" value={form.adminPassword} onChange={event => update("adminPassword", event.target.value)} placeholder="Minimo 6 caracteres" required minLength={6} />
         </label>
         <label className="users-tenant-wide">
-          <span>Email admin</span>
+          <span>Email admin (login)</span>
           <input type="email" value={form.adminEmail} onChange={event => update("adminEmail", event.target.value)} placeholder="admin@empresa.com" />
         </label>
+
+        <p className="users-tenant-section-title">Datos comerciales de la empresa</p>
+
+        <label>
+          <span>NIT</span>
+          <input value={form.nit} onChange={event => update("nit", event.target.value)} placeholder="Se autogenera si se deja vacio" />
+        </label>
+        <label>
+          <span>Celular catalogo</span>
+          <input value={form.celular} onChange={event => update("celular", event.target.value)} placeholder="Numero que ve el cliente en el catalogo" />
+        </label>
+        <label>
+          <span>Ciudad</span>
+          <input value={form.ciudad} onChange={event => update("ciudad", event.target.value)} placeholder="Bogota" />
+        </label>
+        <label className="users-tenant-wide">
+          <span>Direccion</span>
+          <input value={form.direccion} onChange={event => update("direccion", event.target.value)} placeholder="Calle 123 #45-67" />
+        </label>
+
+        <p className="users-tenant-section-title">Contacto / administrador responsable</p>
+
+        <label>
+          <span>Nombre del administrador</span>
+          <input value={form.nombreResponsable} onChange={event => update("nombreResponsable", event.target.value)} placeholder="Nombre completo" />
+        </label>
+        <label>
+          <span>Contacto (cargo)</span>
+          <input value={form.cargoResponsable} onChange={event => update("cargoResponsable", event.target.value)} placeholder="Gerente, Encargado..." />
+        </label>
+        <label>
+          <span>Celular</span>
+          <input value={form.celularResponsable} onChange={event => update("celularResponsable", event.target.value)} placeholder="300 000 0000" />
+        </label>
+        <label>
+          <span>Email de contacto</span>
+          <input type="email" value={form.correoResponsable} onChange={event => update("correoResponsable", event.target.value)} placeholder="contacto@empresa.com" />
+        </label>
+
         <button type="submit" className="btn-primary users-tenant-submit" disabled={saving}>
           <Building2 size={18} strokeWidth={2} aria-hidden="true" />
           {saving ? "Creando tenant..." : "Crear tenant"}

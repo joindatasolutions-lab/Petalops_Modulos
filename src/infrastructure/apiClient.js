@@ -380,7 +380,10 @@ export function createApiClient(config) {
       return requestJson("/auth/usuarios/empresas/modulos");
     },
 
-    async crearEmpresaGestion({ nombreComercial, planID, estado = "Activo", slug = "", adminLogin = "", adminPassword = "", adminEmail = "", sucursalNombre = "" }) {
+    async crearEmpresaGestion({
+      nombreComercial, planID, estado = "Activo", slug = "", adminLogin = "", adminPassword = "", adminEmail = "", sucursalNombre = "",
+      nit = "", celular = "", ciudad = "", direccion = "", nombreResponsable = "", cargoResponsable = "", correoResponsable = "", celularResponsable = "",
+    }) {
       return requestJson("/auth/usuarios/empresas", {
         method: "POST",
         headers: {
@@ -395,7 +398,54 @@ export function createApiClient(config) {
           adminPassword,
           adminEmail,
           sucursalNombre,
+          nit,
+          celular,
+          ciudad,
+          direccion,
+          nombreResponsable,
+          cargoResponsable,
+          correoResponsable,
+          celularResponsable,
         })
+      });
+    },
+
+    async obtenerEmpresaGestion({ empresaId }) {
+      return requestJson(`/auth/usuarios/empresas/${empresaId}`);
+    },
+
+    async actualizarEmpresaGestion({ empresaId, nombreComercial, estado, nit, celular, ciudad, direccion, nombreResponsable, cargoResponsable, correoResponsable, celularResponsable }) {
+      return requestJson(`/auth/usuarios/empresas/${empresaId}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          nombreComercial,
+          estado,
+          nit,
+          celular,
+          ciudad,
+          direccion,
+          nombreResponsable,
+          cargoResponsable,
+          correoResponsable,
+          celularResponsable,
+        })
+      });
+    },
+
+    async obtenerTemaEmpresa({ empresaId }) {
+      return requestJson(`/auth/usuarios/empresas/${empresaId}/tema`);
+    },
+
+    async actualizarTemaEmpresa({ empresaId, colorPrimario, colorSecundario, fuenteFamilia }) {
+      return requestJson(`/auth/usuarios/empresas/${empresaId}/tema`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ colorPrimario, colorSecundario, fuenteFamilia })
       });
     },
 

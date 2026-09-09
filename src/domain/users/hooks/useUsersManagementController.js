@@ -5,6 +5,7 @@ import { createApiClient } from "../../../infrastructure/apiClient.js";
 import { useSidebarState } from "../../../shared/useSidebarState.js";
 import {
   UserFormModel,
+  DEFAULT_FONT_FAMILY,
   defaultModulesForRoles,
   filterVisibleRoles,
   normalizeTenantSlug,
@@ -18,6 +19,44 @@ import {
 const TENANT_S3_CREATE_ERROR_MESSAGE = "No fue posible crear la estructura de archivos del tenant en S3. Intenta nuevamente o contacta soporte.";
 const TENANT_CONFLICT_ERROR_MESSAGE = "Ya existe una empresa con ese nombre o slug.";
 const TENANT_INVALID_ERROR_MESSAGE = "Revisa el nombre, slug y datos del admin del tenant.";
+
+const INITIAL_TENANT_FORM = {
+  nombreComercial: "",
+  slug: "",
+  planID: "1",
+  estado: "Activo",
+  sucursalNombre: "",
+  adminLogin: "",
+  adminPassword: "",
+  adminEmail: "",
+  nit: "",
+  celular: "",
+  ciudad: "",
+  direccion: "",
+  nombreResponsable: "",
+  cargoResponsable: "",
+  correoResponsable: "",
+  celularResponsable: "",
+};
+
+const INITIAL_COMPANY_PROFILE_FORM = {
+  nombreComercial: "",
+  estado: "Activo",
+  nit: "",
+  celular: "",
+  ciudad: "",
+  direccion: "",
+  nombreResponsable: "",
+  cargoResponsable: "",
+  correoResponsable: "",
+  celularResponsable: "",
+};
+
+const INITIAL_COMPANY_THEME_FORM = {
+  colorPrimario: "#d94b8a",
+  colorSecundario: "#8f2e56",
+  fuenteFamilia: DEFAULT_FONT_FAMILY,
+};
 
 export function useUsersManagementController({ session, canViewUsuariosGlobal }) {
   const api = useMemo(() => createApiClient(tenantConfig), []);
@@ -49,6 +88,11 @@ export function useUsersManagementController({ session, canViewUsuariosGlobal })
   const [modulesLoading, setModulesLoading] = useState(false);
   const [modulesSaving, setModulesSaving] = useState(false);
   const [empresasModulesLoading, setEmpresasModulesLoading] = useState(false);
+  const [companyProfileForm, setCompanyProfileForm] = useState(INITIAL_COMPANY_PROFILE_FORM);
+  const [companyThemeForm, setCompanyThemeForm] = useState(INITIAL_COMPANY_THEME_FORM);
+  const [companyProfileLoading, setCompanyProfileLoading] = useState(false);
+  const [companyProfileSaving, setCompanyProfileSaving] = useState(false);
+  const [companyThemeSaving, setCompanyThemeSaving] = useState(false);
   const [newModulo, setNewModulo] = useState("");
   const [showAdvancedModules, setShowAdvancedModules] = useState(false);
   const [showUserModuleDropdown, setShowUserModuleDropdown] = useState(false);
@@ -69,16 +113,7 @@ export function useUsersManagementController({ session, canViewUsuariosGlobal })
   const [showEditDrawer, setShowEditDrawer] = useState(false);
   const [showEditModuleDropdown, setShowEditModuleDropdown] = useState(false);
   const [form, setForm] = useState(UserFormModel.initial());
-  const [tenantForm, setTenantForm] = useState({
-    nombreComercial: "",
-    slug: "",
-    planID: "1",
-    estado: "Activo",
-    sucursalNombre: "",
-    adminLogin: "",
-    adminPassword: "",
-    adminEmail: "",
-  });
+  const [tenantForm, setTenantForm] = useState(INITIAL_TENANT_FORM);
 
   const empresaSeleccionadaNombre = useMemo(() => {
     const found = empresas.find(item => Number(item.empresaID) === Number(empresaID));
@@ -281,6 +316,79 @@ export function useUsersManagementController({ session, canViewUsuariosGlobal })
     }
   }, [api, empresaID]);
 
+  const loadCompanyProfile = useCallback(async () => {
+    if (!canViewUsuariosGlobal) return;
+    const targetEmpresaID = Number(empresaID);
+    if (!Number.isFinite(targetEmpresaID) || targetEmpresaID <= 0) return;
+    setCompanyProfileLoading(true);
+    try {
+      const [empresa, tema] = await Promise.all([
+        api.obtenerEmpresaGestion({ empresaId: targetEmpresaID }),
+        api.obtenerTemaEmpresa({ empresaId: targetEmpresaID }),
+      ]);
+      setCompanyProfileForm({
+        nombreComercial: empresa?.nombreComercial || "",
+        estado: empresa?.estado || "Activo",
+        nit: empresa?.nit || "",
+        celular: empresa?.celular || "",
+        ciudad: empresa?.ciudad || "",
+        direccion: empresa?.direccion || "",
+        nombreResponsable: empresa?.nombreResponsable || "",
+        cargoResponsable: empresa?.cargoResponsable || "",
+        correoResponsable: empresa?.correoResponsable || "",
+        celularResponsable: empresa?.celularResponsable || "",
+      });
+      setCompanyThemeForm({
+        colorPrimario: tema?.colorPrimario || INITIAL_COMPANY_THEME_FORM.colorPrimario,
+        colorSecundario: tema?.colorSecundario || INITIAL_COMPANY_THEME_FORM.colorSecundario,
+        fuenteFamilia: tema?.fuenteFamilia || DEFAULT_FONT_FAMILY,
+      });
+    } catch (nextError) {
+      console.error("Error cargando perfil de empresa:", nextError);
+      setCompanyProfileForm(INITIAL_COMPANY_PROFILE_FORM);
+      setCompanyThemeForm(INITIAL_COMPANY_THEME_FORM);
+    } finally {
+      setCompanyProfileLoading(false);
+    }
+  }, [api, empresaID, canViewUsuariosGlobal]);
+
+  const saveCompanyProfile = useCallback(async event => {
+    event.preventDefault();
+    const targetEmpresaID = Number(empresaID);
+    if (!Number.isFinite(targetEmpresaID) || targetEmpresaID <= 0) return;
+    setCompanyProfileSaving(true);
+    setError("");
+    setInfo("");
+    try {
+      await api.actualizarEmpresaGestion({ empresaId: targetEmpresaID, ...companyProfileForm });
+      await loadEmpresas();
+      setInfo("Datos de la empresa actualizados.");
+    } catch (nextError) {
+      console.error("Error actualizando empresa:", nextError);
+      setError(nextError?.detail || nextError?.message || "No fue posible actualizar la empresa.");
+    } finally {
+      setCompanyProfileSaving(false);
+    }
+  }, [api, empresaID, companyProfileForm, loadEmpresas]);
+
+  const saveCompanyTheme = useCallback(async event => {
+    event.preventDefault();
+    const targetEmpresaID = Number(empresaID);
+    if (!Number.isFinite(targetEmpresaID) || targetEmpresaID <= 0) return;
+    setCompanyThemeSaving(true);
+    setError("");
+    setInfo("");
+    try {
+      await api.actualizarTemaEmpresa({ empresaId: targetEmpresaID, ...companyThemeForm });
+      setInfo("Tema (colores y tipografia) actualizado.");
+    } catch (nextError) {
+      console.error("Error actualizando tema de empresa:", nextError);
+      setError(nextError?.detail || nextError?.message || "No fue posible actualizar el tema.");
+    } finally {
+      setCompanyThemeSaving(false);
+    }
+  }, [api, empresaID, companyThemeForm]);
+
   const loadPaymentMethods = useCallback(async () => {
     const targetEmpresaID = Number(empresaID);
     if (!Number.isFinite(targetEmpresaID) || targetEmpresaID <= 0) {
@@ -345,6 +453,10 @@ export function useUsersManagementController({ session, canViewUsuariosGlobal })
   useEffect(() => {
     loadModules().catch(() => {});
   }, [loadModules]);
+
+  useEffect(() => {
+    loadCompanyProfile().catch(() => {});
+  }, [loadCompanyProfile]);
 
   useEffect(() => {
     loadPaymentMethods().catch(() => {});
@@ -498,21 +610,20 @@ export function useUsersManagementController({ session, canViewUsuariosGlobal })
         adminLogin,
         adminPassword,
         adminEmail: tenantForm.adminEmail,
+        nit: tenantForm.nit,
+        celular: tenantForm.celular,
+        ciudad: tenantForm.ciudad,
+        direccion: tenantForm.direccion,
+        nombreResponsable: tenantForm.nombreResponsable,
+        cargoResponsable: tenantForm.cargoResponsable,
+        correoResponsable: tenantForm.correoResponsable,
+        celularResponsable: tenantForm.celularResponsable,
       });
       await loadEmpresas();
       await loadEmpresasModuloResumen();
       if (response?.empresaID) setEmpresaID(Number(response.empresaID));
       const assetsPrefix = String(response?.assetsPrefix || "").trim();
-      setTenantForm({
-        nombreComercial: "",
-        slug: "",
-        planID: "1",
-        estado: "Activo",
-        sucursalNombre: "",
-        adminLogin: "",
-        adminPassword: "",
-        adminEmail: "",
-      });
+      setTenantForm(INITIAL_TENANT_FORM);
       setActivePanel("tenants");
       setShowTenantCreatePanel(false);
       setInfo(assetsPrefix
@@ -935,6 +1046,15 @@ export function useUsersManagementController({ session, canViewUsuariosGlobal })
     modulesLoading,
     modulesSaving,
     empresasModulesLoading,
+    companyProfileForm,
+    setCompanyProfileForm,
+    companyThemeForm,
+    setCompanyThemeForm,
+    companyProfileLoading,
+    companyProfileSaving,
+    companyThemeSaving,
+    saveCompanyProfile,
+    saveCompanyTheme,
     newModulo,
     setNewModulo,
     showAdvancedModules,
