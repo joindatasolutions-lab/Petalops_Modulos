@@ -61,6 +61,10 @@ export function useUsersManagementController({ session, canViewUsuariosGlobal })
   const [paymentMethodsLoading, setPaymentMethodsLoading] = useState(false);
   const [editingUserId, setEditingUserId] = useState(null);
   const [passwordVisible, setPasswordVisible] = useState(false);
+  const [storedPasswordVisible, setStoredPasswordVisible] = useState(false);
+  const [storedPasswordLoading, setStoredPasswordLoading] = useState(false);
+  const [storedPasswordValue, setStoredPasswordValue] = useState("");
+  const [storedPasswordMessage, setStoredPasswordMessage] = useState("");
   const [editForm, setEditForm] = useState(UserFormModel.initial());
   const [showEditDrawer, setShowEditDrawer] = useState(false);
   const [showEditModuleDropdown, setShowEditModuleDropdown] = useState(false);
@@ -119,6 +123,10 @@ export function useUsersManagementController({ session, canViewUsuariosGlobal })
   const closeEditDrawer = useCallback(() => {
     setEditingUserId(null);
     setPasswordVisible(false);
+    setStoredPasswordVisible(false);
+    setStoredPasswordLoading(false);
+    setStoredPasswordValue("");
+    setStoredPasswordMessage("");
     setShowEditDrawer(false);
     setShowEditModuleDropdown(false);
     setEditForm(current => UserFormModel.initial({
@@ -129,12 +137,14 @@ export function useUsersManagementController({ session, canViewUsuariosGlobal })
 
   const openCreateModal = useCallback(() => {
     setForm(UserFormModel.initial());
+    setPasswordVisible(false);
     setShowUserModuleDropdown(false);
     setShowCreateModal(true);
   }, []);
 
   const closeCreateModal = useCallback(() => {
     setShowCreateModal(false);
+    setPasswordVisible(false);
     setShowUserModuleDropdown(false);
     setForm(UserFormModel.initial());
   }, []);
@@ -642,6 +652,10 @@ export function useUsersManagementController({ session, canViewUsuariosGlobal })
       const detail = await api.obtenerUsuarioGestion({ userId: item.userID });
       setEditingUserId(item.userID);
       setPasswordVisible(false);
+      setStoredPasswordVisible(false);
+      setStoredPasswordLoading(false);
+      setStoredPasswordValue("");
+      setStoredPasswordMessage("");
       setEditForm({
         nombre: detail.nombre || "",
         login: detail.login || "",
@@ -662,6 +676,39 @@ export function useUsersManagementController({ session, canViewUsuariosGlobal })
       console.error("Error cargando usuario:", nextError);
       setError(nextError?.message || "No fue posible cargar el usuario.");
     }
+  };
+
+  const revealStoredPassword = async () => {
+    if (!editingUserId) return;
+    const confirmed = globalThis.confirm("Esta accion quedara auditada. ¿Quieres ver la contrasena guardada de este usuario?");
+    if (!confirmed) return;
+    setStoredPasswordLoading(true);
+    setStoredPasswordValue("");
+    setStoredPasswordMessage("");
+    setError("");
+    try {
+      const response = await api.obtenerPasswordUsuarioGestion({ userId: editingUserId });
+      if (response?.available && response?.password) {
+        setStoredPasswordValue(String(response.password));
+        setStoredPasswordVisible(true);
+        setStoredPasswordMessage("Contrasena recuperada desde el vault.");
+      } else {
+        setStoredPasswordVisible(false);
+        setStoredPasswordMessage(response?.message || "Este usuario no tiene contrasena recuperable.");
+      }
+    } catch (nextError) {
+      console.error("Error consultando contrasena guardada:", nextError);
+      setStoredPasswordVisible(false);
+      setStoredPasswordMessage("");
+      setError(nextError?.message || "No fue posible consultar la contrasena guardada.");
+    } finally {
+      setStoredPasswordLoading(false);
+    }
+  };
+
+  const hideStoredPassword = () => {
+    setStoredPasswordVisible(false);
+    setStoredPasswordValue("");
   };
 
   const deleteUser = async item => {
@@ -805,6 +852,8 @@ export function useUsersManagementController({ session, canViewUsuariosGlobal })
     selectedRoleIDs: form.rolesIDs || [],
     modulosActivosEmpresa,
     sucursales,
+    passwordVisible,
+    onTogglePasswordVisible: () => setPasswordVisible(current => !current),
     saving,
     onToggleRole: toggleUserRoleAccess,
     onSubmit: submitCreate,
@@ -832,6 +881,12 @@ export function useUsersManagementController({ session, canViewUsuariosGlobal })
     canViewUsuariosGlobal,
     passwordVisible,
     onTogglePasswordVisible: () => setPasswordVisible(current => !current),
+    storedPasswordVisible,
+    storedPasswordLoading,
+    storedPasswordValue,
+    storedPasswordMessage,
+    onRevealStoredPassword: revealStoredPassword,
+    onHideStoredPassword: hideStoredPassword,
     saving,
     onToggleRole: toggleEditUserRoleAccess,
     onSubmit: submitEdit,

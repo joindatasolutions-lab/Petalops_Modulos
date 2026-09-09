@@ -1291,6 +1291,42 @@
   padding-right: 48px;
 }
 
+.users-stored-password-box {
+  display: grid;
+  gap: 8px;
+  border: 1px solid rgba(236, 72, 153, 0.16);
+  border-radius: 14px;
+  padding: 12px;
+  background: #fff7fa;
+}
+
+.users-stored-password-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  color: #6f5960;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.users-stored-password-head .btn-outline {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  width: auto;
+  min-height: 34px;
+  padding: 8px 12px;
+  white-space: nowrap;
+}
+
+.users-page-view .users-stored-password-box input[readonly] {
+  background: #fff;
+  color: #241b20;
+  font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
+}
+
 .users-password-toggle {
   position: absolute;
   right: 6px;
@@ -1741,6 +1777,15 @@
   .header-actions {
     width: 100%;
     justify-content: stretch;
+  }
+
+  .users-stored-password-head {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .users-stored-password-head .btn-outline {
+    width: 100%;
   }
 
   .users-payment-panel-head {
