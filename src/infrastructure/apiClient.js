@@ -395,6 +395,16 @@ export function createApiClient(config) {
       });
     },
 
+    async crearMetodoPagoEmpresa({ empresaId, nombre }) {
+      return requestJson(`/configuracion/empresas/${empresaId}/metodos-pago`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ nombre })
+      });
+    },
+
     async listarModulosEmpresaGestion({ empresaId }) {
       const params = new URLSearchParams();
       params.set("empresaID", String(empresaId));
