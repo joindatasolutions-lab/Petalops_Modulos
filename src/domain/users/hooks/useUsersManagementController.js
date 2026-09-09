@@ -105,7 +105,7 @@ export function useUsersManagementController({ session, canViewUsuariosGlobal })
   const [paymentMethodEditing, setPaymentMethodEditing] = useState(null);
   const [paymentMethods, setPaymentMethods] = useState([]);
   const [paymentMethodsLoading, setPaymentMethodsLoading] = useState(false);
-  const [asignacionConfig, setAsignacionConfig] = useState({ asignacionProduccionActiva: false, asignacionDomicilioActiva: false });
+  const [asignacionConfig, setAsignacionConfig] = useState({ asignacionProduccionActiva: true, asignacionDomicilioActiva: true });
   const [asignacionLoading, setAsignacionLoading] = useState(false);
   const [asignacionSaving, setAsignacionSaving] = useState(false);
   const [editingUserId, setEditingUserId] = useState(null);
@@ -417,7 +417,7 @@ export function useUsersManagementController({ session, canViewUsuariosGlobal })
   const loadAsignacionConfig = useCallback(async () => {
     const targetEmpresaID = Number(empresaID);
     if (!Number.isFinite(targetEmpresaID) || targetEmpresaID <= 0) {
-      setAsignacionConfig({ asignacionProduccionActiva: false, asignacionDomicilioActiva: false });
+      setAsignacionConfig({ asignacionProduccionActiva: true, asignacionDomicilioActiva: true });
       return;
     }
     setAsignacionLoading(true);

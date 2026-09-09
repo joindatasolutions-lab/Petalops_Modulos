@@ -1787,7 +1787,7 @@ export function DeliveryPage({
   const usuarioCambio = String(session?.email || session?.nombre || "admin");
   const pedidosRole = isPedidosRole(session);
   const adminRole = isAdminRole(session);
-  const [asignacionDomicilioActiva, setAsignacionDomicilioActiva] = useState(false);
+  const [asignacionDomicilioActiva, setAsignacionDomicilioActiva] = useState(true);
   const canDomiciliarioSelfAssign = !adminRole && asignacionDomicilioActiva;
 
   useEffect(() => {

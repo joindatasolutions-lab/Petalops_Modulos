@@ -1413,7 +1413,7 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
   // Al final de la lista de useState a proposito: varios tests de este archivo mockean
   // useState por posicion (indice de llamada), asi que agregar un estado nuevo en medio
   // desplaza esos indices y rompe tests que no tienen nada que ver con esta funcionalidad.
-  const [asignacionProduccionActiva, setAsignacionProduccionActiva] = useState(false);
+  const [asignacionProduccionActiva, setAsignacionProduccionActiva] = useState(true);
   const productionListRef = useRef(null);
   const productionMenuRef = useRef(null);
 
