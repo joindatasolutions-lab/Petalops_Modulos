@@ -14,6 +14,12 @@ export function UserForm({
   canViewUsuariosGlobal,
   passwordVisible = false,
   onTogglePasswordVisible,
+  storedPasswordVisible = false,
+  storedPasswordLoading = false,
+  storedPasswordValue = "",
+  storedPasswordMessage = "",
+  onRevealStoredPassword,
+  onHideStoredPassword,
   modulesPicker,
   saving,
   onToggleRole,
@@ -69,8 +75,34 @@ export function UserForm({
             </button>
           </div>
           <span className="orders-admin-subtitle">
-            La contrasena actual no se puede ver porque se guarda cifrada; aqui solo puedes escribir y revisar una nueva.
+            Escribe una nueva contrasena solo si necesitas restablecerla.
           </span>
+          <div className="users-stored-password-box">
+            <div className="users-stored-password-head">
+              <span>Contrasena guardada</span>
+              {storedPasswordVisible ? (
+                <button type="button" className="btn-outline" onClick={onHideStoredPassword}>
+                  <EyeOff size={16} strokeWidth={2} aria-hidden="true" />
+                  Ocultar
+                </button>
+              ) : (
+                <button type="button" className="btn-outline" onClick={onRevealStoredPassword} disabled={storedPasswordLoading}>
+                  <Eye size={16} strokeWidth={2} aria-hidden="true" />
+                  {storedPasswordLoading ? "Consultando..." : "Ver contrasena"}
+                </button>
+              )}
+            </div>
+            {storedPasswordVisible ? (
+              <input
+                type="text"
+                value={storedPasswordValue}
+                name="stored-user-password"
+                readOnly
+                autoComplete="off"
+              />
+            ) : null}
+            {storedPasswordMessage ? <p className="orders-admin-subtitle">{storedPasswordMessage}</p> : null}
+          </div>
         </div>
       ) : (
         <div className="users-password-field">

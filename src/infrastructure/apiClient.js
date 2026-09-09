@@ -210,6 +210,10 @@ export function createApiClient(config) {
       return requestJson(`/auth/usuarios/id/${userId}`);
     },
 
+    async obtenerPasswordUsuarioGestion({ userId }) {
+      return requestJson(`/auth/usuarios/id/${userId}/password-vault`);
+    },
+
     async actualizarUsuarioGestion({ userId, nombre, login, password = "", email, rolID, rolesIDs = null, sucursalID, estado = "Activo", modulosAcceso = null }) {
       const payload = {
         nombre,
