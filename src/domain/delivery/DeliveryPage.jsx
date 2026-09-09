@@ -1787,6 +1787,21 @@ export function DeliveryPage({
   const usuarioCambio = String(session?.email || session?.nombre || "admin");
   const pedidosRole = isPedidosRole(session);
   const adminRole = isAdminRole(session);
+  const [asignacionDomicilioActiva, setAsignacionDomicilioActiva] = useState(false);
+  const canDomiciliarioSelfAssign = !adminRole && asignacionDomicilioActiva;
+
+  useEffect(() => {
+    if (adminRole || !empresaId) return;
+    let disposed = false;
+    api.obtenerConfiguracionAsignacion({ empresaId })
+      .then(data => {
+        if (!disposed) setAsignacionDomicilioActiva(Boolean(data?.asignacionDomicilioActiva));
+      })
+      .catch(nextError => {
+        console.error("Error cargando configuracion de asignacion:", nextError);
+      });
+    return () => { disposed = true; };
+  }, [api, empresaId, adminRole]);
   const displayUserName = useMemo(
     () => String(session?.nombre || session?.login || "Usuario").trim() || "Usuario",
     [session]
@@ -5333,9 +5348,11 @@ export function DeliveryPage({
                   <div className="delivery-courier-actions">
                     <button type="button" className="btn-outline" onClick={() => openDeliveryDetail(item)}>Ver detalle</button>
                     <button type="button" className="btn-outline" onClick={() => openMaps(item)}>Abrir Maps</button>
-                    <button type="button" className="btn-primary" onClick={() => onTomar(item)} disabled={actionKey === `tomar-${item.idEntrega}`}>
-                      {actionKey === `tomar-${item.idEntrega}` ? "Tomando..." : "Tomar pedido"}
-                    </button>
+                    {adminRole || canDomiciliarioSelfAssign ? (
+                      <button type="button" className="btn-primary" onClick={() => onTomar(item)} disabled={actionKey === `tomar-${item.idEntrega}`}>
+                        {actionKey === `tomar-${item.idEntrega}` ? "Tomando..." : "Tomar pedido"}
+                      </button>
+                    ) : null}
                   </div>
                 </article>
               ))}
@@ -5792,7 +5809,7 @@ export function DeliveryPage({
                 <div className="delivery-courier-actions">
                   <button type="button" className="btn-outline" onClick={() => openMaps(selectedDeliveryItem)}>Abrir en Google Maps</button>
                   <button type="button" className="btn-outline" onClick={() => openWhatsApp(selectedDeliveryItem)}>WhatsApp</button>
-                  {modo === "disponibles" ? (
+                  {modo === "disponibles" && (adminRole || canDomiciliarioSelfAssign) ? (
                     <button
                       type="button"
                       className="btn-primary"

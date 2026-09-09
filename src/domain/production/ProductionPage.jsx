@@ -1410,6 +1410,10 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
   const [activeMetricFilter, setActiveMetricFilter] = useState(null);
   const [productionPage, setProductionPage] = useState(1);
   const [productionPageSize, setProductionPageSize] = useState(10);
+  // Al final de la lista de useState a proposito: varios tests de este archivo mockean
+  // useState por posicion (indice de llamada), asi que agregar un estado nuevo en medio
+  // desplaza esos indices y rompe tests que no tienen nada que ver con esta funcionalidad.
+  const [asignacionProduccionActiva, setAsignacionProduccionActiva] = useState(false);
   const productionListRef = useRef(null);
   const productionMenuRef = useRef(null);
 
@@ -1980,6 +1984,21 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
   useEffect(() => {
     void loadFloristaData();
   }, [loadFloristaData]);
+
+  useEffect(() => {
+    if (canManageProductionActions || !empresaId) return;
+    let disposed = false;
+    api.obtenerConfiguracionAsignacion({ empresaId })
+      .then(data => {
+        if (!disposed) setAsignacionProduccionActiva(Boolean(data?.asignacionProduccionActiva));
+      })
+      .catch(nextError => {
+        console.error("Error cargando configuracion de asignacion:", nextError);
+      });
+    return () => { disposed = true; };
+  }, [api, empresaId, canManageProductionActions]);
+
+  const canFloristaSelfAssign = canFloristaQuickState && asignacionProduccionActiva;
 
 
   useEffect(() => {
@@ -2595,7 +2614,7 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
                           <span className={`production-timing-badge ${timing.className}`}>{timing.label}</span>
                         </div>
                         <div className="production-mobile-card-actions">
-                          {canManageProductionActions || canFloristaQuickState ? (
+                          {canManageProductionActions || canFloristaSelfAssign ? (
                             <button type="button" onClick={() => openAssignmentDrawer(item)}>Asignar</button>
                           ) : null}
                           <button type="button" onClick={() => openActionsDrawer(item)}>Ver detalle</button>
@@ -2828,7 +2847,7 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
                             <Eye size={18} strokeWidth={2} aria-hidden="true" />
                             <span className="production-action-label">Ver detalle</span>
                           </button>
-                          {canManageProductionActions || canFloristaQuickState ? (
+                          {canManageProductionActions || canFloristaSelfAssign ? (
                             <button
                               type="button"
                               className="production-icon-action production-icon-action--assign"
@@ -2979,7 +2998,7 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
                       >
                         <Eye size={18} strokeWidth={2} aria-hidden="true" />
                       </button>
-                      {canManageProductionActions || canFloristaQuickState ? (
+                      {canManageProductionActions || canFloristaSelfAssign ? (
                         <button
                           type="button"
                           className="production-icon-action production-icon-action--assign"
