@@ -1,4 +1,4 @@
-import { Building2, X } from "lucide-react";
+import { Building2, CreditCard, X } from "lucide-react";
 
 import { UserForm } from "./UserForm.jsx";
 
@@ -45,6 +45,82 @@ export function CreateUserModal({
         </header>
 
         <UserForm mode="create" canViewUsuariosGlobal={canViewUsuariosGlobal} onCancel={onClose} {...formProps} />
+      </section>
+    </div>
+  );
+}
+
+export function PaymentMethodModal({
+  empresaSeleccionadaNombre,
+  empresaID,
+  empresas = [],
+  setEmpresaID,
+  canViewUsuariosGlobal,
+  form,
+  setForm,
+  saving,
+  onSubmit,
+  onClose,
+}) {
+  return (
+    <div className="users-modal-backdrop" role="presentation" onMouseDown={onClose}>
+      <section
+        className="users-modal-panel users-payment-method-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="users-payment-method-modal-title"
+        onMouseDown={event => event.stopPropagation()}
+      >
+        <header className="users-modal-head">
+          <div>
+            <p className="orders-admin-subtitle">Metodos de pago</p>
+            <h3 id="users-payment-method-modal-title">Crear metodo de pago</h3>
+            <p className="orders-admin-subtitle">Empresa objetivo: <strong>{empresaSeleccionadaNombre}</strong> (ID {empresaID}).</p>
+            {canViewUsuariosGlobal ? (
+              <label className="users-modal-tenant-picker">
+                <span><Building2 size={15} strokeWidth={2} aria-hidden="true" /> Tenant para el metodo de pago</span>
+                <select value={empresaID} onChange={event => setEmpresaID?.(Number(event.target.value))}>
+                  {empresas.map(item => (
+                    <option key={item.empresaID} value={item.empresaID}>
+                      {item.empresaSlug ? `${item.nombre} (ID ${item.empresaID} - ${item.empresaSlug})` : `${item.nombre} (ID ${item.empresaID})`}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            ) : null}
+          </div>
+          <button type="button" className="users-modal-close" onClick={onClose} aria-label="Cerrar crear metodo de pago">
+            <X size={18} strokeWidth={2.4} aria-hidden="true" />
+          </button>
+        </header>
+
+        <form className="users-create-form users-payment-method-form" onSubmit={onSubmit} autoComplete="off">
+          <label className="users-payment-method-field">
+            <span>Nombre del metodo</span>
+            <input
+              type="text"
+              name="new-payment-method-name"
+              placeholder="Ej. Nequi, Daviplata, Transferencia"
+              value={form.nombre}
+              autoComplete="off"
+              onChange={event => setForm(current => ({ ...current, nombre: event.target.value }))}
+              required
+              autoFocus
+            />
+          </label>
+
+          <div className="users-payment-method-note">
+            <CreditCard size={18} strokeWidth={2} aria-hidden="true" />
+            <p>El metodo quedara activo para la empresa seleccionada y disponible para pedidos.</p>
+          </div>
+
+          <div className="users-modal-actions">
+            <button type="button" className="btn-outline" onClick={onClose}>Cancelar</button>
+            <button type="submit" className="btn-primary" disabled={saving}>
+              {saving ? "Guardando..." : "Crear metodo de pago"}
+            </button>
+          </div>
+        </form>
       </section>
     </div>
   );

@@ -699,6 +699,62 @@
   font-size: 14px;
 }
 
+.users-payment-method-modal {
+  width: min(560px, 100%);
+}
+
+.users-payment-method-form {
+  display: grid;
+  gap: 14px;
+}
+
+.users-payment-method-field {
+  display: grid;
+  gap: 7px;
+  color: #6f5960;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.users-payment-method-form input {
+  width: 100%;
+  min-height: 44px;
+  border: 1px solid #ead9de;
+  border-radius: 14px;
+  padding: 10px 12px;
+  background: #fff;
+  color: #241b20;
+  font-size: 14px;
+  font-weight: 700;
+  outline: none;
+}
+
+.users-payment-method-form input:focus {
+  border-color: rgba(236, 72, 153, 0.42);
+  box-shadow: 0 0 0 3px rgba(236, 72, 153, 0.12);
+}
+
+.users-payment-method-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  border: 1px solid rgba(236, 72, 153, 0.16);
+  border-radius: 14px;
+  padding: 12px;
+  background: #fff7fa;
+  color: #7f3958;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.users-payment-method-note svg {
+  flex: 0 0 auto;
+}
+
+.users-payment-method-note p {
+  margin: 0;
+}
+
 .users-role-picker {
   display: grid;
   gap: 7px;

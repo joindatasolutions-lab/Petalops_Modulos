@@ -1,9 +1,9 @@
-import { Building2, RefreshCw, UserPlus, UsersRound } from "lucide-react";
+import { Building2, CreditCard, RefreshCw, UserPlus, UsersRound } from "lucide-react";
 
 import { AppSidebar } from "../../shared/AppSidebar.jsx";
 import { CompanyModulesPanel } from "./components/CompanyModulesPanel.jsx";
 import { CompanyModulesSummaryTable } from "./components/CompanyModulesSummaryTable.jsx";
-import { CreateUserModal, EditUserModal } from "./components/UserModals.jsx";
+import { CreateUserModal, EditUserModal, PaymentMethodModal } from "./components/UserModals.jsx";
 import { TenantCreatePanel } from "./components/TenantCreatePanel.jsx";
 import { UsersFilters } from "./components/UsersFilters.jsx";
 import { UsersTable } from "./components/UsersTable.jsx";
@@ -88,10 +88,16 @@ export function UsersManagementPage({
               </button>
             ) : null}
             {isUsuariosPanel ? (
-              <button type="button" className="btn-primary users-create-open-btn" onClick={users.openCreateModal}>
-                <UserPlus size={18} strokeWidth={2} aria-hidden="true" />
-                Crear usuario
-              </button>
+              <>
+                <button type="button" className="btn-primary users-create-open-btn" onClick={users.openPaymentMethodModal}>
+                  <CreditCard size={18} strokeWidth={2} aria-hidden="true" />
+                  Crear metodo de pago
+                </button>
+                <button type="button" className="btn-primary users-create-open-btn" onClick={users.openCreateModal}>
+                  <UserPlus size={18} strokeWidth={2} aria-hidden="true" />
+                  Crear usuario
+                </button>
+              </>
             ) : null}
             <button
               type="button"
@@ -192,6 +198,21 @@ export function UsersManagementPage({
           canViewUsuariosGlobal={canViewUsuariosGlobal}
           onClose={users.closeCreateModal}
           formProps={users.createFormProps}
+        />
+      ) : null}
+
+      {users.showPaymentMethodModal ? (
+        <PaymentMethodModal
+          empresaSeleccionadaNombre={users.empresaSeleccionadaNombre}
+          empresaID={users.empresaID}
+          empresas={users.empresas}
+          setEmpresaID={users.setEmpresaID}
+          canViewUsuariosGlobal={canViewUsuariosGlobal}
+          form={users.paymentMethodForm}
+          setForm={users.setPaymentMethodForm}
+          saving={users.paymentMethodSaving}
+          onSubmit={users.submitCreatePaymentMethod}
+          onClose={users.closePaymentMethodModal}
         />
       ) : null}
 

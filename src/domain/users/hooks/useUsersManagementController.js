@@ -53,6 +53,9 @@ export function useUsersManagementController({ session, canViewUsuariosGlobal })
   const [showAdvancedModules, setShowAdvancedModules] = useState(false);
   const [showUserModuleDropdown, setShowUserModuleDropdown] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showPaymentMethodModal, setShowPaymentMethodModal] = useState(false);
+  const [paymentMethodForm, setPaymentMethodForm] = useState({ nombre: "" });
+  const [paymentMethodSaving, setPaymentMethodSaving] = useState(false);
   const [editingUserId, setEditingUserId] = useState(null);
   const [passwordVisible, setPasswordVisible] = useState(false);
   const [editForm, setEditForm] = useState(UserFormModel.initial());
@@ -131,6 +134,16 @@ export function useUsersManagementController({ session, canViewUsuariosGlobal })
     setShowCreateModal(false);
     setShowUserModuleDropdown(false);
     setForm(UserFormModel.initial());
+  }, []);
+
+  const openPaymentMethodModal = useCallback(() => {
+    setPaymentMethodForm({ nombre: "" });
+    setShowPaymentMethodModal(true);
+  }, []);
+
+  const closePaymentMethodModal = useCallback(() => {
+    setShowPaymentMethodModal(false);
+    setPaymentMethodForm({ nombre: "" });
   }, []);
 
   const selectedUserModulesCount = (form.modulosAcceso || []).length;
@@ -336,6 +349,46 @@ export function useUsersManagementController({ session, canViewUsuariosGlobal })
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [closeCreateModal, showCreateModal]);
+
+  useEffect(() => {
+    if (!showPaymentMethodModal) return undefined;
+    const onKeyDown = event => {
+      if (event.key === "Escape") closePaymentMethodModal();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [closePaymentMethodModal, showPaymentMethodModal]);
+
+
+  const submitCreatePaymentMethod = async event => {
+    event.preventDefault();
+    const nombre = String(paymentMethodForm.nombre || "").trim();
+    const targetEmpresaID = Number(empresaID);
+    if (!Number.isFinite(targetEmpresaID) || targetEmpresaID <= 0) {
+      setError("Selecciona una empresa valida para crear el metodo de pago.");
+      return;
+    }
+    if (nombre.length < 2) {
+      setError("El metodo de pago debe tener al menos 2 caracteres.");
+      return;
+    }
+    setPaymentMethodSaving(true);
+    setError("");
+    setInfo("");
+    try {
+      const response = await api.crearMetodoPagoEmpresa({
+        empresaId: targetEmpresaID,
+        nombre,
+      });
+      closePaymentMethodModal();
+      setInfo(`Metodo de pago ${response?.nombre || nombre} creado para ${empresaSeleccionadaNombre}.`);
+    } catch (nextError) {
+      console.error("Error creando metodo de pago:", nextError);
+      setError(nextError?.message || "No fue posible crear el metodo de pago.");
+    } finally {
+      setPaymentMethodSaving(false);
+    }
+  };
 
 
   const submitCreateTenant = async event => {
@@ -769,7 +822,12 @@ export function useUsersManagementController({ session, canViewUsuariosGlobal })
     setShowAdvancedModules,
     showCreateModal,
     setShowCreateModal,
+    showPaymentMethodModal,
+    paymentMethodForm,
+    setPaymentMethodForm,
+    paymentMethodSaving,
     openCreateModal,
+    openPaymentMethodModal,
     editingUserId,
     editForm,
     showEditDrawer,
@@ -777,6 +835,7 @@ export function useUsersManagementController({ session, canViewUsuariosGlobal })
     loadUsers,
     loadEmpresasModuloResumen,
     closeCreateModal,
+    closePaymentMethodModal,
     closeEditDrawer,
     toggleEstado,
     toggleModule,
@@ -784,6 +843,7 @@ export function useUsersManagementController({ session, canViewUsuariosGlobal })
     deleteUser,
     saveModules,
     addModulo,
+    submitCreatePaymentMethod,
     createFormProps,
     editFormProps,
   };
