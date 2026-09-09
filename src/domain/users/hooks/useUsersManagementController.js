@@ -105,6 +105,9 @@ export function useUsersManagementController({ session, canViewUsuariosGlobal })
   const [paymentMethodEditing, setPaymentMethodEditing] = useState(null);
   const [paymentMethods, setPaymentMethods] = useState([]);
   const [paymentMethodsLoading, setPaymentMethodsLoading] = useState(false);
+  const [asignacionConfig, setAsignacionConfig] = useState({ asignacionProduccionActiva: false, asignacionDomicilioActiva: false });
+  const [asignacionLoading, setAsignacionLoading] = useState(false);
+  const [asignacionSaving, setAsignacionSaving] = useState(false);
   const [editingUserId, setEditingUserId] = useState(null);
   const [passwordVisible, setPasswordVisible] = useState(false);
   const [storedPasswordVisible, setStoredPasswordVisible] = useState(false);
@@ -411,6 +414,68 @@ export function useUsersManagementController({ session, canViewUsuariosGlobal })
     }
   }, [api, empresaID]);
 
+  const loadAsignacionConfig = useCallback(async () => {
+    const targetEmpresaID = Number(empresaID);
+    if (!Number.isFinite(targetEmpresaID) || targetEmpresaID <= 0) {
+      setAsignacionConfig({ asignacionProduccionActiva: false, asignacionDomicilioActiva: false });
+      return;
+    }
+    setAsignacionLoading(true);
+    setError("");
+    try {
+      const data = await api.obtenerConfiguracionAsignacion({ empresaId: targetEmpresaID });
+      setAsignacionConfig({
+        asignacionProduccionActiva: Boolean(data.asignacionProduccionActiva),
+        asignacionDomicilioActiva: Boolean(data.asignacionDomicilioActiva),
+      });
+    } catch (nextError) {
+      console.error("Error cargando configuracion de asignacion:", nextError);
+      setError(nextError?.message || "No fue posible cargar la configuracion de asignacion.");
+    } finally {
+      setAsignacionLoading(false);
+    }
+  }, [api, empresaID]);
+
+  const toggleAsignacionProduccion = async () => {
+    const targetEmpresaID = Number(empresaID);
+    if (!Number.isFinite(targetEmpresaID) || targetEmpresaID <= 0) return;
+    setAsignacionSaving(true);
+    setError("");
+    try {
+      const nextValue = !asignacionConfig.asignacionProduccionActiva;
+      const data = await api.actualizarConfiguracionAsignacion({ empresaId: targetEmpresaID, asignacionProduccionActiva: nextValue });
+      setAsignacionConfig({
+        asignacionProduccionActiva: Boolean(data.asignacionProduccionActiva),
+        asignacionDomicilioActiva: Boolean(data.asignacionDomicilioActiva),
+      });
+    } catch (nextError) {
+      console.error("Error actualizando asignacion de produccion:", nextError);
+      setError(nextError?.message || "No fue posible actualizar la asignacion de produccion.");
+    } finally {
+      setAsignacionSaving(false);
+    }
+  };
+
+  const toggleAsignacionDomicilio = async () => {
+    const targetEmpresaID = Number(empresaID);
+    if (!Number.isFinite(targetEmpresaID) || targetEmpresaID <= 0) return;
+    setAsignacionSaving(true);
+    setError("");
+    try {
+      const nextValue = !asignacionConfig.asignacionDomicilioActiva;
+      const data = await api.actualizarConfiguracionAsignacion({ empresaId: targetEmpresaID, asignacionDomicilioActiva: nextValue });
+      setAsignacionConfig({
+        asignacionProduccionActiva: Boolean(data.asignacionProduccionActiva),
+        asignacionDomicilioActiva: Boolean(data.asignacionDomicilioActiva),
+      });
+    } catch (nextError) {
+      console.error("Error actualizando asignacion de domicilio:", nextError);
+      setError(nextError?.message || "No fue posible actualizar la asignacion de domicilio.");
+    } finally {
+      setAsignacionSaving(false);
+    }
+  };
+
   const loadEmpresasModuloResumen = useCallback(async () => {
     if (!canViewUsuariosGlobal) return;
     setEmpresasModulesLoading(true);
@@ -463,6 +528,10 @@ export function useUsersManagementController({ session, canViewUsuariosGlobal })
   useEffect(() => {
     loadPaymentMethods().catch(() => {});
   }, [loadPaymentMethods]);
+
+  useEffect(() => {
+    loadAsignacionConfig().catch(() => {});
+  }, [loadAsignacionConfig]);
 
   useEffect(() => {
     setForm(current => {
@@ -1070,6 +1139,9 @@ export function useUsersManagementController({ session, canViewUsuariosGlobal })
     paymentMethodEditing,
     paymentMethods,
     paymentMethodsLoading,
+    asignacionConfig,
+    asignacionLoading,
+    asignacionSaving,
     openCreateModal,
     openPaymentMethodModal,
     editingUserId,
@@ -1078,6 +1150,7 @@ export function useUsersManagementController({ session, canViewUsuariosGlobal })
     empresaSeleccionadaNombre,
     loadUsers,
     loadPaymentMethods,
+    loadAsignacionConfig,
     loadEmpresasModuloResumen,
     closeCreateModal,
     closePaymentMethodModal,
@@ -1091,6 +1164,8 @@ export function useUsersManagementController({ session, canViewUsuariosGlobal })
     submitCreatePaymentMethod,
     editPaymentMethod,
     togglePaymentMethodActive,
+    toggleAsignacionProduccion,
+    toggleAsignacionDomicilio,
     createFormProps,
     editFormProps,
   };

@@ -4721,6 +4721,35 @@
   }
 }
 
+.users-acciones-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 16px;
+}
+
+.users-acciones-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.users-acciones-card-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.users-acciones-card-head h5 {
+  margin: 0 0 4px;
+}
+
+@media (max-width: 640px) {
+  .users-acciones-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
 .users-modal-tenant-picker {
   display: grid;
   gap: 6px;

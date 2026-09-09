@@ -477,6 +477,23 @@ export function createApiClient(config) {
       });
     },
 
+    async obtenerConfiguracionAsignacion({ empresaId }) {
+      return requestJson(`/configuracion/empresas/${empresaId}/asignacion`);
+    },
+
+    async actualizarConfiguracionAsignacion({ empresaId, asignacionProduccionActiva, asignacionDomicilioActiva }) {
+      const payload = {};
+      if (asignacionProduccionActiva !== undefined) payload.asignacionProduccionActiva = asignacionProduccionActiva;
+      if (asignacionDomicilioActiva !== undefined) payload.asignacionDomicilioActiva = asignacionDomicilioActiva;
+      return requestJson(`/configuracion/empresas/${empresaId}/asignacion`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(payload)
+      });
+    },
+
     async listarModulosEmpresaGestion({ empresaId }) {
       const params = new URLSearchParams();
       params.set("empresaID", String(empresaId));

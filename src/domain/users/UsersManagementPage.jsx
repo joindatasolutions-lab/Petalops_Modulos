@@ -1,6 +1,7 @@
-import { Building2, CreditCard, RefreshCw, UserPlus, UsersRound } from "lucide-react";
+import { Building2, CreditCard, RefreshCw, SlidersHorizontal, UserPlus, UsersRound } from "lucide-react";
 
 import { AppSidebar } from "../../shared/AppSidebar.jsx";
+import { AccionesPanel } from "./components/AccionesPanel.jsx";
 import { CompanyModulesPanel } from "./components/CompanyModulesPanel.jsx";
 import { CompanyModulesSummaryTable } from "./components/CompanyModulesSummaryTable.jsx";
 import { CompanyProfilePanel } from "./components/CompanyProfilePanel.jsx";
@@ -62,7 +63,8 @@ export function UsersManagementPage({
   };
   const isTenantsPanel = canViewUsuariosGlobal && users.activePanel === "tenants";
   const isPaymentMethodsPanel = users.activePanel === "paymentMethods";
-  const isUsuariosPanel = !isPaymentMethodsPanel && (!canViewUsuariosGlobal || users.activePanel === "usuarios");
+  const isAccionesPanel = users.activePanel === "acciones";
+  const isUsuariosPanel = !isPaymentMethodsPanel && !isAccionesPanel && (!canViewUsuariosGlobal || users.activePanel === "usuarios");
 
   return (
     <div className={`app-shell ${users.sidebarPinned ? "is-sidebar-pinned" : ""} ${users.sidebarMobileOpen ? "is-sidebar-mobile-open" : ""}`}>
@@ -100,11 +102,11 @@ export function UsersManagementPage({
             <button
               type="button"
               className="btn-primary orders-header-refresh"
-              onClick={isTenantsPanel ? users.loadEmpresasModuloResumen : (isPaymentMethodsPanel ? users.loadPaymentMethods : users.loadUsers)}
-              disabled={users.loading || users.empresasModulesLoading || users.paymentMethodsLoading}
+              onClick={isTenantsPanel ? users.loadEmpresasModuloResumen : (isPaymentMethodsPanel ? users.loadPaymentMethods : (isAccionesPanel ? users.loadAsignacionConfig : users.loadUsers))}
+              disabled={users.loading || users.empresasModulesLoading || users.paymentMethodsLoading || users.asignacionLoading}
             >
               <RefreshCw size={18} strokeWidth={2} aria-hidden="true" />
-              {users.loading || users.empresasModulesLoading || users.paymentMethodsLoading ? "Actualizando..." : "Actualizar"}
+              {users.loading || users.empresasModulesLoading || users.paymentMethodsLoading || users.asignacionLoading ? "Actualizando..." : "Actualizar"}
             </button>
           </div>
         </header>
@@ -123,6 +125,10 @@ export function UsersManagementPage({
           <button type="button" className={isPaymentMethodsPanel ? "is-active" : ""} onClick={() => users.setActivePanel("paymentMethods")}>
             <CreditCard size={16} strokeWidth={2} aria-hidden="true" />
             Metodos de pago
+          </button>
+          <button type="button" className={isAccionesPanel ? "is-active" : ""} onClick={() => users.setActivePanel("acciones")}>
+            <SlidersHorizontal size={16} strokeWidth={2} aria-hidden="true" />
+            Acciones
           </button>
         </nav>
 
@@ -241,6 +247,20 @@ export function UsersManagementPage({
             onCreate={users.openPaymentMethodModal}
             onEdit={users.editPaymentMethod}
             onToggleActive={users.togglePaymentMethodActive}
+          />
+        ) : isAccionesPanel ? (
+          <AccionesPanel
+            empresaID={users.empresaID}
+            empresaSeleccionadaNombre={users.empresaSeleccionadaNombre}
+            empresas={users.empresas}
+            setEmpresaID={users.setEmpresaID}
+            canViewUsuariosGlobal={canViewUsuariosGlobal}
+            loading={users.asignacionLoading}
+            saving={users.asignacionSaving}
+            asignacionProduccionActiva={users.asignacionConfig.asignacionProduccionActiva}
+            asignacionDomicilioActiva={users.asignacionConfig.asignacionDomicilioActiva}
+            onToggleProduccion={users.toggleAsignacionProduccion}
+            onToggleDomicilio={users.toggleAsignacionDomicilio}
           />
         ) : (
           <section className="users-grid-layout users-list-layout">
