@@ -4,6 +4,7 @@ import { AppSidebar } from "../../shared/AppSidebar.jsx";
 import { CompanyModulesPanel } from "./components/CompanyModulesPanel.jsx";
 import { CompanyModulesSummaryTable } from "./components/CompanyModulesSummaryTable.jsx";
 import { CompanyProfilePanel } from "./components/CompanyProfilePanel.jsx";
+import { CompanyThemePanel } from "./components/CompanyThemePanel.jsx";
 import { PaymentMethodsPanel } from "./components/PaymentMethodsPanel.jsx";
 import { CreateUserModal, EditUserModal, PaymentMethodModal } from "./components/UserModals.jsx";
 import { TenantCreatePanel } from "./components/TenantCreatePanel.jsx";
@@ -85,7 +86,7 @@ export function UsersManagementPage({
           </div>
           <div className="header-actions">
             {isTenantsPanel ? (
-              <button type="button" className="btn-primary users-create-open-btn" onClick={() => users.setShowTenantCreatePanel(true)}>
+              <button type="button" className="btn-primary users-create-open-btn" onClick={() => users.setTenantSection("crear")}>
                 <Building2 size={18} strokeWidth={2} aria-hidden="true" />
                 Nuevo tenant
               </button>
@@ -148,7 +149,26 @@ export function UsersManagementPage({
 
         {isTenantsPanel ? (
           <section className="users-tenants-layout">
-            {users.showTenantCreatePanel ? (
+            <nav className="users-section-tabs users-tenant-subtabs" aria-label="Secciones de empresas">
+              <button type="button" className={users.tenantSection === "crear" ? "is-active" : ""} onClick={() => users.setTenantSection("crear")}>
+                <Building2 size={16} strokeWidth={2} aria-hidden="true" />
+                Crear tenant
+              </button>
+              <button type="button" className={users.tenantSection === "perfil" ? "is-active" : ""} onClick={() => users.setTenantSection("perfil")}>
+                Perfil de la empresa
+              </button>
+              <button type="button" className={users.tenantSection === "tema" ? "is-active" : ""} onClick={() => users.setTenantSection("tema")}>
+                Tema visual (catalogo web)
+              </button>
+              <button type="button" className={users.tenantSection === "modulos" ? "is-active" : ""} onClick={() => users.setTenantSection("modulos")}>
+                Habilitacion comercial de modulos
+              </button>
+              <button type="button" className={users.tenantSection === "resumen" ? "is-active" : ""} onClick={() => users.setTenantSection("resumen")}>
+                Modulos por empresa
+              </button>
+            </nav>
+
+            {users.tenantSection === "crear" ? (
               <TenantCreatePanel
                 form={users.tenantForm}
                 setForm={users.setTenantForm}
@@ -157,40 +177,56 @@ export function UsersManagementPage({
               />
             ) : null}
 
-            <CompanyProfilePanel
-              empresaID={users.empresaID}
-              empresaSeleccionadaNombre={users.empresaSeleccionadaNombre}
-              empresas={users.empresas}
-              setEmpresaID={users.setEmpresaID}
-              loading={users.companyProfileLoading}
-              profileForm={users.companyProfileForm}
-              setProfileForm={users.setCompanyProfileForm}
-              profileSaving={users.companyProfileSaving}
-              onSaveProfile={users.saveCompanyProfile}
-              themeForm={users.companyThemeForm}
-              setThemeForm={users.setCompanyThemeForm}
-              themeSaving={users.companyThemeSaving}
-              onSaveTheme={users.saveCompanyTheme}
-            />
+            {users.tenantSection === "perfil" ? (
+              <CompanyProfilePanel
+                empresaID={users.empresaID}
+                empresaSeleccionadaNombre={users.empresaSeleccionadaNombre}
+                empresas={users.empresas}
+                setEmpresaID={users.setEmpresaID}
+                loading={users.companyProfileLoading}
+                profileForm={users.companyProfileForm}
+                setProfileForm={users.setCompanyProfileForm}
+                profileSaving={users.companyProfileSaving}
+                onSaveProfile={users.saveCompanyProfile}
+              />
+            ) : null}
 
-            <CompanyModulesPanel
-              empresaID={users.empresaID}
-              empresaSeleccionadaNombre={users.empresaSeleccionadaNombre}
-              empresas={users.empresas}
-              setEmpresaID={users.setEmpresaID}
-              modulesLoading={users.modulesLoading}
-              moduleItems={users.moduleItems}
-              onToggleModule={users.toggleModule}
-              showAdvancedModules={users.showAdvancedModules}
-              setShowAdvancedModules={users.setShowAdvancedModules}
-              newModulo={users.newModulo}
-              setNewModulo={users.setNewModulo}
-              onAddModulo={users.addModulo}
-              modulesSaving={users.modulesSaving}
-              onSaveModules={users.saveModules}
-            />
+            {users.tenantSection === "tema" ? (
+              <CompanyThemePanel
+                empresaID={users.empresaID}
+                empresaSeleccionadaNombre={users.empresaSeleccionadaNombre}
+                empresas={users.empresas}
+                setEmpresaID={users.setEmpresaID}
+                loading={users.companyProfileLoading}
+                themeForm={users.companyThemeForm}
+                setThemeForm={users.setCompanyThemeForm}
+                themeSaving={users.companyThemeSaving}
+                onSaveTheme={users.saveCompanyTheme}
+              />
+            ) : null}
 
-            <CompanyModulesSummaryTable loading={users.empresasModulesLoading} items={users.empresasModuloResumen} />
+            {users.tenantSection === "modulos" ? (
+              <CompanyModulesPanel
+                empresaID={users.empresaID}
+                empresaSeleccionadaNombre={users.empresaSeleccionadaNombre}
+                empresas={users.empresas}
+                setEmpresaID={users.setEmpresaID}
+                modulesLoading={users.modulesLoading}
+                moduleItems={users.moduleItems}
+                onToggleModule={users.toggleModule}
+                showAdvancedModules={users.showAdvancedModules}
+                setShowAdvancedModules={users.setShowAdvancedModules}
+                newModulo={users.newModulo}
+                setNewModulo={users.setNewModulo}
+                onAddModulo={users.addModulo}
+                modulesSaving={users.modulesSaving}
+                onSaveModules={users.saveModules}
+              />
+            ) : null}
+
+            {users.tenantSection === "resumen" ? (
+              <CompanyModulesSummaryTable loading={users.empresasModulesLoading} items={users.empresasModuloResumen} />
+            ) : null}
           </section>
         ) : isPaymentMethodsPanel ? (
           <PaymentMethodsPanel

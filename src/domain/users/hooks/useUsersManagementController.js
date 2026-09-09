@@ -72,7 +72,9 @@ export function useUsersManagementController({ session, canViewUsuariosGlobal })
   const [estadoFiltro, setEstadoFiltro] = useState("");
   const [q, setQ] = useState("");
   const [activePanel, setActivePanel] = useState(canViewUsuariosGlobal ? "tenants" : "usuarios");
-  const [showTenantCreatePanel, setShowTenantCreatePanel] = useState(false);
+  // Sub-secciones independientes dentro de "Empresas/tenants": cada una es su propia
+  // pestana/formulario, no se muestran todas apiladas en la misma pagina.
+  const [tenantSection, setTenantSection] = useState("perfil");
 
   const [items, setItems] = useState([]);
   const [empresas, setEmpresas] = useState([]);
@@ -625,7 +627,7 @@ export function useUsersManagementController({ session, canViewUsuariosGlobal })
       const assetsPrefix = String(response?.assetsPrefix || "").trim();
       setTenantForm(INITIAL_TENANT_FORM);
       setActivePanel("tenants");
-      setShowTenantCreatePanel(false);
+      setTenantSection("perfil");
       setInfo(assetsPrefix
         ? `Tenant ${nombreComercial} creado con admin ${adminLogin}. Assets: ${assetsPrefix}`
         : `Tenant ${nombreComercial} creado con admin ${adminLogin}.`);
@@ -1023,8 +1025,8 @@ export function useUsersManagementController({ session, canViewUsuariosGlobal })
     setActivePanel,
     tenantForm,
     setTenantForm,
-    showTenantCreatePanel,
-    setShowTenantCreatePanel,
+    tenantSection,
+    setTenantSection,
     submitCreateTenant,
     empresaID,
     setEmpresaID,

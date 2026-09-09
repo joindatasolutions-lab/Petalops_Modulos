@@ -4528,6 +4528,18 @@
   align-items: start;
 }
 
+.users-tenant-subtabs {
+  margin-bottom: 18px;
+  padding-bottom: 14px;
+  border-bottom: 1px dashed rgba(233, 30, 114, 0.18);
+}
+
+.users-tenant-subtabs button {
+  min-height: 36px;
+  font-size: 13px;
+  padding: 0 12px;
+}
+
 .users-panel-heading {
   display: flex;
   align-items: flex-start;
