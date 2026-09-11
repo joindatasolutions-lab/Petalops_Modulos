@@ -484,6 +484,20 @@ export function createApiClient(config) {
       });
     },
 
+    async obtenerConfiguracionCatalogoTransferencia({ empresaId }) {
+      return requestJson(`/configuracion/empresas/${empresaId}/catalogo-transferencia`);
+    },
+
+    async actualizarConfiguracionCatalogoTransferencia({ empresaId, datosTransferenciaCatalogoActivo }) {
+      return requestJson(`/configuracion/empresas/${empresaId}/catalogo-transferencia`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ datosTransferenciaCatalogoActivo })
+      });
+    },
+
     async obtenerConfiguracionAsignacion({ empresaId }) {
       return requestJson(`/configuracion/empresas/${empresaId}/asignacion`);
     },

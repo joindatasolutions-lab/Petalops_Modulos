@@ -9,10 +9,12 @@ export function PaymentMethodsPanel({
   loading,
   items,
   saving,
+  datosTransferenciaCatalogoActivo,
   onCreate,
   onEdit,
   onToggleActive,
   onToggleCatalogAccount,
+  onToggleCatalogTransfer,
 }) {
   return (
     <section className="users-payment-layout">
@@ -126,6 +128,24 @@ export function PaymentMethodsPanel({
             <h4>Datos para transferir catalogo</h4>
             <p className="orders-admin-subtitle">Configura banco o cuenta, numero y visibilidad para el catalogo de {empresaSeleccionadaNombre}.</p>
           </div>
+          <div className="users-payment-catalog-master">
+            <span>{datosTransferenciaCatalogoActivo ? "Activo en catalogo" : "Inactivo en catalogo"}</span>
+            <label className="users-switch" title={datosTransferenciaCatalogoActivo ? "Ocultar bloque en catalogo" : "Mostrar bloque en catalogo"}>
+              <input
+                type="checkbox"
+                checked={Boolean(datosTransferenciaCatalogoActivo)}
+                disabled={saving || loading}
+                onChange={() => onToggleCatalogTransfer?.()}
+              />
+              <span className="users-switch-slider" />
+            </label>
+          </div>
+        </div>
+
+        <div className={`users-payment-catalog-status ${datosTransferenciaCatalogoActivo ? "is-active" : "is-inactive"}`}>
+          {datosTransferenciaCatalogoActivo
+            ? "El catalogo puede mostrar el bloque Datos para transferir usando las cuentas activas."
+            : "El bloque Datos para transferir no se mostrara en el catalogo hasta activar este interruptor."}
         </div>
 
         {loading ? (

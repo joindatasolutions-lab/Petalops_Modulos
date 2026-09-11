@@ -112,6 +112,7 @@ export function useUsersManagementController({ session, canViewUsuariosGlobal })
   const [paymentMethodEditing, setPaymentMethodEditing] = useState(null);
   const [paymentMethods, setPaymentMethods] = useState([]);
   const [paymentMethodsLoading, setPaymentMethodsLoading] = useState(false);
+  const [datosTransferenciaCatalogoActivo, setDatosTransferenciaCatalogoActivo] = useState(false);
   const [asignacionConfig, setAsignacionConfig] = useState({ asignacionProduccionActiva: true, asignacionDomicilioActiva: true, autoAsignacionProduccionActiva: true });
   const [asignacionLoading, setAsignacionLoading] = useState(false);
   const [asignacionSaving, setAsignacionSaving] = useState(false);
@@ -405,6 +406,7 @@ export function useUsersManagementController({ session, canViewUsuariosGlobal })
     const targetEmpresaID = Number(empresaID);
     if (!Number.isFinite(targetEmpresaID) || targetEmpresaID <= 0) {
       setPaymentMethods([]);
+      setDatosTransferenciaCatalogoActivo(false);
       return;
     }
     setPaymentMethodsLoading(true);
@@ -412,9 +414,11 @@ export function useUsersManagementController({ session, canViewUsuariosGlobal })
     try {
       const data = await api.listarMetodosPagoEmpresa({ empresaId: targetEmpresaID });
       setPaymentMethods(Array.isArray(data.items) ? data.items : []);
+      setDatosTransferenciaCatalogoActivo(Boolean(data.datosTransferenciaCatalogoActivo));
     } catch (nextError) {
       console.error("Error cargando metodos de pago:", nextError);
       setPaymentMethods([]);
+      setDatosTransferenciaCatalogoActivo(false);
       setError(nextError?.message || "No fue posible cargar metodos de pago.");
     } finally {
       setPaymentMethodsLoading(false);
@@ -721,6 +725,28 @@ export function useUsersManagementController({ session, canViewUsuariosGlobal })
     } catch (nextError) {
       console.error("Error actualizando datos de transferencia:", nextError);
       setError(nextError?.message || "No fue posible actualizar los datos de transferencia del catalogo.");
+    } finally {
+      setPaymentMethodSaving(false);
+    }
+  };
+
+  const toggleDatosTransferenciaCatalogo = async () => {
+    const targetEmpresaID = Number(empresaID);
+    if (!Number.isFinite(targetEmpresaID) || targetEmpresaID <= 0) return;
+    const nextValue = !Boolean(datosTransferenciaCatalogoActivo);
+    setPaymentMethodSaving(true);
+    setError("");
+    setInfo("");
+    try {
+      const response = await api.actualizarConfiguracionCatalogoTransferencia({
+        empresaId: targetEmpresaID,
+        datosTransferenciaCatalogoActivo: nextValue,
+      });
+      setDatosTransferenciaCatalogoActivo(Boolean(response?.datosTransferenciaCatalogoActivo));
+      setInfo(`Datos para transferir en catalogo ${nextValue ? "activados" : "desactivados"} para ${empresaSeleccionadaNombre}.`);
+    } catch (nextError) {
+      console.error("Error actualizando configuracion de transferencia catalogo:", nextError);
+      setError(nextError?.message || "No fue posible actualizar la configuracion de transferencia del catalogo.");
     } finally {
       setPaymentMethodSaving(false);
     }
@@ -1218,6 +1244,7 @@ export function useUsersManagementController({ session, canViewUsuariosGlobal })
     paymentMethodEditing,
     paymentMethods,
     paymentMethodsLoading,
+    datosTransferenciaCatalogoActivo,
     asignacionConfig,
     asignacionLoading,
     asignacionSaving,
@@ -1244,6 +1271,7 @@ export function useUsersManagementController({ session, canViewUsuariosGlobal })
     editPaymentMethod,
     togglePaymentMethodActive,
     togglePaymentMethodCatalogAccount,
+    toggleDatosTransferenciaCatalogo,
     toggleAsignacionProduccion,
     toggleAsignacionDomicilio,
     toggleAutoAsignacionProduccion,

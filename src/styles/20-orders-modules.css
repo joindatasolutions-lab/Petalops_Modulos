@@ -838,6 +838,46 @@
   margin: 0 0 6px;
 }
 
+.users-payment-catalog-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.users-payment-catalog-master {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  flex: 0 0 auto;
+  border: 1px solid rgba(206, 164, 183, 0.46);
+  border-radius: 14px;
+  padding: 10px 12px;
+  background: #fff;
+  color: #5f4b55;
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.users-payment-catalog-status {
+  border: 1px solid rgba(206, 164, 183, 0.42);
+  border-radius: 14px;
+  padding: 11px 12px;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.users-payment-catalog-status.is-active {
+  border-color: rgba(74, 178, 107, 0.22);
+  background: #f2fbf5;
+  color: #277343;
+}
+
+.users-payment-catalog-status.is-inactive {
+  background: #fff7fa;
+  color: #7f3958;
+}
+
 .users-payment-catalog-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
@@ -1651,6 +1691,16 @@
   .users-payment-catalog-card {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .users-payment-catalog-head {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .users-payment-catalog-master {
+    justify-content: space-between;
+    width: 100%;
   }
 
   .users-payment-catalog-actions {

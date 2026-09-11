@@ -244,10 +244,12 @@ export function UsersManagementPage({
             loading={users.paymentMethodsLoading}
             items={users.paymentMethods}
             saving={users.paymentMethodSaving}
+            datosTransferenciaCatalogoActivo={users.datosTransferenciaCatalogoActivo}
             onCreate={users.openPaymentMethodModal}
             onEdit={users.editPaymentMethod}
             onToggleActive={users.togglePaymentMethodActive}
             onToggleCatalogAccount={users.togglePaymentMethodCatalogAccount}
+            onToggleCatalogTransfer={users.toggleDatosTransferenciaCatalogo}
           />
         ) : isAccionesPanel ? (
           <AccionesPanel
