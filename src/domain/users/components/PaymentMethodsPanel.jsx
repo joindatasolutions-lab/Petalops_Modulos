@@ -119,6 +119,58 @@ export function PaymentMethodsPanel({
           </tbody>
         </table>
       </article>
+
+      <article className="order-block users-payment-catalog-panel">
+        <div className="users-payment-catalog-head">
+          <div>
+            <h4>Datos para transferir catalogo</h4>
+            <p className="orders-admin-subtitle">Configura banco o cuenta, numero y visibilidad para el catalogo de {empresaSeleccionadaNombre}.</p>
+          </div>
+        </div>
+
+        {loading ? (
+          <p className="orders-message">Cargando datos de transferencia...</p>
+        ) : items.length === 0 ? (
+          <p className="orders-message">Primero crea un metodo de pago para agregar datos de transferencia.</p>
+        ) : (
+          <div className="users-payment-catalog-grid">
+            {items.map(item => {
+              const numeroCuenta = item.numeroCuenta || item.numero_cuenta || "";
+              const catalogActive = Boolean(item.activasCuentasCatalogo ?? item.activas_cuentas_catalogo);
+              return (
+                <div className="users-payment-catalog-card" key={`catalog-${item.id}`}>
+                  <div className="users-payment-catalog-card-main">
+                    <div className="users-payment-method-name">
+                      <CreditCard size={17} strokeWidth={2} aria-hidden="true" />
+                      <strong>{item.nombre}</strong>
+                    </div>
+                    <div className="users-payment-catalog-data">
+                      <span>{item.cuenta || "Banco o cuenta pendiente"}</span>
+                      <strong>{numeroCuenta || "Numero de cuenta pendiente"}</strong>
+                    </div>
+                  </div>
+
+                  <div className="users-payment-catalog-actions">
+                    <label className="users-switch" title={`${catalogActive ? "Ocultar" : "Mostrar"} datos para transferir en catalogo`}>
+                      <input
+                        type="checkbox"
+                        checked={catalogActive}
+                        disabled={saving}
+                        onChange={() => onToggleCatalogAccount?.(item)}
+                      />
+                      <span className="users-switch-slider" />
+                    </label>
+                    <button type="button" className="btn-outline" onClick={() => onEdit(item)}>
+                      <Pencil size={16} strokeWidth={2} aria-hidden="true" />
+                      Editar datos
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </article>
     </section>
   );
 }

@@ -829,6 +829,72 @@
   margin-top: 14px;
 }
 
+.users-payment-catalog-panel {
+  display: grid;
+  gap: 14px;
+}
+
+.users-payment-catalog-head h4 {
+  margin: 0 0 6px;
+}
+
+.users-payment-catalog-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 12px;
+}
+
+.users-payment-catalog-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  min-width: 0;
+  border: 1px solid rgba(206, 164, 183, 0.42);
+  border-radius: 14px;
+  padding: 14px;
+  background: #fff9fb;
+}
+
+.users-payment-catalog-card-main {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.users-payment-catalog-data {
+  display: grid;
+  gap: 2px;
+}
+
+.users-payment-catalog-data span {
+  color: #5f4b55;
+  font-size: 13px;
+  font-weight: 800;
+  overflow-wrap: anywhere;
+}
+
+.users-payment-catalog-data strong {
+  color: #241b20;
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+
+.users-payment-catalog-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 0 0 auto;
+}
+
+.users-payment-catalog-actions .btn-outline {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  width: auto;
+  white-space: nowrap;
+}
+
 .users-payment-method-name,
 .users-payment-method-actions {
   display: flex;
@@ -1580,6 +1646,21 @@
 
   .users-payment-transfer-grid {
     grid-template-columns: 1fr;
+  }
+
+  .users-payment-catalog-card {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .users-payment-catalog-actions {
+    justify-content: space-between;
+    width: 100%;
+  }
+
+  .users-payment-catalog-actions .btn-outline {
+    flex: 1 1 auto;
+    justify-content: center;
   }
 }
 
