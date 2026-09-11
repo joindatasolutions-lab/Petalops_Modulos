@@ -755,6 +755,60 @@
   margin: 0;
 }
 
+.users-payment-transfer-box {
+  display: grid;
+  gap: 12px;
+  border: 1px solid rgba(206, 164, 183, 0.44);
+  border-radius: 16px;
+  padding: 14px;
+  background: #fff9fb;
+}
+
+.users-payment-transfer-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.users-payment-transfer-head h4 {
+  margin: 0 0 4px;
+  color: #241b20;
+  font-size: 15px;
+}
+
+.users-payment-transfer-head p {
+  margin: 0;
+  color: #7f7278;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.users-payment-transfer-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 12px;
+}
+
+.users-payment-transfer-cell {
+  display: grid;
+  gap: 2px;
+  min-width: 150px;
+}
+
+.users-payment-transfer-cell strong {
+  color: #3a2b31;
+  font-size: 13px;
+}
+
+.users-payment-transfer-cell span {
+  color: #7f7278;
+  font-size: 12px;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
 .users-payment-layout {
   display: grid;
   gap: 16px;
@@ -1516,7 +1570,17 @@
 }
 
 .users-table {
-  min-width: 980px;
+  min-width: 1120px;
+}
+
+@media (max-width: 640px) {
+  .users-payment-transfer-head {
+    align-items: stretch;
+  }
+
+  .users-payment-transfer-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 .icon-btn {

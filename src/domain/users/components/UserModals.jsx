@@ -112,9 +112,54 @@ export function PaymentMethodModal({
             />
           </label>
 
+          <section className="users-payment-transfer-box" aria-label="Datos para transferir catalogo">
+            <div className="users-payment-transfer-head">
+              <div>
+                <h4>Datos para transferir catalogo</h4>
+                <p>Banco o cuenta y numero que puede consumir el catalogo cuando este activo.</p>
+              </div>
+              <label className="users-switch" title={form.activasCuentasCatalogo ? "Desactivar en catalogo" : "Activar en catalogo"}>
+                <input
+                  type="checkbox"
+                  checked={Boolean(form.activasCuentasCatalogo)}
+                  disabled={saving}
+                  onChange={event => setForm(current => ({ ...current, activasCuentasCatalogo: event.target.checked }))}
+                />
+                <span className="users-switch-slider" />
+              </label>
+            </div>
+
+            <div className="users-payment-transfer-grid">
+              <label className="users-payment-method-field">
+                <span>Banco o cuenta</span>
+                <input
+                  type="text"
+                  name="payment-method-transfer-account"
+                  placeholder="Ej. Nequi, Daviplata, Bancolombia"
+                  value={form.cuenta || ""}
+                  autoComplete="off"
+                  onChange={event => setForm(current => ({ ...current, cuenta: event.target.value }))}
+                />
+              </label>
+
+              <label className="users-payment-method-field">
+                <span>Numero de cuenta</span>
+                <input
+                  type="text"
+                  inputMode="text"
+                  name="payment-method-transfer-number"
+                  placeholder="Ej. 3001720582"
+                  value={form.numeroCuenta || ""}
+                  autoComplete="off"
+                  onChange={event => setForm(current => ({ ...current, numeroCuenta: event.target.value }))}
+                />
+              </label>
+            </div>
+          </section>
+
           <div className="users-payment-method-note">
             <CreditCard size={18} strokeWidth={2} aria-hidden="true" />
-            <p>El metodo quedara activo para la empresa seleccionada y disponible para pedidos.</p>
+            <p>El metodo queda disponible para pedidos. Los datos de transferencia solo salen al catalogo cuando el interruptor esta activo.</p>
           </div>
 
           <div className="users-modal-actions">

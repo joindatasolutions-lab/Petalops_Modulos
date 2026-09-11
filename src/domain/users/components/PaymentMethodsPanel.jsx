@@ -12,6 +12,7 @@ export function PaymentMethodsPanel({
   onCreate,
   onEdit,
   onToggleActive,
+  onToggleCatalogAccount,
 }) {
   return (
     <section className="users-payment-layout">
@@ -48,6 +49,8 @@ export function PaymentMethodsPanel({
             <tr>
               <th>Metodo</th>
               <th>Codigo</th>
+              <th>Datos catalogo</th>
+              <th>Catalogo</th>
               <th>Orden</th>
               <th>Estado</th>
               <th>Accion</th>
@@ -56,11 +59,11 @@ export function PaymentMethodsPanel({
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan={5}>Cargando metodos de pago...</td>
+                <td colSpan={7}>Cargando metodos de pago...</td>
               </tr>
             ) : items.length === 0 ? (
               <tr>
-                <td colSpan={5}>No hay metodos de pago configurados para esta empresa.</td>
+                <td colSpan={7}>No hay metodos de pago configurados para esta empresa.</td>
               </tr>
             ) : items.map(item => (
               <tr key={item.id}>
@@ -71,6 +74,23 @@ export function PaymentMethodsPanel({
                   </div>
                 </td>
                 <td data-label="Codigo">{item.codigo || "-"}</td>
+                <td data-label="Datos catalogo">
+                  <div className="users-payment-transfer-cell">
+                    <strong>{item.cuenta || "-"}</strong>
+                    <span>{item.numeroCuenta || item.numero_cuenta || "Sin numero"}</span>
+                  </div>
+                </td>
+                <td data-label="Catalogo">
+                  <label className="users-switch" title={`${(item.activasCuentasCatalogo ?? item.activas_cuentas_catalogo) ? "Ocultar" : "Mostrar"} datos para transferir en catalogo`}>
+                    <input
+                      type="checkbox"
+                      checked={Boolean(item.activasCuentasCatalogo ?? item.activas_cuentas_catalogo)}
+                      disabled={saving}
+                      onChange={() => onToggleCatalogAccount?.(item)}
+                    />
+                    <span className="users-switch-slider" />
+                  </label>
+                </td>
                 <td data-label="Orden">{item.orden ?? "-"}</td>
                 <td data-label="Estado">
                   <span className={`users-module-chip ${item.activo ? "is-active" : "is-inactive"}`}>

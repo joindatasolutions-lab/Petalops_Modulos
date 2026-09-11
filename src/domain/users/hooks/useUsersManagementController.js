@@ -58,6 +58,13 @@ const INITIAL_COMPANY_THEME_FORM = {
   fuenteFamilia: DEFAULT_FONT_FAMILY,
 };
 
+const INITIAL_PAYMENT_METHOD_FORM = {
+  nombre: "",
+  cuenta: "",
+  numeroCuenta: "",
+  activasCuentasCatalogo: false,
+};
+
 export function useUsersManagementController({ session, canViewUsuariosGlobal }) {
   const api = useMemo(() => createApiClient(tenantConfig), []);
   const sidebar = useSidebarState();
@@ -100,7 +107,7 @@ export function useUsersManagementController({ session, canViewUsuariosGlobal })
   const [showUserModuleDropdown, setShowUserModuleDropdown] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showPaymentMethodModal, setShowPaymentMethodModal] = useState(false);
-  const [paymentMethodForm, setPaymentMethodForm] = useState({ nombre: "" });
+  const [paymentMethodForm, setPaymentMethodForm] = useState(INITIAL_PAYMENT_METHOD_FORM);
   const [paymentMethodSaving, setPaymentMethodSaving] = useState(false);
   const [paymentMethodEditing, setPaymentMethodEditing] = useState(null);
   const [paymentMethods, setPaymentMethods] = useState([]);
@@ -191,14 +198,14 @@ export function useUsersManagementController({ session, canViewUsuariosGlobal })
 
   const openPaymentMethodModal = useCallback(() => {
     setPaymentMethodEditing(null);
-    setPaymentMethodForm({ nombre: "" });
+    setPaymentMethodForm(INITIAL_PAYMENT_METHOD_FORM);
     setShowPaymentMethodModal(true);
   }, []);
 
   const closePaymentMethodModal = useCallback(() => {
     setShowPaymentMethodModal(false);
     setPaymentMethodEditing(null);
-    setPaymentMethodForm({ nombre: "" });
+    setPaymentMethodForm(INITIAL_PAYMENT_METHOD_FORM);
   }, []);
 
   const selectedUserModulesCount = (form.modulosAcceso || []).length;
@@ -609,6 +616,9 @@ export function useUsersManagementController({ session, canViewUsuariosGlobal })
   const submitCreatePaymentMethod = async event => {
     event.preventDefault();
     const nombre = String(paymentMethodForm.nombre || "").trim();
+    const cuenta = String(paymentMethodForm.cuenta || "").trim();
+    const numeroCuenta = String(paymentMethodForm.numeroCuenta || "").trim();
+    const activasCuentasCatalogo = Boolean(paymentMethodForm.activasCuentasCatalogo);
     const targetEmpresaID = Number(empresaID);
     if (!Number.isFinite(targetEmpresaID) || targetEmpresaID <= 0) {
       setError("Selecciona una empresa valida para crear el metodo de pago.");
@@ -616,6 +626,10 @@ export function useUsersManagementController({ session, canViewUsuariosGlobal })
     }
     if (nombre.length < 2) {
       setError("El metodo de pago debe tener al menos 2 caracteres.");
+      return;
+    }
+    if (activasCuentasCatalogo && (!cuenta || !numeroCuenta)) {
+      setError("Para activar los datos de transferencia en el catalogo, agrega banco o cuenta y numero de cuenta.");
       return;
     }
     setPaymentMethodSaving(true);
@@ -627,10 +641,16 @@ export function useUsersManagementController({ session, canViewUsuariosGlobal })
             empresaId: targetEmpresaID,
             itemId: paymentMethodEditing.id,
             nombre,
+            cuenta: cuenta || null,
+            numeroCuenta: numeroCuenta || null,
+            activasCuentasCatalogo,
           })
         : await api.crearMetodoPagoEmpresa({
             empresaId: targetEmpresaID,
             nombre,
+            cuenta: cuenta || null,
+            numeroCuenta: numeroCuenta || null,
+            activasCuentasCatalogo,
           });
       closePaymentMethodModal();
       await loadPaymentMethods();
@@ -645,7 +665,12 @@ export function useUsersManagementController({ session, canViewUsuariosGlobal })
 
   const editPaymentMethod = item => {
     setPaymentMethodEditing(item);
-    setPaymentMethodForm({ nombre: item?.nombre || "" });
+    setPaymentMethodForm({
+      nombre: item?.nombre || "",
+      cuenta: item?.cuenta || "",
+      numeroCuenta: item?.numeroCuenta || item?.numero_cuenta || "",
+      activasCuentasCatalogo: Boolean(item?.activasCuentasCatalogo ?? item?.activas_cuentas_catalogo),
+    });
     setShowPaymentMethodModal(true);
   };
 
@@ -666,6 +691,36 @@ export function useUsersManagementController({ session, canViewUsuariosGlobal })
     } catch (nextError) {
       console.error("Error actualizando metodo de pago:", nextError);
       setError(nextError?.message || "No fue posible actualizar el metodo de pago.");
+    } finally {
+      setPaymentMethodSaving(false);
+    }
+  };
+
+  const togglePaymentMethodCatalogAccount = async item => {
+    const targetEmpresaID = Number(empresaID);
+    if (!item?.id || !Number.isFinite(targetEmpresaID) || targetEmpresaID <= 0) return;
+    const nextValue = !Boolean(item.activasCuentasCatalogo ?? item.activas_cuentas_catalogo);
+    const cuenta = String(item.cuenta || "").trim();
+    const numeroCuenta = String(item.numeroCuenta || item.numero_cuenta || "").trim();
+    if (nextValue && (!cuenta || !numeroCuenta)) {
+      setError("Agrega banco o cuenta y numero de cuenta antes de mostrar este metodo en el catalogo.");
+      setInfo("");
+      return;
+    }
+    setPaymentMethodSaving(true);
+    setError("");
+    setInfo("");
+    try {
+      await api.actualizarMetodoPagoEmpresa({
+        empresaId: targetEmpresaID,
+        itemId: item.id,
+        activasCuentasCatalogo: nextValue,
+      });
+      await loadPaymentMethods();
+      setInfo(`Datos para transferir ${nextValue ? "activados" : "desactivados"} en catalogo para ${item.nombre}.`);
+    } catch (nextError) {
+      console.error("Error actualizando datos de transferencia:", nextError);
+      setError(nextError?.message || "No fue posible actualizar los datos de transferencia del catalogo.");
     } finally {
       setPaymentMethodSaving(false);
     }
@@ -1188,6 +1243,7 @@ export function useUsersManagementController({ session, canViewUsuariosGlobal })
     submitCreatePaymentMethod,
     editPaymentMethod,
     togglePaymentMethodActive,
+    togglePaymentMethodCatalogAccount,
     toggleAsignacionProduccion,
     toggleAsignacionDomicilio,
     toggleAutoAsignacionProduccion,

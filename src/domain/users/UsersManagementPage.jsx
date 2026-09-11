@@ -247,6 +247,7 @@ export function UsersManagementPage({
             onCreate={users.openPaymentMethodModal}
             onEdit={users.editPaymentMethod}
             onToggleActive={users.togglePaymentMethodActive}
+            onToggleCatalogAccount={users.togglePaymentMethodCatalogAccount}
           />
         ) : isAccionesPanel ? (
           <AccionesPanel

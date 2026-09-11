@@ -449,13 +449,17 @@ export function createApiClient(config) {
       });
     },
 
-    async crearMetodoPagoEmpresa({ empresaId, nombre }) {
+    async crearMetodoPagoEmpresa({ empresaId, nombre, cuenta, numeroCuenta, activasCuentasCatalogo }) {
+      const payload = { nombre };
+      if (cuenta !== undefined) payload.cuenta = cuenta;
+      if (numeroCuenta !== undefined) payload.numeroCuenta = numeroCuenta;
+      if (activasCuentasCatalogo !== undefined) payload.activasCuentasCatalogo = activasCuentasCatalogo;
       return requestJson(`/configuracion/empresas/${empresaId}/metodos-pago`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json"
         },
-        body: JSON.stringify({ nombre })
+        body: JSON.stringify(payload)
       });
     },
 
@@ -463,11 +467,14 @@ export function createApiClient(config) {
       return requestJson(`/configuracion/empresas/${empresaId}/metodos-pago`);
     },
 
-    async actualizarMetodoPagoEmpresa({ empresaId, itemId, nombre, activo, orden }) {
+    async actualizarMetodoPagoEmpresa({ empresaId, itemId, nombre, activo, orden, cuenta, numeroCuenta, activasCuentasCatalogo }) {
       const payload = {};
       if (nombre !== undefined) payload.nombre = nombre;
       if (activo !== undefined) payload.activo = activo;
       if (orden !== undefined) payload.orden = orden;
+      if (cuenta !== undefined) payload.cuenta = cuenta;
+      if (numeroCuenta !== undefined) payload.numeroCuenta = numeroCuenta;
+      if (activasCuentasCatalogo !== undefined) payload.activasCuentasCatalogo = activasCuentasCatalogo;
       return requestJson(`/configuracion/empresas/${empresaId}/metodos-pago/${itemId}`, {
         method: "PATCH",
         headers: {
