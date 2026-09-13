@@ -10,6 +10,7 @@ import {
   filterVisibleRoles,
   normalizeTenantSlug,
   normalizeModuleKey,
+  normalizeAsignacionConfig,
   selectedModulesSummary,
   sameStringList,
   syncSelectedModules,
@@ -113,7 +114,7 @@ export function useUsersManagementController({ session, canViewUsuariosGlobal })
   const [paymentMethods, setPaymentMethods] = useState([]);
   const [paymentMethodsLoading, setPaymentMethodsLoading] = useState(false);
   const [datosTransferenciaCatalogoActivo, setDatosTransferenciaCatalogoActivo] = useState(false);
-  const [asignacionConfig, setAsignacionConfig] = useState({ asignacionProduccionActiva: true, asignacionDomicilioActiva: true, autoAsignacionProduccionActiva: true });
+  const [asignacionConfig, setAsignacionConfig] = useState(() => normalizeAsignacionConfig());
   const [asignacionLoading, setAsignacionLoading] = useState(false);
   const [asignacionSaving, setAsignacionSaving] = useState(false);
   const [editingUserId, setEditingUserId] = useState(null);
@@ -428,18 +429,14 @@ export function useUsersManagementController({ session, canViewUsuariosGlobal })
   const loadAsignacionConfig = useCallback(async () => {
     const targetEmpresaID = Number(empresaID);
     if (!Number.isFinite(targetEmpresaID) || targetEmpresaID <= 0) {
-      setAsignacionConfig({ asignacionProduccionActiva: true, asignacionDomicilioActiva: true, autoAsignacionProduccionActiva: true });
+      setAsignacionConfig(normalizeAsignacionConfig());
       return;
     }
     setAsignacionLoading(true);
     setError("");
     try {
       const data = await api.obtenerConfiguracionAsignacion({ empresaId: targetEmpresaID });
-      setAsignacionConfig({
-        asignacionProduccionActiva: Boolean(data.asignacionProduccionActiva),
-        asignacionDomicilioActiva: Boolean(data.asignacionDomicilioActiva),
-        autoAsignacionProduccionActiva: Boolean(data.autoAsignacionProduccionActiva),
-      });
+      setAsignacionConfig(normalizeAsignacionConfig(data));
     } catch (nextError) {
       console.error("Error cargando configuracion de asignacion:", nextError);
       setError(nextError?.message || "No fue posible cargar la configuracion de asignacion.");
@@ -456,11 +453,7 @@ export function useUsersManagementController({ session, canViewUsuariosGlobal })
     try {
       const nextValue = !asignacionConfig.asignacionProduccionActiva;
       const data = await api.actualizarConfiguracionAsignacion({ empresaId: targetEmpresaID, asignacionProduccionActiva: nextValue });
-      setAsignacionConfig({
-        asignacionProduccionActiva: Boolean(data.asignacionProduccionActiva),
-        asignacionDomicilioActiva: Boolean(data.asignacionDomicilioActiva),
-        autoAsignacionProduccionActiva: Boolean(data.autoAsignacionProduccionActiva),
-      });
+      setAsignacionConfig(normalizeAsignacionConfig(data));
     } catch (nextError) {
       console.error("Error actualizando asignacion de produccion:", nextError);
       setError(nextError?.message || "No fue posible actualizar la asignacion de produccion.");
@@ -477,11 +470,7 @@ export function useUsersManagementController({ session, canViewUsuariosGlobal })
     try {
       const nextValue = !asignacionConfig.asignacionDomicilioActiva;
       const data = await api.actualizarConfiguracionAsignacion({ empresaId: targetEmpresaID, asignacionDomicilioActiva: nextValue });
-      setAsignacionConfig({
-        asignacionProduccionActiva: Boolean(data.asignacionProduccionActiva),
-        asignacionDomicilioActiva: Boolean(data.asignacionDomicilioActiva),
-        autoAsignacionProduccionActiva: Boolean(data.autoAsignacionProduccionActiva),
-      });
+      setAsignacionConfig(normalizeAsignacionConfig(data));
     } catch (nextError) {
       console.error("Error actualizando asignacion de domicilio:", nextError);
       setError(nextError?.message || "No fue posible actualizar la asignacion de domicilio.");
@@ -498,11 +487,7 @@ export function useUsersManagementController({ session, canViewUsuariosGlobal })
     try {
       const nextValue = !asignacionConfig.autoAsignacionProduccionActiva;
       const data = await api.actualizarConfiguracionAsignacion({ empresaId: targetEmpresaID, autoAsignacionProduccionActiva: nextValue });
-      setAsignacionConfig({
-        asignacionProduccionActiva: Boolean(data.asignacionProduccionActiva),
-        asignacionDomicilioActiva: Boolean(data.asignacionDomicilioActiva),
-        autoAsignacionProduccionActiva: Boolean(data.autoAsignacionProduccionActiva),
-      });
+      setAsignacionConfig(normalizeAsignacionConfig(data));
     } catch (nextError) {
       console.error("Error actualizando autoasignacion automatica de produccion:", nextError);
       setError(nextError?.message || "No fue posible actualizar la autoasignacion automatica.");
@@ -730,6 +715,31 @@ export function useUsersManagementController({ session, canViewUsuariosGlobal })
     }
   };
 
+  const toggleNotificacionAccion = async field => {
+    const targetEmpresaID = Number(empresaID);
+    if (!Number.isFinite(targetEmpresaID) || targetEmpresaID <= 0) return;
+    setAsignacionSaving(true);
+    setError("");
+    try {
+      const data = await api.actualizarConfiguracionAsignacion({
+        empresaId: targetEmpresaID,
+        [field]: !asignacionConfig[field],
+      });
+      setAsignacionConfig(normalizeAsignacionConfig(data));
+    } catch (nextError) {
+      console.error("Error actualizando accion de notificacion:", nextError);
+      setError(nextError?.message || "No fue posible actualizar la accion de notificacion.");
+    } finally {
+      setAsignacionSaving(false);
+    }
+  };
+
+  const toggleNotificacionPedidoAceptado = () => toggleNotificacionAccion("notificacionPedidoAceptadoActiva");
+  const toggleNotificacionPedidoEntregado = () => toggleNotificacionAccion("notificacionPedidoEntregadoActiva");
+  const toggleNotificacionNuevoPedidoDomiciliario = () => (
+    toggleNotificacionAccion("notificacionNuevoPedidoDomiciliarioActiva")
+  );
+
   const toggleDatosTransferenciaCatalogo = async () => {
     const targetEmpresaID = Number(empresaID);
     if (!Number.isFinite(targetEmpresaID) || targetEmpresaID <= 0) return;
@@ -837,6 +847,8 @@ export function useUsersManagementController({ session, canViewUsuariosGlobal })
         nombre: payload.nombre,
         login: payload.login,
         password: payload.password,
+        email: payload.email,
+        celular: payload.celular,
         rolID: payload.rolID,
         sucursalID: payload.sucursalID,
         estado: payload.estado,
@@ -854,6 +866,7 @@ export function useUsersManagementController({ session, canViewUsuariosGlobal })
           nombre: payload.nombre,
           login: payload.login,
           email: response?.email || "",
+          celular: response?.celular || payload.celular,
           rolID: payload.rolID,
           rol: createdRole?.nombreRol || String(payload.rolID),
           rolesIDs: payload.rolesIDs,
@@ -896,6 +909,8 @@ export function useUsersManagementController({ session, canViewUsuariosGlobal })
         nombre: payload.nombre,
         login: payload.login,
         password: payload.password,
+        email: payload.email,
+        celular: payload.celular,
         rolID: payload.rolID,
         sucursalID: payload.sucursalID,
         estado: payload.estado,
@@ -947,6 +962,7 @@ export function useUsersManagementController({ session, canViewUsuariosGlobal })
         nombre: detail.nombre || "",
         login: detail.login || "",
         email: detail.email || "",
+        celular: detail.celular || "",
         password: "",
         rolID: String(detail.rolID || ""),
         rolesIDs: Array.isArray(detail.rolesIDs) && detail.rolesIDs.length > 0
@@ -1275,6 +1291,9 @@ export function useUsersManagementController({ session, canViewUsuariosGlobal })
     toggleAsignacionProduccion,
     toggleAsignacionDomicilio,
     toggleAutoAsignacionProduccion,
+    toggleNotificacionPedidoAceptado,
+    toggleNotificacionPedidoEntregado,
+    toggleNotificacionNuevoPedidoDomiciliario,
     createFormProps,
     editFormProps,
   };

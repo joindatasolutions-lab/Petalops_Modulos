@@ -263,9 +263,18 @@ export function UsersManagementPage({
             asignacionProduccionActiva={users.asignacionConfig.asignacionProduccionActiva}
             asignacionDomicilioActiva={users.asignacionConfig.asignacionDomicilioActiva}
             autoAsignacionProduccionActiva={users.asignacionConfig.autoAsignacionProduccionActiva}
+            notificacionesModuloActivo={users.moduleItems.some(
+              item => String(item.modulo || "").trim().toLowerCase() === "notificaciones_whatsapp" && item.activo
+            )}
+            notificacionPedidoAceptadoActiva={users.asignacionConfig.notificacionPedidoAceptadoActiva}
+            notificacionPedidoEntregadoActiva={users.asignacionConfig.notificacionPedidoEntregadoActiva}
+            notificacionNuevoPedidoDomiciliarioActiva={users.asignacionConfig.notificacionNuevoPedidoDomiciliarioActiva}
             onToggleProduccion={users.toggleAsignacionProduccion}
             onToggleDomicilio={users.toggleAsignacionDomicilio}
             onToggleAutoAsignacionProduccion={users.toggleAutoAsignacionProduccion}
+            onToggleNotificacionPedidoAceptado={users.toggleNotificacionPedidoAceptado}
+            onToggleNotificacionPedidoEntregado={users.toggleNotificacionPedidoEntregado}
+            onToggleNotificacionNuevoPedidoDomiciliario={users.toggleNotificacionNuevoPedidoDomiciliario}
           />
         ) : (
           <section className="users-grid-layout users-list-layout">
