@@ -1,4 +1,4 @@
-import { Factory, Truck, Zap } from "lucide-react";
+import { BellRing, CircleCheckBig, Factory, PackageCheck, Truck, Zap } from "lucide-react";
 
 function AsignacionToggleCard({ icon, title, description, checked, disabled, onToggle }) {
   return (
@@ -29,9 +29,16 @@ export function AccionesPanel({
   asignacionProduccionActiva,
   asignacionDomicilioActiva,
   autoAsignacionProduccionActiva,
+  notificacionesModuloActivo,
+  notificacionPedidoAceptadoActiva,
+  notificacionPedidoEntregadoActiva,
+  notificacionNuevoPedidoDomiciliarioActiva,
   onToggleProduccion,
   onToggleDomicilio,
   onToggleAutoAsignacionProduccion,
+  onToggleNotificacionPedidoAceptado,
+  onToggleNotificacionPedidoEntregado,
+  onToggleNotificacionNuevoPedidoDomiciliario,
 }) {
   return (
     <section className="users-payment-layout">
@@ -84,6 +91,44 @@ export function AccionesPanel({
           checked={autoAsignacionProduccionActiva}
           disabled={saving || loading}
           onToggle={onToggleAutoAsignacionProduccion}
+        />
+      </div>
+
+      <div className="users-panel-heading users-acciones-section-heading">
+        <div>
+          <h4>Notificaciones por WhatsApp</h4>
+          <p className="orders-admin-subtitle">
+            {notificacionesModuloActivo
+              ? "Selecciona que eventos enviaran mensajes para esta empresa."
+              : "Activa primero el modulo Notificaciones WhatsApp en la habilitacion comercial."}
+          </p>
+        </div>
+      </div>
+
+      <div className="users-acciones-grid">
+        <AsignacionToggleCard
+          icon={<CircleCheckBig size={18} strokeWidth={2} />}
+          title="Pedido aceptado"
+          description="Notifica al cliente cuando su pedido queda aprobado o pagado."
+          checked={notificacionPedidoAceptadoActiva}
+          disabled={saving || loading || !notificacionesModuloActivo}
+          onToggle={onToggleNotificacionPedidoAceptado}
+        />
+        <AsignacionToggleCard
+          icon={<PackageCheck size={18} strokeWidth={2} />}
+          title="Pedido entregado"
+          description="Notifica al cliente cuando la entrega se confirma como entregada."
+          checked={notificacionPedidoEntregadoActiva}
+          disabled={saving || loading || !notificacionesModuloActivo}
+          onToggle={onToggleNotificacionPedidoEntregado}
+        />
+        <AsignacionToggleCard
+          icon={<BellRing size={18} strokeWidth={2} />}
+          title="Nuevo pedido al domiciliario"
+          description="Notifica al domiciliario cuando un pedido se le asigna manualmente o por autoasignacion."
+          checked={notificacionNuevoPedidoDomiciliarioActiva}
+          disabled={saving || loading || !notificacionesModuloActivo}
+          onToggle={onToggleNotificacionNuevoPedidoDomiciliario}
         />
       </div>
     </section>

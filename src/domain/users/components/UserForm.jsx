@@ -52,6 +52,23 @@ export function UserForm({
         onChange={event => setForm(current => ({ ...current, login: event.target.value }))}
         required
       />
+      <input
+        type="email"
+        placeholder="Correo electronico"
+        value={form.email}
+        name={isEdit ? "edit-user-email" : "new-user-email"}
+        autoComplete="off"
+        onChange={event => setForm(current => ({ ...current, email: event.target.value }))}
+      />
+      <input
+        type="tel"
+        inputMode="tel"
+        placeholder="Celular (ej. 3007252222)"
+        value={form.celular}
+        name={isEdit ? "edit-user-phone" : "new-user-phone"}
+        autoComplete="off"
+        onChange={event => setForm(current => ({ ...current, celular: event.target.value }))}
+      />
 
       {isEdit ? (
         <div style={{ display: "grid", gap: 8 }}>

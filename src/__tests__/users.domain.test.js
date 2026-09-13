@@ -5,6 +5,7 @@ import {
   buildSlug,
   defaultModulesForRoles,
   filterVisibleRoles,
+  normalizeAsignacionConfig,
   normalizeTenantSlug,
   selectedModulesSummary,
   syncSelectedModules,
@@ -28,6 +29,8 @@ describe("dominio de usuarios", () => {
     const payload = UserFormModel.normalizeCreate({
       nombre: "  Diego Ustariz  ",
       login: "  DUSTARIZFL  ",
+      email: "  DIEGO@EXAMPLE.COM  ",
+      celular: " 3007252222 ",
       password: "secret1",
       rolID: "7",
       rolesIDs: ["7", "8"],
@@ -39,12 +42,32 @@ describe("dominio de usuarios", () => {
     expect(payload).toMatchObject({
       nombre: "Diego Ustariz",
       login: "dustarizfl",
+      email: "diego@example.com",
+      celular: "3007252222",
       rolID: 7,
       rolesIDs: [7, 8],
       sucursalID: 2,
     });
     expect(UserFormModel.validateCreate(payload)).toBe("");
     expect(UserFormModel.validateCreate({ ...payload, password: "123" })).toBe("La contraseña debe tener al menos 6 caracteres.");
+  });
+
+  it("mantiene activas las notificaciones existentes y apaga la nueva por defecto", () => {
+    expect(normalizeAsignacionConfig({})).toMatchObject({
+      notificacionPedidoAceptadoActiva: true,
+      notificacionPedidoEntregadoActiva: true,
+      notificacionNuevoPedidoDomiciliarioActiva: false,
+    });
+
+    expect(normalizeAsignacionConfig({
+      notificacionPedidoAceptadoActiva: false,
+      notificacionPedidoEntregadoActiva: false,
+      notificacionNuevoPedidoDomiciliarioActiva: true,
+    })).toMatchObject({
+      notificacionPedidoAceptadoActiva: false,
+      notificacionPedidoEntregadoActiva: false,
+      notificacionNuevoPedidoDomiciliarioActiva: true,
+    });
   });
 
   it("suma los modulos permitidos por multiples roles activos", () => {
