@@ -40,6 +40,18 @@ export function todayIsoDate() {
   return todayIsoDateBogota();
 }
 
+export function toggleTodayDeliveriesFilters(current, today = todayIsoDate()) {
+  const soloEntregasHoy = !Boolean(current?.soloEntregasHoy);
+  return {
+    ...current,
+    soloEntregasHoy,
+    soloTienda: false,
+    fechaDesde: soloEntregasHoy ? "" : today,
+    fechaHasta: soloEntregasHoy ? "" : today,
+    page: 1,
+  };
+}
+
 function formatIsoDateFromLocalDate(date) {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, "0");

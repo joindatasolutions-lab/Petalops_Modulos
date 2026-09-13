@@ -100,6 +100,7 @@ import {
   thisMonthRangeIso,
   thisWeekRangeIso,
   todayIsoDate,
+  toggleTodayDeliveriesFilters,
 } from "./ordersDomain.js";
 
 /**
@@ -1524,20 +1525,14 @@ const openNewOrderModal = () => {
 
   const toggleTodayDeliveries = () => {
     const nextSoloEntregasHoy = !filters.soloEntregasHoy;
-    setFilters(current => ({
-      ...current,
-      soloEntregasHoy: nextSoloEntregasHoy,
-      soloTienda: false,
-      fechaDesde: "",
-      fechaHasta: "",
-      page: 1,
-    }));
+    const today = todayIsoDate();
+    setFilters(current => toggleTodayDeliveriesFilters(current, today));
     setOrderNotification({
       tone: nextSoloEntregasHoy ? "success" : "info",
       title: nextSoloEntregasHoy ? "Entregas hoy" : "Todos los pedidos",
       message: nextSoloEntregasHoy
         ? "Mostrando pedidos cuya entrega esta programada para hoy."
-        : "Mostrando todos los pedidos con los filtros actuales.",
+        : "Mostrando los pedidos registrados hoy.",
     });
   };
 
