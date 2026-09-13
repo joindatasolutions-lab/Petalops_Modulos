@@ -1,5 +1,6 @@
 import { IconWallet } from "@tabler/icons-react";
 import {
+  CalendarCheck2,
   CheckCircle2,
   ChevronDown,
   Clock3,
@@ -30,6 +31,7 @@ export function OrdersHeader({
   canViewCatalogo = false,
   catalogUrl = "",
   onFilterChange,
+  onToggleTodayDeliveries,
   onToggleStoreDeliveries,
   onRefresh,
   onNewOrder,
@@ -60,6 +62,17 @@ export function OrdersHeader({
       </label>
       <div className="orders-header-side">
         <div className="header-actions">
+          <button
+            type="button"
+            className={`btn-primary orders-header-refresh orders-store-toggle orders-today-toggle${filters.soloEntregasHoy ? " is-active" : ""}`}
+            onClick={onToggleTodayDeliveries}
+            title={filters.soloEntregasHoy ? "Ver todos los pedidos" : "Ver entregas de hoy"}
+            aria-label={filters.soloEntregasHoy ? "Ver todos los pedidos" : "Ver entregas de hoy"}
+            data-tooltip={filters.soloEntregasHoy ? "Ver todos los pedidos" : "Ver entregas de hoy"}
+          >
+            <CalendarCheck2 size={18} strokeWidth={2} />
+            <span>{filters.soloEntregasHoy ? "Todos los pedidos" : "Entregas hoy"}</span>
+          </button>
           <button
             type="button"
             className={`btn-primary orders-header-refresh orders-store-toggle${filters.soloTienda ? " is-active" : ""}`}

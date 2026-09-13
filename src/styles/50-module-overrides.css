@@ -5381,7 +5381,8 @@
 
 .orders-page-view .orders-page-header .header-actions {
   display: grid !important;
-  grid-template-columns: minmax(420px, 1fr) repeat(3, max-content) !important;
+  grid-template-columns: minmax(160px, 1fr) repeat(4, max-content) !important;
+  grid-template-areas: none !important;
   align-items: center !important;
   gap: 8px !important;
   width: 100% !important;
@@ -5549,7 +5550,7 @@
   }
 
   .orders-page-view .orders-page-header .header-actions {
-    grid-template-columns: minmax(360px, 1fr) repeat(3, max-content) !important;
+    grid-template-columns: minmax(160px, 1fr) repeat(4, max-content) !important;
   }
 
   .orders-page-view .orders-header-metrics {

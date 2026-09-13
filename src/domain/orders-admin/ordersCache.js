@@ -7,7 +7,7 @@ import { ORDERS_FILTER_CACHE_LIMIT } from "./ordersAdminConstants.js";
  * debe incluir cualquier campo que cambie el resultado visible.
  */
 
-export function buildOrdersCacheKey({ empresaId, sucursalId, q, estado, sinImprimir, soloTienda, metodoPago, fechaDesde, fechaHasta, page, pageSize }) {
+export function buildOrdersCacheKey({ empresaId, sucursalId, q, estado, sinImprimir, soloTienda, soloEntregasHoy, metodoPago, fechaDesde, fechaHasta, page, pageSize }) {
   return [
     empresaId,
     sucursalId,
@@ -15,6 +15,7 @@ export function buildOrdersCacheKey({ empresaId, sucursalId, q, estado, sinImpri
     estado || "",
     sinImprimir ? "1" : "0",
     soloTienda ? "1" : "0",
+    soloEntregasHoy ? "1" : "0",
     metodoPago || "",
     fechaDesde || "",
     fechaHasta || "",

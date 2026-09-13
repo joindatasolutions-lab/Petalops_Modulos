@@ -24,6 +24,7 @@ describe("apiClient.listarPedidos", () => {
       fechaDesde: "2026-06-25T00:00:00",
       fechaHasta: "2026-06-25T23:59:59",
       sinImprimir: false,
+      soloEntregasHoy: true,
       page: 1,
       pageSize: 10000,
     });
@@ -36,6 +37,7 @@ describe("apiClient.listarPedidos", () => {
     expect(parsed.searchParams.get("fechaHasta")).toBe("2026-06-25T23:59:59");
     expect(parsed.searchParams.get("pageSize")).toBe("300");
     expect(parsed.searchParams.get("sinImprimir")).toBe("false");
+    expect(parsed.searchParams.get("soloEntregasHoy")).toBe("true");
   });
 
   it("consulta ventas diarias de contabilidad con tenant dinamico y sucursal opcional", async () => {

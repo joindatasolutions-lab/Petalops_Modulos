@@ -736,7 +736,7 @@ export function createApiClient(config) {
       });
     },
 
-    async listarPedidos({ empresaId, sucursalId, q, estado, fechaDesde, fechaHasta, sinImprimir, soloTienda, page, pageSize }) {
+    async listarPedidos({ empresaId, sucursalId, q, estado, fechaDesde, fechaHasta, sinImprimir, soloTienda, soloEntregasHoy, page, pageSize }) {
       const params = new URLSearchParams();
       params.set("empresaID", String(empresaId));
       if (sucursalId != null) params.set("sucursalID", String(sucursalId));
@@ -748,6 +748,7 @@ export function createApiClient(config) {
       if (normalizedFechaHasta) params.set("fechaHasta", normalizedFechaHasta);
       params.set("sinImprimir", sinImprimir ? "true" : "false");
       if (soloTienda) params.set("soloTienda", "true");
+      if (soloEntregasHoy) params.set("soloEntregasHoy", "true");
       params.set("page", String(page || 1));
       params.set("pageSize", String(normalizePedidosPageSize(pageSize)));
 

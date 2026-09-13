@@ -17,6 +17,7 @@ export const initialFilters = {
   estado: "",
   sinImprimir: false,
   soloTienda: false,
+  soloEntregasHoy: false,
   metodoPago: "",
   fechaDesde: todayIsoDateBogota(),
   fechaHasta: todayIsoDateBogota(),

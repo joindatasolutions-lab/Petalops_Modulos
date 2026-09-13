@@ -772,6 +772,7 @@ const messageCard = useMessageCardController({
       return {
         ...current,
         [name]: value,
+        ...(name === "fechaDesde" || name === "fechaHasta" ? { soloEntregasHoy: false } : {}),
         page: 1
       };
     });
@@ -784,6 +785,7 @@ const messageCard = useMessageCardController({
         ...current,
         fechaDesde: value,
         fechaHasta: value,
+        soloEntregasHoy: false,
         page: 1
       };
     });
@@ -1520,9 +1522,33 @@ const openNewOrderModal = () => {
     await loadTodaySalesSummary();
   };
 
+  const toggleTodayDeliveries = () => {
+    const nextSoloEntregasHoy = !filters.soloEntregasHoy;
+    setFilters(current => ({
+      ...current,
+      soloEntregasHoy: nextSoloEntregasHoy,
+      soloTienda: false,
+      fechaDesde: "",
+      fechaHasta: "",
+      page: 1,
+    }));
+    setOrderNotification({
+      tone: nextSoloEntregasHoy ? "success" : "info",
+      title: nextSoloEntregasHoy ? "Entregas hoy" : "Todos los pedidos",
+      message: nextSoloEntregasHoy
+        ? "Mostrando pedidos cuya entrega esta programada para hoy."
+        : "Mostrando todos los pedidos con los filtros actuales.",
+    });
+  };
+
   const toggleStoreDeliveries = () => {
     const nextSoloTienda = !filters.soloTienda;
-    applyFilterValue("soloTienda", nextSoloTienda);
+    setFilters(current => ({
+      ...current,
+      soloTienda: nextSoloTienda,
+      soloEntregasHoy: false,
+      page: 1,
+    }));
     setOrderNotification({
       tone: nextSoloTienda ? "success" : "info",
       title: nextSoloTienda ? "Entregas en tienda" : "Todos los pedidos",
@@ -1546,7 +1572,7 @@ const openNewOrderModal = () => {
       if (current.fechaDesde === range.fechaDesde && current.fechaHasta === range.fechaHasta && Number(current.page || 1) === 1) {
         return current;
       }
-      return { ...current, ...range, page: 1 };
+      return { ...current, ...range, soloEntregasHoy: false, page: 1 };
     });
   };
 
@@ -1558,6 +1584,7 @@ const openNewOrderModal = () => {
       estado: "",
       sinImprimir: false,
       soloTienda: false,
+      soloEntregasHoy: false,
       metodoPago: "",
       fechaDesde: today,
       fechaHasta: today,
@@ -1572,6 +1599,7 @@ const openNewOrderModal = () => {
         ...current,
         estado: "",
         sinImprimir: false,
+        soloEntregasHoy: false,
         page: 1,
       };
 
@@ -1852,6 +1880,7 @@ const ordersOverlayOpen = drawerOpen || newOrderOpen || messageCardOpen || Boole
             canViewCatalogo={canViewCatalogo}
             catalogUrl={catalogUrl}
             onFilterChange={applyFilterValue}
+            onToggleTodayDeliveries={toggleTodayDeliveries}
             onToggleStoreDeliveries={toggleStoreDeliveries}
             onRefresh={refresh}
             onNewOrder={openNewOrderModal}
