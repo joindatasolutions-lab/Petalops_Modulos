@@ -21,12 +21,14 @@ import {
   clientToForm,
   extractClientItems,
   extractPayloadTotal,
+  loadAllClientPages,
   normalizeCustomerMetricItem,
   normalizeDashboardMetrics,
   isEmpresaAdminRole,
 } from "./clientsDomain.js";
 
 const CLIENTS_PAGE_SIZE = 50;
+const CLIENTS_API_PAGE_SIZE = 300;
 const CLIENTS_SEGMENT_PAGE_SIZE = 10;
 
 export function ClientsPage({
@@ -116,8 +118,12 @@ export function ClientsPage({
     setLoading(true);
     setError("");
     try {
-      const data = await api.listarClientes({ empresaId, q, soloActivos: false, includeMetrics: true, page: 1, pageSize: 300 });
-      setItems(extractClientItems(data));
+      const data = await loadAllClientPages(
+        api,
+        { empresaId, q, soloActivos: false, includeMetrics: true },
+        { pageSize: CLIENTS_API_PAGE_SIZE }
+      );
+      setItems(data);
     } catch (nextError) {
       console.error("Error cargando clientes:", nextError);
       setItems([]);
