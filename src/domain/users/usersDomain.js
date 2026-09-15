@@ -82,6 +82,7 @@ export class UserFormModel {
       nombre: "",
       login: "",
       email: "",
+      celular: "",
       password: "",
       rolID: "",
       rolesIDs: [],
@@ -98,6 +99,8 @@ export class UserFormModel {
       nombre: String(form.nombre || "").trim(),
       login: String(form.login || "").trim().toLowerCase(),
       password: String(form.password || ""),
+      email: String(form.email || "").trim().toLowerCase(),
+      celular: String(form.celular || "").trim(),
       rolID: Number(form.rolID || rolesIDs[0]),
       rolesIDs,
       sucursalID: Number(form.sucursalID),
@@ -127,6 +130,17 @@ export class UserFormModel {
     if (!Number.isFinite(payload.sucursalID) || payload.sucursalID <= 0) return "Debes seleccionar una sucursal válida.";
     return "";
   }
+}
+
+export function normalizeAsignacionConfig(data = {}) {
+  return {
+    asignacionProduccionActiva: data.asignacionProduccionActiva !== false,
+    asignacionDomicilioActiva: data.asignacionDomicilioActiva !== false,
+    autoAsignacionProduccionActiva: data.autoAsignacionProduccionActiva !== false,
+    notificacionPedidoAceptadoActiva: data.notificacionPedidoAceptadoActiva !== false,
+    notificacionPedidoEntregadoActiva: data.notificacionPedidoEntregadoActiva !== false,
+    notificacionNuevoPedidoDomiciliarioActiva: Boolean(data.notificacionNuevoPedidoDomiciliarioActiva),
+  };
 }
 
 export function normalizeRoleIds(values) {

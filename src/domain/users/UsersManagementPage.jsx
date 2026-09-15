@@ -223,7 +223,30 @@ export function UsersManagementPage(props) {
         ) : isPaymentMethodsPanel ? (
           <PaymentMethodsPanel empresaID={users.empresaID} empresaSeleccionadaNombre={users.empresaSeleccionadaNombre} empresas={users.empresas} setEmpresaID={users.setEmpresaID} canViewUsuariosGlobal={canViewUsuariosGlobal} loading={users.paymentMethodsLoading} items={users.paymentMethods} saving={users.paymentMethodSaving} datosTransferenciaCatalogoActivo={users.datosTransferenciaCatalogoActivo} onCreate={users.openPaymentMethodModal} onEdit={users.editPaymentMethod} onToggleActive={users.togglePaymentMethodActive} onToggleCatalogAccount={users.togglePaymentMethodCatalogAccount} onToggleCatalogTransfer={users.toggleDatosTransferenciaCatalogo} />
         ) : isAccionesPanel ? (
-          <AccionesPanel empresaID={users.empresaID} empresaSeleccionadaNombre={users.empresaSeleccionadaNombre} empresas={users.empresas} setEmpresaID={users.setEmpresaID} canViewUsuariosGlobal={canViewUsuariosGlobal} loading={users.asignacionLoading} saving={users.asignacionSaving} asignacionProduccionActiva={users.asignacionConfig.asignacionProduccionActiva} asignacionDomicilioActiva={users.asignacionConfig.asignacionDomicilioActiva} autoAsignacionProduccionActiva={users.asignacionConfig.autoAsignacionProduccionActiva} onToggleProduccion={users.toggleAsignacionProduccion} onToggleDomicilio={users.toggleAsignacionDomicilio} onToggleAutoAsignacionProduccion={users.toggleAutoAsignacionProduccion} />
+          <AccionesPanel
+            empresaID={users.empresaID}
+            empresaSeleccionadaNombre={users.empresaSeleccionadaNombre}
+            empresas={users.empresas}
+            setEmpresaID={users.setEmpresaID}
+            canViewUsuariosGlobal={canViewUsuariosGlobal}
+            loading={users.asignacionLoading}
+            saving={users.asignacionSaving}
+            asignacionProduccionActiva={users.asignacionConfig.asignacionProduccionActiva}
+            asignacionDomicilioActiva={users.asignacionConfig.asignacionDomicilioActiva}
+            autoAsignacionProduccionActiva={users.asignacionConfig.autoAsignacionProduccionActiva}
+            notificacionesModuloActivo={users.moduleItems.some(
+              item => String(item.modulo || "").trim().toLowerCase() === "notificaciones_whatsapp" && item.activo
+            )}
+            notificacionPedidoAceptadoActiva={users.asignacionConfig.notificacionPedidoAceptadoActiva}
+            notificacionPedidoEntregadoActiva={users.asignacionConfig.notificacionPedidoEntregadoActiva}
+            notificacionNuevoPedidoDomiciliarioActiva={users.asignacionConfig.notificacionNuevoPedidoDomiciliarioActiva}
+            onToggleProduccion={users.toggleAsignacionProduccion}
+            onToggleDomicilio={users.toggleAsignacionDomicilio}
+            onToggleAutoAsignacionProduccion={users.toggleAutoAsignacionProduccion}
+            onToggleNotificacionPedidoAceptado={users.toggleNotificacionPedidoAceptado}
+            onToggleNotificacionPedidoEntregado={users.toggleNotificacionPedidoEntregado}
+            onToggleNotificacionNuevoPedidoDomiciliario={users.toggleNotificacionNuevoPedidoDomiciliario}
+          />
         ) : (
           <section className="users-grid-layout users-list-layout">
             <UsersTable items={users.items} canViewUsuariosGlobal={canViewUsuariosGlobal} sessionUserID={session?.userID} onEdit={users.startEditUser} onToggleEstado={users.toggleEstado} onDelete={users.deleteUser} />
