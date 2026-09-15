@@ -227,6 +227,223 @@ describe("apiClient.listarPedidos", () => {
     expect(parsed.searchParams.get("comparison")).toBe("true");
   });
 
+  it("crea tenant enviando campos nuevos de empresa y conserva celular para pedidos", async () => {
+    const fetchMock = vi.fn(async () => ({
+      ok: true,
+      json: async () => ({ empresaID: 9 }),
+    }));
+    vi.stubGlobal("fetch", fetchMock);
+    vi.stubGlobal("localStorage", {
+      getItem: () => "token-test",
+    });
+
+    const api = createApiClient({ apiBaseUrl: "https://api.test" });
+    await api.crearTenantGestion({
+      nombreComercial: "La Fiore",
+      nombreEmpresa: "La Fiore SAS",
+      nit: "900123456-7",
+      ciudad: "Barranquilla",
+      direccion: "Calle 84",
+      nombreResponsable: "Maria Perez",
+      cargoResponsable: "Gerente",
+      correoResponsable: "responsable@empresa.com",
+      celularResponsable: "3001112233",
+      celular: "3019998877",
+      slug: "la-fiore",
+      planID: 2,
+      estado: "Activo",
+      sucursalNombre: "Principal",
+      adminLogin: "admin",
+      adminPassword: "secret1",
+      adminEmail: "admin@empresa.com",
+    });
+
+    const [url, options] = fetchMock.mock.calls[0];
+    const body = JSON.parse(options.body);
+
+    expect(url).toBe("https://api.test/auth/usuarios/empresas");
+    expect(options.method).toBe("POST");
+    expect(body.nombreComercial).toBe("La Fiore");
+    expect(body.nombreEmpresa).toBe("La Fiore SAS");
+    expect(body.nit).toBe("900123456-7");
+    expect(body.celularResponsable).toBe("3001112233");
+    expect(body.celular).toBe("3019998877");
+    expect(body.estado).toBe("Activo");
+    expect(body.sucursalNombre).toBe("Principal");
+    expect(body.adminLogin).toBe("admin");
+  });
+
+  it("envia nit null al crear tenant cuando esta vacio", async () => {
+    const fetchMock = vi.fn(async () => ({
+      ok: true,
+      json: async () => ({ empresaID: 9 }),
+    }));
+    vi.stubGlobal("fetch", fetchMock);
+    vi.stubGlobal("localStorage", {
+      getItem: () => "token-test",
+    });
+
+    const api = createApiClient({ apiBaseUrl: "https://api.test" });
+    await api.crearTenantGestion({
+      nombreComercial: "La Fiore",
+      nombreEmpresa: "La Fiore SAS",
+      nit: null,
+      ciudad: "Barranquilla",
+      direccion: "Calle 84",
+      nombreResponsable: "Maria Perez",
+      cargoResponsable: "",
+      correoResponsable: "responsable@empresa.com",
+      celularResponsable: "3001112233",
+      celular: "3019998877",
+      slug: "la-fiore",
+      planID: 2,
+      estado: "Activo",
+      sucursalNombre: "Principal",
+      adminLogin: "admin",
+      adminPassword: "secret1",
+    });
+
+    const [, options] = fetchMock.mock.calls[0];
+    const body = JSON.parse(options.body);
+
+    expect(body.nit).toBeNull();
+    expect(body.adminLogin).toBe("admin");
+    expect(body.adminEmail).toBeUndefined();
+  });
+
+  it("crea tenant con logo usando multipart y campos planos", async () => {
+    const fetchMock = vi.fn(async () => ({
+      ok: true,
+      json: async () => ({ empresaID: 9, logoUrl: "https://ddy2osi8uorg4.cloudfront.net/tenants/petalops/logos/logo.png" }),
+    }));
+    vi.stubGlobal("fetch", fetchMock);
+    vi.stubGlobal("localStorage", {
+      getItem: () => "token-test",
+    });
+
+    const logoFile = new File(["logo"], "logo.png", { type: "image/png" });
+    const api = createApiClient({ apiBaseUrl: "https://api.test" });
+    await api.crearTenantGestion({
+      nombreComercial: "PetalOps",
+      nombreEmpresa: "PetalOps SAS",
+      nit: null,
+      ciudad: "Barranquilla",
+      direccion: "Calle 84",
+      nombreResponsable: "Maria Perez",
+      cargoResponsable: "",
+      correoResponsable: "responsable@empresa.com",
+      celularResponsable: "3001112233",
+      celular: "3019998877",
+      slug: "petalops",
+      planID: 2,
+      estado: "Activo",
+      sucursalNombre: "Principal",
+      adminLogin: "admin",
+      adminPassword: "secret1",
+      adminEmail: "admin@empresa.com",
+      logoFile,
+    });
+
+    const [url, options] = fetchMock.mock.calls[0];
+    const body = options.body;
+
+    expect(url).toBe("https://api.test/auth/usuarios/empresas");
+    expect(options.method).toBe("POST");
+    expect(options.headers?.["Content-Type"]).toBeUndefined();
+    expect(body).toBeInstanceOf(FormData);
+    expect(body.get("file")).toBe(logoFile);
+    expect(body.get("slug")).toBe("petalops");
+    expect(body.get("estado")).toBe("Activo");
+    expect(body.get("adminLogin")).toBe("admin");
+    expect(body.has("logo")).toBe(false);
+    expect(body.has("logoFile")).toBe(false);
+    expect(body.has("logoFolder")).toBe(false);
+  });
+
+  it("permite crear empresa sin credenciales admin iniciales", async () => {
+    const fetchMock = vi.fn(async () => ({
+      ok: true,
+      json: async () => ({ empresaID: 9 }),
+    }));
+    vi.stubGlobal("fetch", fetchMock);
+    vi.stubGlobal("localStorage", {
+      getItem: () => "token-test",
+    });
+
+    const api = createApiClient({ apiBaseUrl: "https://api.test" });
+    await api.crearTenantGestion({
+      nombreComercial: "La Fiore",
+      nombreEmpresa: "La Fiore SAS",
+      nit: null,
+      ciudad: "Barranquilla",
+      direccion: "Calle 84",
+      nombreResponsable: "Maria Perez",
+      cargoResponsable: "",
+      correoResponsable: "responsable@empresa.com",
+      celularResponsable: "3001112233",
+      celular: "3019998877",
+      slug: "la-fiore",
+      planID: 2,
+      estado: "Activo",
+      sucursalNombre: "Principal",
+      adminLogin: "",
+      adminPassword: "",
+      adminEmail: "",
+    });
+
+    const [, options] = fetchMock.mock.calls[0];
+    const body = JSON.parse(options.body);
+
+    expect(body.adminLogin).toBeUndefined();
+    expect(body.adminPassword).toBeUndefined();
+    expect(body.adminEmail).toBeUndefined();
+    expect(body.sucursalNombre).toBe("Principal");
+  });
+
+  it("actualiza empresa enviando campos nuevos sin credenciales admin", async () => {
+    const fetchMock = vi.fn(async () => ({
+      ok: true,
+      json: async () => ({ ok: true }),
+    }));
+    vi.stubGlobal("fetch", fetchMock);
+    vi.stubGlobal("localStorage", {
+      getItem: () => "token-test",
+    });
+
+    const api = createApiClient({ apiBaseUrl: "https://api.test" });
+    await api.actualizarEmpresaGestion({
+      empresaId: 9,
+      nombreComercial: "La Fiore",
+      nombreEmpresa: "La Fiore SAS",
+      nit: "900123456-7",
+      ciudad: "Barranquilla",
+      direccion: "Calle 84",
+      nombreResponsable: "Maria Perez",
+      cargoResponsable: "",
+      correoResponsable: "responsable@empresa.com",
+      celularResponsable: "3001112233",
+      celular: "3019998877",
+      slug: "la-fiore",
+      planID: 2,
+      estado: "Activo",
+      sucursalNombre: "Principal",
+      adminLogin: "no-debe-enviarse",
+    });
+
+    const [url, options] = fetchMock.mock.calls[0];
+    const body = JSON.parse(options.body);
+
+    expect(url).toBe("https://api.test/auth/usuarios/empresas/9");
+    expect(options.method).toBe("PUT");
+    expect(body.correoResponsable).toBe("responsable@empresa.com");
+    expect(body.celularResponsable).toBe("3001112233");
+    expect(body.celular).toBe("3019998877");
+    expect(body.adminLogin).toBeUndefined();
+    expect(body.adminPassword).toBeUndefined();
+    expect(body.adminEmail).toBeUndefined();
+    expect(body.sucursalNombre).toBeUndefined();
+  });
+
   it("consulta clientes por segmento", async () => {
     const fetchMock = vi.fn(async () => ({
       ok: true,

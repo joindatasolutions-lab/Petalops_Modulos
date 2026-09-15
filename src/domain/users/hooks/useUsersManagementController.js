@@ -6,19 +6,30 @@ import { useSidebarState } from "../../../shared/useSidebarState.js";
 import {
   UserFormModel,
   DEFAULT_FONT_FAMILY,
+  TenantCompanyFormModel,
   defaultModulesForRoles,
   filterVisibleRoles,
-  normalizeTenantSlug,
   normalizeModuleKey,
   selectedModulesSummary,
   sameStringList,
   syncSelectedModules,
-  validateTenantSlug,
 } from "../usersDomain.js";
 
 const TENANT_S3_CREATE_ERROR_MESSAGE = "No fue posible crear la estructura de archivos del tenant en S3. Intenta nuevamente o contacta soporte.";
-const TENANT_CONFLICT_ERROR_MESSAGE = "Ya existe una empresa con ese nombre o slug.";
-const TENANT_INVALID_ERROR_MESSAGE = "Revisa el nombre, slug y datos del admin del tenant.";
+const TENANT_CONFLICT_ERROR_MESSAGE = "Ya existe una empresa con ese nombre o URL de catalogo.";
+const TENANT_INVALID_ERROR_MESSAGE = "Revisa el nombre, URL de catalogo y datos del administrador.";
+const CATALOG_PUBLIC_BASE_URL = "https://catalogo-web.joindata.com.co/catalogo";
+
+function isMultipartCreateUnsupportedError(error) {
+  const message = String(error?.message || error?.detail || "").toLowerCase();
+  return Number(error?.status) === 422
+    && message.includes("valid dictionary")
+    && message.includes("object");
+}
+
+function isLogoCreateFallbackError(error) {
+  return isMultipartCreateUnsupportedError(error) || Boolean(error?.isNetworkError);
+}
 
 const INITIAL_TENANT_FORM = {
   nombreComercial: "",
@@ -79,9 +90,9 @@ export function useUsersManagementController({ session, canViewUsuariosGlobal })
   const [estadoFiltro, setEstadoFiltro] = useState("");
   const [q, setQ] = useState("");
   const [activePanel, setActivePanel] = useState(canViewUsuariosGlobal ? "tenants" : "usuarios");
-  // Sub-secciones independientes dentro de "Empresas/tenants": cada una es su propia
-  // pestana/formulario, no se muestran todas apiladas en la misma pagina.
   const [tenantSection, setTenantSection] = useState("perfil");
+  const [showTenantCreatePanel, setShowTenantCreatePanel] = useState(false);
+  const [showTenantEditPanel, setShowTenantEditPanel] = useState(false);
 
   const [items, setItems] = useState([]);
   const [empresas, setEmpresas] = useState([]);
@@ -91,6 +102,9 @@ export function useUsersManagementController({ session, canViewUsuariosGlobal })
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [info, setInfo] = useState("");
+  const [tenantCredentialsToast, setTenantCredentialsToast] = useState(null);
+  const [tenantFormErrors, setTenantFormErrors] = useState({});
+  const [tenantEditFormErrors, setTenantEditFormErrors] = useState({});
   const [saving, setSaving] = useState(false);
   const [moduleItems, setModuleItems] = useState([]);
   const [empresasModuloResumen, setEmpresasModuloResumen] = useState([]);
@@ -126,7 +140,8 @@ export function useUsersManagementController({ session, canViewUsuariosGlobal })
   const [showEditDrawer, setShowEditDrawer] = useState(false);
   const [showEditModuleDropdown, setShowEditModuleDropdown] = useState(false);
   const [form, setForm] = useState(UserFormModel.initial());
-  const [tenantForm, setTenantForm] = useState(INITIAL_TENANT_FORM);
+  const [tenantForm, setTenantForm] = useState(TenantCompanyFormModel.initial());
+  const [tenantEditForm, setTenantEditForm] = useState(TenantCompanyFormModel.initial());
 
   const empresaSeleccionadaNombre = useMemo(() => {
     const found = empresas.find(item => Number(item.empresaID) === Number(empresaID));
@@ -607,15 +622,47 @@ export function useUsersManagementController({ session, canViewUsuariosGlobal })
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [closeCreateModal, showCreateModal]);
 
-  useEffect(() => {
-    if (!showPaymentMethodModal) return undefined;
-    const onKeyDown = event => {
-      if (event.key === "Escape") closePaymentMethodModal();
-    };
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [closePaymentMethodModal, showPaymentMethodModal]);
+  const resetTenantForm = () => {
+    setTenantForm(TenantCompanyFormModel.initial());
+    setTenantFormErrors({});
+  };
 
+  const startEditTenant = async empresaArg => {
+    if (!canViewUsuariosGlobal) return;
+    const targetEmpresaID = Number(empresaArg?.empresaID || empresaID);
+    if (!Number.isFinite(targetEmpresaID) || targetEmpresaID <= 0) {
+      setError("Selecciona una empresa valida para editar.");
+      return;
+    }
+
+    const fallbackEmpresa = empresaArg || empresas.find(item => Number(item.empresaID) === targetEmpresaID) || {};
+    if (Number(empresaID) !== targetEmpresaID) setEmpresaID(targetEmpresaID);
+    setSaving(true);
+    setError("");
+    try {
+      let data = fallbackEmpresa;
+      if (typeof api.obtenerEmpresaGestion === "function") {
+        try {
+          data = await api.obtenerEmpresaGestion({ empresaId: targetEmpresaID });
+        } catch (nextError) {
+          if (Number(nextError?.status) !== 404) throw nextError;
+        }
+      }
+      setTenantEditForm(TenantCompanyFormModel.fromEmpresa(data?.item || data));
+      setTenantEditFormErrors({});
+      setShowTenantCreatePanel(false);
+      setShowTenantEditPanel(true);
+    } catch (nextError) {
+      console.error("Error cargando empresa:", nextError);
+      setTenantEditForm(TenantCompanyFormModel.fromEmpresa(fallbackEmpresa));
+      setTenantEditFormErrors({});
+      setShowTenantCreatePanel(false);
+      setShowTenantEditPanel(true);
+      setError(nextError?.message || "No fue posible cargar todos los datos de la empresa. Revisa los campos antes de guardar.");
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const submitCreatePaymentMethod = async event => {
     event.preventDefault();
@@ -660,7 +707,7 @@ export function useUsersManagementController({ session, canViewUsuariosGlobal })
       await loadPaymentMethods();
       setInfo(`Metodo de pago ${response?.nombre || nombre} ${paymentMethodEditing ? "actualizado" : "creado"} para ${empresaSeleccionadaNombre}.`);
     } catch (nextError) {
-      console.error("Error creando metodo de pago:", nextError);
+      console.error("Error guardando metodo de pago:", nextError);
       setError(nextError?.message || "No fue posible guardar el metodo de pago.");
     } finally {
       setPaymentMethodSaving(false);
@@ -752,61 +799,66 @@ export function useUsersManagementController({ session, canViewUsuariosGlobal })
     }
   };
 
-
   const submitCreateTenant = async event => {
     event.preventDefault();
+    if (saving) return;
     if (!canViewUsuariosGlobal) return;
-    const nombreComercial = String(tenantForm.nombreComercial || "").trim();
-    const slug = normalizeTenantSlug(tenantForm.slug);
-    const adminLogin = String(tenantForm.adminLogin || "").trim().toLowerCase();
-    const adminPassword = String(tenantForm.adminPassword || "");
-    if (nombreComercial.length < 3) {
-      setError("El nombre comercial del tenant debe tener al menos 3 caracteres.");
-      return;
-    }
-    const slugError = validateTenantSlug(slug);
-    if (slugError) {
-      setError(slugError);
-      return;
-    }
-    if (adminLogin.length < 3 || adminPassword.length < 6) {
-      setError("Define un login y una contrasena inicial valida para el admin del tenant.");
+    const payload = TenantCompanyFormModel.normalize(tenantForm);
+    const validationErrors = TenantCompanyFormModel.validateFields(payload, { requireConfig: true, requireAdmin: true });
+    if (Object.keys(validationErrors).length > 0) {
+      setTenantFormErrors(validationErrors);
+      setError("Revisa los campos marcados antes de crear la empresa.");
       return;
     }
     setSaving(true);
     setError("");
     setInfo("");
-    try {
-      const response = await api.crearEmpresaGestion({
-        nombreComercial,
-        slug,
-        planID: Number(tenantForm.planID || 1),
-        estado: tenantForm.estado || "Activo",
-        sucursalNombre: tenantForm.sucursalNombre,
-        adminLogin,
-        adminPassword,
-        adminEmail: tenantForm.adminEmail,
-        nit: tenantForm.nit,
-        celular: tenantForm.celular,
-        ciudad: tenantForm.ciudad,
-        direccion: tenantForm.direccion,
-        nombreResponsable: tenantForm.nombreResponsable,
-        cargoResponsable: tenantForm.cargoResponsable,
-        correoResponsable: tenantForm.correoResponsable,
-        celularResponsable: tenantForm.celularResponsable,
-      });
+    setTenantFormErrors({});
+    const finishTenantCreate = async (response, { logoPending = false } = {}) => {
       await loadEmpresas();
       await loadEmpresasModuloResumen();
       if (response?.empresaID) setEmpresaID(Number(response.empresaID));
       const assetsPrefix = String(response?.assetsPrefix || "").trim();
-      setTenantForm(INITIAL_TENANT_FORM);
+      resetTenantForm();
       setActivePanel("tenants");
       setTenantSection("perfil");
+      setShowTenantCreatePanel(false);
+      setTenantCredentialsToast({
+        tenant: payload.nombreComercial,
+        empresaID: response?.empresaID ? Number(response.empresaID) : null,
+        catalogUrl: `${CATALOG_PUBLIC_BASE_URL}/${encodeURIComponent(payload.slug)}`,
+        adminEmail: payload.adminEmail || payload.correoResponsable,
+        usuario: payload.adminLogin,
+        password: payload.adminPassword,
+        logoPending,
+      });
+      const adminInfo = payload.adminLogin ? ` con admin ${payload.adminLogin}` : "";
+      const logoInfo = logoPending ? " Logo pendiente de carga." : "";
       setInfo(assetsPrefix
-        ? `Tenant ${nombreComercial} creado con admin ${adminLogin}. Assets: ${assetsPrefix}`
-        : `Tenant ${nombreComercial} creado con admin ${adminLogin}.`);
+        ? `Empresa ${payload.nombreComercial} creada${adminInfo}. Assets: ${assetsPrefix}.${logoInfo}`
+        : `Empresa ${payload.nombreComercial} creada${adminInfo}.${logoInfo}`);
+    };
+
+    try {
+      const response = await api.crearTenantGestion({
+        ...payload,
+      });
+      await finishTenantCreate(response);
     } catch (nextError) {
       console.error("Error creando tenant:", nextError);
+      if (payload.logoFile && isLogoCreateFallbackError(nextError)) {
+        try {
+          const response = await api.crearTenantGestion({
+            ...payload,
+            logoFile: null,
+          });
+          await finishTenantCreate(response, { logoPending: true });
+          return;
+        } catch (fallbackError) {
+          console.error("Error creando tenant sin logo:", fallbackError);
+          nextError = fallbackError;
+        }
+      }
       const isS3CreateError = Number(nextError?.status) === 502 && nextError?.code === "AUTH_EMPRESA_CREATE_S3_ERROR";
       if (isS3CreateError) {
         setError(TENANT_S3_CREATE_ERROR_MESSAGE);
@@ -815,12 +867,58 @@ export function useUsersManagementController({ session, canViewUsuariosGlobal })
       } else if (Number(nextError?.status) === 400) {
         setError(nextError?.detail || TENANT_INVALID_ERROR_MESSAGE);
       } else {
-        setError(nextError?.message || "No fue posible crear el tenant.");
+        setError(nextError?.message || "No fue posible crear la empresa.");
       }
     } finally {
       setSaving(false);
     }
-  };  const submitCreate = async event => {
+  };
+
+  const submitEditTenant = async event => {
+    event.preventDefault();
+    if (saving) return;
+    if (!canViewUsuariosGlobal) return;
+    const targetEmpresaID = Number(empresaID);
+    if (!Number.isFinite(targetEmpresaID) || targetEmpresaID <= 0) {
+      setError("Selecciona una empresa valida para editar.");
+      return;
+    }
+    const payload = TenantCompanyFormModel.normalize(tenantEditForm);
+    const validationErrors = TenantCompanyFormModel.validateFields(payload, { requireConfig: true, requireAdmin: false });
+    if (Object.keys(validationErrors).length > 0) {
+      setTenantEditFormErrors(validationErrors);
+      setError("Revisa los campos marcados antes de guardar la empresa.");
+      return;
+    }
+
+    setSaving(true);
+    setError("");
+    setInfo("");
+    setTenantEditFormErrors({});
+    try {
+      await api.actualizarEmpresaGestion({
+        empresaId: targetEmpresaID,
+        ...payload,
+      });
+      await loadEmpresas();
+      await loadEmpresasModuloResumen();
+      setShowTenantEditPanel(false);
+      setInfo(`Empresa ${payload.nombreComercial} actualizada.`);
+    } catch (nextError) {
+      console.error("Error actualizando empresa:", nextError);
+      if (Number(nextError?.status) === 409) {
+        setError(nextError?.detail || TENANT_CONFLICT_ERROR_MESSAGE);
+      } else if (Number(nextError?.status) === 400) {
+        setError(nextError?.detail || TENANT_INVALID_ERROR_MESSAGE);
+      } else {
+        setError(nextError?.message || "No fue posible actualizar la empresa.");
+      }
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const submitCreate = async event => {
     event.preventDefault();
     const payload = UserFormModel.normalizeCreate(form);
     const validationError = UserFormModel.validateCreate(payload);
@@ -1201,7 +1299,15 @@ export function useUsersManagementController({ session, canViewUsuariosGlobal })
     setTenantForm,
     tenantSection,
     setTenantSection,
+    tenantEditForm,
+    setTenantEditForm,
+    showTenantCreatePanel,
+    setShowTenantCreatePanel,
+    showTenantEditPanel,
+    setShowTenantEditPanel,
     submitCreateTenant,
+    submitEditTenant,
+    startEditTenant,
     empresaID,
     setEmpresaID,
     sucursalID,
@@ -1217,6 +1323,12 @@ export function useUsersManagementController({ session, canViewUsuariosGlobal })
     saving,
     error,
     info,
+    tenantCredentialsToast,
+    setTenantCredentialsToast,
+    tenantFormErrors,
+    tenantEditFormErrors,
+    setTenantFormErrors,
+    setTenantEditFormErrors,
     moduleItems,
     empresasModuloResumen,
     modulesLoading,

@@ -18,6 +18,47 @@ function toNetworkError(originalError) {
   error.cause = originalError;
   return error;
 }
+
+function buildEmpresaGestionPayload(payload = {}, { includeAdmin = false, includeSucursal = false } = {}) {
+  const body = {
+    nombreComercial: payload.nombreComercial,
+    nombreEmpresa: payload.nombreEmpresa,
+    nit: payload.nit || null,
+    ciudad: payload.ciudad,
+    direccion: payload.direccion,
+    nombreResponsable: payload.nombreResponsable,
+    cargoResponsable: payload.cargoResponsable,
+    correoResponsable: payload.correoResponsable,
+    celularResponsable: payload.celularResponsable,
+    celular: payload.celular,
+    planID: payload.planID,
+    estado: payload.estado,
+    slug: payload.slug,
+  };
+
+  if (includeSucursal) {
+    body.sucursalNombre = payload.sucursalNombre;
+  }
+
+  if (includeAdmin) {
+    if (payload.adminLogin) body.adminLogin = payload.adminLogin;
+    if (payload.adminPassword) body.adminPassword = payload.adminPassword;
+    if (payload.adminEmail) body.adminEmail = payload.adminEmail;
+  }
+
+  return body;
+}
+
+function buildEmpresaGestionFormData(payload = {}, options = {}) {
+  const body = buildEmpresaGestionPayload(payload, options);
+  const formData = new FormData();
+  Object.entries(body).forEach(([key, value]) => {
+    if (value !== undefined) formData.append(key, value == null ? "" : String(value));
+  });
+  if (payload.logoFile) formData.append("file", payload.logoFile);
+  return formData;
+}
+
 const PRODUCTION_STATUS_CODE_BY_UI = {
   Pendiente: "PENDIENTE",
   EnProduccion: "EN_PROCESO",
@@ -262,6 +303,10 @@ export function createApiClient(config) {
       return requestJson("/auth/usuarios/empresas");
     },
 
+    async obtenerEmpresaGestion({ empresaId }) {
+      return requestJson(`/auth/usuarios/empresas/${empresaId}`);
+    },
+
     async listarClientes({ empresaId, q = "", celular = "", telefono = "", soloActivos = false, includeMetrics = false, page = null, pageSize = null }) {
       const params = new URLSearchParams();
       params.set("empresaID", String(empresaId));
@@ -380,59 +425,39 @@ export function createApiClient(config) {
       return requestJson("/auth/usuarios/empresas/modulos");
     },
 
-    async crearEmpresaGestion({
-      nombreComercial, planID, estado = "Activo", slug = "", adminLogin = "", adminPassword = "", adminEmail = "", sucursalNombre = "",
-      nit = "", celular = "", ciudad = "", direccion = "", nombreResponsable = "", cargoResponsable = "", correoResponsable = "", celularResponsable = "",
-    }) {
+    async crearTenantGestion(payload) {
+      if (payload?.logoFile) {
+        return requestJson("/auth/usuarios/empresas", {
+          method: "POST",
+          body: buildEmpresaGestionFormData(payload, { includeAdmin: true, includeSucursal: true })
+        });
+      }
+
       return requestJson("/auth/usuarios/empresas", {
         method: "POST",
         headers: {
           "Content-Type": "application/json"
         },
-        body: JSON.stringify({
-          nombreComercial,
-          planID,
-          estado,
-          slug,
-          adminLogin,
-          adminPassword,
-          adminEmail,
-          sucursalNombre,
-          nit,
-          celular,
-          ciudad,
-          direccion,
-          nombreResponsable,
-          cargoResponsable,
-          correoResponsable,
-          celularResponsable,
-        })
+        body: JSON.stringify(buildEmpresaGestionPayload(payload, { includeAdmin: true, includeSucursal: true }))
       });
     },
 
-    async obtenerEmpresaGestion({ empresaId }) {
-      return requestJson(`/auth/usuarios/empresas/${empresaId}`);
+    async crearEmpresaGestion(payload) {
+      return this.crearTenantGestion(payload);
     },
 
-    async actualizarEmpresaGestion({ empresaId, nombreComercial, estado, nit, celular, ciudad, direccion, nombreResponsable, cargoResponsable, correoResponsable, celularResponsable }) {
+    async actualizarEmpresaGestion({ empresaId, ...payload }) {
       return requestJson(`/auth/usuarios/empresas/${empresaId}`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json"
         },
-        body: JSON.stringify({
-          nombreComercial,
-          estado,
-          nit,
-          celular,
-          ciudad,
-          direccion,
-          nombreResponsable,
-          cargoResponsable,
-          correoResponsable,
-          celularResponsable,
-        })
+        body: JSON.stringify(buildEmpresaGestionPayload(payload))
       });
+    },
+
+    async obtenerEmpresaGestion({ empresaId }) {
+      return requestJson(`/auth/usuarios/empresas/${empresaId}`);
     },
 
     async obtenerTemaEmpresa({ empresaId }) {

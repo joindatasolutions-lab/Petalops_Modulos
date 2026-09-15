@@ -15,12 +15,16 @@ export function CompanyModulesPanel({
   onAddModulo,
   modulesSaving,
   onSaveModules,
+  onEditCompany,
 }) {
   return (
     <article className="order-block users-create-block users-top-panel">
       <h4>Habilitacion comercial de modulos</h4>
       <p className="orders-admin-subtitle">Empresa objetivo: <strong>{empresaSeleccionadaNombre}</strong> (ID {empresaID}).</p>
       <p className="orders-admin-subtitle">Activa o desactiva modulos segun lo contratado para esta empresa.</p>
+      <button type="button" className="btn-outline users-company-edit-btn" onClick={onEditCompany}>
+        Editar empresa
+      </button>
 
       <div className="users-create-form users-modulos-form" style={{ gap: 10 }}>
         <label className="users-modulo-company-label" htmlFor="empresa-modulos-target">Empresa a configurar</label>

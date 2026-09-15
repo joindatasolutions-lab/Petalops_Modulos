@@ -6,6 +6,7 @@ export const ACCOUNTING_VIEWS = [
   { key: "arreglos", label: "Metricas por arreglo" },
   { key: "personal", label: "Personal" },
   { key: "cuentas", label: "Cuentas de pago" },
+  { key: "metodosPago", label: "Metodos de pago" },
   { key: "caja", label: "Caja" },
 ];
 
@@ -15,6 +16,7 @@ export const ACCOUNTING_VIEW_ICONS = {
   arreglos: BarChart3,
   personal: Users,
   cuentas: CreditCard,
+  metodosPago: CreditCard,
   caja: Wallet,
 };
 

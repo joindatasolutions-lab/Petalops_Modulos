@@ -8,8 +8,9 @@ import { buildArrangementExportRows, buildCashExportRows, buildDeliveryPersonOrd
 import { buildArrangementSummary, buildDetailChartRows, buildDetailInsight, buildPaymentSummary, buildPersonnelSummary, buildSummaryTotals } from "../accountingSelectors.js";
 import { filterAccountingDetailRows, formatAccountingLocalDate, getAccountingPeriodRange, hasCashClosingData, normalizeCashClosingRow, normalizeCashSummaryRow, parseMoneyInput, roundMoney } from "../accountingDomain.js";
 import { useAccountingData } from "./useAccountingData.js";
+import { useAccountingPaymentMethods } from "./useAccountingPaymentMethods.js";
 
-export function useAccountingController({ session }) {
+export function useAccountingController({ session, canViewUsuariosGlobal = false }) {
   const api = useMemo(() => createApiClient(tenantConfig), []);
   const empresaId = Number(session?.empresaID || tenantConfig.empresaId);
   const sessionSucursalValue = session?.sucursalID ?? session?.sucursalId ?? session?.sucursal_id;
@@ -67,6 +68,12 @@ export function useAccountingController({ session }) {
     accountingDetailRows,
     loadAccountingData,
   } = useAccountingData({ api, empresaId, sucursalId, selectedSucursalId, filters });
+  const paymentMethodsController = useAccountingPaymentMethods({
+    api,
+    session,
+    canViewUsuariosGlobal,
+    enabled: activeView === "metodosPago",
+  });
   const loadCashClosings = useCallback(async () => {
     setCashLoading(true);
     try {
@@ -780,9 +787,11 @@ export function useAccountingController({ session }) {
     if (activeView === "personal") return { onClick: exportPersonal, disabled: floristMetricRows.length === 0 && deliveryPersonMetricRows.length === 0 };
     if (activeView === "cuentas") return { onClick: exportCuentas, disabled: paymentAccountRows.length === 0 };
     if (activeView === "caja") return { onClick: exportCaja, disabled: cashHistoryRows.length === 0 };
+    if (activeView === "metodosPago") return { onClick: () => {}, disabled: true };
     return { onClick: exportVentas, disabled: orderRows.length === 0 };
   })();
   return {
+    ...paymentMethodsController,
     activeDeliveryPersonOrdersStatus,
     activeExportAction,
     activePeriodPreset,
