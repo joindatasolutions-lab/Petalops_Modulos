@@ -557,6 +557,12 @@
   .delivery-page-view .delivery-actions-menu {
     position: relative !important;
     justify-self: end !important;
+    overflow: visible !important;
+    z-index: 2 !important;
+  }
+
+  .delivery-page-view .delivery-actions-menu:has(.delivery-actions-menu-trigger[aria-expanded="true"]) {
+    z-index: 120 !important;
   }
 
   .delivery-page-view .delivery-actions-menu-trigger {
@@ -571,10 +577,11 @@
   }
 
   .delivery-page-view .delivery-actions-menu-panel {
-    top: calc(100% + 8px) !important;
+    top: auto !important;
+    bottom: calc(100% + 8px) !important;
     right: 0 !important;
     left: auto !important;
-    z-index: 90 !important;
+    z-index: 140 !important;
     min-width: 190px !important;
   }
 }

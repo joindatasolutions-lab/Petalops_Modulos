@@ -70,13 +70,6 @@ const INITIAL_COMPANY_THEME_FORM = {
   fuenteFamilia: DEFAULT_FONT_FAMILY,
 };
 
-const INITIAL_PAYMENT_METHOD_FORM = {
-  nombre: "",
-  cuenta: "",
-  numeroCuenta: "",
-  activasCuentasCatalogo: false,
-};
-
 export function useUsersManagementController({ session, canViewUsuariosGlobal }) {
   const api = useMemo(() => createApiClient(tenantConfig), []);
   const sidebar = useSidebarState();
@@ -121,13 +114,6 @@ export function useUsersManagementController({ session, canViewUsuariosGlobal })
   const [showAdvancedModules, setShowAdvancedModules] = useState(false);
   const [showUserModuleDropdown, setShowUserModuleDropdown] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [showPaymentMethodModal, setShowPaymentMethodModal] = useState(false);
-  const [paymentMethodForm, setPaymentMethodForm] = useState(INITIAL_PAYMENT_METHOD_FORM);
-  const [paymentMethodSaving, setPaymentMethodSaving] = useState(false);
-  const [paymentMethodEditing, setPaymentMethodEditing] = useState(null);
-  const [paymentMethods, setPaymentMethods] = useState([]);
-  const [paymentMethodsLoading, setPaymentMethodsLoading] = useState(false);
-  const [datosTransferenciaCatalogoActivo, setDatosTransferenciaCatalogoActivo] = useState(false);
   const [asignacionConfig, setAsignacionConfig] = useState(() => normalizeAsignacionConfig());
   const [asignacionLoading, setAsignacionLoading] = useState(false);
   const [asignacionSaving, setAsignacionSaving] = useState(false);
@@ -211,18 +197,6 @@ export function useUsersManagementController({ session, canViewUsuariosGlobal })
     setPasswordVisible(false);
     setShowUserModuleDropdown(false);
     setForm(UserFormModel.initial());
-  }, []);
-
-  const openPaymentMethodModal = useCallback(() => {
-    setPaymentMethodEditing(null);
-    setPaymentMethodForm(INITIAL_PAYMENT_METHOD_FORM);
-    setShowPaymentMethodModal(true);
-  }, []);
-
-  const closePaymentMethodModal = useCallback(() => {
-    setShowPaymentMethodModal(false);
-    setPaymentMethodEditing(null);
-    setPaymentMethodForm(INITIAL_PAYMENT_METHOD_FORM);
   }, []);
 
   const selectedUserModulesCount = (form.modulosAcceso || []).length;
@@ -418,29 +392,6 @@ export function useUsersManagementController({ session, canViewUsuariosGlobal })
     }
   }, [api, empresaID, companyThemeForm]);
 
-  const loadPaymentMethods = useCallback(async () => {
-    const targetEmpresaID = Number(empresaID);
-    if (!Number.isFinite(targetEmpresaID) || targetEmpresaID <= 0) {
-      setPaymentMethods([]);
-      setDatosTransferenciaCatalogoActivo(false);
-      return;
-    }
-    setPaymentMethodsLoading(true);
-    setError("");
-    try {
-      const data = await api.listarMetodosPagoEmpresa({ empresaId: targetEmpresaID });
-      setPaymentMethods(Array.isArray(data.items) ? data.items : []);
-      setDatosTransferenciaCatalogoActivo(Boolean(data.datosTransferenciaCatalogoActivo));
-    } catch (nextError) {
-      console.error("Error cargando metodos de pago:", nextError);
-      setPaymentMethods([]);
-      setDatosTransferenciaCatalogoActivo(false);
-      setError(nextError?.message || "No fue posible cargar metodos de pago.");
-    } finally {
-      setPaymentMethodsLoading(false);
-    }
-  }, [api, empresaID]);
-
   const loadAsignacionConfig = useCallback(async () => {
     const targetEmpresaID = Number(empresaID);
     if (!Number.isFinite(targetEmpresaID) || targetEmpresaID <= 0) {
@@ -561,10 +512,6 @@ export function useUsersManagementController({ session, canViewUsuariosGlobal })
   }, [loadCompanyProfile]);
 
   useEffect(() => {
-    loadPaymentMethods().catch(() => {});
-  }, [loadPaymentMethods]);
-
-  useEffect(() => {
     loadAsignacionConfig().catch(() => {});
   }, [loadAsignacionConfig]);
 
@@ -649,119 +596,6 @@ export function useUsersManagementController({ session, canViewUsuariosGlobal })
     }
   };
 
-  const submitCreatePaymentMethod = async event => {
-    event.preventDefault();
-    const nombre = String(paymentMethodForm.nombre || "").trim();
-    const cuenta = String(paymentMethodForm.cuenta || "").trim();
-    const numeroCuenta = String(paymentMethodForm.numeroCuenta || "").trim();
-    const activasCuentasCatalogo = Boolean(paymentMethodForm.activasCuentasCatalogo);
-    const targetEmpresaID = Number(empresaID);
-    if (!Number.isFinite(targetEmpresaID) || targetEmpresaID <= 0) {
-      setError("Selecciona una empresa valida para crear el metodo de pago.");
-      return;
-    }
-    if (nombre.length < 2) {
-      setError("El metodo de pago debe tener al menos 2 caracteres.");
-      return;
-    }
-    if (activasCuentasCatalogo && (!cuenta || !numeroCuenta)) {
-      setError("Para activar los datos de transferencia en el catalogo, agrega banco o cuenta y numero de cuenta.");
-      return;
-    }
-    setPaymentMethodSaving(true);
-    setError("");
-    setInfo("");
-    try {
-      const response = paymentMethodEditing
-        ? await api.actualizarMetodoPagoEmpresa({
-            empresaId: targetEmpresaID,
-            itemId: paymentMethodEditing.id,
-            nombre,
-            cuenta: cuenta || null,
-            numeroCuenta: numeroCuenta || null,
-            activasCuentasCatalogo,
-          })
-        : await api.crearMetodoPagoEmpresa({
-            empresaId: targetEmpresaID,
-            nombre,
-            cuenta: cuenta || null,
-            numeroCuenta: numeroCuenta || null,
-            activasCuentasCatalogo,
-          });
-      closePaymentMethodModal();
-      await loadPaymentMethods();
-      setInfo(`Metodo de pago ${response?.nombre || nombre} ${paymentMethodEditing ? "actualizado" : "creado"} para ${empresaSeleccionadaNombre}.`);
-    } catch (nextError) {
-      console.error("Error guardando metodo de pago:", nextError);
-      setError(nextError?.message || "No fue posible guardar el metodo de pago.");
-    } finally {
-      setPaymentMethodSaving(false);
-    }
-  };
-
-  const editPaymentMethod = item => {
-    setPaymentMethodEditing(item);
-    setPaymentMethodForm({
-      nombre: item?.nombre || "",
-      cuenta: item?.cuenta || "",
-      numeroCuenta: item?.numeroCuenta || item?.numero_cuenta || "",
-      activasCuentasCatalogo: Boolean(item?.activasCuentasCatalogo ?? item?.activas_cuentas_catalogo),
-    });
-    setShowPaymentMethodModal(true);
-  };
-
-  const togglePaymentMethodActive = async item => {
-    const targetEmpresaID = Number(empresaID);
-    if (!item?.id || !Number.isFinite(targetEmpresaID) || targetEmpresaID <= 0) return;
-    setPaymentMethodSaving(true);
-    setError("");
-    setInfo("");
-    try {
-      await api.actualizarMetodoPagoEmpresa({
-        empresaId: targetEmpresaID,
-        itemId: item.id,
-        activo: !Boolean(item.activo),
-      });
-      await loadPaymentMethods();
-      setInfo(`Metodo de pago ${item.nombre} ${item.activo ? "inactivado" : "activado"} para ${empresaSeleccionadaNombre}.`);
-    } catch (nextError) {
-      console.error("Error actualizando metodo de pago:", nextError);
-      setError(nextError?.message || "No fue posible actualizar el metodo de pago.");
-    } finally {
-      setPaymentMethodSaving(false);
-    }
-  };
-
-  const togglePaymentMethodCatalogAccount = async item => {
-    const targetEmpresaID = Number(empresaID);
-    if (!item?.id || !Number.isFinite(targetEmpresaID) || targetEmpresaID <= 0) return;
-    const nextValue = !Boolean(item.activasCuentasCatalogo ?? item.activas_cuentas_catalogo);
-    const cuenta = String(item.cuenta || "").trim();
-    const numeroCuenta = String(item.numeroCuenta || item.numero_cuenta || "").trim();
-    if (nextValue && (!cuenta || !numeroCuenta)) {
-      setError("Agrega banco o cuenta y numero de cuenta antes de mostrar este metodo en el catalogo.");
-      setInfo("");
-      return;
-    }
-    setPaymentMethodSaving(true);
-    setError("");
-    setInfo("");
-    try {
-      await api.actualizarMetodoPagoEmpresa({
-        empresaId: targetEmpresaID,
-        itemId: item.id,
-        activasCuentasCatalogo: nextValue,
-      });
-      await loadPaymentMethods();
-      setInfo(`Datos para transferir ${nextValue ? "activados" : "desactivados"} en catalogo para ${item.nombre}.`);
-    } catch (nextError) {
-      console.error("Error actualizando datos de transferencia:", nextError);
-      setError(nextError?.message || "No fue posible actualizar los datos de transferencia del catalogo.");
-    } finally {
-      setPaymentMethodSaving(false);
-    }
-  };
-
   const toggleNotificacionAccion = async field => {
     const targetEmpresaID = Number(empresaID);
     if (!Number.isFinite(targetEmpresaID) || targetEmpresaID <= 0) return;
@@ -786,28 +620,6 @@ export function useUsersManagementController({ session, canViewUsuariosGlobal })
   const toggleNotificacionNuevoPedidoDomiciliario = () => (
     toggleNotificacionAccion("notificacionNuevoPedidoDomiciliarioActiva")
   );
-
-  const toggleDatosTransferenciaCatalogo = async () => {
-    const targetEmpresaID = Number(empresaID);
-    if (!Number.isFinite(targetEmpresaID) || targetEmpresaID <= 0) return;
-    const nextValue = !Boolean(datosTransferenciaCatalogoActivo);
-    setPaymentMethodSaving(true);
-    setError("");
-    setInfo("");
-    try {
-      const response = await api.actualizarConfiguracionCatalogoTransferencia({
-        empresaId: targetEmpresaID,
-        datosTransferenciaCatalogoActivo: nextValue,
-      });
-      setDatosTransferenciaCatalogoActivo(Boolean(response?.datosTransferenciaCatalogoActivo));
-      setInfo(`Datos para transferir en catalogo ${nextValue ? "activados" : "desactivados"} para ${empresaSeleccionadaNombre}.`);
-    } catch (nextError) {
-      console.error("Error actualizando configuracion de transferencia catalogo:", nextError);
-      setError(nextError?.message || "No fue posible actualizar la configuracion de transferencia del catalogo.");
-    } finally {
-      setPaymentMethodSaving(false);
-    }
-  };
 
   const submitCreateTenant = async event => {
     event.preventDefault();
@@ -1365,29 +1177,18 @@ export function useUsersManagementController({ session, canViewUsuariosGlobal })
     setShowAdvancedModules,
     showCreateModal,
     setShowCreateModal,
-    showPaymentMethodModal,
-    paymentMethodForm,
-    setPaymentMethodForm,
-    paymentMethodSaving,
-    paymentMethodEditing,
-    paymentMethods,
-    paymentMethodsLoading,
-    datosTransferenciaCatalogoActivo,
     asignacionConfig,
     asignacionLoading,
     asignacionSaving,
     openCreateModal,
-    openPaymentMethodModal,
     editingUserId,
     editForm,
     showEditDrawer,
     empresaSeleccionadaNombre,
     loadUsers,
-    loadPaymentMethods,
     loadAsignacionConfig,
     loadEmpresasModuloResumen,
     closeCreateModal,
-    closePaymentMethodModal,
     closeEditDrawer,
     toggleEstado,
     toggleModule,
@@ -1395,11 +1196,6 @@ export function useUsersManagementController({ session, canViewUsuariosGlobal })
     deleteUser,
     saveModules,
     addModulo,
-    submitCreatePaymentMethod,
-    editPaymentMethod,
-    togglePaymentMethodActive,
-    togglePaymentMethodCatalogAccount,
-    toggleDatosTransferenciaCatalogo,
     toggleAsignacionProduccion,
     toggleAsignacionDomicilio,
     toggleAutoAsignacionProduccion,

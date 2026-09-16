@@ -1,4 +1,4 @@
-import { Building2, CreditCard, KeyRound, Mail, RefreshCw, SlidersHorizontal, UserCog, UserPlus, UsersRound, X } from "lucide-react";
+import { Building2, KeyRound, Mail, RefreshCw, SlidersHorizontal, UserCog, UserPlus, UsersRound, X } from "lucide-react";
 
 import { AppSidebar } from "../../shared/AppSidebar.jsx";
 import { AccionesPanel } from "./components/AccionesPanel.jsx";
@@ -6,8 +6,7 @@ import { CompanyModulesPanel } from "./components/CompanyModulesPanel.jsx";
 import { CompanyModulesSummaryTable } from "./components/CompanyModulesSummaryTable.jsx";
 import { CompanyProfilePanel } from "./components/CompanyProfilePanel.jsx";
 import { CompanyThemePanel } from "./components/CompanyThemePanel.jsx";
-import { PaymentMethodsPanel } from "./components/PaymentMethodsPanel.jsx";
-import { CreateUserModal, EditUserModal, PaymentMethodModal } from "./components/UserModals.jsx";
+import { CreateUserModal, EditUserModal } from "./components/UserModals.jsx";
 import { TenantCreatePanel } from "./components/TenantCreatePanel.jsx";
 import { UsersFilters } from "./components/UsersFilters.jsx";
 import { UsersTable } from "./components/UsersTable.jsx";
@@ -41,10 +40,9 @@ export function UsersManagementPage(props) {
   } = props;
   const users = useUsersManagementController({ session, canViewUsuariosGlobal });
   const isTenantsPanel = canViewUsuariosGlobal && users.activePanel === "tenants";
-  const isPaymentMethodsPanel = canViewUsuariosGlobal && users.activePanel === "paymentMethods";
   const isAccionesPanel = canViewUsuariosGlobal && users.activePanel === "acciones";
   const isUsuariosPanel = !canViewUsuariosGlobal || users.activePanel === "usuarios";
-  const isRefreshing = users.loading || users.empresasModulesLoading || users.paymentMethodsLoading || users.asignacionLoading;
+  const isRefreshing = users.loading || users.empresasModulesLoading || users.asignacionLoading;
 
   const openTenantCreate = () => {
     users.setTenantSection("crear");
@@ -108,7 +106,7 @@ export function UsersManagementPage(props) {
             <button
               type="button"
               className="btn-primary orders-header-refresh"
-              onClick={isTenantsPanel ? users.loadEmpresasModuloResumen : (isPaymentMethodsPanel ? users.loadPaymentMethods : (isAccionesPanel ? users.loadAsignacionConfig : users.loadUsers))}
+              onClick={isTenantsPanel ? users.loadEmpresasModuloResumen : (isAccionesPanel ? users.loadAsignacionConfig : users.loadUsers)}
               disabled={isRefreshing}
             >
               <RefreshCw size={18} strokeWidth={2} aria-hidden="true" />
@@ -130,10 +128,6 @@ export function UsersManagementPage(props) {
           </button>
           {canViewUsuariosGlobal ? (
             <>
-              <button type="button" className={isPaymentMethodsPanel ? "is-active" : ""} onClick={() => users.setActivePanel("paymentMethods")}>
-                <CreditCard size={16} strokeWidth={2} aria-hidden="true" />
-                Metodos de pago
-              </button>
               <button type="button" className={isAccionesPanel ? "is-active" : ""} onClick={() => users.setActivePanel("acciones")}>
                 <SlidersHorizontal size={16} strokeWidth={2} aria-hidden="true" />
                 Acciones
@@ -220,8 +214,6 @@ export function UsersManagementPage(props) {
               <CompanyModulesSummaryTable loading={users.empresasModulesLoading} items={users.empresasModuloResumen} onEditCompany={users.startEditTenant} />
             ) : null}
           </section>
-        ) : isPaymentMethodsPanel ? (
-          <PaymentMethodsPanel empresaID={users.empresaID} empresaSeleccionadaNombre={users.empresaSeleccionadaNombre} empresas={users.empresas} setEmpresaID={users.setEmpresaID} canViewUsuariosGlobal={canViewUsuariosGlobal} loading={users.paymentMethodsLoading} items={users.paymentMethods} saving={users.paymentMethodSaving} datosTransferenciaCatalogoActivo={users.datosTransferenciaCatalogoActivo} onCreate={users.openPaymentMethodModal} onEdit={users.editPaymentMethod} onToggleActive={users.togglePaymentMethodActive} onToggleCatalogAccount={users.togglePaymentMethodCatalogAccount} onToggleCatalogTransfer={users.toggleDatosTransferenciaCatalogo} />
         ) : isAccionesPanel ? (
           <AccionesPanel
             empresaID={users.empresaID}
@@ -256,7 +248,6 @@ export function UsersManagementPage(props) {
 
       {users.showCreateModal ? <CreateUserModal empresaSeleccionadaNombre={users.empresaSeleccionadaNombre} empresaID={users.empresaID} empresas={users.empresas} setEmpresaID={users.setEmpresaID} canViewUsuariosGlobal={canViewUsuariosGlobal} onClose={users.closeCreateModal} formProps={users.createFormProps} /> : null}
       {users.showEditDrawer ? <EditUserModal editingUserId={users.editingUserId} editForm={users.editForm} empresaSeleccionadaNombre={users.empresaSeleccionadaNombre} empresaID={users.empresaID} onClose={users.closeEditDrawer} formProps={users.editFormProps} /> : null}
-      {users.showPaymentMethodModal ? <PaymentMethodModal form={users.paymentMethodForm} setForm={users.setPaymentMethodForm} saving={users.paymentMethodSaving} editing={users.paymentMethodEditing} onClose={users.closePaymentMethodModal} onSubmit={users.submitCreatePaymentMethod} /> : null}
     </div>
   );
 }
