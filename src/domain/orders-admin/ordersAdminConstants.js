@@ -21,6 +21,7 @@ export const initialFilters = {
   metodoPago: "",
   fechaDesde: todayIsoDateBogota(),
   fechaHasta: todayIsoDateBogota(),
+  filtrarPorEntrega: false,
   page: 1,
   pageSize: 10
 };

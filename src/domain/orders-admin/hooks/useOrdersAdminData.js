@@ -70,6 +70,7 @@ export function useOrdersAdminData({
       metodoPago: filters.metodoPago,
       fechaDesde: filters.fechaDesde,
       fechaHasta: filters.fechaHasta,
+      filtrarPorEntrega: filters.filtrarPorEntrega,
       page: filters.page,
       pageSize: filters.pageSize,
     };
@@ -83,11 +84,13 @@ export function useOrdersAdminData({
     });
     const cached = !silent ? filterCache.get(cacheKey) : null;
 
+    const skipCreatedDateRefilter = requestFilters.soloTienda || requestFilters.soloEntregasHoy || requestFilters.filtrarPorEntrega;
+
     if (cached) {
-      const cachedItems = requestFilters.soloTienda || requestFilters.soloEntregasHoy
+      const cachedItems = skipCreatedDateRefilter
         ? cached.items
         : filterOrdersByCreatedDateRange(cached.items, requestFechaDesde, requestFechaHasta);
-      const cachedMetricItems = requestFilters.soloTienda || requestFilters.soloEntregasHoy
+      const cachedMetricItems = skipCreatedDateRefilter
         ? cached.metricItems
         : filterOrdersByCreatedDateRange(cached.metricItems, requestFechaDesde, requestFechaHasta);
       const cachedHadOutOfRangeItems = cachedItems.length !== (Array.isArray(cached.items) ? cached.items.length : 0);
@@ -121,6 +124,7 @@ export function useOrdersAdminData({
         soloEntregasHoy: requestFilters.soloEntregasHoy,
         fechaDesde: localDateStartParam(requestFechaDesde),
         fechaHasta: localDateEndParam(requestFechaHasta),
+        filtrarPorEntrega: requestFilters.filtrarPorEntrega,
         page: requestFilters.page,
         pageSize: requestFilters.pageSize,
       });
@@ -129,7 +133,7 @@ export function useOrdersAdminData({
       if (silent && (requestId !== requestTracker.current || visibleLoadingRequest.current)) return;
 
       const loadedItems = extractOrdersPayloadItems(data).map(applyDeliveryGiftOverrideToItem);
-      const dateItems = requestFilters.soloTienda || requestFilters.soloEntregasHoy
+      const dateItems = skipCreatedDateRefilter
         ? loadedItems
         : filterOrdersByCreatedDateRange(loadedItems, requestFechaDesde, requestFechaHasta);
       const statusItems = filterOrdersByStatus(dateItems, requestFilters.estado);
@@ -179,7 +183,7 @@ export function useOrdersAdminData({
         setLoading(false);
       }
     }
-  }, [api, debouncedQuery, empresaId, filterCache, filters.estado, filters.fechaDesde, filters.fechaHasta, filters.metodoPago, filters.page, filters.pageSize, filters.sinImprimir, filters.soloEntregasHoy, filters.soloTienda, requestTracker, sucursalId]);
+  }, [api, debouncedQuery, empresaId, filterCache, filters.estado, filters.fechaDesde, filters.fechaHasta, filters.filtrarPorEntrega, filters.metodoPago, filters.page, filters.pageSize, filters.sinImprimir, filters.soloEntregasHoy, filters.soloTienda, requestTracker, sucursalId]);
 
   const loadYesterdayMetrics = useCallback(async () => {
     setYesterdayMetrics(buildOrdersMetrics([], 0, shiftIsoDate(todayIsoDate(), -1)));

@@ -773,7 +773,7 @@ const messageCard = useMessageCardController({
       return {
         ...current,
         [name]: value,
-        ...(name === "fechaDesde" || name === "fechaHasta" ? { soloEntregasHoy: false } : {}),
+        ...(name === "fechaDesde" || name === "fechaHasta" ? { soloEntregasHoy: false, filtrarPorEntrega: false } : {}),
         page: 1
       };
     });
@@ -787,6 +787,7 @@ const messageCard = useMessageCardController({
         fechaDesde: value,
         fechaHasta: value,
         soloEntregasHoy: false,
+        filtrarPorEntrega: false,
         page: 1
       };
     });
@@ -1572,11 +1573,21 @@ const openNewOrderModal = () => {
       mes: thisMonthRangeIso(),
     };
     const range = ranges[preset] || ranges.hoy;
+    // "Hoy" sigue filtrando por fecha de creacion del pedido (comportamiento
+    // historico); los demas presets filtran por fecha de entrega, porque un
+    // pedido no puede haberse creado en el futuro y por eso "Manana"/"Esta
+    // semana"/"Este mes" nunca mostraban nada.
+    const filtrarPorEntrega = preset !== "hoy";
     setFilters(current => {
-      if (current.fechaDesde === range.fechaDesde && current.fechaHasta === range.fechaHasta && Number(current.page || 1) === 1) {
+      if (
+        current.fechaDesde === range.fechaDesde
+        && current.fechaHasta === range.fechaHasta
+        && Boolean(current.filtrarPorEntrega) === filtrarPorEntrega
+        && Number(current.page || 1) === 1
+      ) {
         return current;
       }
-      return { ...current, ...range, soloEntregasHoy: false, page: 1 };
+      return { ...current, ...range, filtrarPorEntrega, soloEntregasHoy: false, page: 1 };
     });
   };
 
@@ -1592,6 +1603,7 @@ const openNewOrderModal = () => {
       metodoPago: "",
       fechaDesde: today,
       fechaHasta: today,
+      filtrarPorEntrega: false,
       page: 1,
     }));
   };
@@ -1604,6 +1616,7 @@ const openNewOrderModal = () => {
         estado: "",
         sinImprimir: false,
         soloEntregasHoy: false,
+        filtrarPorEntrega: false,
         page: 1,
       };
 
