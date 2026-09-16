@@ -14,6 +14,7 @@ export function AccountingPage({
   canViewContabilidad,
   canViewClientesPanel,
   canViewUsuariosPanel,
+  canViewUsuariosGlobal,
   onGoPipeline,
   onGoPedidos,
   onGoProduccion,
@@ -26,7 +27,7 @@ export function AccountingPage({
   onLogout,
 }) {
   const { sidebarPinned, sidebarMobileOpen, setSidebarMobileOpen, toggleSidebar } = useSidebarState();
-  const controller = useAccountingController({ session });
+  const controller = useAccountingController({ session, canViewUsuariosGlobal });
 
   return (
     <div className={`app-shell ${sidebarPinned ? "is-sidebar-pinned" : ""} ${sidebarMobileOpen ? "is-sidebar-mobile-open" : ""}`}>

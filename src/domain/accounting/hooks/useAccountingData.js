@@ -37,7 +37,6 @@ export function useAccountingData({ api, empresaId, sucursalId, selectedSucursal
       try {
         ventasDiarioPayload = await api.obtenerVentasDiarioContabilidad(query);
       } catch (ventasError) {
-        if (ventasError?.status !== 404) throw ventasError;
         console.warn("Resumen diario de ventas no disponible, usando resumen contable existente:", ventasError);
       }
       const nextOrderRows = Array.isArray(ventasDiarioPayload?.orderRows) ? ventasDiarioPayload.orderRows : [];

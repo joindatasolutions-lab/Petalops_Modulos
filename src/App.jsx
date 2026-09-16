@@ -235,6 +235,7 @@ export default function App() {
     canViewContabilidad: canContabilidad,
     canViewClientesPanel: canClientes,
     canViewUsuariosPanel: canUsuariosPanel,
+    canViewUsuariosGlobal: canUsuariosGlobal,
     onGoPipeline: () => canPipeline && setView("pipeline"),
     onGoPedidos: () => canPedidos && setView("pedidos"),
     onGoProduccion: () => canProduccion && setView("produccion"),

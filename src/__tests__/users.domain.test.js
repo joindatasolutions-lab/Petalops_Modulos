@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   UserFormModel,
+  TenantCompanyFormModel,
   buildSlug,
   defaultModulesForRoles,
   filterVisibleRoles,
@@ -114,8 +115,59 @@ describe("dominio de usuarios", () => {
 
     expect(validateTenantSlug("lafiore")).toBe("");
     expect(validateTenantSlug("la-fiore")).toBe("");
-    expect(validateTenantSlug("la")).toBe("El slug catalogo debe tener al menos 3 caracteres.");
-    expect(validateTenantSlug("a".repeat(81))).toBe("El slug catalogo no puede superar 80 caracteres.");
-    expect(validateTenantSlug("-lafiore")).toBe("El slug catalogo solo puede usar letras minusculas, numeros y guiones, sin guiones al inicio o al final.");
+    expect(validateTenantSlug("la")).toBe("La URL del catalogo debe tener al menos 3 caracteres.");
+    expect(validateTenantSlug("a".repeat(81))).toBe("La URL del catalogo no puede superar 80 caracteres.");
+    expect(validateTenantSlug("-lafiore")).toBe("Usa solo letras minusculas, numeros y guiones, sin guiones al inicio o al final.");
+  });
+
+  it("normaliza y valida datos nuevos de empresa para crear tenant", () => {
+    const payload = TenantCompanyFormModel.normalize({
+      nombreComercial: "  La Fiore  ",
+      nombreEmpresa: "  La Fiore SAS  ",
+      nit: " ",
+      ciudad: " Barranquilla ",
+      direccion: " Calle 84 ",
+      nombreResponsable: " Maria Perez ",
+      cargoResponsable: "",
+      correoResponsable: " RESPONSABLE@EMPRESA.COM ",
+      celularResponsable: " 3001112233 ",
+      celular: " 3019998877 ",
+      slug: "",
+      planID: "2",
+      estado: "Activo",
+      adminLogin: " ADMIN ",
+      adminPassword: "secret1",
+    });
+
+    expect(payload).toMatchObject({
+      nombreComercial: "La Fiore",
+      nombreEmpresa: "La Fiore SAS",
+      nit: null,
+      ciudad: "Barranquilla",
+      direccion: "Calle 84",
+      nombreResponsable: "Maria Perez",
+      correoResponsable: "responsable@empresa.com",
+      celularResponsable: "3001112233",
+      celular: "3019998877",
+      slug: "la-fiore",
+      planID: 2,
+      adminLogin: "admin",
+    });
+    expect(TenantCompanyFormModel.validate(payload, { requireAdmin: true })).toBe("");
+    expect(TenantCompanyFormModel.validate({ ...payload, correoResponsable: "correo-malo" })).toBe("Ingresa un correo electronico valido.");
+    expect(TenantCompanyFormModel.validate({ ...payload, celular: "" })).toBe("El celular para recibir pedidos es obligatorio.");
+    expect(TenantCompanyFormModel.validate({ ...payload, adminEmail: "admin-malo" }, { requireAdmin: true })).toBe("Ingresa un correo electronico valido.");
+    expect(TenantCompanyFormModel.validate({ ...payload, estado: "Suspendido" })).toBe("Selecciona Activo o Inactivo.");
+    expect(TenantCompanyFormModel.validate({ ...payload, adminLogin: "", adminPassword: "" }, { requireAdmin: true })).toBe("");
+    expect(TenantCompanyFormModel.validate({ ...payload, adminLogin: "ad", adminPassword: "secret1" }, { requireAdmin: true })).toBe("Minimo 3 caracteres.");
+    expect(TenantCompanyFormModel.validate({ ...payload, adminLogin: "admin", adminPassword: "123" }, { requireAdmin: true })).toBe("Minimo 6 caracteres.");
+    expect(TenantCompanyFormModel.validate({
+      ...payload,
+      logoFile: new File(["logo"], "logo.gif", { type: "image/gif" }),
+    })).toBe("Formato no permitido. Usa JPG, PNG, WebP, HEIC o HEIF.");
+    expect(TenantCompanyFormModel.validate({
+      ...payload,
+      logoFile: new File(["logo"], "logo.webp", { type: "image/webp" }),
+    })).toBe("");
   });
 });

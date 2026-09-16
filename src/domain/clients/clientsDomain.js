@@ -259,7 +259,7 @@ export function extractClientItems(payload) {
   return candidates.find(Array.isArray) || [];
 }
 
-export function extractPayloadTotal(payload, fallbackItems = []) {
+export function extractPayloadTotalValue(payload) {
   const candidates = [
     payload?.total,
     payload?.totalItems,
@@ -272,7 +272,32 @@ export function extractPayloadTotal(payload, fallbackItems = []) {
   ];
   const value = candidates.find(item => item != null && item !== "");
   const total = Number(value);
-  return Number.isFinite(total) ? total : fallbackItems.length;
+  return Number.isFinite(total) ? total : null;
+}
+
+export function extractPayloadTotal(payload, fallbackItems = []) {
+  const total = extractPayloadTotalValue(payload);
+  return total != null ? total : fallbackItems.length;
+}
+
+export async function loadAllClientPages(api, params, { pageSize = 300, maxPages = 100 } = {}) {
+  const items = [];
+  let expectedTotal = null;
+
+  for (let nextPage = 1; nextPage <= maxPages; nextPage += 1) {
+    const data = await api.listarClientes({ ...params, page: nextPage, pageSize });
+    const pageItems = extractClientItems(data);
+    const payloadTotal = extractPayloadTotalValue(data);
+
+    if (payloadTotal != null) expectedTotal = payloadTotal;
+    items.push(...pageItems);
+
+    if (pageItems.length === 0) break;
+    if (expectedTotal != null && items.length >= expectedTotal) break;
+    if (pageItems.length < pageSize) break;
+  }
+
+  return items;
 }
 
 export function segmentLabel(segment) {

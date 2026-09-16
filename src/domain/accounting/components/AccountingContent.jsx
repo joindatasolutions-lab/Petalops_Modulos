@@ -1,5 +1,7 @@
 import { Banknote, CalendarDays, ChevronDown, FileSpreadsheet, FileText, Filter, ListChecks, MoreHorizontal, Package, Receipt, RefreshCw, ShoppingCart, XCircle } from "lucide-react";
 import { formatearCOP } from "../../../shared/utils.js";
+import { PaymentMethodsPanel } from "../../users/components/PaymentMethodsPanel.jsx";
+import { PaymentMethodModal } from "../../users/components/UserModals.jsx";
 import { ACCOUNTING_VIEWS, ACCOUNTING_VIEW_ICONS } from "../accountingConstants.js";
 import { AccountingArrangementsView, AccountingCashView, AccountingDetailView, AccountingPaymentAccountsView, AccountingPersonnelView, AccountingSalesView } from "./AccountingViews.jsx";
 
@@ -43,6 +45,7 @@ export function AccountingContent(contentProps) {
   guardadoValue,
   info,
   loadAccountingData,
+  loadPaymentMethods,
   loading,
   moneyMapRows,
   monthlySalesRows,
@@ -50,6 +53,16 @@ export function AccountingContent(contentProps) {
   orderRows,
   paymentAccountRows,
   paymentSummary,
+  paymentMethodEditing,
+  paymentMethodError,
+  paymentMethodForm,
+  paymentMethodInfo,
+  paymentMethodSaving,
+  paymentMethods,
+  paymentMethodsEmpresaID,
+  paymentMethodsEmpresaNombre,
+  paymentMethodsEmpresas,
+  paymentMethodsLoading,
   personnelDashboardRows,
   personnelDashboardSummary,
   personnelMode,
@@ -72,7 +85,9 @@ export function AccountingContent(contentProps) {
   setPersonnelSearch,
   setPersonnelTypeFilter,
   setSelectedAccountingCase,
+  setPaymentMethodForm,
   showAccountingDetail,
+  showPaymentMethodModal,
   summaryTotals,
   todayCashDate,
   toggleArrangementSelection,
@@ -80,7 +95,16 @@ export function AccountingContent(contentProps) {
   topArrangementByUnits,
   topPaymentAccount,
   totalEfectivoCaja,
+  canViewUsuariosGlobal,
+  closePaymentMethodModal,
+  editPaymentMethod,
+  openPaymentMethodModal,
+  setPaymentMethodsEmpresaID,
+  submitPaymentMethod,
+  togglePaymentMethodActive,
   } = contentProps;
+  const isPaymentMethodsConfigView = activeView === "metodosPago";
+  const refreshing = isPaymentMethodsConfigView ? paymentMethodsLoading : loading;
   return (
       <main className={`orders-admin-view accounting-view accounting-page-view ${activeView === "personal" ? "is-personal-view" : ""}`}>
         <header className="orders-admin-header orders-page-header accounting-page-header">
@@ -146,12 +170,12 @@ export function AccountingContent(contentProps) {
                   </div>
                 ) : null}
               </div>
-              <button type="button" className="btn-primary orders-header-refresh" onClick={loadAccountingData} disabled={loading}>
+              <button type="button" className="btn-primary orders-header-refresh" onClick={isPaymentMethodsConfigView ? loadPaymentMethods : loadAccountingData} disabled={refreshing}>
                 <RefreshCw size={18} strokeWidth={2} aria-hidden="true" />
-                {loading ? "Actualizando..." : "Actualizar"}
+                {refreshing ? "Actualizando..." : "Actualizar"}
             </button>
           </div>
-          {activeView !== "personal" ? (
+          {activeView !== "personal" && !isPaymentMethodsConfigView ? (
           <div className="orders-header-metrics accounting-header-metrics" aria-label="Resumen contabilidad">
             <article className="orders-header-metric-card is-primary">
                 <span className="orders-header-metric-icon" aria-hidden="true"><ShoppingCart size={20} strokeWidth={2} /></span>
@@ -183,6 +207,7 @@ export function AccountingContent(contentProps) {
           </div>
         </header>
 
+        {!isPaymentMethodsConfigView ? (
         <section className="orders-filters orders-page-filters accounting-filters">
           <div className="accounting-date-range-control">
             <CalendarDays size={16} strokeWidth={2} aria-hidden="true" />
@@ -253,9 +278,12 @@ export function AccountingContent(contentProps) {
             </button>
           </div>
         </section>
+        ) : null}
 
         {error ? <p className="orders-message">{error}</p> : null}
         {info ? <p className="orders-message">{info}</p> : null}
+        {paymentMethodError ? <p className="orders-message">{paymentMethodError}</p> : null}
+        {paymentMethodInfo ? <p className="orders-message">{paymentMethodInfo}</p> : null}
 
         <AccountingSalesView {...contentProps} />
 
@@ -440,6 +468,38 @@ export function AccountingContent(contentProps) {
         ) : null}
 
         <AccountingPaymentAccountsView {...contentProps} />
+
+        {isPaymentMethodsConfigView ? (
+          <PaymentMethodsPanel
+            empresaID={paymentMethodsEmpresaID}
+            empresaSeleccionadaNombre={paymentMethodsEmpresaNombre}
+            empresas={paymentMethodsEmpresas}
+            setEmpresaID={setPaymentMethodsEmpresaID}
+            canViewUsuariosGlobal={canViewUsuariosGlobal}
+            loading={paymentMethodsLoading}
+            items={paymentMethods}
+            saving={paymentMethodSaving}
+            onCreate={openPaymentMethodModal}
+            onEdit={editPaymentMethod}
+            onToggleActive={togglePaymentMethodActive}
+          />
+        ) : null}
+
+        {showPaymentMethodModal ? (
+          <PaymentMethodModal
+            empresaSeleccionadaNombre={paymentMethodsEmpresaNombre}
+            empresaID={paymentMethodsEmpresaID}
+            empresas={paymentMethodsEmpresas}
+            setEmpresaID={setPaymentMethodsEmpresaID}
+            canViewUsuariosGlobal={canViewUsuariosGlobal}
+            editingItem={paymentMethodEditing}
+            form={paymentMethodForm}
+            setForm={setPaymentMethodForm}
+            saving={paymentMethodSaving}
+            onSubmit={submitPaymentMethod}
+            onClose={closePaymentMethodModal}
+          />
+        ) : null}
 
         <AccountingCashView {...contentProps} />
       </main>

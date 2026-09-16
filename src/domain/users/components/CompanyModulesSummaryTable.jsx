@@ -1,4 +1,4 @@
-export function CompanyModulesSummaryTable({ loading, items }) {
+export function CompanyModulesSummaryTable({ loading, items, onEditCompany }) {
   return (
     <article className="orders-table-wrap users-table-wrap users-table-panel">
       <table className="orders-table users-table users-company-modules-table">
@@ -9,16 +9,17 @@ export function CompanyModulesSummaryTable({ loading, items }) {
             <th>Estado</th>
             <th>Modulos Activos</th>
             <th>Modulos Inactivos</th>
+            <th>Acciones</th>
           </tr>
         </thead>
         <tbody>
           {loading ? (
             <tr>
-              <td colSpan={5}>Cargando resumen de modulos...</td>
+              <td colSpan={6}>Cargando resumen de modulos...</td>
             </tr>
           ) : items.length === 0 ? (
             <tr>
-              <td colSpan={5}>No hay empresas para mostrar.</td>
+              <td colSpan={6}>No hay empresas para mostrar.</td>
             </tr>
           ) : items.map(item => {
             const active = (item.items || []).filter(module => Boolean(module.activo)).map(module => module.modulo);
@@ -37,6 +38,11 @@ export function CompanyModulesSummaryTable({ loading, items }) {
                   <div className="users-module-chip-wrap">
                     {inactive.length === 0 ? <span className="users-module-chip is-active">Ninguno</span> : inactive.map(module => <span key={`${item.empresaID}-i-${module}`} className="users-module-chip is-inactive">{module}</span>)}
                   </div>
+                </td>
+                <td data-label="Acciones">
+                  <button type="button" className="btn-outline users-company-row-edit" onClick={() => onEditCompany?.(item)}>
+                    Editar
+                  </button>
                 </td>
               </tr>
             );
