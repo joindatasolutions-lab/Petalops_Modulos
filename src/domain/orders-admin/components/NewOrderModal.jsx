@@ -256,7 +256,21 @@ export function NewOrderModal({
                     <input
                       type="tel"
                       value={newOrderForm.clienteTelefono}
-                      onChange={event => updateNewOrderForm("clienteTelefono", event.target.value)}
+                      onChange={event => {
+                        const nextTelefono = event.target.value;
+                        // Si el telefono cambia, cualquier clienteID/identificacion que haya
+                        // quedado de una busqueda anterior (por ej. de un pedido previo en la
+                        // misma sesion) deja de ser valido para ESTE telefono nuevo. Sin este
+                        // reset, ese ID viejo puede terminar sobrescribiendo a otro cliente
+                        // real cuando se guarda el pedido -- ver incidente Daniela/Rodrigo
+                        // Colon en Maria C Floristeria (2026-09-16).
+                        setNewOrderForm(current => ({
+                          ...current,
+                          clienteTelefono: nextTelefono,
+                          clienteID: null,
+                          clienteIdentificacion: "",
+                        }));
+                      }}
                       onBlur={event => onLookupClientByPhone?.(event.target.value)}
                     />
                   </label>
