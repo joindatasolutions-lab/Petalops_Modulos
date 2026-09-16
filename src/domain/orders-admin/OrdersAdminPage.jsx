@@ -1047,6 +1047,7 @@ const messageCard = useMessageCardController({
   });
 const openNewOrderModal = () => {
     setNewOrderForm({ ...DEFAULT_NEW_ORDER_FORM, fechaEntrega: todayIsoDate() });
+    newOrderLookupPhoneRef.current = "";
     setNewOrderError("");
     setNewOrderProductQuery("");
     setNewOrderBarrioQuery("");
@@ -1175,6 +1176,14 @@ const openNewOrderModal = () => {
       return;
     }
     if (newOrderLookupPhoneRef.current === digits) return;
+
+    // El valor debounced puede quedar "atrasado" (del pedido anterior) justo al
+    // reabrir el modal, porque el campo Celular ya se limpio pero el debounce aun
+    // no alcanza a reflejar ese cambio. Si no coincide con lo que hay ahora mismo
+    // en el formulario, es un valor viejo: se ignora en vez de autocompletar con
+    // el cliente equivocado.
+    const liveDigits = normalizePhoneDigits(newOrderForm.clienteTelefono);
+    if (liveDigits !== digits) return;
 
     newOrderLookupPhoneRef.current = digits;
     hydrateNewOrderClientByPhone(digits);
