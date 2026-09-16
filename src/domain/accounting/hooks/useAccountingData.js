@@ -32,7 +32,8 @@ export function useAccountingData({ api, empresaId, sucursalId, selectedSucursal
     try {
       const query = { empresaId, sucursalId, fechaDesde: filters.fechaDesde, fechaHasta: filters.fechaHasta };
       const payload = await api.obtenerResumenContabilidad(query);
-      const nextDetailRows = Array.isArray(payload?.accountingDetailRows) ? payload.accountingDetailRows : [];
+      const nextDetailRows = readArrayPayload(payload, ["accountingDetailRows", "detailRows", "detalleRows", "detalles", "items"]);
+      const backendPaymentRows = readArrayPayload(payload, ["paymentAccountRows", "cuentasPagoRows", "paymentMethodRows", "metodosPagoRows"]);
       let ventasDiarioPayload = null;
       try {
         ventasDiarioPayload = await api.obtenerVentasDiarioContabilidad(query);
@@ -97,7 +98,7 @@ export function useAccountingData({ api, empresaId, sucursalId, selectedSucursal
       setOrderRows(nextOrderRows.length > 0 ? nextOrderRows : applyApprovedOrderCountsToRows(payload?.orderRows, nextDetailRows));
       setOrderTotals(nextOrderTotals);
       setArrangementRows(Array.isArray(payload?.arrangementRows) ? payload.arrangementRows : []);
-      setPaymentAccountRows(Array.isArray(payload?.paymentAccountRows) ? payload.paymentAccountRows : []);
+      setPaymentAccountRows(backendPaymentRows);
       setAccountingDetailRows(nextDetailRows);
       setFloristMetricRows(resolvedFloristRows.filter(row => row?.id != null || (row?.nombre && row.nombre !== "Sin florista")));
       setDeliveryPersonMetricRows(resolvedDeliveryRows.filter(row => row?.id != null));

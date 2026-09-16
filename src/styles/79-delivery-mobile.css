@@ -591,13 +591,19 @@
     position: relative;
     width: 42px;
     min-width: 42px;
+    z-index: 2;
+  }
+
+  .delivery-mobile-more:has(.delivery-mobile-menu-panel) {
+    z-index: 120;
   }
 
   .delivery-mobile-menu-panel {
     position: absolute;
-    top: calc(100% + 6px);
+    top: auto;
+    bottom: calc(100% + 6px);
     right: 0;
-    z-index: 90;
+    z-index: 140;
     display: grid;
     gap: 4px;
     width: min(210px, calc(100vw - 40px));

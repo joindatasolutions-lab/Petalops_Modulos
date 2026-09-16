@@ -850,6 +850,11 @@ main.orders-admin-view.orders-page-view.delivery-page-view,
   justify-content: center !important;
   justify-self: end !important;
   overflow: visible !important;
+  z-index: 2 !important;
+}
+
+.delivery-page-view .delivery-actions-menu:has(.delivery-actions-menu-trigger[aria-expanded="true"]) {
+  z-index: 120 !important;
 }
 
 .delivery-page-view .delivery-actions-menu-trigger {
@@ -890,9 +895,10 @@ main.orders-admin-view.orders-page-view.delivery-page-view,
 .delivery-page-view .delivery-actions-menu-panel {
   position: absolute !important;
   right: 0 !important;
-  top: calc(100% + 8px) !important;
+  top: auto !important;
+  bottom: calc(100% + 8px) !important;
   min-width: 190px !important;
-  z-index: 80 !important;
+  z-index: 140 !important;
 }
 
 .delivery-modal-backdrop {
@@ -3665,6 +3671,12 @@ main.orders-admin-view.orders-page-view.delivery-page-view,
   grid-template-columns: minmax(0, 1fr) auto !important;
   grid-auto-flow: row !important;
   min-width: 0 !important;
+}
+
+.delivery-page-view .delivery-card-actions .delivery-actions-menu-panel {
+  top: auto !important;
+  bottom: calc(100% + 8px) !important;
+  right: 0 !important;
 }
 
 @media (max-width: 900px) {

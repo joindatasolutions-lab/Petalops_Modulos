@@ -1,9 +1,9 @@
 import { Banknote, CalendarDays, ChevronDown, FileSpreadsheet, FileText, Filter, ListChecks, MoreHorizontal, Package, Receipt, RefreshCw, ShoppingCart, XCircle } from "lucide-react";
 import { formatearCOP } from "../../../shared/utils.js";
-import { PaymentMethodsPanel } from "../../users/components/PaymentMethodsPanel.jsx";
-import { PaymentMethodModal } from "../../users/components/UserModals.jsx";
 import { ACCOUNTING_VIEWS, ACCOUNTING_VIEW_ICONS } from "../accountingConstants.js";
 import { AccountingArrangementsView, AccountingCashView, AccountingDetailView, AccountingPaymentAccountsView, AccountingPersonnelView, AccountingSalesView } from "./AccountingViews.jsx";
+import { PaymentMethodModal } from "./PaymentMethodModal.jsx";
+import { PaymentMethodsPanel } from "./PaymentMethodsPanel.jsx";
 
 export function AccountingContent(contentProps) {
   const {
@@ -28,6 +28,7 @@ export function AccountingContent(contentProps) {
   detailChartRows,
   detailFilter,
   detailInsight,
+  datosTransferenciaCatalogoActivo,
   displayUserName,
   efectivoValue,
   executiveMetrics,
@@ -102,6 +103,8 @@ export function AccountingContent(contentProps) {
   setPaymentMethodsEmpresaID,
   submitPaymentMethod,
   togglePaymentMethodActive,
+  togglePaymentMethodCatalogAccount,
+  toggleDatosTransferenciaCatalogo,
   } = contentProps;
   const isPaymentMethodsConfigView = activeView === "metodosPago";
   const refreshing = isPaymentMethodsConfigView ? paymentMethodsLoading : loading;
@@ -479,9 +482,12 @@ export function AccountingContent(contentProps) {
             loading={paymentMethodsLoading}
             items={paymentMethods}
             saving={paymentMethodSaving}
+            datosTransferenciaCatalogoActivo={datosTransferenciaCatalogoActivo}
             onCreate={openPaymentMethodModal}
             onEdit={editPaymentMethod}
             onToggleActive={togglePaymentMethodActive}
+            onToggleCatalogAccount={togglePaymentMethodCatalogAccount}
+            onToggleCatalogTransfer={toggleDatosTransferenciaCatalogo}
           />
         ) : null}
 

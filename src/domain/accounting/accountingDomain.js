@@ -139,9 +139,17 @@ export function buildPaymentAccountRows(items) {
   const grouped = new Map();
   let totalGlobal = 0;
   for (const item of items) {
-    const pedidoId = Number(item?.order?.pedidoID || item?.detail?.pedidoID || 0);
-    const fecha = splitDateTimeParts(item?.order?.fechaPedido || item?.order?.fecha).date || "";
-    const financiero = item?.detail?.financiero || {};
+    const pedidoId = Number(item?.order?.pedidoID || item?.detail?.pedidoID || item?.pedidoID || item?.pedidoId || 0);
+    const fecha = splitDateTimeParts(
+      item?.order?.fechaPedido
+      || item?.order?.fecha
+      || item?.fechaPedido
+      || item?.fecha_pedido
+      || item?.fecha
+      || item?.fechaOperacion
+      || item?.fecha_operacion
+    ).date || "";
+    const financiero = item?.detail?.financiero || item?.financiero || item || {};
     const entries = extractPaymentEntries(financiero);
     for (const entry of entries) {
       const cuenta = entry.cuenta;
@@ -539,38 +547,58 @@ export function buildPersonnelMetricsFromAccountingDetails(rows) {
 export function extractPaymentEntries(financiero) {
   const breakdownCandidates = [
     financiero?.detallePago,
+    financiero?.detalle_pago,
     financiero?.desglosePago,
+    financiero?.desglose_pago,
     financiero?.metodosPagoDetalle,
+    financiero?.metodos_pago_detalle,
     financiero?.paymentBreakdown,
+    financiero?.payment_breakdown,
   ];
   const breakdown = breakdownCandidates.find(Array.isArray) || [];
   if (breakdown.length > 0) {
     return breakdown.map(item => ({
-      cuenta: String(item?.metodo || item?.metodoPago || item?.nombre || "Sin especificar").trim() || "Sin especificar",
-      metodo: String(item?.metodo || item?.metodoPago || item?.nombre || "Sin especificar").trim() || "Sin especificar",
-      monto: Number(item?.monto ?? item?.valor ?? item?.amount ?? 0),
-    }));
+      cuenta: String(item?.cuenta || item?.cuentaPago || item?.cuenta_pago || item?.metodo || item?.metodoPago || item?.metodo_pago || item?.nombre || "Sin especificar").trim() || "Sin especificar",
+      metodo: String(item?.metodo || item?.metodoPago || item?.metodo_pago || item?.nombre || item?.cuenta || item?.cuentaPago || item?.cuenta_pago || "Sin especificar").trim() || "Sin especificar",
+      monto: Number(item?.monto ?? item?.valor ?? item?.amount ?? item?.total ?? item?.totalVenta ?? item?.total_venta ?? 0),
+    })).filter(item => Number(item.monto || 0) > 0);
   }
-  const methods = Array.isArray(financiero?.metodosPago)
-    ? financiero.metodosPago.map(item => String(item || "").trim()).filter(Boolean)
-    : [];
-  const total = Number(financiero?.total || 0);
+  const rawMethods = Array.isArray(financiero?.metodosPago)
+    ? financiero.metodosPago
+    : Array.isArray(financiero?.metodos_pago)
+      ? financiero.metodos_pago
+      : [];
+  const methods = rawMethods
+    .map(item => String(item?.metodo || item?.metodoPago || item?.metodo_pago || item?.nombre || item || "").trim())
+    .filter(Boolean);
+  const total = Number(financiero?.total ?? financiero?.totalVenta ?? financiero?.total_venta ?? financiero?.valorTotal ?? financiero?.valor_total ?? 0);
+  const cuentaPago = String(financiero?.cuentaPago || financiero?.cuenta_pago || financiero?.cuenta || "").trim();
+  if (cuentaPago && total > 0) {
+    const metodo = String(financiero?.metodoPago || financiero?.metodo_pago || methods[0] || cuentaPago).trim() || cuentaPago;
+    return [{
+      cuenta: cuentaPago,
+      metodo,
+      monto: metodo.toLowerCase().includes("efectivo")
+        ? Number(financiero?.montoEfectivo ?? financiero?.monto_efectivo ?? financiero?.efectivoMonto ?? financiero?.efectivo_monto ?? total)
+        : total,
+    }];
+  }
   if (methods.length === 1) {
     return [{
       cuenta: methods[0],
       metodo: methods[0],
       monto: methods[0].toLowerCase().includes("efectivo")
-        ? Number(financiero?.montoEfectivo ?? financiero?.efectivoMonto ?? total)
+        ? Number(financiero?.montoEfectivo ?? financiero?.monto_efectivo ?? financiero?.efectivoMonto ?? financiero?.efectivo_monto ?? total)
         : total,
     }];
   }
-  const metodoPago = String(financiero?.metodoPago || "").trim();
+  const metodoPago = String(financiero?.metodoPago || financiero?.metodo_pago || "").trim();
   if (metodoPago) {
     return [{
       cuenta: metodoPago,
       metodo: metodoPago,
       monto: metodoPago.toLowerCase().includes("efectivo")
-        ? Number(financiero?.montoEfectivo ?? financiero?.efectivoMonto ?? total)
+        ? Number(financiero?.montoEfectivo ?? financiero?.monto_efectivo ?? financiero?.efectivoMonto ?? financiero?.efectivo_monto ?? total)
         : total,
     }];
   }
