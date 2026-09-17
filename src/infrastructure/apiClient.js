@@ -582,14 +582,16 @@ export function createApiClient(config) {
       });
     },
 
-    async listarInventario({ empresaId, categoria, estado, proveedorId, q, soloCriticos = false }) {
+    async listarInventario({ empresaId, sucursalId, categoria, estado, proveedorId, q, soloCriticos = false, soloVendibles = false }) {
       const params = new URLSearchParams();
       params.set("empresaID", String(empresaId));
+      if (sucursalId != null) params.set("sucursalID", String(sucursalId));
       if (categoria) params.set("categoria", String(categoria));
       if (estado) params.set("estado", String(estado));
       if (proveedorId != null) params.set("proveedorID", String(proveedorId));
       if (q) params.set("q", String(q));
       params.set("soloCriticos", soloCriticos ? "true" : "false");
+      params.set("soloVendibles", soloVendibles ? "true" : "false");
       return requestJson(`/inventario?${params.toString()}`);
     },
 
@@ -919,6 +921,16 @@ export function createApiClient(config) {
 
     async crearPedidoManual(payload) {
       return requestJson("/pedido/manual", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(payload)
+      });
+    },
+
+    async crearPedidoVentaRapida(payload) {
+      return requestJson("/pedido/venta-rapida", {
         method: "POST",
         headers: {
           "Content-Type": "application/json"

@@ -145,6 +145,52 @@ export function buildNewOrderCheckoutPayload({
   };
 }
 
+export function buildQuickSaleOrderPayload({
+  form,
+  empresaId,
+  sucursalId,
+}) {
+  const items = (Array.isArray(form.ventaRapidaItems) ? form.ventaRapidaItems : [])
+    .map(item => {
+      const inventarioID = Number(item?.inventarioID || 0);
+      const cantidad = Number(item?.cantidad || 0);
+      const precioUnitario = normalizeWholePeso(item?.precioUnitario ?? item?.precio);
+      if (!inventarioID || cantidad <= 0 || !Number.isFinite(precioUnitario) || precioUnitario <= 0) return null;
+      return { inventarioID, cantidad, precioUnitario };
+    })
+    .filter(Boolean);
+
+  if (items.length === 0) throw new Error("Agrega al menos una flor por unidad.");
+  if (!String(form.metodoPago || "").trim()) throw new Error("Metodo de pago es obligatorio.");
+  if (!String(form.canalFlora || "").trim()) throw new Error("Canal de venta es obligatorio.");
+
+  const registrarCliente = Boolean(form.registrarClienteVentaRapida);
+  if (registrarCliente && !String(form.clienteNombre || "").trim()) {
+    throw new Error("Ingresa el nombre del cliente o desactiva registrar cliente.");
+  }
+
+  return {
+    empresaID: empresaId,
+    sucursalID: sucursalId,
+    registrarCliente,
+    cliente: registrarCliente
+      ? {
+          clienteID: form.clienteID != null ? Number(form.clienteID) : null,
+          tipoIdent: form.clienteTipoIdent || null,
+          identificacion: form.clienteIdentificacion || null,
+          nombreCompleto: String(form.clienteNombre || "").trim(),
+          telefono: String(form.clienteTelefono || "").trim(),
+          email: form.clienteEmail || null,
+        }
+      : null,
+    items,
+    metodoPago: form.metodoPago || null,
+    metodosPago: form.metodoPago ? [form.metodoPago] : [],
+    canalFlora: form.canalFlora || null,
+    observaciones: textOrNull(form.observacionGeneral, form.ventaRapidaObservaciones),
+  };
+}
+
 export function buildDuplicateCheckoutPayload({
   detalle,
   empresaId,

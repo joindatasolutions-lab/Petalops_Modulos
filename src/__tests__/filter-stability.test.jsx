@@ -5,7 +5,7 @@ import { buildDeliveryAdminQueryPlan, deliveryMatchesSearch } from "../domain/de
 import { filterInventoryItems } from "../domain/inventory/InventoryPage.jsx";
 import { filterNeighborhoodItems, sortNeighborhoods } from "../domain/neighborhoods/NeighborhoodsPage.jsx";
 import { buildOrdersMetrics, extractOrdersPayloadItems, filterOrdersByCreatedDateRange, filterOrdersBySearch, filterOrdersByStatus, isStorePickupOrder, localDateEndParam, localDateStartParam, resolveOrdersPayloadTotal, shouldAutoGenerateInvoiceForCompany, shouldShowPendingInvoiceAlert } from "../domain/orders-admin/OrdersAdminPage.jsx";
-import { buildDetailUpdatePayload, buildNewOrderCheckoutPayload } from "../domain/orders-admin/orderPayloadBuilders.js";
+import { buildDetailUpdatePayload, buildNewOrderCheckoutPayload, buildQuickSaleOrderPayload } from "../domain/orders-admin/orderPayloadBuilders.js";
 import { buildEditedOrderFinancialBase, buildOrderFinancialPreview, getOrderFinancialTotal, patchOrderItemFromDetail, resolveOrderListTotal } from "../domain/orders-admin/ordersDomain.js";
 import { buildSalesExportRows } from "../domain/accounting/accountingExports.js";
 import { applyApprovedOrderCountsToRows } from "../domain/accounting/accountingSelectors.js";
@@ -324,6 +324,28 @@ describe("estabilidad de filtros por vista", () => {
     expect(payload.financiero.domicilioOriginal).toBe(15000);
     expect(payload.financiero.descuentoDomicilio).toBe(15000);
     expect(payload.financiero.omitirCostoDomicilio).toBe(true);
+  });
+
+  it("Pedidos: venta rapida por unidad usa inventario y cliente mostrador", () => {
+    const payload = buildQuickSaleOrderPayload({
+      empresaId: 4,
+      sucursalId: 2,
+      form: {
+        registrarClienteVentaRapida: false,
+        ventaRapidaItems: [
+          { inventarioID: 101, cantidad: 3, precioUnitario: "5000" },
+        ],
+        metodoPago: "Efectivo",
+        canalFlora: "Mostrador",
+        observacionGeneral: "Venta directa",
+      },
+    });
+
+    expect(payload.registrarCliente).toBe(false);
+    expect(payload.cliente).toBeNull();
+    expect(payload.items).toEqual([{ inventarioID: 101, cantidad: 3, precioUnitario: 5000 }]);
+    expect(payload.metodosPago).toEqual(["Efectivo"]);
+    expect(payload.canalFlora).toBe("Mostrador");
   });
 
   it("Produccion: empresa 3 resuelve imagen por codigo_catalogo antes que codigo_producto", () => {

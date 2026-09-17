@@ -46,6 +46,7 @@ import {
   buildDetailUpdatePayload,
   buildDuplicateCheckoutPayload as buildDuplicateCheckoutPayloadData,
   buildNewOrderCheckoutPayload as buildNewOrderManualPayloadData,
+  buildQuickSaleOrderPayload,
 } from "./orderPayloadBuilders.js";
 import { useMessageCardController } from "./hooks/useMessageCardController.js";
 import { useOrderDetailEditor } from "./hooks/useOrderDetailEditor.js";
@@ -212,6 +213,8 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
   const [newOrderProducts, setNewOrderProducts] = useState([]);
   const [newOrderProductsLoading, setNewOrderProductsLoading] = useState(false);
   const [newOrderProductDropdownOpen, setNewOrderProductDropdownOpen] = useState(false);
+  const [quickSaleInventoryItems, setQuickSaleInventoryItems] = useState([]);
+  const [quickSaleInventoryLoading, setQuickSaleInventoryLoading] = useState(false);
   const [newOrderBarrioQuery, setNewOrderBarrioQuery] = useState("");
   const [newOrderBarrios, setNewOrderBarrios] = useState([]);
   const [newOrderBarrioDropdownOpen, setNewOrderBarrioDropdownOpen] = useState(false);
@@ -1100,6 +1103,45 @@ const messageCard = useMessageCardController({
     setNewOrderProductsLoading,
     setNewOrderError,
   });
+
+  const normalizeQuickSaleInventoryItem = item => {
+    const inventarioID = Number(item?.inventarioID ?? item?.inventarioId ?? item?.idInventario ?? item?.id_inventario ?? item?.id ?? 0);
+    if (!inventarioID) return null;
+    return {
+      inventarioID,
+      codigo: item?.codigo || item?.codigoBarra || item?.codigo_barra || "",
+      nombre: item?.nombre || item?.nombreInsumo || item?.nombre_insumo || `Item ${inventarioID}`,
+      categoria: item?.categoria || "",
+      stockActual: Number(item?.stockActual ?? item?.stock_actual ?? 0),
+      unidadMedida: item?.unidadMedida || item?.unidad_medida || "Unidad",
+      precioVenta: Number(item?.precioVenta ?? item?.precio_venta ?? 0),
+    };
+  };
+
+  const loadQuickSaleInventoryItems = async () => {
+    if (!empresaId) return;
+    setQuickSaleInventoryLoading(true);
+    try {
+      const payload = await api.listarInventario({
+        empresaId,
+        sucursalId,
+        categoria: "Flores",
+        soloVendibles: true,
+      });
+      const rows = [
+        payload?.items,
+        payload?.data?.items,
+        payload?.rows,
+        payload,
+      ].find(Array.isArray) || [];
+      setQuickSaleInventoryItems(rows.map(normalizeQuickSaleInventoryItem).filter(Boolean));
+    } catch (nextError) {
+      console.error("Error cargando flores vendibles:", nextError);
+      setQuickSaleInventoryItems([]);
+    } finally {
+      setQuickSaleInventoryLoading(false);
+    }
+  };
 const openNewOrderModal = () => {
     setNewOrderForm({ ...DEFAULT_NEW_ORDER_FORM, fechaEntrega: todayIsoDate() });
     newOrderLookupPhoneRef.current = "";
@@ -1109,6 +1151,9 @@ const openNewOrderModal = () => {
     setNewOrderProductDropdownOpen(false);
     setNewOrderBarrioDropdownOpen(false);
     setNewOrderOpen(true);
+    if (quickSaleInventoryItems.length === 0) {
+      void loadQuickSaleInventoryItems();
+    }
     if (detailEditCatalog.length === 0) {
       setNewOrderProductsLoading(true);
       api.buscarArreglosCatalogo({ empresaId, sucursalId, q: "" })
@@ -1148,6 +1193,9 @@ const openNewOrderModal = () => {
   };
 
   const updateNewOrderForm = (name, value) => {
+    if (name === "ventaRapida" && value && quickSaleInventoryItems.length === 0 && !quickSaleInventoryLoading) {
+      void loadQuickSaleInventoryItems();
+    }
     setNewOrderForm(current => ({ ...current, [name]: value }));
   };
 
@@ -1266,6 +1314,29 @@ const openNewOrderModal = () => {
 
     setNewOrderSaving(true);
     try {
+      if (newOrderForm.ventaRapida) {
+        const hydratedQuickSaleForm = newOrderForm.registrarClienteVentaRapida
+          ? await hydrateNewOrderClientByPhone(newOrderForm.clienteTelefono)
+          : null;
+        const quickSalePayload = buildQuickSaleOrderPayload({
+          form: hydratedQuickSaleForm || newOrderForm,
+          empresaId,
+          sucursalId,
+        });
+        const created = await api.crearPedidoVentaRapida(quickSalePayload);
+        const createdPedidoId = created?.pedidoID || created?.pedidoId || created?.pedido_id || created?.idPedido || created?.id_pedido || created?.id;
+        setNewOrderOpen(false);
+        setOrderNotification({
+          type: "success",
+          title: "Venta rapida registrada",
+          message: `Pedido #${created?.numeroPedido || created?.pedidoID || ""} guardado y entregado correctamente.`,
+        });
+        await loadQuickSaleInventoryItems();
+        await loadOrders(false);
+        if (createdPedidoId) await openDetail(createdPedidoId);
+        return;
+      }
+
       const hydratedForm = await hydrateNewOrderClientByPhone(newOrderForm.clienteTelefono);
       const manualPayload = buildNewOrderManualPayload(hydratedForm || newOrderForm);
       const created = await api.crearPedidoManual(manualPayload);
@@ -2011,6 +2082,8 @@ const ordersOverlayOpen = drawerOpen || newOrderOpen || messageCardOpen || Boole
           barrioQuery={newOrderBarrioQuery}
           barrioDropdownOpen={newOrderBarrioDropdownOpen}
           filteredBarrios={filteredNewOrderBarrios}
+          quickSaleInventoryItems={quickSaleInventoryItems}
+          quickSaleInventoryLoading={quickSaleInventoryLoading}
           saving={newOrderSaving}
           error={newOrderError}
           paymentFieldConfig={paymentFieldConfig}

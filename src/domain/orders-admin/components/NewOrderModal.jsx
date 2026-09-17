@@ -20,6 +20,8 @@ export function NewOrderModal({
   barrioQuery,
   barrioDropdownOpen,
   filteredBarrios,
+  quickSaleInventoryItems,
+  quickSaleInventoryLoading,
   saving,
   error,
   paymentFieldConfig,
@@ -47,8 +49,10 @@ export function NewOrderModal({
   const newOrderBarrioQuery = barrioQuery;
   const newOrderBarrioDropdownOpen = barrioDropdownOpen;
   const filteredNewOrderBarrios = filteredBarrios;
+  const quickSaleItems = Array.isArray(quickSaleInventoryItems) ? quickSaleInventoryItems : [];
   const newOrderSaving = saving;
   const newOrderError = error;
+  const isQuickSale = Boolean(newOrderForm.ventaRapida);
   const isStorePickup = normalizeDeliveryType(newOrderForm.barrioNombre) === "recogida_en_tienda";
   const closeNewOrderModal = onClose;
   const onSaveNewOrder = onSave;
@@ -61,8 +65,11 @@ export function NewOrderModal({
   const setNewOrderBarrioDropdownOpen = onSetBarrioDropdownOpen;
   const loadBarrioOptions = onLoadBarrios;
   const addedProducts = Array.isArray(newOrderForm.productos) ? newOrderForm.productos : [];
+  const addedQuickSaleItems = Array.isArray(newOrderForm.ventaRapidaItems) ? newOrderForm.ventaRapidaItems : [];
   const currentProductId = Number(newOrderForm.productoID || 0);
   const hasCurrentProduct = currentProductId > 0;
+  const selectedQuickSaleItem = quickSaleItems.find(item => String(item.inventarioID) === String(newOrderForm.ventaRapidaInventarioID));
+  const hasQuickSaleSelection = Boolean(selectedQuickSaleItem);
   const showPaymentSection = Boolean(paymentFieldConfig || salesChannelFieldConfig);
   const selectedBarrio = (Array.isArray(filteredNewOrderBarrios) ? filteredNewOrderBarrios : [])
     .find(item => item?.nombre === newOrderForm.barrioNombre);
@@ -124,6 +131,43 @@ export function NewOrderModal({
     }));
   };
 
+  const addQuickSaleItem = () => {
+    if (!selectedQuickSaleItem) return;
+    const quantity = Math.max(1, Number(newOrderForm.ventaRapidaCantidad || 1));
+    const unitPrice = Number(sanitizeWholePesoInput(newOrderForm.ventaRapidaPrecio) || selectedQuickSaleItem.precioVenta || 0);
+    if (!unitPrice) return;
+    setNewOrderForm(current => {
+      const currentItems = Array.isArray(current.ventaRapidaItems) ? current.ventaRapidaItems : [];
+      const existingIndex = currentItems.findIndex(item => String(item.inventarioID) === String(selectedQuickSaleItem.inventarioID));
+      const nextItem = {
+        inventarioID: selectedQuickSaleItem.inventarioID,
+        codigo: selectedQuickSaleItem.codigo || "",
+        nombre: selectedQuickSaleItem.nombre,
+        unidadMedida: selectedQuickSaleItem.unidadMedida || "Unidad",
+        stockActual: selectedQuickSaleItem.stockActual,
+        cantidad: quantity,
+        precioUnitario: unitPrice,
+      };
+      const nextItems = existingIndex >= 0
+        ? currentItems.map((item, index) => index === existingIndex ? { ...nextItem, cantidad: Number(item.cantidad || 0) + quantity } : item)
+        : [...currentItems, nextItem];
+      return {
+        ...current,
+        ventaRapidaItems: nextItems,
+        ventaRapidaInventarioID: "",
+        ventaRapidaCantidad: 1,
+        ventaRapidaPrecio: "",
+      };
+    });
+  };
+
+  const removeQuickSaleItem = index => {
+    setNewOrderForm(current => ({
+      ...current,
+      ventaRapidaItems: (Array.isArray(current.ventaRapidaItems) ? current.ventaRapidaItems : []).filter((_, currentIndex) => currentIndex !== index),
+    }));
+  };
+
   return (
         <div className="orders-modal-backdrop" role="presentation">
           <section className="orders-new-order-modal" role="dialog" aria-modal="true" aria-labelledby="new-order-title">
@@ -138,6 +182,102 @@ export function NewOrderModal({
             </header>
 
             <div className="orders-new-order-body">
+              <section className="orders-new-order-section">
+                <label className="order-detail-edit-check">
+                  <input
+                    type="checkbox"
+                    checked={isQuickSale}
+                    onChange={event => {
+                      const checked = event.target.checked;
+                      setNewOrderForm(current => ({
+                        ...current,
+                        ventaRapida: checked,
+                        barrioNombre: checked ? "Recoger en tienda" : current.barrioNombre,
+                        barrioCostoDomicilio: checked ? 0 : current.barrioCostoDomicilio,
+                        direccion: checked ? "Recoger En Tienda" : current.direccion,
+                        domicilioObsequiado: checked ? false : current.domicilioObsequiado,
+                      }));
+                    }}
+                  />
+                  <span>Venta rapida por unidad</span>
+                </label>
+              </section>
+
+              {isQuickSale ? (
+                <section className="orders-new-order-section">
+                  <h3>Flores por unidad</h3>
+                  <div className="order-detail-edit-grid">
+                    <label className="order-detail-edit-label">
+                      Flor vendible
+                      <select
+                        value={newOrderForm.ventaRapidaInventarioID}
+                        onChange={event => {
+                          const inventarioID = event.target.value;
+                          const item = quickSaleItems.find(row => String(row.inventarioID) === String(inventarioID));
+                          setNewOrderForm(current => ({
+                            ...current,
+                            ventaRapidaInventarioID: inventarioID,
+                            ventaRapidaPrecio: item?.precioVenta ? String(item.precioVenta) : current.ventaRapidaPrecio,
+                          }));
+                        }}
+                        disabled={quickSaleInventoryLoading}
+                      >
+                        <option value="">{quickSaleInventoryLoading ? "Cargando flores..." : "Seleccionar flor"}</option>
+                        {quickSaleItems.map(item => (
+                          <option key={`quick-sale-${item.inventarioID}`} value={item.inventarioID}>
+                            {item.nombre}{item.codigo ? ` (${item.codigo})` : ""} - Stock {item.stockActual}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label className="order-detail-edit-label">
+                      Cantidad
+                      <input
+                        type="number"
+                        min="1"
+                        step="1"
+                        value={newOrderForm.ventaRapidaCantidad}
+                        onChange={event => updateNewOrderForm("ventaRapidaCantidad", event.target.value === "" ? "" : Math.max(1, Number(event.target.value)))}
+                      />
+                    </label>
+                    <label className="order-detail-edit-label">
+                      Precio unitario
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        value={newOrderForm.ventaRapidaPrecio}
+                        onChange={event => updateNewOrderForm("ventaRapidaPrecio", sanitizeWholePesoInput(event.target.value) ?? "")}
+                        placeholder="Precio de venta"
+                      />
+                    </label>
+                  </div>
+                  <div className="orders-new-order-product-actions">
+                    <button type="button" className="btn-outline" onClick={addQuickSaleItem} disabled={!hasQuickSaleSelection}>
+                      Agregar flor
+                    </button>
+                    <span>{addedQuickSaleItems.length} item{addedQuickSaleItems.length === 1 ? "" : "s"}</span>
+                  </div>
+                  {addedQuickSaleItems.length > 0 ? (
+                    <ul className="orders-new-order-products">
+                      {addedQuickSaleItems.map((item, index) => (
+                        <li key={`quick-sale-added-${item.inventarioID}-${index}`}>
+                          <div>
+                            <strong>{item.nombre || `Inventario ${item.inventarioID}`}</strong>
+                            <span>
+                              Cant. {Number(item.cantidad || 0)} - Total ${formatearCOP(Number(item.cantidad || 0) * Number(item.precioUnitario || 0))}
+                            </span>
+                          </div>
+                          <button type="button" className="icon-btn" onClick={() => removeQuickSaleItem(index)} title="Quitar flor">
+                            <IconX size={15} stroke={2} />
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : null}
+                </section>
+              ) : null}
+
+              {!isQuickSale ? (
               <section className="orders-new-order-section">
                 <h3>Producto</h3>
                 <label className="order-detail-edit-label">
@@ -247,9 +387,21 @@ export function NewOrderModal({
                   </ul>
                 ) : null}
               </section>
+              ) : null}
 
               <section className="orders-new-order-section">
                 <h3>Cliente</h3>
+                {isQuickSale ? (
+                  <label className="order-detail-edit-check">
+                    <input
+                      type="checkbox"
+                      checked={Boolean(newOrderForm.registrarClienteVentaRapida)}
+                      onChange={event => updateNewOrderForm("registrarClienteVentaRapida", event.target.checked)}
+                    />
+                    <span>Registrar datos del cliente</span>
+                  </label>
+                ) : null}
+                {(!isQuickSale || newOrderForm.registrarClienteVentaRapida) ? (
                 <div className="order-detail-edit-grid">
                   <label className="order-detail-edit-label">
                     Nombre cliente
@@ -287,8 +439,12 @@ export function NewOrderModal({
                     <input type="text" value={newOrderForm.clienteIdentificacion} onChange={event => updateNewOrderForm("clienteIdentificacion", event.target.value)} />
                   </label>
                 </div>
+                ) : (
+                  <p className="orders-new-order-delivery-cost">Se registrara como Cliente mostrador.</p>
+                )}
               </section>
 
+              {!isQuickSale ? (
               <section className="orders-new-order-section">
                 <h3>Entrega</h3>
                 <div className="order-detail-edit-grid">
@@ -383,6 +539,7 @@ export function NewOrderModal({
                   <span>Domicilio obsequiado</span>
                 </label>
               </section>
+              ) : null}
 
               {showPaymentSection ? (
                 <section className="orders-new-order-section">
@@ -418,6 +575,7 @@ export function NewOrderModal({
                 </section>
               ) : null}
 
+              {!isQuickSale ? (
               <section className="orders-new-order-section">
                 <h3>Mensaje</h3>
                 <div className="order-detail-edit-grid">
@@ -435,6 +593,7 @@ export function NewOrderModal({
                   <textarea value={newOrderForm.observacionGeneral} onChange={event => updateNewOrderForm("observacionGeneral", event.target.value)} rows={2} />
                 </label>
               </section>
+              ) : null}
 
               {newOrderError ? <p className="orders-message">{newOrderError}</p> : null}
             </div>
@@ -442,7 +601,7 @@ export function NewOrderModal({
             <footer className="orders-new-order-actions">
               <button type="button" className="btn-outline" onClick={closeNewOrderModal} disabled={newOrderSaving}>Cancelar</button>
               <button type="button" className="btn-primary" onClick={onSaveNewOrder} disabled={newOrderSaving}>
-                {newOrderSaving ? "Guardando..." : "Guardar pedido"}
+                {newOrderSaving ? "Guardando..." : isQuickSale ? "Guardar y entregar" : "Guardar pedido"}
               </button>
             </footer>
           </section>

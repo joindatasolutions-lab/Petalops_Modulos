@@ -112,6 +112,7 @@ export function InventoryPage({
     fechaVencimiento: "",
     marca: "",
     precioVenta: "0",
+    vendibleUnidad: false,
     proveedorID: "",
     stockActual: "0",
     stockMinimo: "5",
@@ -281,6 +282,7 @@ export function InventoryPage({
       categoria: moduloConfig?.categoria || "Flores",
       subcategoria: "",
       unidadMedida: moduloConfig?.unidades[0] || "Unidad",
+      vendibleUnidad: moduloConfig?.key === "flores" ? f.vendibleUnidad : false,
     }));
   }, [moduloConfig]);
 
@@ -644,6 +646,7 @@ export function InventoryPage({
       fechaVencimiento: item.fechaVencimiento ? String(item.fechaVencimiento).slice(0, 10) : "",
       marca: item.marca || "",
       precioVenta: item.precioVenta != null ? String(item.precioVenta) : "0",
+      vendibleUnidad: Boolean(item.vendibleUnidad),
       proveedorID: item.proveedorID ? String(item.proveedorID) : "",
       stockActual: item.stockActual != null ? String(item.stockActual) : "0",
       stockMinimo: item.stockMinimo != null ? String(item.stockMinimo) : "0",
@@ -1335,7 +1338,17 @@ export function InventoryPage({
                     <span>Costo unitario</span>
                     <input type="number" min="0" step="0.01" value={createForm.valorUnitario} onChange={e => setCreateForm(f => ({ ...f, valorUnitario: e.target.value }))} required />
                   </label>
-                  {moduloActivo === "adicionales" ? (
+                  {moduloActivo === "flores" ? (
+                    <label className="order-detail-edit-check">
+                      <input
+                        type="checkbox"
+                        checked={Boolean(createForm.vendibleUnidad)}
+                        onChange={e => setCreateForm(f => ({ ...f, vendibleUnidad: e.target.checked }))}
+                      />
+                      <span>Vendible por unidad</span>
+                    </label>
+                  ) : null}
+                  {(moduloActivo === "adicionales" || createForm.vendibleUnidad) ? (
                     <label className="inventory-field">
                       <span>Precio de venta</span>
                       <input type="number" min="0" step="0.01" value={createForm.precioVenta} onChange={e => setCreateForm(f => ({ ...f, precioVenta: e.target.value }))} />
