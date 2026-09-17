@@ -495,6 +495,14 @@ export function createApiClient(config) {
       return requestJson(`/configuracion/empresas/${empresaId}/metodos-pago`);
     },
 
+    async listarCanalesVentaEmpresa({ empresaId }) {
+      return requestJson(`/configuracion/empresas/${empresaId}/canales-venta`);
+    },
+
+    async listarMenuPedidoEmpresa({ empresaId }) {
+      return requestJson(`/configuracion/empresas/${empresaId}/menu-pedido`);
+    },
+
     async actualizarMetodoPagoEmpresa({ empresaId, itemId, nombre, activo, orden, cuenta, numeroCuenta, activasCuentasCatalogo }) {
       const payload = {};
       if (nombre !== undefined) payload.nombre = nombre;

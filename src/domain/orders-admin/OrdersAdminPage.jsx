@@ -134,6 +134,14 @@ function resolveCatalogTenantSlug(session) {
   return String(session?.empresaSlug || "").trim();
 }
 
+function extractActiveCatalogNames(payload) {
+  const items = Array.isArray(payload?.items) ? payload.items : [];
+  return items
+    .filter(item => item?.activo !== false)
+    .map(item => String(item?.nombre || "").trim())
+    .filter(Boolean);
+}
+
 export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canViewCatalogo, canViewProduccion, canViewDomicilios, canViewBarrios, canViewInventario, canViewContabilidad, canViewClientesPanel, canViewUsuariosPanel, onLogout, onGoPipeline, onGoPedidos, onGoProduccion, onGoDomicilios, onGoBarrios, onGoInventario, onGoContabilidad, onGoClientes, onGoUsuarios }) {
   const [filters, setFilters] = useState(initialFilters);
   const [selectedPedidoId, setSelectedPedidoId] = useState(null);
@@ -209,6 +217,7 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
   const [newOrderBarrioDropdownOpen, setNewOrderBarrioDropdownOpen] = useState(false);
   const [newOrderSaving, setNewOrderSaving] = useState(false);
   const [newOrderError, setNewOrderError] = useState("");
+  const [configuredPedidoMenuFields, setConfiguredPedidoMenuFields] = useState([]);
 
   const api = useMemo(() => createApiClient(tenantConfig), []);
   const loadOrdersRef = useRef(null);
@@ -252,9 +261,13 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
     () => String(session?.nombre || session?.login || "Usuario").trim() || "Usuario",
     [session]
   );
-  const pedidoMenuFields = useMemo(
+  const detailPedidoMenuFields = useMemo(
     () => (Array.isArray(detalle?.camposEmpresa?.pedidoDetalle) ? detalle.camposEmpresa.pedidoDetalle : []),
     [detalle]
+  );
+  const pedidoMenuFields = useMemo(
+    () => (configuredPedidoMenuFields.length ? configuredPedidoMenuFields : detailPedidoMenuFields),
+    [configuredPedidoMenuFields, detailPedidoMenuFields]
   );
   const paymentFieldConfig = useMemo(
     () => pedidoMenuFields.find(field => field?.codigo === "pedido_metodos_pago" && field?.activo),
@@ -544,6 +557,47 @@ const messageCard = useMessageCardController({
   useEffect(() => {
     loadTodaySalesSummary();
   }, [loadTodaySalesSummary]);
+
+  useEffect(() => {
+    let isCurrent = true;
+
+    async function loadPedidoMenuFields() {
+      if (!empresaId) {
+        setConfiguredPedidoMenuFields([]);
+        return;
+      }
+
+      try {
+        const [menuResponse, paymentResponse, channelResponse] = await Promise.all([
+          api.listarMenuPedidoEmpresa({ empresaId }),
+          api.listarMetodosPagoEmpresa({ empresaId }),
+          api.listarCanalesVentaEmpresa({ empresaId }),
+        ]);
+        if (!isCurrent) return;
+
+        const paymentOptions = extractActiveCatalogNames(paymentResponse);
+        const channelOptions = extractActiveCatalogNames(channelResponse);
+        const menuItems = Array.isArray(menuResponse?.items) ? menuResponse.items : [];
+        setConfiguredPedidoMenuFields(menuItems.map(field => {
+          if (field?.codigo === "pedido_metodos_pago") {
+            return { ...field, opciones: paymentOptions };
+          }
+          if (field?.codigo === "pedido_canal_venta") {
+            return { ...field, opciones: channelOptions };
+          }
+          return field;
+        }));
+      } catch (error) {
+        console.error("Error cargando configuracion de pago del pedido:", error);
+        if (isCurrent) setConfiguredPedidoMenuFields([]);
+      }
+    }
+
+    loadPedidoMenuFields();
+    return () => {
+      isCurrent = false;
+    };
+  }, [api, empresaId]);
 
   useEffect(() => {
     const intervalId = globalThis.setInterval(() => {

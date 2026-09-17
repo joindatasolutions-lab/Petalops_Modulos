@@ -63,6 +63,7 @@ export function NewOrderModal({
   const addedProducts = Array.isArray(newOrderForm.productos) ? newOrderForm.productos : [];
   const currentProductId = Number(newOrderForm.productoID || 0);
   const hasCurrentProduct = currentProductId > 0;
+  const showPaymentSection = Boolean(paymentFieldConfig || salesChannelFieldConfig);
   const selectedBarrio = (Array.isArray(filteredNewOrderBarrios) ? filteredNewOrderBarrios : [])
     .find(item => item?.nombre === newOrderForm.barrioNombre);
   const selectedDeliveryCost = Number(selectedBarrio?.costoDomicilio ?? newOrderForm.barrioCostoDomicilio ?? 0);
@@ -383,37 +384,39 @@ export function NewOrderModal({
                 </label>
               </section>
 
-              <section className="orders-new-order-section">
-                <h3>Pago</h3>
-                <div className="order-detail-edit-grid">
-                  {paymentFieldConfig ? (
-                    <label className="order-detail-edit-label">
-                      {paymentFieldConfig.titulo || "Metodo de pago"}
-                      <select
-                        required
-                        value={newOrderForm.metodoPago}
-                        onChange={event => updateNewOrderForm("metodoPago", event.target.value)}
-                      >
-                        <option value="">Seleccionar</option>
-                        {(Array.isArray(paymentFieldOptions) ? paymentFieldOptions : []).map(option => <option key={option} value={option}>{option}</option>)}
-                      </select>
-                    </label>
-                  ) : null}
-                  {salesChannelFieldConfig ? (
-                    <label className="order-detail-edit-label">
-                      {salesChannelFieldConfig.titulo || "Canal de venta"}
-                      <select
-                        required
-                        value={newOrderForm.canalFlora}
-                        onChange={event => updateNewOrderForm("canalFlora", event.target.value)}
-                      >
-                        <option value="">Seleccionar</option>
-                        {(Array.isArray(salesChannelFieldConfig.opciones) ? salesChannelFieldConfig.opciones : []).map(option => <option key={option} value={option}>{option}</option>)}
-                      </select>
-                    </label>
-                  ) : null}
-                </div>
-              </section>
+              {showPaymentSection ? (
+                <section className="orders-new-order-section">
+                  <h3>Pago</h3>
+                  <div className="order-detail-edit-grid">
+                    {paymentFieldConfig ? (
+                      <label className="order-detail-edit-label">
+                        {paymentFieldConfig.titulo || "Metodo de pago"}
+                        <select
+                          required
+                          value={newOrderForm.metodoPago}
+                          onChange={event => updateNewOrderForm("metodoPago", event.target.value)}
+                        >
+                          <option value="">Seleccionar</option>
+                          {(Array.isArray(paymentFieldOptions) ? paymentFieldOptions : []).map(option => <option key={option} value={option}>{option}</option>)}
+                        </select>
+                      </label>
+                    ) : null}
+                    {salesChannelFieldConfig ? (
+                      <label className="order-detail-edit-label">
+                        {salesChannelFieldConfig.titulo || "Canal de venta"}
+                        <select
+                          required
+                          value={newOrderForm.canalFlora}
+                          onChange={event => updateNewOrderForm("canalFlora", event.target.value)}
+                        >
+                          <option value="">Seleccionar</option>
+                          {(Array.isArray(salesChannelFieldConfig.opciones) ? salesChannelFieldConfig.opciones : []).map(option => <option key={option} value={option}>{option}</option>)}
+                        </select>
+                      </label>
+                    ) : null}
+                  </div>
+                </section>
+              ) : null}
 
               <section className="orders-new-order-section">
                 <h3>Mensaje</h3>
