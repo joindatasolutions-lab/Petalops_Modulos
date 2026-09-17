@@ -987,6 +987,7 @@ export function createApiClient(config) {
           "Content-Type": "application/json"
         },
         body: JSON.stringify({
+          pedidoID: pedidoId != null ? Number(pedidoId) : null,
           detalleID: detalleID != null ? Number(detalleID) : null,
           productoID: productoID != null ? Number(productoID) : null,
           cantidad: cantidad != null ? Number(cantidad) : null,

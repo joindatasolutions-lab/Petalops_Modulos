@@ -226,6 +226,7 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
   const loadOrdersRef = useRef(null);
   const loadTodaySalesSummaryRef = useRef(null);
   const newOrderLookupPhoneRef = useRef("");
+  const detailRequestSeqRef = useRef(0);
   const debouncedQuery = useDebouncedValue(filters.q, 300);
   const debouncedNewOrderPhone = useDebouncedValue(newOrderForm.clienteTelefono, 500);
   const empresaId = Number(session?.empresaID || tenantConfig.empresaId);
@@ -851,13 +852,21 @@ const messageCard = useMessageCardController({
   };
 
   const openDetail = async (pedidoId, detailPatch = null) => {
+    const requestedPedidoId = Number(pedidoId || 0);
+    const requestSeq = detailRequestSeqRef.current + 1;
+    detailRequestSeqRef.current = requestSeq;
     setOpenOrderActionsId(null);
     setDrawerOpen(true);
-    setSelectedPedidoId(pedidoId);
+    setSelectedPedidoId(requestedPedidoId || pedidoId);
     setDetalle(null);
 
     try {
       const rawDetail = applyDeliveryGiftOverrideToDetail(pedidoId, await api.obtenerDetallePedido(pedidoId));
+      if (requestSeq !== detailRequestSeqRef.current) return null;
+      const responsePedidoId = Number(rawDetail?.pedidoID || rawDetail?.pedidoId || rawDetail?.idPedido || rawDetail?.id_pedido || 0);
+      if (requestedPedidoId && responsePedidoId && responsePedidoId !== requestedPedidoId) {
+        throw new Error("El detalle recibido no corresponde al pedido seleccionado. Vuelve a abrir el pedido.");
+      }
       const detail = detailPatch && typeof detailPatch === "object"
         ? {
             ...rawDetail,
@@ -880,6 +889,7 @@ const messageCard = useMessageCardController({
       patchOrderListItemFromDetail(pedidoId, detail);
       return detail;
     } catch (nextError) {
+      if (requestSeq !== detailRequestSeqRef.current) return null;
       console.error("Error obteniendo detalle:", nextError);
       setDetalle({ error: true });
       return null;
@@ -1513,6 +1523,10 @@ const openNewOrderModal = () => {
     setDetailEditError("");
     setDetailEditSaving(true);
     try {
+      const detallePedidoId = Number(detalle?.pedidoID || detalle?.pedidoId || detalle?.idPedido || detalle?.id_pedido || 0);
+      if (!isDuplicatingDetail && detallePedidoId && Number(selectedPedidoId) !== detallePedidoId) {
+        throw new Error("El detalle abierto no corresponde al pedido seleccionado. Cierra y vuelve a abrir el pedido antes de guardar.");
+      }
       if (detailEditIsCustomArrangement) {
         const customPrice = normalizeWholePeso(detailEditPrecio);
         if (!Number.isFinite(customPrice) || customPrice <= 0) {
