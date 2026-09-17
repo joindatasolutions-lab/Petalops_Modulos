@@ -620,6 +620,7 @@ export function useUsersManagementController({ session, canViewUsuariosGlobal })
   const toggleNotificacionNuevoPedidoDomiciliario = () => (
     toggleNotificacionAccion("notificacionNuevoPedidoDomiciliarioActiva")
   );
+  const toggleVozPedidos = () => toggleNotificacionAccion("vozPedidosActiva");
 
   const submitCreateTenant = async event => {
     event.preventDefault();
@@ -1202,6 +1203,7 @@ export function useUsersManagementController({ session, canViewUsuariosGlobal })
     toggleNotificacionPedidoAceptado,
     toggleNotificacionPedidoEntregado,
     toggleNotificacionNuevoPedidoDomiciliario,
+    toggleVozPedidos,
     createFormProps,
     editFormProps,
   };

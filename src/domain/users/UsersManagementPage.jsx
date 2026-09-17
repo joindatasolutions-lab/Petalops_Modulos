@@ -232,12 +232,14 @@ export function UsersManagementPage(props) {
             notificacionPedidoAceptadoActiva={users.asignacionConfig.notificacionPedidoAceptadoActiva}
             notificacionPedidoEntregadoActiva={users.asignacionConfig.notificacionPedidoEntregadoActiva}
             notificacionNuevoPedidoDomiciliarioActiva={users.asignacionConfig.notificacionNuevoPedidoDomiciliarioActiva}
+            vozPedidosActiva={users.asignacionConfig.vozPedidosActiva}
             onToggleProduccion={users.toggleAsignacionProduccion}
             onToggleDomicilio={users.toggleAsignacionDomicilio}
             onToggleAutoAsignacionProduccion={users.toggleAutoAsignacionProduccion}
             onToggleNotificacionPedidoAceptado={users.toggleNotificacionPedidoAceptado}
             onToggleNotificacionPedidoEntregado={users.toggleNotificacionPedidoEntregado}
             onToggleNotificacionNuevoPedidoDomiciliario={users.toggleNotificacionNuevoPedidoDomiciliario}
+            onToggleVozPedidos={users.toggleVozPedidos}
           />
         ) : (
           <section className="users-grid-layout users-list-layout">

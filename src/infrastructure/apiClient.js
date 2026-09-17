@@ -546,6 +546,7 @@ export function createApiClient(config) {
       notificacionPedidoAceptadoActiva,
       notificacionPedidoEntregadoActiva,
       notificacionNuevoPedidoDomiciliarioActiva,
+      vozPedidosActiva,
     }) {
       const payload = {};
       if (asignacionProduccionActiva !== undefined) payload.asignacionProduccionActiva = asignacionProduccionActiva;
@@ -554,12 +555,23 @@ export function createApiClient(config) {
       if (notificacionPedidoAceptadoActiva !== undefined) payload.notificacionPedidoAceptadoActiva = notificacionPedidoAceptadoActiva;
       if (notificacionPedidoEntregadoActiva !== undefined) payload.notificacionPedidoEntregadoActiva = notificacionPedidoEntregadoActiva;
       if (notificacionNuevoPedidoDomiciliarioActiva !== undefined) payload.notificacionNuevoPedidoDomiciliarioActiva = notificacionNuevoPedidoDomiciliarioActiva;
+      if (vozPedidosActiva !== undefined) payload.vozPedidosActiva = vozPedidosActiva;
       return requestJson(`/configuracion/empresas/${empresaId}/asignacion`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json"
         },
         body: JSON.stringify(payload)
+      });
+    },
+
+    async actualizarConfiguracionVozPedidos({ empresaId, vozPedidosActiva }) {
+      return requestJson(`/configuracion/empresas/${empresaId}/voz-pedidos`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ vozPedidosActiva })
       });
     },
 

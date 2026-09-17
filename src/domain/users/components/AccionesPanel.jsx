@@ -1,4 +1,4 @@
-import { BellRing, CircleCheckBig, Factory, PackageCheck, Truck, Zap } from "lucide-react";
+import { BellRing, CircleCheckBig, Factory, PackageCheck, Truck, Volume2, Zap } from "lucide-react";
 
 function AsignacionToggleCard({ icon, title, description, checked, disabled, onToggle }) {
   return (
@@ -33,12 +33,14 @@ export function AccionesPanel({
   notificacionPedidoAceptadoActiva,
   notificacionPedidoEntregadoActiva,
   notificacionNuevoPedidoDomiciliarioActiva,
+  vozPedidosActiva,
   onToggleProduccion,
   onToggleDomicilio,
   onToggleAutoAsignacionProduccion,
   onToggleNotificacionPedidoAceptado,
   onToggleNotificacionPedidoEntregado,
   onToggleNotificacionNuevoPedidoDomiciliario,
+  onToggleVozPedidos,
 }) {
   return (
     <section className="users-payment-layout">
@@ -91,6 +93,24 @@ export function AccionesPanel({
           checked={autoAsignacionProduccionActiva}
           disabled={saving || loading}
           onToggle={onToggleAutoAsignacionProduccion}
+        />
+      </div>
+
+      <div className="users-panel-heading users-acciones-section-heading">
+        <div>
+          <h4>Alertas operativas</h4>
+          <p className="orders-admin-subtitle">Define si el modulo de Pedidos anuncia por voz los pedidos externos nuevos.</p>
+        </div>
+      </div>
+
+      <div className="users-acciones-grid">
+        <AsignacionToggleCard
+          icon={<Volume2 size={18} strokeWidth={2} />}
+          title="Voz pedidos"
+          description="Mantiene activadas las alertas de voz para pedidos nuevos creados desde fuentes externas."
+          checked={vozPedidosActiva}
+          disabled={saving || loading}
+          onToggle={onToggleVozPedidos}
         />
       </div>
 

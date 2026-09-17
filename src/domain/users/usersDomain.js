@@ -140,6 +140,7 @@ export function normalizeAsignacionConfig(data = {}) {
     notificacionPedidoAceptadoActiva: data.notificacionPedidoAceptadoActiva !== false,
     notificacionPedidoEntregadoActiva: data.notificacionPedidoEntregadoActiva !== false,
     notificacionNuevoPedidoDomiciliarioActiva: Boolean(data.notificacionNuevoPedidoDomiciliarioActiva),
+    vozPedidosActiva: Boolean(data.vozPedidosActiva),
   };
 }
 

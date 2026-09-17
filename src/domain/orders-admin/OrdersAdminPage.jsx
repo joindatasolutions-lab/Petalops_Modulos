@@ -445,24 +445,44 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
     }
   }, [api, empresaId, sucursalId, orderVoiceLabel, showDesktopOrderNotification, speakVoiceAlert, voiceAlertsEnabled, voiceAlertsPedidoStorageScopeKey, voiceAlertsStorageScopeKey]);
   const toggleVoiceAlerts = useCallback(async () => {
+    if (!empresaId) return;
     const nextEnabled = !voiceAlertsEnabled;
     setVoiceAlertsEnabled(nextEnabled);
     globalThis.localStorage?.setItem(VOICE_ALERTS_STORAGE_KEY, nextEnabled ? "1" : "0");
-    if (nextEnabled) {
-      await requestDesktopNotificationPermission();
-      speakVoiceAlert("Alertas de voz activadas.");
-      setOrderNotification({
-        title: "Alertas de voz activadas",
-        message: "Te avisare aunque la ventana este minimizada, mientras el navegador mantenga PetalOps abierto.",
+
+    try {
+      if (nextEnabled) {
+        await requestDesktopNotificationPermission();
+        speakVoiceAlert("Alertas de voz activadas.");
+      } else {
+        globalThis.speechSynthesis?.cancel?.();
+      }
+
+      const data = await api.actualizarConfiguracionVozPedidos({
+        empresaId,
+        vozPedidosActiva: nextEnabled,
       });
-    } else {
-      globalThis.speechSynthesis?.cancel?.();
-      setOrderNotification({
+      const savedValue = Boolean(data?.vozPedidosActiva);
+      setVoiceAlertsEnabled(savedValue);
+      globalThis.localStorage?.setItem(VOICE_ALERTS_STORAGE_KEY, savedValue ? "1" : "0");
+      setOrderNotification(nextEnabled ? {
+        title: "Alertas de voz activadas",
+        message: "La preferencia quedo guardada para esta empresa.",
+      } : {
         title: "Alertas de voz desactivadas",
-        message: "No se anunciaran por voz los pedidos nuevos.",
+        message: "La preferencia quedo guardada para esta empresa.",
+      });
+    } catch (nextError) {
+      console.error("Error actualizando alertas de voz:", nextError);
+      setVoiceAlertsEnabled(voiceAlertsEnabled);
+      globalThis.localStorage?.setItem(VOICE_ALERTS_STORAGE_KEY, voiceAlertsEnabled ? "1" : "0");
+      setOrderNotification({
+        tone: "danger",
+        title: "No se pudo guardar voz pedidos",
+        message: nextError?.detail || nextError?.message || "Intenta nuevamente en unos segundos.",
       });
     }
-  }, [requestDesktopNotificationPermission, speakVoiceAlert, voiceAlertsEnabled]);
+  }, [api, empresaId, requestDesktopNotificationPermission, speakVoiceAlert, voiceAlertsEnabled]);
   const detailPedidoMenuFields = useMemo(
     () => (Array.isArray(detalle?.camposEmpresa?.pedidoDetalle) ? detalle.camposEmpresa.pedidoDetalle : []),
     [detalle]
@@ -767,6 +787,24 @@ const messageCard = useMessageCardController({
     voiceLastAuditIdRef.current = Number(globalThis.localStorage?.getItem(voiceAlertsStorageScopeKey) || 0);
     voiceLastPedidoIdRef.current = Number(globalThis.localStorage?.getItem(voiceAlertsPedidoStorageScopeKey) || 0);
   }, [voiceAlertsPedidoStorageScopeKey, voiceAlertsStorageScopeKey]);
+
+  useEffect(() => {
+    if (!empresaId) return undefined;
+    let disposed = false;
+    api.obtenerConfiguracionAsignacion({ empresaId })
+      .then(data => {
+        if (disposed) return;
+        const enabled = Boolean(data?.vozPedidosActiva);
+        setVoiceAlertsEnabled(enabled);
+        globalThis.localStorage?.setItem(VOICE_ALERTS_STORAGE_KEY, enabled ? "1" : "0");
+      })
+      .catch(nextError => {
+        console.error("Error cargando configuracion de voz pedidos:", nextError);
+      });
+    return () => {
+      disposed = true;
+    };
+  }, [api, empresaId]);
 
   useEffect(() => {
     if (!voiceAlertsEnabled || !empresaId) return undefined;
