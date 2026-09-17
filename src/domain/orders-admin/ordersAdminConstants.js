@@ -13,6 +13,7 @@ export const PAGE_SIZE_OPTIONS = [10, 20, 50];
 export const CANCELADO_PEDIDO_ESTADO_ID = 6;
 export const VOICE_ALERTS_STORAGE_KEY = "petalops_orders_voice_alerts_enabled";
 export const VOICE_ALERTS_LAST_AUDIT_STORAGE_PREFIX = "petalops_orders_voice_last_audit";
+export const VOICE_ALERTS_LAST_PEDIDO_STORAGE_PREFIX = "petalops_orders_voice_last_pedido";
 
 export const initialFilters = {
   q: "",

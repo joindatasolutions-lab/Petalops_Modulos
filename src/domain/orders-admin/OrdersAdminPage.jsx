@@ -33,6 +33,7 @@ import {
   CANCELADO_PEDIDO_ESTADO_ID,
   DEFAULT_NEW_ORDER_FORM,
   VOICE_ALERTS_LAST_AUDIT_STORAGE_PREFIX,
+  VOICE_ALERTS_LAST_PEDIDO_STORAGE_PREFIX,
   VOICE_ALERTS_STORAGE_KEY,
   initialFilters,
 } from "./ordersAdminConstants.js";
@@ -239,12 +240,17 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
   const voiceAlertsPrimedRef = useRef(false);
   const voiceAlertsPollingRef = useRef(false);
   const voiceLastAuditIdRef = useRef(0);
+  const voiceLastPedidoIdRef = useRef(0);
   const debouncedQuery = useDebouncedValue(filters.q, 300);
   const debouncedNewOrderPhone = useDebouncedValue(newOrderForm.clienteTelefono, 500);
   const empresaId = Number(session?.empresaID || tenantConfig.empresaId);
   const sucursalId = Number(session?.sucursalID || tenantConfig.sucursalId);
   const voiceAlertsStorageScopeKey = useMemo(
     () => `${VOICE_ALERTS_LAST_AUDIT_STORAGE_PREFIX}:${empresaId || "0"}:${sucursalId || "all"}`,
+    [empresaId, sucursalId]
+  );
+  const voiceAlertsPedidoStorageScopeKey = useMemo(
+    () => `${VOICE_ALERTS_LAST_PEDIDO_STORAGE_PREFIX}:${empresaId || "0"}:${sucursalId || "all"}`,
     [empresaId, sucursalId]
   );
   const catalogTenantSlug = resolveCatalogTenantSlug(session);
@@ -335,20 +341,30 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
         empresaId,
         sucursalId,
         sinceAuditId: voiceLastAuditIdRef.current,
+        sincePedidoId: voiceLastPedidoIdRef.current,
         limit: 10,
       });
       const rows = Array.isArray(response?.items) ? response.items : [];
       const responseLatestAuditId = Number(response?.latestAuditID || 0);
+      const responseLatestPedidoId = Number(response?.latestPedidoID || 0);
       const latestAuditId = Math.max(
         responseLatestAuditId,
         ...rows.map(item => Number(item?.auditID || 0))
       );
+      const latestPedidoId = Math.max(
+        responseLatestPedidoId,
+        ...rows.map(item => Number(item?.pedidoID || item?.cursorID || 0))
+      );
 
-      if (!voiceAlertsPrimedRef.current && voiceLastAuditIdRef.current <= 0) {
+      if (!voiceAlertsPrimedRef.current && voiceLastPedidoIdRef.current <= 0) {
         voiceAlertsPrimedRef.current = true;
         if (latestAuditId > 0) {
           voiceLastAuditIdRef.current = latestAuditId;
           globalThis.localStorage?.setItem(voiceAlertsStorageScopeKey, String(latestAuditId));
+        }
+        if (latestPedidoId > 0) {
+          voiceLastPedidoIdRef.current = latestPedidoId;
+          globalThis.localStorage?.setItem(voiceAlertsPedidoStorageScopeKey, String(latestPedidoId));
         }
         return;
       }
@@ -357,6 +373,10 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
       if (latestAuditId > voiceLastAuditIdRef.current) {
         voiceLastAuditIdRef.current = latestAuditId;
         globalThis.localStorage?.setItem(voiceAlertsStorageScopeKey, String(latestAuditId));
+      }
+      if (latestPedidoId > voiceLastPedidoIdRef.current) {
+        voiceLastPedidoIdRef.current = latestPedidoId;
+        globalThis.localStorage?.setItem(voiceAlertsPedidoStorageScopeKey, String(latestPedidoId));
       }
 
       if (!rows.length || !speak) return;
@@ -376,7 +396,7 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
     } finally {
       voiceAlertsPollingRef.current = false;
     }
-  }, [api, empresaId, sucursalId, orderVoiceLabel, showDesktopOrderNotification, speakVoiceAlert, voiceAlertsEnabled, voiceAlertsStorageScopeKey]);
+  }, [api, empresaId, sucursalId, orderVoiceLabel, showDesktopOrderNotification, speakVoiceAlert, voiceAlertsEnabled, voiceAlertsPedidoStorageScopeKey, voiceAlertsStorageScopeKey]);
   const toggleVoiceAlerts = useCallback(async () => {
     const nextEnabled = !voiceAlertsEnabled;
     setVoiceAlertsEnabled(nextEnabled);
@@ -689,12 +709,13 @@ const messageCard = useMessageCardController({
     voiceAlertsPrimedRef.current = false;
     voiceAlertsPollingRef.current = false;
     voiceLastAuditIdRef.current = Number(globalThis.localStorage?.getItem(voiceAlertsStorageScopeKey) || 0);
-  }, [voiceAlertsStorageScopeKey]);
+    voiceLastPedidoIdRef.current = Number(globalThis.localStorage?.getItem(voiceAlertsPedidoStorageScopeKey) || 0);
+  }, [voiceAlertsPedidoStorageScopeKey, voiceAlertsStorageScopeKey]);
 
   useEffect(() => {
     if (!voiceAlertsEnabled || !empresaId) return undefined;
 
-    pollVoiceOrderAlerts({ speak: voiceLastAuditIdRef.current > 0 });
+    pollVoiceOrderAlerts({ speak: voiceLastPedidoIdRef.current > 0 });
     const intervalId = globalThis.setInterval(() => {
       pollVoiceOrderAlerts({ speak: true });
     }, AUTO_REFRESH_INTERVAL_MS);

@@ -805,11 +805,12 @@ export function createApiClient(config) {
       return requestJson(`/pedidos?${params.toString()}`);
     },
 
-    async listarAlertasPedidosNuevosCreados({ empresaId, sucursalId, sinceAuditId = 0, limit = 20 }) {
+    async listarAlertasPedidosNuevosCreados({ empresaId, sucursalId, sinceAuditId = 0, sincePedidoId = 0, limit = 20 }) {
       const params = new URLSearchParams();
       params.set("empresaID", String(empresaId));
       if (sucursalId != null) params.set("sucursalID", String(sucursalId));
       params.set("sinceAuditId", String(Math.max(0, Number(sinceAuditId || 0))));
+      params.set("sincePedidoId", String(Math.max(0, Number(sincePedidoId || 0))));
       params.set("limit", String(Math.min(Math.max(1, Number(limit || 20)), 50)));
       return requestJson(`/pedidos/alertas/nuevos-creados?${params.toString()}`);
     },
