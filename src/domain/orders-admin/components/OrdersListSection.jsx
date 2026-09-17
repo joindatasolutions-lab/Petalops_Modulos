@@ -17,6 +17,8 @@ export function OrdersListSection({
   empresaId,
   session,
   approvingPedidoIds,
+  finalizingPedidoIds,
+  finalizedPickupPedidoIds,
   selectedPedidoId,
   drawerOpen,
   openOrderActionsId,
@@ -90,6 +92,8 @@ export function OrdersListSection({
                   empresaId={empresaId}
                   session={session}
                   approvingPedidoIds={approvingPedidoIds}
+                  finalizingPedidoIds={finalizingPedidoIds}
+                  finalizedPickupPedidoIds={finalizedPickupPedidoIds}
                   selectedPedidoId={selectedPedidoId}
                   drawerOpen={drawerOpen}
                   openOrderActionsId={openOrderActionsId}

@@ -6,7 +6,7 @@ import { filterInventoryItems } from "../domain/inventory/InventoryPage.jsx";
 import { filterNeighborhoodItems, sortNeighborhoods } from "../domain/neighborhoods/NeighborhoodsPage.jsx";
 import { buildOrdersMetrics, extractOrdersPayloadItems, filterOrdersByCreatedDateRange, filterOrdersBySearch, filterOrdersByStatus, isStorePickupOrder, localDateEndParam, localDateStartParam, resolveOrdersPayloadTotal, shouldAutoGenerateInvoiceForCompany, shouldShowPendingInvoiceAlert } from "../domain/orders-admin/OrdersAdminPage.jsx";
 import { buildDetailUpdatePayload, buildNewOrderCheckoutPayload, buildQuickSaleOrderPayload } from "../domain/orders-admin/orderPayloadBuilders.js";
-import { buildEditedOrderFinancialBase, buildOrderFinancialPreview, getOrderFinancialTotal, patchOrderItemFromDetail, resolveOrderListTotal } from "../domain/orders-admin/ordersDomain.js";
+import { buildEditedOrderFinancialBase, buildOrderFinancialPreview, customArrangementPreTaxTotal, getOrderFinancialTotal, isDeliveryDelivered, isValidPaymentBreakdownTotal, patchOrderItemFromDetail, resolveOrderListTotal } from "../domain/orders-admin/ordersDomain.js";
 import { buildSalesExportRows } from "../domain/accounting/accountingExports.js";
 import { applyApprovedOrderCountsToRows } from "../domain/accounting/accountingSelectors.js";
 import {
@@ -70,6 +70,12 @@ describe("estabilidad de filtros por vista", () => {
     expect(isStorePickupOrder({ tipoEntrega: "recogida_en_tienda" })).toBe(true);
     expect(isStorePickupOrder({ destinatario: { barrio: "Recoger en tienda" } })).toBe(true);
     expect(isStorePickupOrder({ entrega: { tipo_entrega: "domicilio" }, barrio: "Riomar" })).toBe(false);
+  });
+
+  it("Pedidos: bloquea finalizar cuando el pedido ya esta finalizado", () => {
+    expect(isDeliveryDelivered({ pedidoFinalizado: true })).toBe(true);
+    expect(isDeliveryDelivered({ entrega: { estado_entrega: "Finalizado" } })).toBe(true);
+    expect(isDeliveryDelivered({ produccion: { estado: "ParaEntrega" } })).toBe(false);
   });
 
   it("Pedidos: busca por pedido, cliente o nombre de producto", () => {
@@ -213,6 +219,20 @@ describe("estabilidad de filtros por vista", () => {
     expect(payload.precioUnitario).toBe(85000);
     expect(payload.productoPrecio).toBe(85000);
     expect(payload.metodosPago).toEqual(["Efectivo"]);
+  });
+
+  it("Pedidos: acepta desglose base antes de IVA para personalizado con NIT", () => {
+    const preTaxTotal = customArrangementPreTaxTotal({
+      isCustomArrangement: true,
+      clienteTipoIdent: "NIT",
+      precio: 200000,
+      cantidad: 1,
+    });
+
+    expect(preTaxTotal).toBe(200000);
+    expect(isValidPaymentBreakdownTotal({ breakdownTotal: 200000, orderTotal: 238000, acceptedPreTaxTotal: preTaxTotal })).toBe(true);
+    expect(isValidPaymentBreakdownTotal({ breakdownTotal: 238000, orderTotal: 238000, acceptedPreTaxTotal: preTaxTotal })).toBe(true);
+    expect(isValidPaymentBreakdownTotal({ breakdownTotal: 200000, orderTotal: 238000 })).toBe(false);
   });
 
   it("Pedidos: totales guardados no cobran domicilio marcado como obsequio", () => {

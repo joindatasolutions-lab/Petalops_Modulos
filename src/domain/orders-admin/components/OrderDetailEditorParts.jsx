@@ -536,6 +536,7 @@ export function OrderDetailPaymentSection({
   saldoFavorMonto,
   saldoFavorNota,
   financialPreview,
+  acceptedPreTaxTotal,
   totalPedido,
   canalFlora,
   onMetodosPagoChange,
@@ -603,7 +604,9 @@ export function OrderDetailPaymentSection({
                 </label>
               ))}
               <p className="order-detail-edit-hint">
-                La suma de los montos debe coincidir con el total del pedido: ${formatearCOP(totalPedido)}.
+                {acceptedPreTaxTotal
+                  ? `La suma puede coincidir con el total del pedido ($${formatearCOP(totalPedido)}) o con la base antes de IVA ($${formatearCOP(acceptedPreTaxTotal)}).`
+                  : `La suma de los montos debe coincidir con el total del pedido: $${formatearCOP(totalPedido)}.`}
               </p>
             </div>
           ) : null}

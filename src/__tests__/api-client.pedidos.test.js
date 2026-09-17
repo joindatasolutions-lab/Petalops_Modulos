@@ -563,6 +563,11 @@ describe("apiClient.listarPedidos", () => {
       productoID: 20,
       precioUnitario: 85000,
       clienteTipoIdent: "NIT",
+      metodosPago: ["Metodo 1", "Metodo 2"],
+      detallePago: [
+        { metodo: "Metodo 1", monto: 120000 },
+        { metodo: "Metodo 2", monto: 80000 },
+      ],
       forzarRecalculoFinanciero: true,
     });
 
@@ -576,6 +581,14 @@ describe("apiClient.listarPedidos", () => {
     expect(body.precioUnitario).toBe(85000);
     expect(body.productoPrecio).toBe(85000);
     expect(body.clienteTipoIdent).toBe("NIT");
+    expect(body.tipoIdent).toBe("NIT");
+    expect(body.detallePago).toEqual([
+      { metodo: "Metodo 1", monto: 120000 },
+      { metodo: "Metodo 2", monto: 80000 },
+    ]);
+    expect(body.desglosePago).toEqual(body.detallePago);
+    expect(body.metodosPagoDetalle).toEqual(body.detallePago);
+    expect(body.paymentBreakdown).toEqual(body.detallePago);
     expect(body.forzarRecalculoFinanciero).toBe(true);
   });
 

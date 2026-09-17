@@ -2,6 +2,7 @@ import { useMemo } from "react";
 
 import {
   displayProductCode,
+  customArrangementPreTaxTotal,
   isCustomArrangement,
   normalizeWholePeso,
 } from "../ordersDomain.js";
@@ -181,6 +182,12 @@ export function useOrderDetailEditor({
       saldoFavorMonto: state.detailEditSaldoFavorMonto,
       saldoFavorNota: state.detailEditSaldoFavorNota,
       financialPreview: state.detailEditFinancialPreview,
+      acceptedPreTaxTotal: customArrangementPreTaxTotal({
+        isCustomArrangement: state.detailEditIsCustomArrangement,
+        clienteTipoIdent: state.detailEditClienteTipoIdent,
+        precio: state.detailEditPrecio,
+        cantidad: state.detailEditCantidad,
+      }),
       totalPedido,
       canalFlora: state.detailEditCanalFlora,
       onMetodosPagoChange: setters.setDetailEditMetodosPago,
