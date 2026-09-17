@@ -111,12 +111,15 @@ export function NewOrderModal({
 
   const selectBarrio = item => {
     setNewOrderBarrioDropdownOpen(false);
+    const nextIsStorePickup = normalizeDeliveryType(item.nombre) === "recogida_en_tienda";
     setNewOrderForm(current => ({
       ...current,
       barrioNombre: item.nombre,
       barrioCostoDomicilio: item.costoDomicilio != null ? Number(item.costoDomicilio) : null,
-      direccion: normalizeDeliveryType(item.nombre) === "recogida_en_tienda" ? "Recoger En Tienda" : current.direccion,
-      domicilioObsequiado: normalizeDeliveryType(item.nombre) === "recogida_en_tienda" ? false : current.domicilioObsequiado,
+      direccion: nextIsStorePickup
+        ? "Recoger En Tienda"
+        : (String(current.direccion || "").trim().toLowerCase() === "recoger en tienda" ? "" : current.direccion),
+      domicilioObsequiado: nextIsStorePickup ? false : current.domicilioObsequiado,
     }));
   };
 
@@ -306,10 +309,6 @@ export function NewOrderModal({
                   </label>
                 </div>
                 <label className="order-detail-edit-label">
-                  Direccion
-                  <input type="text" value={newOrderForm.direccion} onChange={event => updateNewOrderForm("direccion", event.target.value)} placeholder="Direccion o referencia" />
-                </label>
-                <label className="order-detail-edit-label">
                   Barrio / tipo entrega
                   <div className="order-combobox">
                     <button type="button" className="order-combobox-trigger" onClick={() => setNewOrderBarrioDropdownOpen(open => !open)}>
@@ -353,6 +352,16 @@ export function NewOrderModal({
                       </div>
                     ) : null}
                   </div>
+                </label>
+                <label className="order-detail-edit-label">
+                  Direccion
+                  <input
+                    type="text"
+                    value={isStorePickup ? "Recoger En Tienda" : newOrderForm.direccion}
+                    onChange={event => updateNewOrderForm("direccion", event.target.value)}
+                    placeholder={isStorePickup ? "No aplica para recoger en tienda" : "Direccion o referencia"}
+                    disabled={isStorePickup}
+                  />
                 </label>
                 {newOrderForm.barrioNombre ? (
                   <p className="orders-new-order-delivery-cost">
