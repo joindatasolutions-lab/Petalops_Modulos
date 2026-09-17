@@ -34,6 +34,7 @@ import {
   DEFAULT_NEW_ORDER_FORM,
   VOICE_ALERTS_LAST_AUDIT_STORAGE_PREFIX,
   VOICE_ALERTS_LAST_PEDIDO_STORAGE_PREFIX,
+  VOICE_ALERTS_INTERVAL_MS,
   VOICE_ALERTS_STORAGE_KEY,
   initialFilters,
 } from "./ordersAdminConstants.js";
@@ -146,6 +147,46 @@ function extractActiveCatalogNames(payload) {
     .filter(item => item?.activo !== false)
     .map(item => String(item?.nombre || "").trim())
     .filter(Boolean);
+}
+
+const SPANISH_FEMALE_VOICE_HINTS = [
+  "sabina",
+  "helena",
+  "elvira",
+  "laura",
+  "paulina",
+  "dalia",
+  "paloma",
+  "maria",
+  "sofia",
+  "luciana",
+  "catalina",
+  "monica",
+  "google espanol",
+  "google español",
+  "spanish latin american",
+];
+
+function selectPreferredSpanishVoice(synth) {
+  const voices = typeof synth?.getVoices === "function" ? synth.getVoices() : [];
+  const spanishVoices = voices.filter(voice => String(voice?.lang || "").toLowerCase().startsWith("es"));
+  if (!spanishVoices.length) return null;
+
+  return spanishVoices
+    .map(voice => {
+      const lang = String(voice.lang || "").toLowerCase();
+      const name = String(voice.name || "").toLowerCase();
+      let score = 0;
+      if (lang === "es-co") score += 90;
+      else if (["es-419", "es-mx", "es-us", "es-es"].includes(lang)) score += 70;
+      else score += 40;
+      if (SPANISH_FEMALE_VOICE_HINTS.some(hint => name.includes(hint))) score += 35;
+      if (name.includes("natural") || name.includes("online") || name.includes("premium")) score += 15;
+      if (name.includes("microsoft") || name.includes("google")) score += 10;
+      if (["pablo", "jorge", "carlos", "diego", "miguel"].some(hint => name.includes(hint))) score -= 20;
+      return { voice, score };
+    })
+    .sort((left, right) => right.score - left.score)[0]?.voice || null;
 }
 
 export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canViewCatalogo, canViewProduccion, canViewDomicilios, canViewBarrios, canViewInventario, canViewContabilidad, canViewClientesPanel, canViewUsuariosPanel, onLogout, onGoPipeline, onGoPedidos, onGoProduccion, onGoDomicilios, onGoBarrios, onGoInventario, onGoContabilidad, onGoClientes, onGoUsuarios }) {
@@ -291,9 +332,15 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
     const synth = globalThis.speechSynthesis;
     if (!synth || typeof globalThis.SpeechSynthesisUtterance !== "function") return false;
     const utterance = new globalThis.SpeechSynthesisUtterance(message);
-    utterance.lang = "es-CO";
-    utterance.rate = 0.95;
-    utterance.pitch = 1;
+    const voice = selectPreferredSpanishVoice(synth);
+    if (voice) {
+      utterance.voice = voice;
+      utterance.lang = voice.lang || "es-CO";
+    } else {
+      utterance.lang = "es-CO";
+    }
+    utterance.rate = 0.92;
+    utterance.pitch = 1.08;
     synth.cancel();
     synth.speak(utterance);
     return true;
@@ -698,6 +745,15 @@ const messageCard = useMessageCardController({
   }, [loadOrders]);
 
   useEffect(() => {
+    const synth = globalThis.speechSynthesis;
+    if (!synth || typeof synth.getVoices !== "function") return undefined;
+    synth.getVoices();
+    const loadVoices = () => synth.getVoices();
+    synth.addEventListener?.("voiceschanged", loadVoices);
+    return () => synth.removeEventListener?.("voiceschanged", loadVoices);
+  }, []);
+
+  useEffect(() => {
     loadOrdersRef.current = loadOrders;
   }, [loadOrders]);
 
@@ -718,7 +774,7 @@ const messageCard = useMessageCardController({
     pollVoiceOrderAlerts({ speak: voiceLastPedidoIdRef.current > 0 });
     const intervalId = globalThis.setInterval(() => {
       pollVoiceOrderAlerts({ speak: true });
-    }, AUTO_REFRESH_INTERVAL_MS);
+    }, VOICE_ALERTS_INTERVAL_MS);
 
     return () => globalThis.clearInterval(intervalId);
   }, [empresaId, pollVoiceOrderAlerts, voiceAlertsEnabled]);

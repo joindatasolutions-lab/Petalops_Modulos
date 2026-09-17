@@ -8,6 +8,7 @@ import { todayIsoDateBogota } from "../../shared/utils.js";
  */
 
 export const AUTO_REFRESH_INTERVAL_MS = 15000;
+export const VOICE_ALERTS_INTERVAL_MS = 5000;
 export const ORDERS_FILTER_CACHE_LIMIT = 8;
 export const PAGE_SIZE_OPTIONS = [10, 20, 50];
 export const CANCELADO_PEDIDO_ESTADO_ID = 6;
