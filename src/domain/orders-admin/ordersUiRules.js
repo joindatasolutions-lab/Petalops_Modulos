@@ -13,6 +13,7 @@ const BADGE_CLASS_BY_STATUS = {
   PENDIENTE: "is-pendiente",
   CREADO: "is-pendiente",
   APROBADO: "is-aprobado",
+  ENTREGADO: "is-entregado",
   CANCELADO: "is-rechazado",
 };
 

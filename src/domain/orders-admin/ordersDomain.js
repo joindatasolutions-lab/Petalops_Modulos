@@ -580,6 +580,25 @@ export function isStorePickupOrder(item) {
     );
 }
 
+export function isDeliveryDelivered(item) {
+  if (!item || typeof item !== "object") return false;
+  const text = [
+    item?.estadoEntrega,
+    item?.estado_entrega,
+    item?.estadoEntregaCodigo,
+    item?.estado_entrega_codigo,
+    item?.entregaEstado,
+    item?.entrega_estado,
+    item?.entrega?.estado,
+    item?.entrega?.estadoEntrega,
+    item?.entrega?.estado_entrega,
+    item?.entrega?.estadoEntregaCodigo,
+    item?.entrega?.estado_entrega_codigo,
+  ].map(normalizeOrderSearchText).filter(Boolean).join(" ");
+  const compact = text.replace(/[^a-z0-9]+/g, "");
+  return compact === "entregado" || compact.includes("entregado");
+}
+
 export function filterStorePickupOrders(items) {
   return (Array.isArray(items) ? items : []).filter(isStorePickupOrder);
 }

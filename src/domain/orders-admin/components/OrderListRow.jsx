@@ -9,6 +9,7 @@ import {
   resolveOrderListTotal,
   resolveOrderProductSummary,
   shouldShowPendingInvoiceAlert,
+  isDeliveryDelivered,
   isStorePickupOrder,
 } from "../ordersDomain.js";
 import { canInvoiceStatus, canMessageCardStatus, isPendingStatus, statusBadgeClass } from "../ordersUiRules.js";
@@ -38,7 +39,9 @@ export function OrderListRow({
   downloadInvoice,
   openMessageCard,
 }) {
-  const statusClass = statusBadgeClass(item.estado, item);
+  const deliveryDelivered = isDeliveryDelivered(item);
+  const displayStatus = deliveryDelivered ? "Entregado" : item.estado;
+  const statusClass = statusBadgeClass(displayStatus, item);
   const productSummary = resolveOrderProductSummary(item, new Map(), empresaId);
   const waPhone = String(item.telefonoCompleto || item.telefono || "").trim().replace(/\+/g, "");
   const pedidoId = resolveOrderId(item);
@@ -55,7 +58,7 @@ export function OrderListRow({
       : "Aprobar pedido";
   const canDownloadInvoice = Boolean(pedidoId) && canInvoiceStatus(item.estado);
   const canViewMessageCard = canMessageCardStatus(item.estado);
-  const canFinalizeAction = Boolean(pedidoId) && isStorePickupOrder(item) && canInvoiceStatus(item.estado);
+  const canFinalizeAction = Boolean(pedidoId) && isStorePickupOrder(item) && canInvoiceStatus(item.estado) && !deliveryDelivered;
   const { date: fechaPedido, time: horaPedido } = splitDateTimeParts(item.fecha_pedido || item.fechaPedido);
   const { time: horaCreacion } = splitDateTimeParts(item.created_at || item.createdAt);
   const horaRegistroPedido = horaPedido || item.horaPedido || item.hora_pedido || item.hora || horaCreacion;
@@ -79,7 +82,7 @@ export function OrderListRow({
             <span className={`orders-order-badge ${statusClass}`}>{displayOrderNumber}</span>
             <span className={`order-badge ${statusClass}`}>
               <span className="orders-status-icon" aria-hidden="true" />
-              {item.estado || "-"}
+              {displayStatus || "-"}
             </span>
           </header>
 
@@ -174,7 +177,7 @@ export function OrderListRow({
         <div className="orders-cell-stack">
           <span className={`order-badge ${statusClass}`}>
             <span className="orders-status-icon" aria-hidden="true" />
-            {item.estado || "-"}
+            {displayStatus || "-"}
           </span>
           {shouldShowPendingInvoiceAlert(item) ? (
             <span className="orders-inline-alert">Factura pendiente</span>
