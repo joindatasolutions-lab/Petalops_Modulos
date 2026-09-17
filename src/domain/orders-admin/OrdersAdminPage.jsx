@@ -1215,6 +1215,21 @@ const openNewOrderModal = () => {
     String(client?.nombreCompleto || client?.nombre_completo || client?.nombre || client?.cliente || "").trim()
   );
 
+  const normalizeClientNameKey = value => (
+    String(value || "")
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .trim()
+      .toLowerCase()
+      .replace(/\s+/g, " ")
+  );
+
+  const clientNamesConflict = (left, right) => {
+    const leftKey = normalizeClientNameKey(left);
+    const rightKey = normalizeClientNameKey(right);
+    return Boolean(leftKey && rightKey && leftKey !== rightKey);
+  };
+
   const findClientByPhone = async phone => {
     const digits = normalizePhoneDigits(phone);
     if (digits.length < 7) return null;
@@ -1259,10 +1274,21 @@ const openNewOrderModal = () => {
 
       let hydratedForm = null;
       setNewOrderForm(current => {
+        const clientName = resolveClientName(client);
+        if (clientNamesConflict(current.clienteNombre, clientName)) {
+          hydratedForm = {
+            ...current,
+            clienteID: null,
+            clienteTelefono: phone || current.clienteTelefono,
+            clienteIdentificacion: "",
+          };
+          return hydratedForm;
+        }
+
         hydratedForm = {
           ...current,
           clienteID: client.clienteID ?? client.clienteId ?? client.idCliente ?? client.id_cliente ?? client.id ?? current.clienteID,
-          clienteNombre: resolveClientName(client) || current.clienteNombre,
+          clienteNombre: clientName || current.clienteNombre,
           clienteTelefono: phone || client.telefonoCompleto || client.telefono || current.clienteTelefono,
           clienteEmail: client.email || "",
           clienteTipoIdent: normalizeIdentType(client.tipoIdent || client.tipo_ident || ""),

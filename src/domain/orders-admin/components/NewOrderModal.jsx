@@ -405,7 +405,19 @@ export function NewOrderModal({
                 <div className="order-detail-edit-grid">
                   <label className="order-detail-edit-label">
                     Nombre cliente
-                    <input type="text" value={newOrderForm.clienteNombre} onChange={event => updateNewOrderForm("clienteNombre", event.target.value)} />
+                    <input
+                      type="text"
+                      value={newOrderForm.clienteNombre}
+                      onChange={event => {
+                        const nextNombre = event.target.value;
+                        setNewOrderForm(current => ({
+                          ...current,
+                          clienteNombre: nextNombre,
+                          clienteID: null,
+                          clienteIdentificacion: "",
+                        }));
+                      }}
+                    />
                   </label>
                   <label className="order-detail-edit-label">
                     Celular
