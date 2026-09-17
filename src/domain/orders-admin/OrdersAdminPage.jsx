@@ -435,7 +435,7 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
         : `${rows.length} pedidos nuevos llegaron en estado creado.`;
       setOrderNotification({ title, message });
       showDesktopOrderNotification(title, message);
-      speakVoiceAlert(message);
+      speakVoiceAlert("Nuevo Pedido");
       loadOrdersRef.current?.(true);
       loadTodaySalesSummaryRef.current?.();
     } catch (nextError) {
