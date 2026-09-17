@@ -582,7 +582,21 @@ export function isStorePickupOrder(item) {
 
 export function isDeliveryDelivered(item) {
   if (!item || typeof item !== "object") return false;
+  if (
+    isTruthyFlag(item?.pedidoFinalizado)
+    || isTruthyFlag(item?.pedido_finalizado)
+    || isTruthyFlag(item?.finalizado)
+    || isTruthyFlag(item?.entregado)
+    || isTruthyFlag(item?.entrega?.finalizada)
+    || isTruthyFlag(item?.entrega?.entregada)
+  ) {
+    return true;
+  }
+
   const text = [
+    item?.estado,
+    item?.estadoPedido,
+    item?.estado_pedido,
     item?.estadoEntrega,
     item?.estado_entrega,
     item?.estadoEntregaCodigo,
@@ -596,7 +610,10 @@ export function isDeliveryDelivered(item) {
     item?.entrega?.estado_entrega_codigo,
   ].map(normalizeOrderSearchText).filter(Boolean).join(" ");
   const compact = text.replace(/[^a-z0-9]+/g, "");
-  return compact === "entregado" || compact.includes("entregado");
+  return compact === "entregado"
+    || compact.includes("entregado")
+    || compact.includes("finalizado")
+    || compact.includes("completado");
 }
 
 export function filterStorePickupOrders(items) {
@@ -746,6 +763,31 @@ export function normalizeWholePeso(value) {
   const parsed = Number.parseFloat(String(value).replace(",", "."));
   if (!Number.isFinite(parsed)) return null;
   return Math.round(parsed);
+}
+
+export function isNitIdentification(value) {
+  return String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .toUpperCase() === "NIT";
+}
+
+export function customArrangementPreTaxTotal({ isCustomArrangement: customArrangement, clienteTipoIdent, precio, cantidad }) {
+  if (!customArrangement || !isNitIdentification(clienteTipoIdent)) return null;
+  const unitPrice = normalizeWholePeso(precio);
+  const quantity = Math.max(1, Number(cantidad || 1));
+  if (!Number.isFinite(unitPrice) || unitPrice <= 0 || !Number.isFinite(quantity) || quantity <= 0) return null;
+  return roundCurrency(unitPrice * quantity);
+}
+
+export function isValidPaymentBreakdownTotal({ breakdownTotal, orderTotal, acceptedPreTaxTotal = null }) {
+  const roundedBreakdownTotal = roundCurrency(breakdownTotal);
+  const roundedOrderTotal = roundCurrency(orderTotal);
+  if (roundedOrderTotal > 0 && roundedBreakdownTotal === roundedOrderTotal) return true;
+
+  const roundedPreTaxTotal = roundCurrency(acceptedPreTaxTotal);
+  return roundedPreTaxTotal > 0 && roundedBreakdownTotal === roundedPreTaxTotal;
 }
 
 export function sanitizeWholePesoInput(value) {

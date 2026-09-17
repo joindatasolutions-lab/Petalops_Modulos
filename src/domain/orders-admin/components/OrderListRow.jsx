@@ -26,7 +26,9 @@ export function OrderListRow({
   item,
   empresaId,
   session,
-  approvingPedidoIds,
+  approvingPedidoIds = [],
+  finalizingPedidoIds = [],
+  finalizedPickupPedidoIds = [],
   selectedPedidoId,
   drawerOpen,
   openOrderActionsId,
@@ -40,11 +42,13 @@ export function OrderListRow({
   openMessageCard,
 }) {
   const deliveryDelivered = isDeliveryDelivered(item);
-  const displayStatus = deliveryDelivered ? "Entregado" : item.estado;
+  const pedidoId = resolveOrderId(item);
+  const pickupFinalized = finalizedPickupPedidoIds.includes(Number(pedidoId));
+  const orderFinalized = deliveryDelivered || pickupFinalized;
+  const displayStatus = orderFinalized ? "Entregado" : item.estado;
   const statusClass = statusBadgeClass(displayStatus, item);
   const productSummary = resolveOrderProductSummary(item, new Map(), empresaId);
   const waPhone = String(item.telefonoCompleto || item.telefono || "").trim().replace(/\+/g, "");
-  const pedidoId = resolveOrderId(item);
   const displayOrderNumber = resolveDisplayOrderNumber(item);
   const canApproveAction = isPendingStatus(item.estado);
   const canCancelAction = canApproveAction || (isEmpresaAdminRole(session) && canInvoiceStatus(item.estado));
@@ -58,7 +62,15 @@ export function OrderListRow({
       : "Aprobar pedido";
   const canDownloadInvoice = Boolean(pedidoId) && canInvoiceStatus(item.estado);
   const canViewMessageCard = canMessageCardStatus(item.estado);
-  const canFinalizeAction = Boolean(pedidoId) && isStorePickupOrder(item) && canInvoiceStatus(item.estado) && !deliveryDelivered;
+  const isFinalizing = finalizingPedidoIds.includes(Number(pedidoId));
+  const canFinalizeAction = Boolean(pedidoId) && isStorePickupOrder(item) && canInvoiceStatus(item.estado);
+  const finalizeDisabled = isFinalizing || orderFinalized;
+  const finalizeLabel = isFinalizing ? "Finalizando..." : orderFinalized ? "Finalizado" : "Finalizar";
+  const finalizeTitle = isFinalizing
+    ? "Finalizando pedido..."
+    : orderFinalized
+      ? "Pedido ya finalizado"
+      : "Finalizar recogida en tienda";
   const { date: fechaPedido, time: horaPedido } = splitDateTimeParts(item.fecha_pedido || item.fechaPedido);
   const { time: horaCreacion } = splitDateTimeParts(item.created_at || item.createdAt);
   const horaRegistroPedido = horaPedido || item.horaPedido || item.hora_pedido || item.hora || horaCreacion;
@@ -134,6 +146,9 @@ export function OrderListRow({
             canDownloadInvoice={canDownloadInvoice}
             canViewMessageCard={canViewMessageCard}
             canFinalizeAction={canFinalizeAction}
+            finalizeDisabled={finalizeDisabled}
+            finalizeLabel={finalizeLabel}
+            finalizeTitle={finalizeTitle}
             onToggle={() => setOpenOrderActionsId(current => current === pedidoId ? null : pedidoId)}
             onClose={() => setOpenOrderActionsId(null)}
             onOpenDetail={openDetail}
@@ -200,6 +215,9 @@ export function OrderListRow({
           canDownloadInvoice={canDownloadInvoice}
           canViewMessageCard={canViewMessageCard}
           canFinalizeAction={canFinalizeAction}
+          finalizeDisabled={finalizeDisabled}
+          finalizeLabel={finalizeLabel}
+          finalizeTitle={finalizeTitle}
           onToggle={() => setOpenOrderActionsId(current => current === pedidoId ? null : pedidoId)}
           onClose={() => setOpenOrderActionsId(null)}
           onOpenDetail={openDetail}

@@ -24,6 +24,9 @@ export function OrderActionsMenu({
   canDownloadInvoice,
   canViewMessageCard,
   canFinalizeAction,
+  finalizeDisabled = false,
+  finalizeLabel = "Finalizar",
+  finalizeTitle = "Finalizar recogida en tienda",
   onToggle,
   onClose,
   onOpenDetail,
@@ -69,9 +72,16 @@ export function OrderActionsMenu({
               <span>Cancelar</span>
             </button>
             {canFinalizeAction && (
-              <button type="button" role="menuitem" className="is-finish" onClick={() => closeAndRun(() => onFinalize(pedidoId))} title="Finalizar recogida en tienda">
+              <button
+                type="button"
+                role="menuitem"
+                className="is-finish"
+                onClick={() => closeAndRun(() => onFinalize(pedidoId))}
+                disabled={finalizeDisabled}
+                title={finalizeTitle}
+              >
                 <PackageCheck size={14} strokeWidth={2.1} />
-                <span>Finalizar</span>
+                <span>{finalizeLabel}</span>
               </button>
             )}
             <a href={`https://wa.me/${waPhone}`} target="_blank" rel="noreferrer" role="menuitem" className="is-whatsapp" onClick={onClose}>

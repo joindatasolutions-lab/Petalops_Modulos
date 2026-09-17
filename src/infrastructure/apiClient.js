@@ -981,6 +981,7 @@ export function createApiClient(config) {
       canalFlora,
     }) {
       const unitPrice = precioUnitario ?? productoPrecio;
+      const paymentBreakdown = Array.isArray(detallePago) ? detallePago : null;
       return requestJson(`/pedido/${pedidoId}/detalle`, {
         method: "PUT",
         headers: {
@@ -1000,6 +1001,7 @@ export function createApiClient(config) {
           clienteTelefono: clienteTelefono ?? null,
           clienteEmail: clienteEmail ?? null,
           clienteTipoIdent: clienteTipoIdent ?? null,
+          tipoIdent: clienteTipoIdent ?? null,
           clienteIdentificacion: clienteIdentificacion ?? null,
           destinatarioNombre: destinatarioNombre ?? null,
           telefonoDestino: telefonoDestino ?? null,
@@ -1011,7 +1013,10 @@ export function createApiClient(config) {
           mensajeTarjeta: mensajeTarjeta ?? null,
           observacionGeneral: observacionGeneral ?? null,
           metodosPago: Array.isArray(metodosPago) ? metodosPago : null,
-          detallePago: Array.isArray(detallePago) ? detallePago : null,
+          detallePago: paymentBreakdown,
+          desglosePago: paymentBreakdown,
+          metodosPagoDetalle: paymentBreakdown,
+          paymentBreakdown,
           montoEfectivo: montoEfectivo != null ? Number(montoEfectivo) : null,
           omitirRecargoLink: omitirRecargoLink != null ? Boolean(omitirRecargoLink) : null,
           domicilio: domicilio != null ? Number(domicilio) : null,

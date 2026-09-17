@@ -60,6 +60,7 @@ import {
 
 import {
   buildCatalogProductIndex,
+  customArrangementPreTaxTotal,
   buildEditedOrderFinancialBase,
   buildOrderFinancialPreview,
   buildOrdersMetrics,
@@ -78,6 +79,7 @@ import {
   isCustomArrangement,
   isEmpresaAdminRole,
   isDeliveryGifted,
+  isValidPaymentBreakdownTotal,
   isLinkPaymentMethod,
   isOrderNumberSearchTerm,
   isStorePickupOrder,
@@ -203,6 +205,8 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
   const [detailAddPrecio, setDetailAddPrecio] = useState(null);
   const [detailAddSaving, setDetailAddSaving] = useState(false);
   const [approvingPedidoIds, setApprovingPedidoIds] = useState([]);
+  const [finalizingPedidoIds, setFinalizingPedidoIds] = useState([]);
+  const [finalizedPickupPedidoIds, setFinalizedPickupPedidoIds] = useState([]);
   const [openOrderActionsId, setOpenOrderActionsId] = useState(null);
   const [catalogProducts, setCatalogProducts] = useState([]);
   const [orderNotification, setOrderNotification] = useState(null);
@@ -1007,10 +1011,16 @@ const messageCard = useMessageCardController({
   };
 
   const finalizeOrder = async pedidoId => {
+    if (finalizingPedidoIds.includes(Number(pedidoId))) {
+      return;
+    }
+
     const item = items.find(current => Number(resolveOrderId(current)) === Number(pedidoId));
     const fallbackNumber = resolveAssignedOrderNumber(null, null, null, item);
+    setFinalizingPedidoIds(current => [...current, Number(pedidoId)]);
     try {
       const response = await api.finalizarPedidoRecogidaTienda(pedidoId);
+      setFinalizedPickupPedidoIds(current => Array.from(new Set([...current, Number(pedidoId)])));
       clearOrdersCache();
       const refreshed = await loadOrders(true);
       await loadTodaySalesSummary();
@@ -1034,6 +1044,8 @@ const messageCard = useMessageCardController({
         title: "No se puede finalizar",
         message: nextError?.detail || nextError?.message || "Para finalizar este pedido, produccion debe estar en estado ParaEntrega.",
       });
+    } finally {
+      setFinalizingPedidoIds(current => current.filter(currentId => currentId !== Number(pedidoId)));
     }
   };
 
@@ -1487,8 +1499,17 @@ const openNewOrderModal = () => {
 
     const roundedBreakdownTotal = roundCurrency(breakdownTotal);
     const roundedOrderTotal = roundCurrency(totalPedido);
-    if (roundedOrderTotal > 0 && roundedBreakdownTotal !== roundedOrderTotal) {
-      throw new Error(`La suma de los montos por método de pago debe ser igual al total del pedido ($${formatearCOP(roundedOrderTotal)}).`);
+    const acceptedPreTaxTotal = customArrangementPreTaxTotal({
+      isCustomArrangement: detailEditIsCustomArrangement,
+      clienteTipoIdent: detailEditClienteTipoIdent,
+      precio: detailEditPrecio,
+      cantidad: detailEditCantidad,
+    });
+    if (!isValidPaymentBreakdownTotal({ breakdownTotal: roundedBreakdownTotal, orderTotal: roundedOrderTotal, acceptedPreTaxTotal })) {
+      const expectedTotals = acceptedPreTaxTotal
+        ? `$${formatearCOP(roundedOrderTotal)} o la base antes de IVA ($${formatearCOP(acceptedPreTaxTotal)})`
+        : `$${formatearCOP(roundedOrderTotal)}`;
+      throw new Error(`La suma de los montos por metodo de pago debe ser igual al total del pedido (${expectedTotals}).`);
     }
 
     return {
@@ -2085,6 +2106,8 @@ const ordersOverlayOpen = drawerOpen || newOrderOpen || messageCardOpen || Boole
             empresaId={empresaId}
             session={session}
             approvingPedidoIds={approvingPedidoIds}
+            finalizingPedidoIds={finalizingPedidoIds}
+            finalizedPickupPedidoIds={finalizedPickupPedidoIds}
             selectedPedidoId={selectedPedidoId}
             drawerOpen={drawerOpen}
             openOrderActionsId={openOrderActionsId}
