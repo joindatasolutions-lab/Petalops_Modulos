@@ -70,6 +70,8 @@ describe("estabilidad de filtros por vista", () => {
     expect(isStorePickupOrder({ tipoEntrega: "recogida_en_tienda" })).toBe(true);
     expect(isStorePickupOrder({ destinatario: { barrio: "Recoger en tienda" } })).toBe(true);
     expect(isStorePickupOrder({ entrega: { tipo_entrega: "domicilio" }, barrio: "Riomar" })).toBe(false);
+    expect(isStorePickupOrder({ tipoEntrega: "domicilio", direccion: "Calle 10 tienda la esquina" })).toBe(false);
+    expect(isStorePickupOrder({ tipoEntrega: "domicilio", observacion: "recoger paquete", direccion: "Tienda del barrio" })).toBe(false);
   });
 
   it("Pedidos: bloquea finalizar cuando el pedido ya esta finalizado", () => {

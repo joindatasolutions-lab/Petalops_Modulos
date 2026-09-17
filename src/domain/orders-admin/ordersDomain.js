@@ -528,12 +528,31 @@ function normalizeOrderSearchText(value) {
     .toLowerCase();
 }
 
+function isStorePickupText(value) {
+  const normalized = normalizeOrderSearchText(value);
+  if (!normalized) return false;
+  const compact = normalized.replace(/[^a-z0-9]+/g, "");
+  return [
+    "tienda",
+    "recoger",
+    "recogida",
+    "retiro",
+    "retirar",
+    "recogidaentienda",
+    "recogerentienda",
+    "retiroentienda",
+    "retirarentienda",
+    "entregaentienda",
+    "entregasentienda",
+  ].includes(compact);
+}
+
 export function isStorePickupOrder(item) {
   if (!item || typeof item !== "object") return false;
   if (item.soloTienda === true || item.entregaEnTienda === true || item.recogerEnTienda === true) return true;
   if (item.solo_tienda === true || item.entrega_en_tienda === true || item.recoger_en_tienda === true) return true;
 
-  const text = [
+  return [
     item?.tipoEntrega,
     item?.tipo_entrega,
     item?.entregaTipo,
@@ -566,18 +585,7 @@ export function isStorePickupOrder(item) {
     item?.entrega?.direccion_entrega,
     item?.entrega?.direccionDestino,
     item?.entrega?.direccion_destino,
-  ].map(normalizeOrderSearchText).filter(Boolean).join(" ");
-
-  const compact = text.replace(/[^a-z0-9]+/g, "");
-  return compact.includes("tienda")
-    && (
-      compact.includes("recoger")
-      || compact.includes("recogida")
-      || compact.includes("retiro")
-      || compact.includes("retirar")
-      || compact.includes("entregaentienda")
-      || compact.includes("entregasentienda")
-    );
+  ].some(isStorePickupText);
 }
 
 export function isDeliveryDelivered(item) {
