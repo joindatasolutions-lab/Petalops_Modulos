@@ -18,6 +18,11 @@ function textOrNull(...values) {
   return text || null;
 }
 
+function identificationOrNull(value) {
+  const text = String(value || "").replace(/\s+/g, " ").trim();
+  return text ? text.slice(0, 50) : null;
+}
+
 export function buildNewOrderCheckoutPayload({
   form,
   empresaId,
@@ -103,7 +108,7 @@ export function buildNewOrderCheckoutPayload({
     cliente: {
       clienteID: form.clienteID != null ? Number(form.clienteID) : null,
       tipoIdent: form.clienteTipoIdent || null,
-      identificacion: form.clienteIdentificacion || null,
+      identificacion: identificationOrNull(form.clienteIdentificacion),
       nombreCompleto: String(form.clienteNombre || "").trim(),
       telefono: String(form.clienteTelefono || "").trim(),
       email: form.clienteEmail || null,
@@ -177,7 +182,7 @@ export function buildQuickSaleOrderPayload({
       ? {
           clienteID: form.clienteID != null ? Number(form.clienteID) : null,
           tipoIdent: form.clienteTipoIdent || null,
-          identificacion: form.clienteIdentificacion || null,
+          identificacion: identificationOrNull(form.clienteIdentificacion),
           nombreCompleto: String(form.clienteNombre || "").trim(),
           telefono: String(form.clienteTelefono || "").trim(),
           email: form.clienteEmail || null,
@@ -238,7 +243,7 @@ export function buildDuplicateCheckoutPayload({
     observaciones_entrega: observacionesEntrega,
     cliente: {
       tipoIdent: edit.clienteTipoIdent || null,
-      identificacion: edit.clienteIdentificacion || null,
+      identificacion: identificationOrNull(edit.clienteIdentificacion),
       indicativo: extractIndicativo(detalle?.cliente?.telefonoCompleto),
       nombreCompleto: String(detalle?.cliente?.nombre || "").trim(),
       telefono: String(detalle?.cliente?.telefono || "").trim(),
@@ -306,7 +311,7 @@ export function buildDetailUpdatePayload({
     clienteTelefono: canEditClientIdentity ? edit.clienteTelefono : null,
     clienteEmail: edit.clienteEmail,
     clienteTipoIdent: edit.clienteTipoIdent,
-    clienteIdentificacion: edit.clienteIdentificacion,
+    clienteIdentificacion: identificationOrNull(edit.clienteIdentificacion) || "",
     destinatarioNombre: edit.destinatarioNombre,
     telefonoDestino: edit.telefonoDestino,
     direccion: edit.direccion,

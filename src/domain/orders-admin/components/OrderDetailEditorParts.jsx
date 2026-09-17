@@ -312,8 +312,9 @@ export function OrderDetailCustomerSection({
             N documento
             <input
               type="text"
+              maxLength={50}
               value={identificacion}
-              onChange={event => onIdentificacionChange(event.target.value)}
+              onChange={event => onIdentificacionChange(event.target.value.slice(0, 50))}
               placeholder="Numero de documento"
             />
           </label>

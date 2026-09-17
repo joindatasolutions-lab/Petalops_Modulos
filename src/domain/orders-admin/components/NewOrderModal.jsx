@@ -448,7 +448,12 @@ export function NewOrderModal({
                   </label>
                   <label className="order-detail-edit-label">
                     Numero de identificacion
-                    <input type="text" value={newOrderForm.clienteIdentificacion} onChange={event => updateNewOrderForm("clienteIdentificacion", event.target.value)} />
+                    <input
+                      type="text"
+                      maxLength={50}
+                      value={newOrderForm.clienteIdentificacion}
+                      onChange={event => updateNewOrderForm("clienteIdentificacion", event.target.value.slice(0, 50))}
+                    />
                   </label>
                 </div>
                 ) : (
