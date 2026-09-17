@@ -40,9 +40,7 @@ const PAGE_SIZE_OPTIONS = [10, 20, 50];
 const LOOKER_STUDIO_URL = "https://lookerstudio.google.com/embed/reporting/d08a04af-ed8e-4dde-a83c-90888bfde39d/page/p_mp7qxa6dzd";
 const SUBMENU_OPTIONS = [
   { key: "pedidos", label: "Pedidos" },
-  { key: "disponibilidad", label: "Disponibilidad florista" },
-  { key: "incapacidad", label: "Gestión incapacidad" },
-  { key: "looker", label: "Looker" }
+  { key: "disponibilidad", label: "Disponibilidad florista" }
 ];
 
 const PRODUCTION_SUBMENU_ICONS = {
@@ -1463,6 +1461,20 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
     if (currentFloristaId == null) return null;
     return floristasDisponibilidad.find(item => Number(item.idFlorista) === Number(currentFloristaId)) || null;
   }, [currentFloristaId, floristasDisponibilidad]);
+  const floristasDisponibilidadPorTipo = useMemo(() => {
+    const sortByNumberAndName = (left, right) => {
+      const leftNumber = Number(left?.numeroFlorista);
+      const rightNumber = Number(right?.numeroFlorista);
+      const normalizedLeftNumber = Number.isFinite(leftNumber) && left?.numeroFlorista !== "" ? leftNumber : Number.MAX_SAFE_INTEGER;
+      const normalizedRightNumber = Number.isFinite(rightNumber) && right?.numeroFlorista !== "" ? rightNumber : Number.MAX_SAFE_INTEGER;
+      if (normalizedLeftNumber !== normalizedRightNumber) return normalizedLeftNumber - normalizedRightNumber;
+      return String(left?.nombre || "").localeCompare(String(right?.nombre || ""), "es", { sensitivity: "base" });
+    };
+    return {
+      internos: floristasDisponibilidad.filter(item => !item?.esExterno).sort(sortByNumberAndName),
+      externos: floristasDisponibilidad.filter(item => item?.esExterno).sort(sortByNumberAndName),
+    };
+  }, [floristasDisponibilidad]);
   const currentFloristaName = useMemo(() => {
     if (ownFloristaDisponibilidad?.nombre) return ownFloristaDisponibilidad.nombre;
     if (currentFloristaId != null) {
@@ -2392,7 +2404,7 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
         sessionLabel={`Sesion activa: ${displayUserName}`}
       />
 
-      <main className="orders-admin-view production-page-view">
+      <main className={`orders-admin-view production-page-view production-page-view--${submenu}`}>
         <header className="orders-admin-header orders-page-header production-page-header">
           <div className="orders-page-heading">
             <div className="orders-page-title-row">
@@ -2497,7 +2509,9 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
                 <span>Futuros</span>
               </button>
             </div>
-            <ProductionDayBanner count={dueUnfinishedOrdersCount} className="production-day-banner--desktop" onClick={focusDuePendingFromBanner} />
+            {submenu === "pedidos" ? (
+              <ProductionDayBanner count={dueUnfinishedOrdersCount} className="production-day-banner--desktop" onClick={focusDuePendingFromBanner} />
+            ) : null}
           </div>
         </header>
 
@@ -3027,52 +3041,68 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
               </div>
             </div>
 
-            <div className="production-availability-grid production-availability-grid--compact floristas-grid">
+            <div className="production-availability-list">
               {floristasDisponibilidad.length === 0 ? (
                 <p className="orders-message" style={{ marginBottom: 0 }}>No hay floristas disponibles para mostrar.</p>
-              ) : floristasDisponibilidad.map(item => {
-                const estaActivo = isFloristaActivo(item);
-                const identificador = item.esExterno ? "Externo" : `#${item.numeroFlorista ?? "-"}`;
-                const capacidad = Number(item.capacidadDiaria || 0);
-                const carga = Number(item.arreglosHoy || 0);
-                const capacidadPct = capacidad > 0 ? Math.min(100, Math.round((carga / capacidad) * 100)) : 0;
-                return (
-                  <article key={item.idFlorista} className={`production-availability-card ${item.esExterno ? "is-external" : ""}`}>
-                    <div className="production-availability-head">
-                      <div>
-                        <p className="production-availability-id">{identificador}</p>
-                        <strong>{item.nombre}</strong>
-                      </div>
-                      <span className={`production-availability-status ${estaActivo ? "is-active" : "is-inactive"}`}>
-                        {estaActivo ? "Activo" : "Inactivo"}
-                      </span>
-                    </div>
+              ) : [
+                { key: "internos", title: "Internos", items: floristasDisponibilidadPorTipo.internos },
+                { key: "externos", title: "Externos", items: floristasDisponibilidadPorTipo.externos },
+              ].map(group => (
+                <section key={group.key} className="production-availability-group" aria-labelledby={`production-availability-${group.key}`}>
+                  <div className="production-availability-group-head">
+                    <h5 id={`production-availability-${group.key}`}>{group.title}</h5>
+                    <span>{group.items.length}</span>
+                  </div>
+                  {group.items.length === 0 ? (
+                    <p className="production-availability-empty">Sin floristas {group.title.toLowerCase()} registrados.</p>
+                  ) : (
+                    <div className="production-availability-rows">
+                      {group.items.map(item => {
+                        const estaActivo = isFloristaActivo(item);
+                        const identificador = item.esExterno ? "Externo" : `#${item.numeroFlorista ?? "-"}`;
+                        const capacidad = Number(item.capacidadDiaria || 0);
+                        const carga = Number(item.arreglosHoy || 0);
+                        const capacidadPct = capacidad > 0 ? Math.min(100, Math.round((carga / capacidad) * 100)) : 0;
+                        return (
+                          <article key={item.idFlorista} className={`production-availability-card production-availability-row ${item.esExterno ? "is-external" : ""}`}>
+                            <div className="production-availability-person">
+                              <p className="production-availability-id">{identificador}</p>
+                              <strong>{item.nombre}</strong>
+                            </div>
 
-                    <div className="production-availability-meta">
-                      <p><span>Arreglos del día</span><strong>{item.arreglosHoy ?? 0}</strong></p>
-                      <p><span>Capacidad diaria</span><strong>{item.capacidadDiaria ?? 0}</strong></p>
-                      <p><span>Tipo</span><strong>{item.esExterno ? "Externo" : "Interno"}</strong></p>
-                    </div>
+                            <div className="production-availability-meta">
+                              <p><span>Arreglos del día</span><strong>{item.arreglosHoy ?? 0}</strong></p>
+                              <p><span>Capacidad diaria</span><strong>{item.capacidadDiaria ?? 0}</strong></p>
+                              <p><span>Tipo</span><strong>{item.esExterno ? "Externo" : "Interno"}</strong></p>
+                            </div>
 
-                    <div className="production-capacity-block">
-                      <div className="production-capacity-bar">
-                        <div className="production-capacity-fill" style={{ width: `${capacidadPct}%` }} />
-                      </div>
-                      <span>{carga} / {capacidad || 0}</span>
-                    </div>
+                            <div className="production-capacity-block">
+                              <div className="production-capacity-bar">
+                                <div className="production-capacity-fill" style={{ width: `${capacidadPct}%` }} />
+                              </div>
+                              <span>{carga} / {capacidad || 0}</span>
+                            </div>
 
-                    <div className="production-inline-actions">
-                      <button
-                        type="button"
-                        className={`btn-outline production-availability-toggle ${estaActivo ? "is-inactivate" : "is-activate"}`}
-                        onClick={() => toggleDisponibilidadFlorista(item)}
-                      >
-                        {estaActivo ? "Inactivar" : "Activar"}
-                      </button>
+                            <span className={`production-availability-status ${estaActivo ? "is-active" : "is-inactive"}`}>
+                              {estaActivo ? "Activo" : "Inactivo"}
+                            </span>
+
+                            <div className="production-inline-actions">
+                              <button
+                                type="button"
+                                className={`btn-outline production-availability-toggle ${estaActivo ? "is-inactivate" : "is-activate"}`}
+                                onClick={() => toggleDisponibilidadFlorista(item)}
+                              >
+                                {estaActivo ? "Inactivar" : "Activar"}
+                              </button>
+                            </div>
+                          </article>
+                        );
+                      })}
                     </div>
-                  </article>
-                );
-              })}
+                  )}
+                </section>
+              ))}
             </div>
           </section>
         )}

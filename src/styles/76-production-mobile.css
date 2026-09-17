@@ -7,6 +7,173 @@
   display: none;
 }
 
+.app-shell > .production-page-view:not(.production-page-view--pedidos),
+.orders-admin-view.production-page-view:not(.production-page-view--pedidos) {
+  grid-template-rows: auto !important;
+  align-content: start !important;
+  max-height: none !important;
+  overflow-x: clip !important;
+  overflow-y: auto !important;
+}
+
+.production-page-view .orders-page-header.production-page-header .production-day-banner--desktop {
+  grid-column: 1 / -1 !important;
+  width: 100% !important;
+  max-width: none !important;
+}
+
+.production-page-view .production-day-banner-copy strong,
+.production-page-view .production-day-banner-copy > span:last-child {
+  display: inline !important;
+}
+
+.production-page-view .production-availability-list {
+  display: grid;
+  gap: 14px;
+}
+
+.production-page-view .production-availability-group {
+  display: grid;
+  gap: 8px;
+}
+
+.production-page-view .production-availability-group-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 32px;
+  padding: 0 2px;
+}
+
+.production-page-view .production-availability-group-head h5 {
+  margin: 0;
+  color: #111827;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.production-page-view .production-availability-group-head span {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  height: 24px;
+  padding: 0 8px;
+  border-radius: 999px;
+  background: #f1f5f9;
+  color: #475467;
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.production-page-view .production-availability-rows {
+  display: grid;
+  gap: 8px;
+}
+
+.production-page-view .production-availability-empty {
+  margin: 0;
+  padding: 12px;
+  border: 1px dashed #e2e8f0;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #667085;
+  font-size: 13px;
+  font-weight: 750;
+}
+
+.production-page-view .production-availability-row {
+  display: grid;
+  grid-template-columns: minmax(180px, 1.2fr) minmax(290px, 1.6fr) minmax(150px, 0.8fr) auto minmax(112px, auto);
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  min-width: 0;
+  padding: 12px;
+  border-radius: 8px;
+}
+
+.production-page-view .production-availability-person {
+  min-width: 0;
+}
+
+.production-page-view .production-availability-person strong {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  color: #111827;
+  font-size: 14px;
+  font-weight: 850;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.production-page-view .production-availability-row .production-availability-id {
+  margin-bottom: 3px;
+}
+
+.production-page-view .production-availability-row .production-availability-meta {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0;
+  min-width: 0;
+}
+
+.production-page-view .production-availability-row .production-availability-meta p {
+  display: grid;
+  gap: 2px;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+
+.production-page-view .production-availability-row .production-availability-meta p span,
+.production-page-view .production-availability-row .production-availability-meta p strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: left;
+}
+
+.production-page-view .production-availability-row .production-capacity-block {
+  margin: 0;
+  min-width: 0;
+}
+
+.production-page-view .production-availability-row .production-availability-status {
+  justify-self: start;
+  white-space: nowrap;
+}
+
+.production-page-view .production-availability-row .production-inline-actions {
+  justify-self: end;
+}
+
+.production-page-view .production-availability-row .production-availability-toggle {
+  min-width: 104px;
+  min-height: 36px;
+  border-radius: 8px;
+}
+
+@media (max-width: 1180px) {
+  .production-page-view .production-availability-row {
+    grid-template-columns: minmax(180px, 1fr) minmax(280px, 1.5fr) minmax(130px, 0.8fr) minmax(112px, auto);
+  }
+
+  .production-page-view .production-availability-row .production-availability-status {
+    grid-column: 1;
+    grid-row: 2;
+  }
+
+  .production-page-view .production-availability-row .production-inline-actions {
+    grid-column: 4;
+    grid-row: 1 / span 2;
+  }
+}
+
 @media (max-width: 640px) {
   .app-shell > .production-page-view,
   .orders-admin-view.production-page-view {
@@ -16,6 +183,7 @@
     padding: 0 10px 22px 58px !important;
     margin: 0 !important;
     overflow-x: clip !important;
+    overflow-y: auto !important;
     background: #f7f8fb !important;
   }
 
@@ -95,23 +263,38 @@
   .production-page-view .production-day-banner--mobile {
     display: flex !important;
     margin: 0 !important;
-    padding: 12px !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    padding: 10px 12px !important;
     border-radius: 9px !important;
+    gap: 10px !important;
   }
 
   .production-page-view .production-day-banner--mobile .production-day-banner-icon {
-    width: 36px !important;
-    height: 36px !important;
-    border-radius: 12px !important;
+    width: 34px !important;
+    height: 34px !important;
+    border-radius: 10px !important;
+  }
+
+  .production-page-view .production-day-banner--mobile .production-day-banner-copy {
+    display: block !important;
+    min-width: 0 !important;
+    line-height: 1.2 !important;
+  }
+
+  .production-page-view .production-day-banner--mobile .production-day-banner-kicker {
+    display: block !important;
+    margin-bottom: 2px !important;
   }
 
   .production-page-view .production-day-banner--mobile strong {
-    font-size: 14px !important;
+    font-size: 13px !important;
+    line-height: 1.18 !important;
   }
 
   .production-page-view .production-day-banner--mobile .production-day-banner-copy > span:last-child {
     font-size: 12px !important;
-    line-height: 1.25 !important;
+    line-height: 1.18 !important;
   }
 
   .production-mobile-search {
@@ -492,6 +675,30 @@
     font-size: 13px;
     font-weight: 950;
   }
+
+  .production-page-view .production-availability-panel {
+    padding: 12px !important;
+  }
+
+  .production-page-view .production-availability-row {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 10px;
+  }
+
+  .production-page-view .production-availability-row .production-availability-meta {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .production-page-view .production-availability-row .production-availability-status,
+  .production-page-view .production-availability-row .production-inline-actions {
+    grid-column: auto;
+    grid-row: auto;
+    justify-self: stretch;
+  }
+
+  .production-page-view .production-availability-row .production-availability-toggle {
+    width: 100%;
+  }
 }
 
 @media (max-width: 390px) {
@@ -506,6 +713,10 @@
   }
 
   .production-mobile-card-actions {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .production-page-view .production-availability-row .production-availability-meta {
     grid-template-columns: minmax(0, 1fr);
   }
 }
