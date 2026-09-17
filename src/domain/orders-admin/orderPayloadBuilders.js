@@ -107,7 +107,7 @@ export function buildNewOrderCheckoutPayload({
     observaciones_entrega: observacionesEntrega,
     cliente: {
       clienteID: form.clienteID != null ? Number(form.clienteID) : null,
-      tipoIdent: form.clienteTipoIdent || null,
+      tipoIdent: form.clienteTipoIdent || "CC",
       identificacion: identificationOrNull(form.clienteIdentificacion),
       nombreCompleto: String(form.clienteNombre || "").trim(),
       telefono: String(form.clienteTelefono || "").trim(),
@@ -181,7 +181,7 @@ export function buildQuickSaleOrderPayload({
     cliente: registrarCliente
       ? {
           clienteID: form.clienteID != null ? Number(form.clienteID) : null,
-          tipoIdent: form.clienteTipoIdent || null,
+          tipoIdent: form.clienteTipoIdent || "CC",
           identificacion: identificationOrNull(form.clienteIdentificacion),
           nombreCompleto: String(form.clienteNombre || "").trim(),
           telefono: String(form.clienteTelefono || "").trim(),

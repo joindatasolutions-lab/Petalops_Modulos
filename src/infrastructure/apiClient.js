@@ -871,6 +871,12 @@ export function createApiClient(config) {
       return requestJson(`/pedido/${pedidoId}/detalle`);
     },
 
+    async listarTiposIdentificacionPedidos({ empresaId }) {
+      const params = new URLSearchParams();
+      params.set("empresaID", String(empresaId));
+      return requestJson(`/pedidos/tipos-identificacion?${params.toString()}`);
+    },
+
     async buscarArreglosCatalogo({ empresaId, sucursalId, q = "" }) {
       const params = new URLSearchParams();
       if (sucursalId != null) params.set("sucursalId", String(sucursalId));

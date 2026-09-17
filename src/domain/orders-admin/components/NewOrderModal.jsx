@@ -27,6 +27,7 @@ export function NewOrderModal({
   paymentFieldConfig,
   paymentFieldOptions,
   salesChannelFieldConfig,
+  identificationTypeOptions,
   buildProductoLabel,
   normalizeDeliveryType,
   onClose,
@@ -71,6 +72,9 @@ export function NewOrderModal({
   const selectedQuickSaleItem = quickSaleItems.find(item => String(item.inventarioID) === String(newOrderForm.ventaRapidaInventarioID));
   const hasQuickSaleSelection = Boolean(selectedQuickSaleItem);
   const showPaymentSection = Boolean(paymentFieldConfig || salesChannelFieldConfig);
+  const documentTypeOptions = Array.isArray(identificationTypeOptions) && identificationTypeOptions.length > 0
+    ? identificationTypeOptions
+    : [{ codigo: "CC", nombre: "Cedula" }, { codigo: "NIT", nombre: "NIT" }];
   const selectedBarrio = (Array.isArray(filteredNewOrderBarrios) ? filteredNewOrderBarrios : [])
     .find(item => item?.nombre === newOrderForm.barrioNombre);
   const selectedDeliveryCost = Number(selectedBarrio?.costoDomicilio ?? newOrderForm.barrioCostoDomicilio ?? 0);
@@ -445,6 +449,17 @@ export function NewOrderModal({
                   <label className="order-detail-edit-label">
                     Email
                     <input type="email" value={newOrderForm.clienteEmail} onChange={event => updateNewOrderForm("clienteEmail", event.target.value)} placeholder="Opcional" />
+                  </label>
+                  <label className="order-detail-edit-label">
+                    Tipo de identificacion
+                    <select
+                      value={newOrderForm.clienteTipoIdent || documentTypeOptions[0]?.codigo || "CC"}
+                      onChange={event => updateNewOrderForm("clienteTipoIdent", event.target.value)}
+                    >
+                      {documentTypeOptions.map(option => (
+                        <option key={option.codigo} value={option.codigo}>{option.nombre}</option>
+                      ))}
+                    </select>
                   </label>
                   <label className="order-detail-edit-label">
                     Numero de identificacion

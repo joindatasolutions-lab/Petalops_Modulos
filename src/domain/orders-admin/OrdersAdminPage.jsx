@@ -149,6 +149,26 @@ function extractActiveCatalogNames(payload) {
     .filter(Boolean);
 }
 
+function normalizeIdentificationTypeOptions(payload) {
+  const rows = Array.isArray(payload?.items) ? payload.items : [];
+  const seen = new Set();
+  const options = rows
+    .map(item => {
+      const codigo = normalizeIdentType(item?.codigo || item?.code || item?.value || "").slice(0, 30);
+      if (!codigo || seen.has(codigo)) return null;
+      seen.add(codigo);
+      return {
+        codigo,
+        nombre: String(item?.nombre || item?.label || codigo).trim() || codigo,
+      };
+    })
+    .filter(Boolean);
+
+  if (!seen.has("CC")) options.unshift({ codigo: "CC", nombre: "Cedula" });
+  if (!seen.has("NIT")) options.push({ codigo: "NIT", nombre: "NIT" });
+  return options;
+}
+
 const SPANISH_FEMALE_VOICE_HINTS = [
   "sabina",
   "helena",
@@ -269,6 +289,10 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
   const [newOrderSaving, setNewOrderSaving] = useState(false);
   const [newOrderError, setNewOrderError] = useState("");
   const [configuredPedidoMenuFields, setConfiguredPedidoMenuFields] = useState([]);
+  const [identificationTypeOptions, setIdentificationTypeOptions] = useState([
+    { codigo: "CC", nombre: "Cedula" },
+    { codigo: "NIT", nombre: "NIT" },
+  ]);
   const [voiceAlertsEnabled, setVoiceAlertsEnabled] = useState(() => (
     globalThis.localStorage?.getItem(VOICE_ALERTS_STORAGE_KEY) === "1"
   ));
@@ -867,6 +891,30 @@ const messageCard = useMessageCardController({
   }, [api, empresaId]);
 
   useEffect(() => {
+    if (!empresaId) return undefined;
+    let disposed = false;
+
+    api.listarTiposIdentificacionPedidos({ empresaId })
+      .then(payload => {
+        if (disposed) return;
+        setIdentificationTypeOptions(normalizeIdentificationTypeOptions(payload));
+      })
+      .catch(error => {
+        console.error("Error cargando tipos de identificacion:", error);
+        if (!disposed) {
+          setIdentificationTypeOptions([
+            { codigo: "CC", nombre: "Cedula" },
+            { codigo: "NIT", nombre: "NIT" },
+          ]);
+        }
+      });
+
+    return () => {
+      disposed = true;
+    };
+  }, [api, empresaId]);
+
+  useEffect(() => {
     const intervalId = globalThis.setInterval(() => {
       if (globalThis.document?.hidden) return;
       loadOrdersRef.current?.(true);
@@ -1424,7 +1472,12 @@ const messageCard = useMessageCardController({
     }
   };
 const openNewOrderModal = () => {
-    setNewOrderForm({ ...DEFAULT_NEW_ORDER_FORM, fechaEntrega: todayIsoDate() });
+    const defaultTipoIdent = identificationTypeOptions[0]?.codigo || DEFAULT_NEW_ORDER_FORM.clienteTipoIdent || "CC";
+    setNewOrderForm({
+      ...DEFAULT_NEW_ORDER_FORM,
+      clienteTipoIdent: defaultTipoIdent,
+      fechaEntrega: todayIsoDate(),
+    });
     newOrderLookupPhoneRef.current = "";
     setNewOrderError("");
     setNewOrderProductQuery("");
@@ -2413,6 +2466,7 @@ const ordersOverlayOpen = drawerOpen || newOrderOpen || messageCardOpen || Boole
           paymentFieldConfig={paymentFieldConfig}
           paymentFieldOptions={paymentFieldOptions}
           salesChannelFieldConfig={salesChannelFieldConfig}
+          identificationTypeOptions={identificationTypeOptions}
           buildProductoLabel={buildProductoLabel}
           normalizeDeliveryType={normalizeDeliveryType}
           onClose={closeNewOrderModal}

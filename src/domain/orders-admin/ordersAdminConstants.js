@@ -56,7 +56,7 @@ export const DEFAULT_NEW_ORDER_FORM = {
   clienteTelefono: "",
   clienteEmail: "",
   clienteID: null,
-  clienteTipoIdent: "",
+  clienteTipoIdent: "CC",
   clienteIdentificacion: "",
   destinatarioNombre: "",
   telefonoDestino: "",
