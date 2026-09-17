@@ -292,6 +292,34 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
     synth.speak(utterance);
     return true;
   }, []);
+  const requestDesktopNotificationPermission = useCallback(async () => {
+    if (!("Notification" in globalThis)) return "unsupported";
+    if (globalThis.Notification.permission === "granted") return "granted";
+    if (globalThis.Notification.permission === "denied") return "denied";
+    try {
+      return await globalThis.Notification.requestPermission();
+    } catch {
+      return "default";
+    }
+  }, []);
+  const showDesktopOrderNotification = useCallback((title, message) => {
+    if (!("Notification" in globalThis) || globalThis.Notification.permission !== "granted") return false;
+    try {
+      const notification = new globalThis.Notification(title, {
+        body: message,
+        icon: "/logo.png",
+        tag: "petalops-new-order-created",
+        renotify: true,
+      });
+      notification.onclick = () => {
+        globalThis.focus?.();
+        notification.close();
+      };
+      return true;
+    } catch {
+      return false;
+    }
+  }, []);
   const orderVoiceLabel = useCallback((order) => {
     const code = String(order?.codigoPedido || "").trim();
     if (code) return code;
@@ -339,6 +367,7 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
         ? `Pedido ${orderVoiceLabel(lastOrder)} llego en estado creado.`
         : `${rows.length} pedidos nuevos llegaron en estado creado.`;
       setOrderNotification({ title, message });
+      showDesktopOrderNotification(title, message);
       speakVoiceAlert(message);
       loadOrdersRef.current?.(true);
       loadTodaySalesSummaryRef.current?.();
@@ -347,16 +376,17 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
     } finally {
       voiceAlertsPollingRef.current = false;
     }
-  }, [api, empresaId, sucursalId, orderVoiceLabel, speakVoiceAlert, voiceAlertsEnabled, voiceAlertsStorageScopeKey]);
-  const toggleVoiceAlerts = useCallback(() => {
+  }, [api, empresaId, sucursalId, orderVoiceLabel, showDesktopOrderNotification, speakVoiceAlert, voiceAlertsEnabled, voiceAlertsStorageScopeKey]);
+  const toggleVoiceAlerts = useCallback(async () => {
     const nextEnabled = !voiceAlertsEnabled;
     setVoiceAlertsEnabled(nextEnabled);
     globalThis.localStorage?.setItem(VOICE_ALERTS_STORAGE_KEY, nextEnabled ? "1" : "0");
     if (nextEnabled) {
+      await requestDesktopNotificationPermission();
       speakVoiceAlert("Alertas de voz activadas.");
       setOrderNotification({
         title: "Alertas de voz activadas",
-        message: "Te avisare cuando llegue un pedido externo en estado creado.",
+        message: "Te avisare aunque la ventana este minimizada, mientras el navegador mantenga PetalOps abierto.",
       });
     } else {
       globalThis.speechSynthesis?.cancel?.();
@@ -365,7 +395,7 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
         message: "No se anunciaran por voz los pedidos nuevos.",
       });
     }
-  }, [speakVoiceAlert, voiceAlertsEnabled]);
+  }, [requestDesktopNotificationPermission, speakVoiceAlert, voiceAlertsEnabled]);
   const detailPedidoMenuFields = useMemo(
     () => (Array.isArray(detalle?.camposEmpresa?.pedidoDetalle) ? detalle.camposEmpresa.pedidoDetalle : []),
     [detalle]
@@ -666,7 +696,6 @@ const messageCard = useMessageCardController({
 
     pollVoiceOrderAlerts({ speak: voiceLastAuditIdRef.current > 0 });
     const intervalId = globalThis.setInterval(() => {
-      if (globalThis.document?.hidden) return;
       pollVoiceOrderAlerts({ speak: true });
     }, AUTO_REFRESH_INTERVAL_MS);
 
