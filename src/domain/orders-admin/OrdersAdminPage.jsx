@@ -32,6 +32,8 @@ import {
   AUTO_REFRESH_INTERVAL_MS,
   CANCELADO_PEDIDO_ESTADO_ID,
   DEFAULT_NEW_ORDER_FORM,
+  VOICE_ALERTS_LAST_AUDIT_STORAGE_PREFIX,
+  VOICE_ALERTS_STORAGE_KEY,
   initialFilters,
 } from "./ordersAdminConstants.js";
 import {
@@ -225,16 +227,26 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
   const [newOrderSaving, setNewOrderSaving] = useState(false);
   const [newOrderError, setNewOrderError] = useState("");
   const [configuredPedidoMenuFields, setConfiguredPedidoMenuFields] = useState([]);
+  const [voiceAlertsEnabled, setVoiceAlertsEnabled] = useState(() => (
+    globalThis.localStorage?.getItem(VOICE_ALERTS_STORAGE_KEY) === "1"
+  ));
 
   const api = useMemo(() => createApiClient(tenantConfig), []);
   const loadOrdersRef = useRef(null);
   const loadTodaySalesSummaryRef = useRef(null);
   const newOrderLookupPhoneRef = useRef("");
   const detailRequestSeqRef = useRef(0);
+  const voiceAlertsPrimedRef = useRef(false);
+  const voiceAlertsPollingRef = useRef(false);
+  const voiceLastAuditIdRef = useRef(0);
   const debouncedQuery = useDebouncedValue(filters.q, 300);
   const debouncedNewOrderPhone = useDebouncedValue(newOrderForm.clienteTelefono, 500);
   const empresaId = Number(session?.empresaID || tenantConfig.empresaId);
   const sucursalId = Number(session?.sucursalID || tenantConfig.sucursalId);
+  const voiceAlertsStorageScopeKey = useMemo(
+    () => `${VOICE_ALERTS_LAST_AUDIT_STORAGE_PREFIX}:${empresaId || "0"}:${sucursalId || "all"}`,
+    [empresaId, sucursalId]
+  );
   const catalogTenantSlug = resolveCatalogTenantSlug(session);
   const catalogUrl = useMemo(
     () => catalogTenantSlug
@@ -269,6 +281,91 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
     () => String(session?.nombre || session?.login || "Usuario").trim() || "Usuario",
     [session]
   );
+  const speakVoiceAlert = useCallback((message) => {
+    const synth = globalThis.speechSynthesis;
+    if (!synth || typeof globalThis.SpeechSynthesisUtterance !== "function") return false;
+    const utterance = new globalThis.SpeechSynthesisUtterance(message);
+    utterance.lang = "es-CO";
+    utterance.rate = 0.95;
+    utterance.pitch = 1;
+    synth.cancel();
+    synth.speak(utterance);
+    return true;
+  }, []);
+  const orderVoiceLabel = useCallback((order) => {
+    const code = String(order?.codigoPedido || "").trim();
+    if (code) return code;
+    const number = Number(order?.numeroPedido || 0);
+    if (number > 0) return `numero ${number}`;
+    return `ID ${order?.pedidoID || ""}`.trim();
+  }, []);
+  const pollVoiceOrderAlerts = useCallback(async ({ speak = true } = {}) => {
+    if (!voiceAlertsEnabled || !empresaId || voiceAlertsPollingRef.current) return;
+    voiceAlertsPollingRef.current = true;
+    try {
+      const response = await api.listarAlertasPedidosNuevosCreados({
+        empresaId,
+        sucursalId,
+        sinceAuditId: voiceLastAuditIdRef.current,
+        limit: 10,
+      });
+      const rows = Array.isArray(response?.items) ? response.items : [];
+      const responseLatestAuditId = Number(response?.latestAuditID || 0);
+      const latestAuditId = Math.max(
+        responseLatestAuditId,
+        ...rows.map(item => Number(item?.auditID || 0))
+      );
+
+      if (!voiceAlertsPrimedRef.current && voiceLastAuditIdRef.current <= 0) {
+        voiceAlertsPrimedRef.current = true;
+        if (latestAuditId > 0) {
+          voiceLastAuditIdRef.current = latestAuditId;
+          globalThis.localStorage?.setItem(voiceAlertsStorageScopeKey, String(latestAuditId));
+        }
+        return;
+      }
+
+      voiceAlertsPrimedRef.current = true;
+      if (latestAuditId > voiceLastAuditIdRef.current) {
+        voiceLastAuditIdRef.current = latestAuditId;
+        globalThis.localStorage?.setItem(voiceAlertsStorageScopeKey, String(latestAuditId));
+      }
+
+      if (!rows.length || !speak) return;
+
+      const lastOrder = rows[rows.length - 1];
+      const title = rows.length === 1 ? "Nuevo pedido recibido" : "Nuevos pedidos recibidos";
+      const message = rows.length === 1
+        ? `Pedido ${orderVoiceLabel(lastOrder)} llego en estado creado.`
+        : `${rows.length} pedidos nuevos llegaron en estado creado.`;
+      setOrderNotification({ title, message });
+      speakVoiceAlert(message);
+      loadOrdersRef.current?.(true);
+      loadTodaySalesSummaryRef.current?.();
+    } catch (nextError) {
+      console.error("Error consultando alertas de pedidos nuevos:", nextError);
+    } finally {
+      voiceAlertsPollingRef.current = false;
+    }
+  }, [api, empresaId, sucursalId, orderVoiceLabel, speakVoiceAlert, voiceAlertsEnabled, voiceAlertsStorageScopeKey]);
+  const toggleVoiceAlerts = useCallback(() => {
+    const nextEnabled = !voiceAlertsEnabled;
+    setVoiceAlertsEnabled(nextEnabled);
+    globalThis.localStorage?.setItem(VOICE_ALERTS_STORAGE_KEY, nextEnabled ? "1" : "0");
+    if (nextEnabled) {
+      speakVoiceAlert("Alertas de voz activadas.");
+      setOrderNotification({
+        title: "Alertas de voz activadas",
+        message: "Te avisare cuando llegue un pedido externo en estado creado.",
+      });
+    } else {
+      globalThis.speechSynthesis?.cancel?.();
+      setOrderNotification({
+        title: "Alertas de voz desactivadas",
+        message: "No se anunciaran por voz los pedidos nuevos.",
+      });
+    }
+  }, [speakVoiceAlert, voiceAlertsEnabled]);
   const detailPedidoMenuFields = useMemo(
     () => (Array.isArray(detalle?.camposEmpresa?.pedidoDetalle) ? detalle.camposEmpresa.pedidoDetalle : []),
     [detalle]
@@ -557,6 +654,24 @@ const messageCard = useMessageCardController({
   useEffect(() => {
     loadTodaySalesSummaryRef.current = loadTodaySalesSummary;
   }, [loadTodaySalesSummary]);
+
+  useEffect(() => {
+    voiceAlertsPrimedRef.current = false;
+    voiceAlertsPollingRef.current = false;
+    voiceLastAuditIdRef.current = Number(globalThis.localStorage?.getItem(voiceAlertsStorageScopeKey) || 0);
+  }, [voiceAlertsStorageScopeKey]);
+
+  useEffect(() => {
+    if (!voiceAlertsEnabled || !empresaId) return undefined;
+
+    pollVoiceOrderAlerts({ speak: voiceLastAuditIdRef.current > 0 });
+    const intervalId = globalThis.setInterval(() => {
+      if (globalThis.document?.hidden) return;
+      pollVoiceOrderAlerts({ speak: true });
+    }, AUTO_REFRESH_INTERVAL_MS);
+
+    return () => globalThis.clearInterval(intervalId);
+  }, [empresaId, pollVoiceOrderAlerts, voiceAlertsEnabled]);
 
   useEffect(() => {
     loadYesterdayMetrics();
@@ -2082,9 +2197,11 @@ const ordersOverlayOpen = drawerOpen || newOrderOpen || messageCardOpen || Boole
             headerSalesSummary={headerSalesSummary}
             canViewCatalogo={canViewCatalogo}
             catalogUrl={catalogUrl}
+            voiceAlertsEnabled={voiceAlertsEnabled}
             onFilterChange={applyFilterValue}
             onToggleTodayDeliveries={toggleTodayDeliveries}
             onToggleStoreDeliveries={toggleStoreDeliveries}
+            onToggleVoiceAlerts={toggleVoiceAlerts}
             onRefresh={refresh}
             onNewOrder={openNewOrderModal}
             onFocusMetric={focusOrderMetric}

@@ -10,6 +10,8 @@ import {
   Receipt,
   RotateCw,
   Search,
+  Volume2,
+  VolumeX,
   XCircle,
 } from "lucide-react";
 
@@ -30,9 +32,11 @@ export function OrdersHeader({
   headerSalesSummary,
   canViewCatalogo = false,
   catalogUrl = "",
+  voiceAlertsEnabled = false,
   onFilterChange,
   onToggleTodayDeliveries,
   onToggleStoreDeliveries,
+  onToggleVoiceAlerts,
   onRefresh,
   onNewOrder,
   onFocusMetric,
@@ -83,6 +87,18 @@ export function OrdersHeader({
           >
             <Gift size={18} strokeWidth={2} />
             <span>{filters.soloTienda ? "Todos los pedidos" : "Entregas en tienda"}</span>
+          </button>
+          <button
+            type="button"
+            className={`btn-primary orders-header-refresh orders-store-toggle${voiceAlertsEnabled ? " is-active" : ""}`}
+            onClick={onToggleVoiceAlerts}
+            title={voiceAlertsEnabled ? "Desactivar alertas de voz" : "Activar alertas de voz"}
+            aria-label={voiceAlertsEnabled ? "Desactivar alertas de voz" : "Activar alertas de voz"}
+            aria-pressed={voiceAlertsEnabled}
+            data-tooltip={voiceAlertsEnabled ? "Desactivar alertas de voz" : "Activar alertas de voz"}
+          >
+            {voiceAlertsEnabled ? <Volume2 size={18} strokeWidth={2} /> : <VolumeX size={18} strokeWidth={2} />}
+            <span>Voz pedidos</span>
           </button>
           <button
             type="button"
