@@ -3,7 +3,6 @@ import { Clock3 } from "lucide-react";
 import { formatearCOP, normalizeStatus, splitDateTimeParts } from "../../../shared/utils.js";
 import {
   isEmpresaAdminRole,
-  orderProductLabel,
   resolveDisplayOrderNumber,
   resolveOrderId,
   resolveOrderListTotal,
@@ -75,8 +74,7 @@ export function OrderListRow({
   const { time: horaCreacion } = splitDateTimeParts(item.created_at || item.createdAt);
   const horaRegistroPedido = horaPedido || item.horaPedido || item.hora_pedido || item.hora || horaCreacion;
   const { date: fechaEntrega, time: horaEntrega } = splitDateTimeParts(item.fechaEntrega);
-  const primaryProduct = productSummary.products?.[0] || null;
-  const primaryProductLabel = orderProductLabel(primaryProduct, empresaId) || productSummary.productText || "-";
+  const productListLabel = productSummary.productText || "-";
   const normalizedStatus = normalizeStatus(item.estado);
   const rowClass = [
     selectedPedidoId === pedidoId && drawerOpen ? "is-active" : "",
@@ -102,7 +100,7 @@ export function OrderListRow({
             <section className="orders-mobile-card-block orders-mobile-product-block">
               <span className="orders-mobile-label">Producto</span>
               <div className="orders-mobile-product">
-                <strong>{primaryProductLabel}</strong>
+                <strong title={productSummary.title}>{productListLabel}</strong>
               </div>
             </section>
 

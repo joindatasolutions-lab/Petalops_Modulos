@@ -6,7 +6,7 @@ import { filterInventoryItems } from "../domain/inventory/InventoryPage.jsx";
 import { filterNeighborhoodItems, sortNeighborhoods } from "../domain/neighborhoods/NeighborhoodsPage.jsx";
 import { buildOrdersMetrics, extractOrdersPayloadItems, filterOrdersByCreatedDateRange, filterOrdersBySearch, filterOrdersByStatus, isStorePickupOrder, localDateEndParam, localDateStartParam, resolveOrdersPayloadTotal, shouldAutoGenerateInvoiceForCompany, shouldShowPendingInvoiceAlert } from "../domain/orders-admin/OrdersAdminPage.jsx";
 import { buildDetailUpdatePayload, buildNewOrderCheckoutPayload, buildQuickSaleOrderPayload } from "../domain/orders-admin/orderPayloadBuilders.js";
-import { buildEditedOrderFinancialBase, buildOrderFinancialPreview, customArrangementPreTaxTotal, getOrderFinancialTotal, isDeliveryDelivered, isValidPaymentBreakdownTotal, normalizePedidosViewStatus, patchOrderItemFromDetail, resolveOrderListTotal } from "../domain/orders-admin/ordersDomain.js";
+import { buildEditedOrderFinancialBase, buildOrderFinancialPreview, customArrangementPreTaxTotal, getOrderFinancialTotal, isDeliveryDelivered, isValidPaymentBreakdownTotal, normalizePedidosViewStatus, patchOrderItemFromDetail, resolveOrderListTotal, resolveOrderProductSummary } from "../domain/orders-admin/ordersDomain.js";
 import { buildSalesExportRows } from "../domain/accounting/accountingExports.js";
 import { applyApprovedOrderCountsToRows } from "../domain/accounting/accountingSelectors.js";
 import {
@@ -72,6 +72,19 @@ describe("estabilidad de filtros por vista", () => {
     expect(isStorePickupOrder({ entrega: { tipo_entrega: "domicilio" }, barrio: "Riomar" })).toBe(false);
     expect(isStorePickupOrder({ tipoEntrega: "domicilio", direccion: "Calle 10 tienda la esquina" })).toBe(false);
     expect(isStorePickupOrder({ tipoEntrega: "domicilio", observacion: "recoger paquete", direccion: "Tienda del barrio" })).toBe(false);
+  });
+
+  it("Pedidos: resume todos los productos del pedido en la tarjeta", () => {
+    const summary = resolveOrderProductSummary({
+      empresaID: 9,
+      productosDetalle: [
+        { codigoProducto: "ROSEGARDEN-0008", nombreProducto: "Chocolate Hershey" },
+        { codigoProducto: "ROSEGARDEN-0072", nombreProducto: "SIX ROSE" },
+      ],
+    });
+
+    expect(summary.productText).toBe("ROSEGARDEN-0008 - Chocolate Hershey, ROSEGARDEN-0072 - SIX ROSE");
+    expect(summary.title).toBe(summary.productText);
   });
 
   it("Pedidos: bloquea finalizar cuando el pedido ya esta finalizado", () => {

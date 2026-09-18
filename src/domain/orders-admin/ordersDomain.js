@@ -411,7 +411,7 @@ export function resolveOrderProductSummary(item, catalogIndex = new Map(), empre
   const names = products.map(product => orderProductLabel(product, empresaId ?? item?.empresaID ?? item?.empresaId)).filter(Boolean);
   return {
     products,
-    productText: names.slice(0, 2).join(", "),
+    productText: names.join(", "),
     title: names.join(", "),
   };
 }
