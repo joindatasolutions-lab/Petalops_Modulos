@@ -210,6 +210,9 @@ export function NewOrderModal({
               {isQuickSale ? (
                 <section className="orders-new-order-section">
                   <h3>Flores por unidad</h3>
+                  <div className="orders-new-order-unit-note" role="note">
+                    Para vender flores por unidad, primero crea esos insumos en Inventario, entra a la categoria Flor, crea una nueva flor y marcala como vendible. Solo las flores vendibles apareceran aqui.
+                  </div>
                   <div className="order-detail-edit-grid">
                     <label className="order-detail-edit-label">
                       Flor vendible
