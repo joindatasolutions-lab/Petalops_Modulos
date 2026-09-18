@@ -25,7 +25,10 @@ describe("filtros de pipeline", () => {
 
     expect(html.match(/type="date"/g)).toHaveLength(1);
     expect(html).toContain("aria-label=\"Buscar pedido o cliente\"");
+    expect(html).toContain("Busqueda");
     expect(html).toContain("aria-label=\"Fecha\"");
+    expect(html).toContain("Fecha");
     expect(html).toContain("aria-label=\"Estado\"");
+    expect(html).toContain("Estado");
   });
 });

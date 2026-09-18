@@ -16,6 +16,7 @@ export function PipelineFilters({ filters, onChange }) {
       <label className="filter-field orders-filter-field pipeline-filter-search">
         <div className="orders-filter-control">
           <Search size={17} strokeWidth={2} aria-hidden="true" />
+          <span className="pipeline-filter-label">Busqueda</span>
           <input
             type="search"
             placeholder="# Pedido, cliente..."
@@ -29,6 +30,7 @@ export function PipelineFilters({ filters, onChange }) {
       <div className="filter-field orders-filter-field pipeline-filter-date">
         <div className="orders-filter-control">
           <Calendar size={17} strokeWidth={2} aria-hidden="true" />
+          <span className="pipeline-filter-label">Fecha</span>
           <input
             type="date"
             value={filters.fechaDesde || ""}
@@ -42,6 +44,7 @@ export function PipelineFilters({ filters, onChange }) {
       <div className="filter-field orders-filter-field pipeline-filter-state">
         <div className="orders-filter-control">
           <Filter size={17} strokeWidth={2} aria-hidden="true" />
+          <span className="pipeline-filter-label">Estado</span>
           <select value={estadoFiltro} onChange={event => onEstadoChange(event.target.value)} aria-label="Estado">
             {PIPELINE_STATE_OPTIONS.map(option => (
               <option key={option.value || "todos"} value={option.value}>{option.label}</option>

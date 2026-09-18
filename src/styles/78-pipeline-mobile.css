@@ -268,15 +268,15 @@
   }
 
   .orders-admin-view.pipeline-view .pipeline-filter-date {
-    flex: 0 0 148px !important;
-    width: 148px !important;
-    min-width: 148px !important;
+    flex: 0 0 190px !important;
+    width: 190px !important;
+    min-width: 190px !important;
   }
 
   .orders-admin-view.pipeline-view .pipeline-filter-state {
-    flex: 0 0 170px !important;
-    width: 170px !important;
-    min-width: 170px !important;
+    flex: 0 0 210px !important;
+    width: 210px !important;
+    min-width: 210px !important;
   }
 
   .orders-admin-view.pipeline-view .orders-filter-control {
@@ -322,6 +322,14 @@
   .orders-admin-view.pipeline-view .orders-filter-control input::placeholder {
     color: #667085 !important;
     opacity: 1 !important;
+  }
+
+  .orders-admin-view.pipeline-view .pipeline-filter-label {
+    color: #8a3252 !important;
+    font-size: 11px !important;
+    font-weight: 850 !important;
+    line-height: 1 !important;
+    white-space: nowrap !important;
   }
 
   .orders-admin-view.pipeline-view .pipeline-board {
