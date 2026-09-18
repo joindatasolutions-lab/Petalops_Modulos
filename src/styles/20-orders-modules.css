@@ -2655,9 +2655,23 @@
 
 /* Grid de 6 columnas � pipeline tiene 6 filtros vs 4 de producci�n */
 .orders-filters.pipeline-filters-bar {
-  grid-template-columns: minmax(200px, 1.5fr) repeat(5, minmax(130px, 1fr)) !important;
+  display: grid !important;
+  grid-template-columns: minmax(280px, 1.35fr) minmax(180px, 0.6fr) minmax(220px, 0.8fr) !important;
+  align-items: center !important;
+  width: 100% !important;
   margin-top: 0 !important;
   margin-bottom: 0 !important;
+}
+
+.pipeline-filters-bar .filter-field,
+.pipeline-filters-bar .orders-filter-control {
+  min-width: 0;
+}
+
+.pipeline-filters-bar .orders-filter-field,
+.pipeline-filters-bar .orders-filter-field:first-child {
+  width: auto !important;
+  max-width: none !important;
 }
 
 /* El select hereda los estilos de production-filter-control input */
@@ -2675,44 +2689,6 @@
   color: inherit;
   appearance: none;
 }
-
-/* -- Tabs de submenu ----------------------------------- */
-
-.pipeline-tabs {
-  display: flex;
-  gap: 2px;
-  padding: 0;
-  border-bottom: 2px solid rgba(138, 50, 82, 0.1);
-  overflow-x: auto;
-  scrollbar-width: none;
-  flex-shrink: 0;
-}
-
-.pipeline-tabs::-webkit-scrollbar { display: none; }
-
-.pipeline-tab {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 9px 16px;
-  border: 0;
-  border-bottom: 2.5px solid transparent;
-  margin-bottom: -2px;
-  background: transparent;
-  color: #6b7280;
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-  white-space: nowrap;
-  border-radius: 8px 8px 0 0;
-  transition: color 0.15s, border-color 0.15s, background 0.15s;
-}
-
-.pipeline-tab svg { color: #9ca3af; transition: color 0.15s; flex-shrink: 0; }
-.pipeline-tab:hover { color: #e91e72; background: rgba(138, 50, 82, 0.05); }
-.pipeline-tab:hover svg { color: #e91e72; }
-.pipeline-tab.is-active { color: #e91e72; font-weight: 800; border-bottom-color: #e91e72; background: rgba(138, 50, 82, 0.04); }
-.pipeline-tab.is-active svg { color: #e91e72; }
 
 /* -- Kanban board -------------------------------------- */
 
