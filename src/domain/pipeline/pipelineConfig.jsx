@@ -1,10 +1,7 @@
 import {
   BadgeCheck,
   CheckCircle,
-  ClipboardList,
-  History,
   PackagePlus,
-  PackageSearch,
   Timer,
   Truck,
   XCircle,
@@ -21,11 +18,6 @@ export const PIPELINE_COLUMNS = [
   { key: "cancelado", title: "Cancelado", stages: ["cancelado"], dropStage: "cancelado" },
 ];
 export const STAGE_TO_ESTADO_ID = { creado: 1, aprobado: 2, cancelado: 6 };
-export const PIPELINE_TABS = [
-  { key: "pipeline", label: "Pipeline", icon: ClipboardList },
-  { key: "historial", label: "Historial reasignaciones", icon: History },
-  { key: "pedidos", label: "Historial pedidos", icon: PackageSearch },
-];
 export const INITIAL_FILTERS = {
   sucursalID: null,
   fechaDesde: todayIsoDateBogota(),

@@ -6,7 +6,7 @@ import { filterInventoryItems } from "../domain/inventory/InventoryPage.jsx";
 import { filterNeighborhoodItems, sortNeighborhoods } from "../domain/neighborhoods/NeighborhoodsPage.jsx";
 import { buildOrdersMetrics, extractOrdersPayloadItems, filterOrdersByCreatedDateRange, filterOrdersBySearch, filterOrdersByStatus, isStorePickupOrder, localDateEndParam, localDateStartParam, resolveOrdersPayloadTotal, shouldAutoGenerateInvoiceForCompany, shouldShowPendingInvoiceAlert } from "../domain/orders-admin/OrdersAdminPage.jsx";
 import { buildDetailUpdatePayload, buildNewOrderCheckoutPayload, buildQuickSaleOrderPayload } from "../domain/orders-admin/orderPayloadBuilders.js";
-import { buildEditedOrderFinancialBase, buildOrderFinancialPreview, customArrangementPreTaxTotal, getOrderFinancialTotal, isDeliveryDelivered, isValidPaymentBreakdownTotal, patchOrderItemFromDetail, resolveOrderListTotal } from "../domain/orders-admin/ordersDomain.js";
+import { buildEditedOrderFinancialBase, buildOrderFinancialPreview, customArrangementPreTaxTotal, getOrderFinancialTotal, isDeliveryDelivered, isValidPaymentBreakdownTotal, normalizePedidosViewStatus, patchOrderItemFromDetail, resolveOrderListTotal } from "../domain/orders-admin/ordersDomain.js";
 import { buildSalesExportRows } from "../domain/accounting/accountingExports.js";
 import { applyApprovedOrderCountsToRows } from "../domain/accounting/accountingSelectors.js";
 import {
@@ -78,6 +78,16 @@ describe("estabilidad de filtros por vista", () => {
     expect(isDeliveryDelivered({ pedidoFinalizado: true })).toBe(true);
     expect(isDeliveryDelivered({ entrega: { estado_entrega: "Finalizado" } })).toBe(true);
     expect(isDeliveryDelivered({ produccion: { estado: "ParaEntrega" } })).toBe(false);
+  });
+
+  it("Pedidos: conserva APROBADO para recogidas finalizadas en tienda", () => {
+    const item = normalizePedidosViewStatus({
+      tipoEntrega: "recogida_en_tienda",
+      estado: "ENTREGADO",
+      pedidoFinalizado: true,
+    });
+
+    expect(item.estado).toBe("APROBADO");
   });
 
   it("Pedidos: busca por pedido, cliente o nombre de producto", () => {

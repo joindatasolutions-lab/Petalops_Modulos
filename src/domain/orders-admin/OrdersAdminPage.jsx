@@ -89,6 +89,7 @@ import {
   isStorePickupOrder,
   localDateEndParam,
   localDateStartParam,
+  normalizePedidosViewStatus,
   normalizeOrderProducts,
   normalizePaymentMethods,
   normalizeWholePeso,
@@ -1172,7 +1173,7 @@ const messageCard = useMessageCardController({
     setDetalle(null);
 
     try {
-      const rawDetail = applyDeliveryGiftOverrideToDetail(pedidoId, await api.obtenerDetallePedido(pedidoId));
+      const rawDetail = normalizePedidosViewStatus(applyDeliveryGiftOverrideToDetail(pedidoId, await api.obtenerDetallePedido(pedidoId)));
       if (requestSeq !== detailRequestSeqRef.current) return null;
       const responsePedidoId = Number(rawDetail?.pedidoID || rawDetail?.pedidoId || rawDetail?.idPedido || rawDetail?.id_pedido || 0);
       if (requestedPedidoId && responsePedidoId && responsePedidoId !== requestedPedidoId) {

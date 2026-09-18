@@ -5,7 +5,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { PipelineFilters } from "../domain/pipeline/PipelineFilters.jsx";
 
 describe("filtros de pipeline", () => {
-  it("renderiza rango de fechas desde y hasta", () => {
+  it("renderiza solo busqueda, fecha y estado", () => {
     const html = renderToStaticMarkup(
       <PipelineFilters
         filters={{
@@ -23,8 +23,9 @@ describe("filtros de pipeline", () => {
       />
     );
 
-    expect(html.match(/type="date"/g)).toHaveLength(2);
-    expect(html).toContain("aria-label=\"Fecha desde\"");
-    expect(html).toContain("aria-label=\"Fecha hasta\"");
+    expect(html.match(/type="date"/g)).toHaveLength(1);
+    expect(html).toContain("aria-label=\"Buscar pedido o cliente\"");
+    expect(html).toContain("aria-label=\"Fecha\"");
+    expect(html).toContain("aria-label=\"Estado\"");
   });
 });

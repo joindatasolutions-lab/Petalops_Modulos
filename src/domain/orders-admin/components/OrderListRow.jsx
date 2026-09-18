@@ -45,7 +45,7 @@ export function OrderListRow({
   const pedidoId = resolveOrderId(item);
   const pickupFinalized = finalizedPickupPedidoIds.includes(Number(pedidoId));
   const orderFinalized = deliveryDelivered || pickupFinalized;
-  const displayStatus = orderFinalized ? "Entregado" : item.estado;
+  const displayStatus = item.estado;
   const statusClass = statusBadgeClass(displayStatus, item);
   const productSummary = resolveOrderProductSummary(item, new Map(), empresaId);
   const waPhone = String(item.telefonoCompleto || item.telefono || "").trim().replace(/\+/g, "");

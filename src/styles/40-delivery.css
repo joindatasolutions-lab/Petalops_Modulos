@@ -2527,7 +2527,7 @@
 /* Pipeline filters: same visual grammar as Pedidos */
 .orders-filters.orders-page-filters.pipeline-filters-bar {
   display: grid !important;
-  grid-template-columns: minmax(230px, 1.35fr) repeat(5, minmax(132px, 1fr)) !important;
+  grid-template-columns: minmax(280px, 1.35fr) minmax(180px, 0.6fr) minmax(220px, 0.8fr) !important;
   gap: 10px !important;
   width: 100% !important;
   max-width: 100% !important;
@@ -2541,6 +2541,8 @@
 }
 
 .pipeline-filters-bar .orders-filter-field {
+  width: auto !important;
+  max-width: none !important;
   min-width: 0 !important;
   padding: 0 !important;
   border: 0 !important;
@@ -2549,6 +2551,11 @@
   box-shadow: none !important;
   display: block !important;
   overflow: visible !important;
+}
+
+.pipeline-filters-bar .orders-filter-field:first-child {
+  width: auto !important;
+  max-width: none !important;
 }
 
 .pipeline-filters-bar .orders-filter-control {
@@ -2596,13 +2603,13 @@
 
 @media (max-width: 1180px) {
   .orders-filters.orders-page-filters.pipeline-filters-bar {
-    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    grid-template-columns: minmax(220px, 1fr) minmax(160px, 0.7fr) minmax(190px, 0.9fr) !important;
   }
 }
 
 @media (max-width: 760px) {
   .orders-filters.orders-page-filters.pipeline-filters-bar {
-    grid-template-columns: 1fr !important;
+    grid-template-columns: minmax(150px, 1fr) 148px 170px !important;
   }
 }
 

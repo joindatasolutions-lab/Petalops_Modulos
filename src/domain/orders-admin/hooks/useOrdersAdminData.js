@@ -16,6 +16,7 @@ import {
   isPaymentSearchTerm,
   localDateEndParam,
   localDateStartParam,
+  normalizePedidosViewStatus,
   resolveOrdersPayloadTotal,
   todayIsoDate,
 } from "../ordersDomain.js";
@@ -132,7 +133,9 @@ export function useOrdersAdminData({
       if (!silent && requestId !== requestTracker.current) return;
       if (silent && (requestId !== requestTracker.current || visibleLoadingRequest.current)) return;
 
-      const loadedItems = extractOrdersPayloadItems(data).map(applyDeliveryGiftOverrideToItem);
+      const loadedItems = extractOrdersPayloadItems(data)
+        .map(applyDeliveryGiftOverrideToItem)
+        .map(normalizePedidosViewStatus);
       const dateItems = skipCreatedDateRefilter
         ? loadedItems
         : filterOrdersByCreatedDateRange(loadedItems, requestFechaDesde, requestFechaHasta);

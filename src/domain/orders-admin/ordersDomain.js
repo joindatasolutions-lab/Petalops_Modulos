@@ -624,6 +624,12 @@ export function isDeliveryDelivered(item) {
     || compact.includes("completado");
 }
 
+export function normalizePedidosViewStatus(item) {
+  if (!item || typeof item !== "object") return item;
+  if (!isStorePickupOrder(item) || !isDeliveryDelivered(item)) return item;
+  return { ...item, estado: "APROBADO" };
+}
+
 export function filterStorePickupOrders(items) {
   return (Array.isArray(items) ? items : []).filter(isStorePickupOrder);
 }
@@ -982,7 +988,7 @@ export function patchOrderItemFromDetail(item, pedidoId, detail) {
   const nextTotal = detailTotal > 0 ? detailTotal : financiero.total;
   const facturaImpresa = financiero.facturaImpresa ?? detail.facturaImpresa ?? item.facturaImpresa;
 
-  return {
+  return normalizePedidosViewStatus({
     ...item,
     estado: detail.estado ?? item.estado,
     facturaImpresa,
@@ -1001,7 +1007,7 @@ export function patchOrderItemFromDetail(item, pedidoId, detail) {
       ...(item.financiero || {}),
       ...financiero,
     },
-  };
+  });
 }
 
 export function extractOrdersPayloadItems(payload) {

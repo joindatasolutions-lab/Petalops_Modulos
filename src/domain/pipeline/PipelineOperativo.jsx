@@ -4,12 +4,11 @@ import { tenantConfig } from "../../config/tenantConfig.js";
 import { createApiClient } from "../../infrastructure/apiClient.js";
 import { AppSidebar } from "../../shared/AppSidebar.jsx";
 import { useSidebarState } from "../../shared/useSidebarState.js";
-import { formatDateTimeCompact } from "../../shared/utils.js";
 import { PipelineColumn } from "./PipelineColumn.jsx";
 import { PipelineFilters } from "./PipelineFilters.jsx";
 import { PedidoModal } from "./PedidoModal.jsx";
-import { INITIAL_FILTERS, PIPELINE_COLUMNS, PIPELINE_TABS, STAGE_TO_ESTADO_ID } from "./pipelineConfig.jsx";
-import { buildColumnItems as buildPipelineColumnItems, buildPipelineMetrics, formatApprovalAction, formatApprovalAuditError, formatHistoryActor, formatHistoryReason, normalizePipelineBoard, resolveHistoryTypeClass, resolveHistoryTypeLabel, todayIsoDate } from "./pipelineDomain.js";
+import { INITIAL_FILTERS, PIPELINE_COLUMNS, STAGE_TO_ESTADO_ID } from "./pipelineConfig.jsx";
+import { buildColumnItems as buildPipelineColumnItems, buildPipelineMetrics, normalizePipelineBoard } from "./pipelineDomain.js";
 
 
 export function PipelineOperativo({
@@ -29,17 +28,6 @@ export function PipelineOperativo({
   const [error, setError] = useState("");
   const [selected, setSelected] = useState(null);
   const [selectedDetail, setSelectedDetail] = useState(null);
-  const [submenu, setSubmenu] = useState("pipeline");
-  const [metricasDesde, setMetricasDesde] = useState(todayIsoDate());
-  const [metricasHasta, setMetricasHasta] = useState(todayIsoDate());
-  const [historial, setHistorial] = useState([]);
-  const [historyLoading, setHistoryLoading] = useState(false);
-  const [historyError, setHistoryError] = useState("");
-  const [auditDesde, setAuditDesde] = useState(todayIsoDate());
-  const [auditHasta, setAuditHasta] = useState(todayIsoDate());
-  const [auditLoading, setAuditLoading] = useState(false);
-  const [auditError, setAuditError] = useState("");
-  const [auditData, setAuditData] = useState({ resumen: [], detalle: [], total: 0 });
   const [processingPedidoIds, setProcessingPedidoIds] = useState([]);
 
   const empresaId = Number(session?.empresaID || tenantConfig.empresaId);
@@ -75,56 +63,6 @@ export function PipelineOperativo({
   }, [activeSucursalId, api, empresaId, filters]);
 
   useEffect(() => { void loadBoard(); }, [loadBoard]);
-
-  const loadHistory = useCallback(async () => {
-    if (!metricasDesde || !metricasHasta) return;
-    setHistoryLoading(true);
-    setHistoryError("");
-    try {
-      const payload = await api.obtenerHistorialReasignaciones({
-        empresaId, sucursalId: activeSucursalId,
-        fechaDesde: metricasDesde, fechaHasta: metricasHasta,
-      });
-      setHistorial(Array.isArray(payload?.items) ? payload.items : []);
-    } catch (nextError) {
-      setHistoryError(nextError?.detail || nextError?.message || "No fue posible cargar el historial.");
-      setHistorial([]);
-    } finally {
-      setHistoryLoading(false);
-    }
-  }, [activeSucursalId, api, empresaId, metricasDesde, metricasHasta]);
-
-  useEffect(() => {
-    if (submenu !== "historial") return;
-    void loadHistory();
-  }, [submenu, loadHistory]);
-
-  const loadApprovalAudit = useCallback(async () => {
-    if (!auditDesde || !auditHasta) return;
-    setAuditLoading(true);
-    setAuditError("");
-    try {
-      const payload = await api.obtenerTrazabilidadAprobacionesPedidos({
-        empresaId, sucursalId: activeSucursalId,
-        fechaDesde: auditDesde, fechaHasta: auditHasta,
-      });
-      setAuditData({
-        resumen: Array.isArray(payload?.resumen) ? payload.resumen : [],
-        detalle: Array.isArray(payload?.detalle) ? payload.detalle : [],
-        total: Number(payload?.total || 0),
-      });
-    } catch (nextError) {
-      setAuditError(formatApprovalAuditError(nextError));
-      setAuditData({ resumen: [], detalle: [], total: 0 });
-    } finally {
-      setAuditLoading(false);
-    }
-  }, [activeSucursalId, api, auditDesde, auditHasta, empresaId]);
-
-  useEffect(() => {
-    if (submenu !== "pedidos") return;
-    void loadApprovalAudit();
-  }, [submenu, loadApprovalAudit]);
 
   const onChangeFilter = (name, value) => setFilters(current => ({ ...current, [name]: value }));
 
@@ -259,160 +197,22 @@ export function PipelineOperativo({
         {/* ── FILTROS ── */}
         <PipelineFilters filters={filters} onChange={onChangeFilter} />
 
-        {/* ── TABS ── */}
-        <div className="pipeline-tabs" role="tablist">
-          {PIPELINE_TABS.map(tab => {
-            const Icon = tab.icon;
-            return (
-              <button
-                key={tab.key}
-                type="button"
-                role="tab"
-                aria-selected={submenu === tab.key}
-                className={`pipeline-tab${submenu === tab.key ? " is-active" : ""}`}
-                onClick={() => setSubmenu(tab.key)}
-              >
-                <Icon size={14} strokeWidth={2} aria-hidden="true" />
-                <span>{tab.label}</span>
-              </button>
-            );
-          })}
-        </div>
-
         {loading ? <p className="orders-message">Cargando pipeline...</p> : null}
         {error ? <p className="orders-message">{error}</p> : null}
 
-        {/* ── HISTORIAL REASIGNACIONES ── */}
-        {submenu === "historial" ? (
-          <section className="order-block production-section-card production-history-panel">
-            <div className="production-section-head">
-              <h4>Historial de reasignaciones</h4>
-              <div className="production-history-filters">
-                <input type="date" value={metricasDesde} onChange={e => setMetricasDesde(e.target.value)} title="Desde" />
-                <input type="date" value={metricasHasta} onChange={e => setMetricasHasta(e.target.value)} title="Hasta" />
-                <button type="button" className="btn-primary" onClick={loadHistory}>Consultar</button>
-              </div>
-            </div>
-            {historyError ? <p className="orders-message">{historyError}</p> : null}
-            {historyLoading ? <p className="orders-message">Cargando historial...</p> : null}
-            {!historyLoading && !historyError ? (
-              <ul className="order-products-list production-history-list">
-                {historial.length === 0 ? (
-                  <li className="production-history-empty">Sin datos para el rango seleccionado</li>
-                ) : historial.map((item, idx) => (
-                  <li key={`${item.produccionID}-${item.fechaCambio}-${idx}`}>
-                    <span className="production-history-copy">
-                      <span className="production-history-line">
-                        <strong>{item.numeroPedido ? `Pedido ${item.numeroPedido}` : `P${item.produccionID}`}</strong>
-                        <span className={`production-history-tag ${resolveHistoryTypeClass(item.tipoMovimiento)}`}>{resolveHistoryTypeLabel(item.tipoMovimiento)}</span>
-                      </span>
-                      <small>{formatHistoryActor(item.usuarioCambio)}</small>
-                      <em>
-                        {item.floristaAnteriorNombre || "Sin florista"} {"→"} {item.floristaNuevoNombre || "Sin florista"}
-                        {item.cliente ? ` — ${item.cliente}` : ""}
-                      </em>
-                      <small>{formatHistoryReason(item.motivo)}</small>
-                    </span>
-                    <strong className="production-history-date">{formatDateTimeCompact(item.fechaCambio) || "-"}</strong>
-                  </li>
-                ))}
-              </ul>
-            ) : null}
-          </section>
-        ) : submenu === "pedidos" ? (
-          <section className="order-block production-section-card production-history-panel">
-            <div className="production-section-head">
-              <h4>Historial de pedidos</h4>
-              <div className="production-history-filters">
-                <input type="date" value={auditDesde} onChange={e => setAuditDesde(e.target.value)} title="Desde" />
-                <input type="date" value={auditHasta} onChange={e => setAuditHasta(e.target.value)} title="Hasta" />
-                <button type="button" className="btn-primary" onClick={loadApprovalAudit}>Consultar</button>
-              </div>
-            </div>
-            {auditError ? <p className="orders-message">{auditError}</p> : null}
-            {auditLoading ? <p className="orders-message">Cargando historial...</p> : null}
-            {!auditLoading && !auditError ? (
-              <>
-                <div className="pipeline-audit-summary">
-                  <article className="pipeline-audit-summary-card">
-                    <span>Total acciones</span>
-                    <strong>{auditData.total || 0}</strong>
-                  </article>
-                  <article className="pipeline-audit-summary-card">
-                    <span>Usuarios</span>
-                    <strong>{auditData.resumen.length}</strong>
-                  </article>
-                  <article className="pipeline-audit-summary-card">
-                    <span>Pedidos impactados</span>
-                    <strong>{auditData.resumen.reduce((sum, item) => sum + Number(item?.pedidosAprobados || 0), 0)}</strong>
-                  </article>
-                </div>
-                <section className="orders-table-wrap orders-page-table-wrap" style={{ marginBottom: 16 }}>
-                  <table className="orders-table">
-                    <thead>
-                      <tr>
-                        <th>Usuario</th><th>Acciones</th><th>Pedidos</th>
-                        <th>Valor total</th><th>Ultimo movimiento</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {auditData.resumen.length === 0 ? (
-                        <tr><td colSpan={5}>Sin movimientos para el rango seleccionado.</td></tr>
-                      ) : auditData.resumen.map(item => (
-                        <tr key={`audit-summary-${item.usuario}`}>
-                          <td>{item.usuario || "-"}</td>
-                          <td>{item.acciones || 0}</td>
-                          <td>{item.pedidosAprobados || 0}</td>
-                          <td>${Number(item.valorTotal || 0).toLocaleString("es-CO")}</td>
-                          <td>{item.ultimoMovimiento ? formatDateTimeCompact(item.ultimoMovimiento) : "-"}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </section>
-                <section className="orders-table-wrap orders-page-table-wrap">
-                  <table className="orders-table">
-                    <thead>
-                      <tr>
-                        <th>Fecha</th><th>Usuario</th><th>Accion</th>
-                        <th>Pedido</th><th>Cliente</th><th>Total</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {auditData.detalle.length === 0 ? (
-                        <tr><td colSpan={6}>Sin movimientos para el rango seleccionado.</td></tr>
-                      ) : auditData.detalle.map((item, index) => (
-                        <tr key={`audit-detail-${item.usuario}-${item.pedidoID}-${index}`}>
-                          <td>{item.fechaAccion ? formatDateTimeCompact(item.fechaAccion) : "-"}</td>
-                          <td>{item.usuario || "-"}</td>
-                          <td>{formatApprovalAction(item.accion)}</td>
-                          <td>{item.numeroPedido ?? item.pedidoID ?? "-"}</td>
-                          <td>{item.cliente || "-"}</td>
-                          <td>${Number(item.totalPedido || 0).toLocaleString("es-CO")}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </section>
-              </>
-            ) : null}
-          </section>
-        ) : (
-          /* ── KANBAN BOARD ── */
-          <section className="pipeline-board">
-            {PIPELINE_COLUMNS.map(column => (
-              <PipelineColumn
-                key={column.key}
-                dropStageKey={column.dropStage}
-                title={column.title}
-                items={buildPipelineColumnItems(board, column.stages, selectedStage)}
-                onOpen={onOpen}
-                onDropCard={onDropCard}
-                onDragStart={onDragStart}
-              />
-            ))}
-          </section>
-        )}
+        <section className="pipeline-board">
+          {PIPELINE_COLUMNS.map(column => (
+            <PipelineColumn
+              key={column.key}
+              dropStageKey={column.dropStage}
+              title={column.title}
+              items={buildPipelineColumnItems(board, column.stages, selectedStage)}
+              onOpen={onOpen}
+              onDropCard={onDropCard}
+              onDragStart={onDragStart}
+            />
+          ))}
+        </section>
       </main>
 
       <PedidoModal
