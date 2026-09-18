@@ -36,6 +36,117 @@ textarea {
 
 .hidden { display: none !important; }
 
+.session-expired-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 2600;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(36, 24, 31, 0.36);
+  backdrop-filter: blur(8px);
+}
+
+.session-expired-dialog {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 16px;
+  width: min(520px, 100%);
+  padding: 22px;
+  border: 1px solid rgba(206, 164, 183, 0.58);
+  border-radius: 18px;
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.99), rgba(255, 247, 250, 0.98));
+  box-shadow: 0 28px 80px rgba(64, 31, 52, 0.24);
+}
+
+.session-expired-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 46px;
+  height: 46px;
+  border-radius: 14px;
+  background: #fff0f6;
+  color: #c2185b;
+  font-size: 24px;
+  font-weight: 800;
+  line-height: 1;
+  box-shadow: inset 0 0 0 1px rgba(233, 30, 114, 0.16);
+}
+
+.session-expired-copy {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.session-expired-copy > span {
+  color: #c2185b;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.session-expired-copy h2 {
+  margin: 0;
+  color: #241b20;
+  font-size: 22px;
+  line-height: 1.2;
+}
+
+.session-expired-copy p {
+  margin: 0;
+  color: #6f5960;
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.session-expired-actions {
+  grid-column: 1 / -1;
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding-top: 4px;
+}
+
+.session-expired-actions .btn-outline,
+.session-expired-actions .btn-primary {
+  min-height: 42px;
+  padding-inline: 16px;
+}
+
+@media (max-width: 520px) {
+  .session-expired-backdrop {
+    align-items: end;
+    padding: 14px;
+  }
+
+  .session-expired-dialog {
+    grid-template-columns: 1fr;
+    gap: 12px;
+    padding: 18px;
+    border-radius: 16px;
+  }
+
+  .session-expired-icon {
+    width: 42px;
+    height: 42px;
+    border-radius: 13px;
+    font-size: 22px;
+  }
+
+  .session-expired-copy h2 {
+    font-size: 19px;
+  }
+
+  .session-expired-actions {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+}
+
 .auth-view {
   position: relative;
   min-height: 100vh;

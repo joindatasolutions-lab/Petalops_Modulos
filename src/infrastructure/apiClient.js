@@ -1,5 +1,6 @@
 const PEDIDOS_MAX_PAGE_SIZE = 300;
 const LOGIN_TIMEOUT_MS = 30000;
+export const AUTH_EXPIRED_EVENT = "petalops:auth-expired";
 const NETWORK_ERROR_MESSAGE = "Sin conexión con el servidor. Verifica tu red e intenta de nuevo.";
 const NETWORK_RETRY_DELAYS_MS = [500, 1200];
 
@@ -17,6 +18,46 @@ function toNetworkError(originalError) {
   error.isNetworkError = true;
   error.cause = originalError;
   return error;
+}
+
+function normalizeErrorText(value) {
+  return String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .toLowerCase();
+}
+
+function isAuthExpiredError(error) {
+  const status = Number(error?.status || 0);
+  if (status !== 401 && status !== 403) return false;
+
+  const text = normalizeErrorText([
+    error?.detail,
+    error?.message,
+    error?.code,
+  ].filter(Boolean).join(" "));
+
+  return text.includes("token")
+    && (
+      text.includes("expir")
+      || text.includes("invalid")
+      || text.includes("invalido")
+      || text.includes("jwt")
+    );
+}
+
+function notifyAuthExpired(error) {
+  try {
+    globalThis.dispatchEvent(new CustomEvent(AUTH_EXPIRED_EVENT, {
+      detail: {
+        status: error?.status || 401,
+        message: error?.detail || error?.message || "Token invalido o expirado",
+      },
+    }));
+  } catch {
+    // Mantiene el flujo original si el navegador no soporta CustomEvent.
+  }
 }
 
 function buildEmpresaGestionPayload(payload = {}, { includeAdmin = false, includeSucursal = false } = {}) {
@@ -146,7 +187,11 @@ export function createApiClient(config) {
 
   const requestJson = async (path, options = {}) => {
     const response = await authFetch(path, options);
-    if (!response.ok) throw await toHttpError(response);
+    if (!response.ok) {
+      const error = await toHttpError(response);
+      if (isAuthExpiredError(error)) notifyAuthExpired(error);
+      throw error;
+    }
     return response.json();
   };
 

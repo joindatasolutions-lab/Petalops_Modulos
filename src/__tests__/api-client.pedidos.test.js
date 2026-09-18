@@ -1,10 +1,11 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { createApiClient } from "../infrastructure/apiClient.js";
+import { AUTH_EXPIRED_EVENT, createApiClient } from "../infrastructure/apiClient.js";
 
 describe("apiClient.listarPedidos", () => {
   afterEach(() => {
     vi.restoreAllMocks();
+    vi.unstubAllGlobals();
   });
 
   it("conserva fechas y limita pageSize para evitar requests 422 en /pedidos", async () => {
@@ -107,6 +108,51 @@ describe("apiClient.listarPedidos", () => {
       module: "pipeline",
       requestId: "b84befc7-3ecc-4878-b0bd-646dbbaf05f3",
       status: 500,
+    });
+  });
+
+  it("emite aviso global cuando el token esta vencido", async () => {
+    const fetchMock = vi.fn(async () => ({
+      ok: false,
+      status: 401,
+      json: async () => ({
+        success: false,
+        error: {
+          code: "HTTP_ERROR",
+          message: "Token invalido o expirado",
+          module: "pipeline",
+          request_id: "request-test",
+        },
+      }),
+    }));
+    const dispatchMock = vi.fn(() => true);
+    const TestCustomEvent = class extends Event {
+      constructor(type, init) {
+        super(type);
+        this.detail = init?.detail;
+      }
+    };
+
+    vi.stubGlobal("fetch", fetchMock);
+    vi.stubGlobal("localStorage", {
+      getItem: () => "token-test",
+    });
+    vi.stubGlobal("CustomEvent", TestCustomEvent);
+    vi.stubGlobal("dispatchEvent", dispatchMock);
+
+    const api = createApiClient({ apiBaseUrl: "https://api.test" });
+
+    await expect(api.listarPipelinePedidos({ empresaId: 1 })).rejects.toMatchObject({
+      status: 401,
+      detail: "Token invalido o expirado",
+    });
+
+    expect(dispatchMock).toHaveBeenCalledTimes(1);
+    const [event] = dispatchMock.mock.calls[0];
+    expect(event.type).toBe(AUTH_EXPIRED_EVENT);
+    expect(event.detail).toMatchObject({
+      status: 401,
+      message: "Token invalido o expirado",
     });
   });
 
