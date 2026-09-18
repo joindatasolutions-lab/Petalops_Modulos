@@ -625,9 +625,27 @@
   padding-left: 10px !important;
   border-left: 1px solid #e7c7d4 !important;
   color: #334155 !important;
-  overflow: hidden !important;
-  text-overflow: ellipsis !important;
-  white-space: nowrap !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+  white-space: normal !important;
+}
+
+.orders-page-table-wrap .orders-table.orders-list-table .orders-product-lines,
+.orders-mobile-product.orders-product-lines {
+  display: grid !important;
+  gap: 3px !important;
+  align-content: start !important;
+  min-width: 0 !important;
+}
+
+.orders-page-table-wrap .orders-table.orders-list-table .orders-product-line,
+.orders-mobile-product .orders-product-line {
+  display: block !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+  overflow-wrap: anywhere !important;
+  white-space: normal !important;
+  line-height: 1.22 !important;
 }
 
 

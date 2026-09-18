@@ -75,6 +75,9 @@ export function OrderListRow({
   const horaRegistroPedido = horaPedido || item.horaPedido || item.hora_pedido || item.hora || horaCreacion;
   const { date: fechaEntrega, time: horaEntrega } = splitDateTimeParts(item.fechaEntrega);
   const productListLabel = productSummary.productText || "-";
+  const productLines = Array.isArray(productSummary.productLabels) && productSummary.productLabels.length > 0
+    ? productSummary.productLabels
+    : [productListLabel];
   const normalizedStatus = normalizeStatus(item.estado);
   const rowClass = [
     selectedPedidoId === pedidoId && drawerOpen ? "is-active" : "",
@@ -99,8 +102,10 @@ export function OrderListRow({
           <div className="orders-mobile-card-grid">
             <section className="orders-mobile-card-block orders-mobile-product-block">
               <span className="orders-mobile-label">Producto</span>
-              <div className="orders-mobile-product">
-                <strong title={productSummary.title}>{productListLabel}</strong>
+              <div className="orders-mobile-product orders-product-lines" title={productSummary.title}>
+                {productLines.map((productName, index) => (
+                  <strong key={`${productName}-${index}`} className="orders-product-line">{productName}</strong>
+                ))}
               </div>
             </section>
 
@@ -180,7 +185,11 @@ export function OrderListRow({
         </div>
       </td>
       <td data-label="Producto(s)" title={productSummary.title}>
-        <span className="orders-products-inline">{productSummary.productText || "-"}</span>
+        <span className="orders-products-inline orders-product-lines">
+          {productLines.map((productName, index) => (
+            <span key={`${productName}-${index}`} className="orders-product-line">{productName}</span>
+          ))}
+        </span>
       </td>
       <td data-label="Total">
         <span className="orders-total-value">${formatearCOP(resolveOrderListTotal(item))}</span>

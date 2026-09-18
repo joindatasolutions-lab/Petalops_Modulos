@@ -84,6 +84,10 @@ describe("estabilidad de filtros por vista", () => {
     });
 
     expect(summary.productText).toBe("ROSEGARDEN-0008 - Chocolate Hershey, ROSEGARDEN-0072 - SIX ROSE");
+    expect(summary.productLabels).toEqual([
+      "ROSEGARDEN-0008 - Chocolate Hershey",
+      "ROSEGARDEN-0072 - SIX ROSE",
+    ]);
     expect(summary.title).toBe(summary.productText);
   });
 
