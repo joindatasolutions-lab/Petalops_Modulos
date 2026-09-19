@@ -139,8 +139,8 @@ export function UsersManagementPage(props) {
         {isUsuariosPanel ? (
           <UsersFilters
             canViewUsuariosGlobal={canViewUsuariosGlobal}
-            empresaID={users.empresaID}
-            setEmpresaID={users.setEmpresaID}
+            empresaID={users.usersEmpresaID}
+            setEmpresaID={users.setUsersEmpresaID}
             empresaSeleccionadaNombre={users.empresaSeleccionadaNombre}
             empresas={users.empresas}
             sucursalID={users.sucursalID}

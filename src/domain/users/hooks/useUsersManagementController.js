@@ -80,6 +80,7 @@ export function useUsersManagementController({ session, canViewUsuariosGlobal })
 
   const initialEmpresaID = Number(session?.empresaID || 1);
   const [empresaID, setEmpresaID] = useState(initialEmpresaID);
+  const [usersEmpresaID, setUsersEmpresaID] = useState(canViewUsuariosGlobal ? "" : initialEmpresaID);
   const [sucursalID, setSucursalID] = useState("");
   const [estadoFiltro, setEstadoFiltro] = useState("");
   const [q, setQ] = useState("");
@@ -149,6 +150,20 @@ export function useUsersManagementController({ session, canViewUsuariosGlobal })
       .map(item => normalizeModuleKey(item.modulo))
       .filter(Boolean)
   ), [moduleItems]);
+
+  const updateUsersEmpresaID = useCallback((value) => {
+    if (canViewUsuariosGlobal && (value === "" || value == null)) {
+      setUsersEmpresaID("");
+      setSucursalID("");
+      return;
+    }
+
+    const nextEmpresaID = Number(value);
+    if (!Number.isFinite(nextEmpresaID) || nextEmpresaID <= 0) return;
+    setUsersEmpresaID(nextEmpresaID);
+    setEmpresaID(nextEmpresaID);
+    setSucursalID("");
+  }, [canViewUsuariosGlobal]);
 
   const modulosCompatiblesRol = useMemo(
     () => defaultModulesForRoles(roles, form.rolesIDs?.length ? form.rolesIDs : [form.rolID], modulosActivosEmpresa),
@@ -227,6 +242,7 @@ export function useUsersManagementController({ session, canViewUsuariosGlobal })
         },
       ]);
       setEmpresaID(Number(initialEmpresaID));
+      setUsersEmpresaID(Number(initialEmpresaID));
       return;
     }
 
@@ -274,9 +290,12 @@ export function useUsersManagementController({ session, canViewUsuariosGlobal })
     setLoading(true);
     setError("");
     try {
+      const targetEmpresaID = canViewUsuariosGlobal
+        ? (usersEmpresaID === "" ? null : Number(usersEmpresaID))
+        : Number(empresaID);
       const data = await api.listarUsuariosGestion({
-        empresaId: empresaID,
-        sucursalId: sucursalID ? Number(sucursalID) : null,
+        empresaId: targetEmpresaID,
+        sucursalId: targetEmpresaID && sucursalID ? Number(sucursalID) : null,
         estado: estadoFiltro || null,
         q: q || null,
       });
@@ -288,7 +307,7 @@ export function useUsersManagementController({ session, canViewUsuariosGlobal })
     } finally {
       setLoading(false);
     }
-  }, [api, empresaID, sucursalID, estadoFiltro, q]);
+  }, [api, empresaID, usersEmpresaID, sucursalID, estadoFiltro, q, canViewUsuariosGlobal]);
 
   const loadModules = useCallback(async () => {
     setModulesLoading(true);
@@ -479,6 +498,7 @@ export function useUsersManagementController({ session, canViewUsuariosGlobal })
   useEffect(() => {
     if (canViewUsuariosGlobal) return;
     setEmpresaID(initialEmpresaID);
+    setUsersEmpresaID(initialEmpresaID);
   }, [canViewUsuariosGlobal, initialEmpresaID]);
 
   useEffect(() => {
@@ -1139,6 +1159,8 @@ export function useUsersManagementController({ session, canViewUsuariosGlobal })
     startEditTenant,
     empresaID,
     setEmpresaID,
+    usersEmpresaID,
+    setUsersEmpresaID: updateUsersEmpresaID,
     sucursalID,
     setSucursalID,
     estadoFiltro,
