@@ -78,6 +78,14 @@ function formatAverage(value) {
   return new Intl.NumberFormat("es-CO", { maximumFractionDigits: 1 }).format(Number(value || 0));
 }
 
+function formatCurrency(value) {
+  return new Intl.NumberFormat("es-CO", {
+    style: "currency",
+    currency: "COP",
+    maximumFractionDigits: 0,
+  }).format(Number(value || 0));
+}
+
 function formatDateLabel(value) {
   const text = String(value || "").trim();
   if (!text) return "";
@@ -107,6 +115,9 @@ export function buildMonitoringRows(items) {
       const slug = resolveEmpresaSlug(item);
       const pedidosHoy = Number(item?.pedidosHoy ?? item?.pedidos_hoy ?? 0);
       const pedidosMes = Number(item?.pedidosMes ?? item?.pedidos_mes ?? 0);
+      const tarifa = Number(item?.tarifa ?? 0);
+      const totalHoy = Number(item?.totalHoy ?? item?.total_hoy ?? 0);
+      const totalMes = Number(item?.totalMes ?? item?.total_mes ?? 0);
       const estado = normalizeStatus(item?.estado);
       return {
         id,
@@ -116,6 +127,9 @@ export function buildMonitoringRows(items) {
         estado,
         pedidosHoy,
         pedidosMes,
+        tarifa,
+        totalHoy,
+        totalMes,
       };
     })
     .filter(item => item.id > 0);
@@ -125,10 +139,14 @@ export function buildMonitoringTotals(summary = {}) {
   const empresas = Number(summary?.tenants ?? summary?.empresas ?? 0);
   const pedidosHoy = Number(summary?.pedidosHoy ?? summary?.pedidos_hoy ?? 0);
   const pedidosMes = Number(summary?.pedidosMes ?? summary?.pedidos_mes ?? 0);
+  const totalHoy = Number(summary?.totalHoy ?? summary?.total_hoy ?? 0);
+  const totalMes = Number(summary?.totalMes ?? summary?.total_mes ?? 0);
   return {
     empresas,
     pedidosHoy,
     pedidosMes,
+    totalHoy,
+    totalMes,
     promedioMensual: empresas > 0 ? pedidosMes / empresas : 0,
   };
 }
@@ -527,6 +545,9 @@ export function TenantMonitoringPage({
                     <col className="tenant-monitoring-col-status" />
                     <col className="tenant-monitoring-col-number" />
                     <col className="tenant-monitoring-col-number" />
+                    <col className="tenant-monitoring-col-money" />
+                    <col className="tenant-monitoring-col-money" />
+                    <col className="tenant-monitoring-col-money is-total-month" />
                   </colgroup>
                   <thead>
                     <tr>
@@ -534,6 +555,9 @@ export function TenantMonitoringPage({
                       <th className="tenant-monitoring-col-status">Estado</th>
                       <th className="tenant-monitoring-col-number">Pedidos hoy</th>
                       <th className="tenant-monitoring-col-number">Pedidos del mes</th>
+                      <th className="tenant-monitoring-col-money">Tarifa</th>
+                      <th className="tenant-monitoring-col-money">Total hoy</th>
+                      <th className="tenant-monitoring-col-money">Total mes</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -560,6 +584,15 @@ export function TenantMonitoringPage({
                         </td>
                         <td className="tenant-monitoring-col-number" data-label="Pedidos del mes">
                           <strong>{formatNumber(row.pedidosMes)}</strong>
+                        </td>
+                        <td className="tenant-monitoring-col-money" data-label="Tarifa">
+                          <strong>{formatCurrency(row.tarifa)}</strong>
+                        </td>
+                        <td className="tenant-monitoring-col-money" data-label="Total hoy">
+                          <strong>{formatCurrency(row.totalHoy)}</strong>
+                        </td>
+                        <td className="tenant-monitoring-col-money" data-label="Total mes">
+                          <strong>{formatCurrency(row.totalMes)}</strong>
                         </td>
                       </tr>
                     ))}

@@ -70,6 +70,9 @@ describe("TenantMonitoringPage", () => {
         estado: "1",
         pedidosHoy: 15,
         pedidosMes: 62,
+        tarifa: 1500,
+        totalHoy: 22500,
+        totalMes: 93000,
       },
     ]);
 
@@ -78,14 +81,19 @@ describe("TenantMonitoringPage", () => {
       logoUrl: "https://cdn.test/logo_lafiore.PNG",
       pedidosHoy: 15,
       pedidosMes: 62,
+      tarifa: 1500,
+      totalHoy: 22500,
+      totalMes: 93000,
     }));
   });
 
   it("calcula el promedio mensual desde el resumen del endpoint", () => {
-    expect(buildMonitoringTotals({ tenants: 2, pedidosHoy: 5, pedidosMes: 43 })).toEqual({
+    expect(buildMonitoringTotals({ tenants: 2, pedidosHoy: 5, pedidosMes: 43, totalHoy: 9500, totalMes: 90000 })).toEqual({
       empresas: 2,
       pedidosHoy: 5,
       pedidosMes: 43,
+      totalHoy: 9500,
+      totalMes: 90000,
       promedioMensual: 21.5,
     });
 
