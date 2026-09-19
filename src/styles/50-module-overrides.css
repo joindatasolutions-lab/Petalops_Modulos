@@ -7023,7 +7023,7 @@
 
 .tenant-monitoring-table-wrap .tenant-monitoring-table {
   width: 100% !important;
-  min-width: 680px !important;
+  min-width: 900px !important;
   table-layout: fixed !important;
   border-collapse: collapse !important;
   border-spacing: 0 !important;
@@ -7064,15 +7064,23 @@
 }
 
 .tenant-monitoring-table col.tenant-monitoring-col-company {
-  width: 46%;
+  width: 30%;
 }
 
 .tenant-monitoring-table col.tenant-monitoring-col-status {
-  width: 18%;
+  width: 12%;
 }
 
 .tenant-monitoring-table col.tenant-monitoring-col-number {
-  width: 18%;
+  width: 12%;
+}
+
+.tenant-monitoring-table col.tenant-monitoring-col-money {
+  width: 11%;
+}
+
+.tenant-monitoring-table col.tenant-monitoring-col-money.is-total-month {
+  width: 12%;
 }
 
 .tenant-monitoring-table th.tenant-monitoring-col-company,
@@ -7083,7 +7091,9 @@
 .tenant-monitoring-table th.tenant-monitoring-col-status,
 .tenant-monitoring-table td.tenant-monitoring-col-status,
 .tenant-monitoring-table th.tenant-monitoring-col-number,
-.tenant-monitoring-table td.tenant-monitoring-col-number {
+.tenant-monitoring-table td.tenant-monitoring-col-number,
+.tenant-monitoring-table th.tenant-monitoring-col-money,
+.tenant-monitoring-table td.tenant-monitoring-col-money {
   text-align: center !important;
 }
 
@@ -7173,10 +7183,15 @@
   font-weight: 850;
 }
 
-.tenant-monitoring-col-number strong {
+.tenant-monitoring-col-number strong,
+.tenant-monitoring-col-money strong {
   color: #0f172a;
   font-size: 14px;
   font-weight: 950;
+}
+
+.tenant-monitoring-col-money strong {
+  white-space: nowrap;
 }
 
 .tenant-monitoring-count {
