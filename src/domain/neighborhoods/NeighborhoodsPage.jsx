@@ -31,6 +31,7 @@ export function NeighborhoodsPage({
   canViewContabilidad,
   canViewClientesPanel,
   canViewUsuariosPanel,
+  canViewTenantMonitoring,
   onLogout,
   onGoPipeline,
   onGoPedidos,
@@ -41,6 +42,7 @@ export function NeighborhoodsPage({
   onGoContabilidad,
   onGoClientes,
   onGoUsuarios,
+  onGoTenantMonitoring,
 }) {
   const api = useMemo(() => createApiClient(tenantConfig), []);
   const sucursalId = Number(session?.sucursalID || tenantConfig.sucursalId);
@@ -190,7 +192,7 @@ export function NeighborhoodsPage({
   };
   return (
     <div className={`app-shell ${sidebarPinned ? "is-sidebar-pinned" : ""} ${sidebarMobileOpen ? "is-sidebar-mobile-open" : ""}`}>
-      <AppSidebar activeKey="barrios" sidebarPinned={sidebarPinned} sidebarMobileOpen={sidebarMobileOpen} toggleSidebar={toggleSidebar} closeSidebarMobile={() => setSidebarMobileOpen(false)} onLogout={onLogout} permissions={{ pipeline: canViewPipeline, pedidos: canViewPedidos, produccion: canViewProduccion, domicilios: canViewDomicilios, barrios: canViewBarrios, inventario: canViewInventario, contabilidad: canViewContabilidad, clientes: canViewClientesPanel, usuarios: canViewUsuariosPanel }} navigation={{ pipeline: onGoPipeline, pedidos: onGoPedidos, produccion: onGoProduccion, domicilios: onGoDomicilios, barrios: onGoBarrios, inventario: onGoInventario, contabilidad: onGoContabilidad, clientes: onGoClientes, usuarios: onGoUsuarios }} badges={{ barrios: items.length }} />
+      <AppSidebar activeKey="barrios" sidebarPinned={sidebarPinned} sidebarMobileOpen={sidebarMobileOpen} toggleSidebar={toggleSidebar} closeSidebarMobile={() => setSidebarMobileOpen(false)} onLogout={onLogout} permissions={{ pipeline: canViewPipeline, pedidos: canViewPedidos, produccion: canViewProduccion, domicilios: canViewDomicilios, barrios: canViewBarrios, inventario: canViewInventario, contabilidad: canViewContabilidad, clientes: canViewClientesPanel, usuarios: canViewUsuariosPanel, seguimiento: canViewTenantMonitoring }} navigation={{ pipeline: onGoPipeline, pedidos: onGoPedidos, produccion: onGoProduccion, domicilios: onGoDomicilios, barrios: onGoBarrios, inventario: onGoInventario, contabilidad: onGoContabilidad, clientes: onGoClientes, usuarios: onGoUsuarios, seguimiento: onGoTenantMonitoring }} badges={{ barrios: items.length }} />
       <main className="orders-admin-view neighborhoods-page-view">
         <NeighborhoodsHeader displayUserName={displayUserName} onExport={exportExcel} onToggleCreate={() => setShowCreatePanel(current => !current)} toggleSidebar={toggleSidebar} />
         <NeighborhoodsMetrics metrics={metrics} />

@@ -1770,6 +1770,7 @@ export function DeliveryPage({
   canViewContabilidad,
   canViewClientesPanel,
   canViewUsuariosPanel,
+  canViewTenantMonitoring,
   onLogout,
   onGoPipeline,
   onGoPedidos,
@@ -1780,6 +1781,7 @@ export function DeliveryPage({
   onGoContabilidad,
   onGoClientes,
   onGoUsuarios,
+  onGoTenantMonitoring,
 }) {
   const api = useMemo(() => createApiClient(tenantConfig), []);
   const empresaId = Number(session?.empresaID || tenantConfig.empresaId);
@@ -3609,6 +3611,7 @@ export function DeliveryPage({
           contabilidad: canViewContabilidad,
           clientes: canViewClientesPanel,
           usuarios: canViewUsuariosPanel,
+          seguimiento: canViewTenantMonitoring,
         }}
         navigation={{
           pipeline: onGoPipeline,
@@ -3620,6 +3623,7 @@ export function DeliveryPage({
           contabilidad: onGoContabilidad,
           clientes: onGoClientes,
           usuarios: onGoUsuarios,
+          seguimiento: onGoTenantMonitoring,
         }}
         badges={{ domicilios: visibleAdminItems.length }}
       />

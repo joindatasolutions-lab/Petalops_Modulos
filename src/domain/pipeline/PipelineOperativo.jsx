@@ -15,9 +15,9 @@ export function PipelineOperativo({
   session,
   canViewPipeline, canViewPedidos, canViewProduccion, canViewDomicilios, canViewBarrios,
   canViewInventario, canViewContabilidad,
-  canViewClientesPanel, canViewUsuariosPanel,
+  canViewClientesPanel, canViewUsuariosPanel, canViewTenantMonitoring,
   onGoPipeline, onGoPedidos, onGoProduccion, onGoDomicilios, onGoBarrios, onGoInventario,
-  onGoContabilidad, onGoClientes, onGoUsuarios, onLogout,
+  onGoContabilidad, onGoClientes, onGoUsuarios, onGoTenantMonitoring, onLogout,
 }) {
   const api = useMemo(() => createApiClient(tenantConfig), []);
   const { sidebarPinned, sidebarMobileOpen, setSidebarMobileOpen, toggleSidebar } = useSidebarState();
@@ -122,8 +122,8 @@ export function PipelineOperativo({
         toggleSidebar={toggleSidebar}
         closeSidebarMobile={() => setSidebarMobileOpen(false)}
         onLogout={onLogout}
-        permissions={{ pipeline: canViewPipeline, pedidos: canViewPedidos, produccion: canViewProduccion, domicilios: canViewDomicilios, barrios: canViewBarrios, inventario: canViewInventario, contabilidad: canViewContabilidad, clientes: canViewClientesPanel, usuarios: canViewUsuariosPanel }}
-        navigation={{ pipeline: onGoPipeline, pedidos: onGoPedidos, produccion: onGoProduccion, domicilios: onGoDomicilios, barrios: onGoBarrios, inventario: onGoInventario, contabilidad: onGoContabilidad, clientes: onGoClientes, usuarios: onGoUsuarios }}
+        permissions={{ pipeline: canViewPipeline, pedidos: canViewPedidos, produccion: canViewProduccion, domicilios: canViewDomicilios, barrios: canViewBarrios, inventario: canViewInventario, contabilidad: canViewContabilidad, clientes: canViewClientesPanel, seguimiento: canViewTenantMonitoring, usuarios: canViewUsuariosPanel }}
+        navigation={{ pipeline: onGoPipeline, pedidos: onGoPedidos, produccion: onGoProduccion, domicilios: onGoDomicilios, barrios: onGoBarrios, inventario: onGoInventario, contabilidad: onGoContabilidad, clientes: onGoClientes, seguimiento: onGoTenantMonitoring, usuarios: onGoUsuarios }}
       />
 
       <main className="orders-admin-view pipeline-view">

@@ -1346,7 +1346,7 @@ function buildPaginationItems(page, pages) {
   return [1, "ellipsis-start", currentPage - 1, currentPage, currentPage + 1, "ellipsis-end", totalPages];
 }
 
-export function ProductionPage({ session, canViewPipeline, canViewPedidos, canViewCatalogo, canViewProduccion, canViewDomicilios, canViewBarrios, canViewInventario, canViewContabilidad, canViewClientesPanel, canViewUsuariosPanel, onLogout, onGoPipeline, onGoPedidos, onGoProduccion, onGoDomicilios, onGoBarrios, onGoInventario, onGoContabilidad, onGoClientes, onGoUsuarios }) {
+export function ProductionPage({ session, canViewPipeline, canViewPedidos, canViewCatalogo, canViewProduccion, canViewDomicilios, canViewBarrios, canViewInventario, canViewContabilidad, canViewClientesPanel, canViewUsuariosPanel, canViewTenantMonitoring, onLogout, onGoPipeline, onGoPedidos, onGoProduccion, onGoDomicilios, onGoBarrios, onGoInventario, onGoContabilidad, onGoClientes, onGoUsuarios, onGoTenantMonitoring }) {
   const api = useMemo(() => createApiClient(tenantConfig), []);
   const empresaId = Number(session?.empresaID || tenantConfig.empresaId);
   const sucursalId = Number(session?.sucursalID || tenantConfig.sucursalId);
@@ -2386,6 +2386,7 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
           contabilidad: canViewContabilidad,
           clientes: canViewClientesPanel,
           usuarios: canViewUsuariosPanel,
+          seguimiento: canViewTenantMonitoring,
         }}
         navigation={{
           pipeline: onGoPipeline,
@@ -2400,6 +2401,7 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
           contabilidad: onGoContabilidad,
           clientes: onGoClientes,
           usuarios: onGoUsuarios,
+          seguimiento: onGoTenantMonitoring,
         }}
         sessionLabel={`Sesion activa: ${displayUserName}`}
       />

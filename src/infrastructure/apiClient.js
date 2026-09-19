@@ -428,6 +428,15 @@ export function createApiClient(config) {
       return requestJson("/auth/usuarios/empresas/modulos");
     },
 
+    async listarSeguimientoTenants({ fechaHoy = "", anio = "", mes = "" } = {}) {
+      const params = new URLSearchParams();
+      if (fechaHoy) params.set("fechaHoy", String(fechaHoy));
+      if (anio) params.set("anio", String(anio));
+      if (mes) params.set("mes", String(mes));
+      const query = params.toString();
+      return requestJson(`/seguimiento-tenants/empresas${query ? `?${query}` : ""}`);
+    },
+
     async crearTenantGestion(payload) {
       if (payload?.logoFile) {
         return requestJson("/auth/usuarios/empresas", {

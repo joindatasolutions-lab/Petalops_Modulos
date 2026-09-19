@@ -42,6 +42,7 @@ export function ClientsPage({
   canViewContabilidad,
   canViewClientesPanel,
   canViewUsuariosPanel,
+  canViewTenantMonitoring,
   onGoPipeline,
   onGoPedidos,
   onGoProduccion,
@@ -51,6 +52,7 @@ export function ClientsPage({
   onGoContabilidad,
   onGoClientes,
   onGoUsuarios,
+  onGoTenantMonitoring,
   onLogout,
 }) {
   const api = useMemo(() => createApiClient(tenantConfig), []);
@@ -389,6 +391,7 @@ export function ClientsPage({
           inventario: canViewInventario,
           contabilidad: canViewContabilidad,
           clientes: canViewClientesPanel,
+          seguimiento: canViewTenantMonitoring,
           usuarios: canViewUsuariosPanel,
         }}
         navigation={{
@@ -400,6 +403,7 @@ export function ClientsPage({
           inventario: onGoInventario,
           contabilidad: onGoContabilidad,
           clientes: onGoClientes,
+          seguimiento: onGoTenantMonitoring,
           usuarios: onGoUsuarios,
         }}
       />
