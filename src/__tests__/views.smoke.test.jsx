@@ -11,6 +11,7 @@ import { NeighborhoodsPage } from "../domain/neighborhoods/NeighborhoodsPage.jsx
 import { OrdersAdminPage } from "../domain/orders-admin/OrdersAdminPage.jsx";
 import { PipelineOperativo } from "../domain/pipeline/PipelineOperativo.jsx";
 import { ProductionPage } from "../domain/production/ProductionPage.jsx";
+import { TenantMonitoringPage } from "../domain/tenant-monitoring/TenantMonitoringPage.jsx";
 import { UsersManagementPage } from "../domain/users/UsersManagementPage.jsx";
 
 const noop = () => {};
@@ -50,6 +51,7 @@ const pageProps = {
   canViewClientesPanel: true,
   canViewUsuariosPanel: true,
   canViewUsuariosGlobal: true,
+  canViewTenantMonitoring: true,
   onLogout: noop,
   onGoPipeline: noop,
   onGoPedidos: noop,
@@ -60,6 +62,7 @@ const pageProps = {
   onGoContabilidad: noop,
   onGoClientes: noop,
   onGoUsuarios: noop,
+  onGoTenantMonitoring: noop,
 };
 
 const views = [
@@ -73,6 +76,7 @@ const views = [
   ["Contabilidad", <AccountingPage {...pageProps} />],
   ["Clientes", <ClientsPage {...pageProps} />],
   ["Usuarios", <UsersManagementPage {...pageProps} />],
+  ["Seguimiento", <TenantMonitoringPage {...pageProps} />],
 ];
 
 const productionOperatorWithoutFloristaProps = {

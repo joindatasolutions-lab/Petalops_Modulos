@@ -47,9 +47,9 @@ export function InventoryPage({
   session,
   canViewPipeline, canViewPedidos, canViewProduccion, canViewDomicilios, canViewBarrios,
   canViewInventario, canViewContabilidad,
-  canViewClientesPanel, canViewUsuariosPanel,
+  canViewClientesPanel, canViewUsuariosPanel, canViewTenantMonitoring,
   onGoPipeline, onGoPedidos, onGoProduccion, onGoDomicilios, onGoBarrios, onGoInventario,
-  onGoContabilidad, onGoClientes, onGoUsuarios, onLogout,
+  onGoContabilidad, onGoClientes, onGoUsuarios, onGoTenantMonitoring, onLogout,
 }) {
   const api = useMemo(() => createApiClient(tenantConfig), []);
   const empresaId = Number(session?.empresaID || tenantConfig.empresaId);
@@ -797,8 +797,8 @@ export function InventoryPage({
         toggleSidebar={toggleSidebar}
         closeSidebarMobile={() => setSidebarMobileOpen(false)}
         onLogout={onLogout}
-        permissions={{ pipeline: canViewPipeline, pedidos: canViewPedidos, produccion: canViewProduccion, domicilios: canViewDomicilios, barrios: canViewBarrios, inventario: canViewInventario, contabilidad: canViewContabilidad, clientes: canViewClientesPanel, usuarios: canViewUsuariosPanel }}
-        navigation={{ pipeline: onGoPipeline, pedidos: onGoPedidos, produccion: onGoProduccion, domicilios: onGoDomicilios, barrios: onGoBarrios, inventario: onGoInventario, contabilidad: onGoContabilidad, clientes: onGoClientes, usuarios: onGoUsuarios }}
+        permissions={{ pipeline: canViewPipeline, pedidos: canViewPedidos, produccion: canViewProduccion, domicilios: canViewDomicilios, barrios: canViewBarrios, inventario: canViewInventario, contabilidad: canViewContabilidad, clientes: canViewClientesPanel, usuarios: canViewUsuariosPanel, seguimiento: canViewTenantMonitoring }}
+        navigation={{ pipeline: onGoPipeline, pedidos: onGoPedidos, produccion: onGoProduccion, domicilios: onGoDomicilios, barrios: onGoBarrios, inventario: onGoInventario, contabilidad: onGoContabilidad, clientes: onGoClientes, usuarios: onGoUsuarios, seguimiento: onGoTenantMonitoring }}
       />
 
       <main className="orders-admin-view orders-page-view inventory-page-view">

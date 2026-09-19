@@ -16,6 +16,7 @@ const InventoryPage = lazy(() => import("./domain/inventory/InventoryPage.jsx").
 const OrdersAdminPage = lazy(() => import("./domain/orders-admin/OrdersAdminPage.jsx").then(module => ({ default: module.OrdersAdminPage })));
 const PipelineOperativo = lazy(() => import("./domain/pipeline/PipelineOperativo.jsx").then(module => ({ default: module.PipelineOperativo })));
 const ProductionPage = lazy(() => import("./domain/production/ProductionPage.jsx").then(module => ({ default: module.ProductionPage })));
+const TenantMonitoringPage = lazy(() => import("./domain/tenant-monitoring/TenantMonitoringPage.jsx").then(module => ({ default: module.TenantMonitoringPage })));
 const UsersManagementPage = lazy(() => import("./domain/users/UsersManagementPage.jsx").then(module => ({ default: module.UsersManagementPage })));
 
 export function hasModuleAccess(session, modulo) {
@@ -34,6 +35,17 @@ function isEmpresaAdminRole(session) {
   return role === "admin" || role === "empresa_admin";
 }
 
+export function isJoinAdminSession(session) {
+  if (!session?.esGlobalJoin) return false;
+  const identities = [
+    session?.login,
+    session?.usuario,
+    session?.username,
+    String(session?.email || "").split("@")[0],
+  ].map(value => String(value || "").trim().toLowerCase());
+  return identities.includes("joinadmin");
+}
+
 export function canAccessPipeline(session) {
   return Boolean(hasModuleAccess(session, "pipeline") || isEmpresaAdminRole(session));
 }
@@ -49,6 +61,7 @@ function canAccessView(session, view) {
   if (view === "contabilidad") return hasModuleAccess(session, "contabilidad");
   if (view === "clientes") return hasModuleAccess(session, "clientes");
   if (view === "usuarios") return Boolean(session?.esGlobalJoin || isEmpresaAdminRole(session));
+  if (view === "seguimiento") return isJoinAdminSession(session);
   return false;
 }
 
@@ -173,6 +186,7 @@ export default function App() {
   const canPipeline = canAccessPipeline(session);
   const canUsuariosGlobal = Boolean(session?.esGlobalJoin);
   const canUsuariosPanel = Boolean(canUsuariosGlobal || isEmpresaAdminRole(session));
+  const canTenantMonitoring = isJoinAdminSession(session);
 
   useEffect(() => {
     if (!session) return;
@@ -190,6 +204,7 @@ export default function App() {
     if (view === "contabilidad" && !canContabilidad) return redirectTo(fallbackView);
     if (view === "clientes" && !canClientes) return redirectTo(fallbackView);
     if (view === "usuarios" && !canUsuariosPanel) return redirectTo(fallbackView);
+    if (view === "seguimiento" && !canTenantMonitoring) return redirectTo(fallbackView);
   }, [
     session,
     view,
@@ -202,6 +217,7 @@ export default function App() {
     canContabilidad,
     canClientes,
     canUsuariosPanel,
+    canTenantMonitoring,
   ]);
 
   const handleLogin = async ({ login, password }) => {
@@ -248,7 +264,7 @@ export default function App() {
     return <LoginPage onSubmit={handleLogin} loading={authLoading} error={authError} />;
   }
 
-  if (!canPipeline && !canPedidos && !canProduccion && !canDomicilios && !canBarrios && !canInventario && !canContabilidad && !canClientes && !canUsuariosPanel) {
+  if (!canPipeline && !canPedidos && !canProduccion && !canDomicilios && !canBarrios && !canInventario && !canContabilidad && !canClientes && !canUsuariosPanel && !canTenantMonitoring) {
     return (
       <main className="auth-view">
         <section className="auth-card">
@@ -273,6 +289,7 @@ export default function App() {
     canViewClientesPanel: canClientes,
     canViewUsuariosPanel: canUsuariosPanel,
     canViewUsuariosGlobal: canUsuariosGlobal,
+    canViewTenantMonitoring: canTenantMonitoring,
     onGoPipeline: () => canPipeline && setView("pipeline"),
     onGoPedidos: () => canPedidos && setView("pedidos"),
     onGoProduccion: () => canProduccion && setView("produccion"),
@@ -282,6 +299,7 @@ export default function App() {
     onGoContabilidad: () => canContabilidad && setView("contabilidad"),
     onGoClientes: () => canClientes && setView("clientes"),
     onGoUsuarios: () => canUsuariosPanel && setView("usuarios"),
+    onGoTenantMonitoring: () => canTenantMonitoring && setView("seguimiento"),
     onLogout: handleLogout,
   };
 
@@ -294,6 +312,7 @@ export default function App() {
     if (view === "inventario") return <InventoryPage {...pageProps} />;
     if (view === "contabilidad") return <AccountingPage {...pageProps} />;
     if (view === "clientes") return <ClientsPage {...pageProps} />;
+    if (view === "seguimiento") return <TenantMonitoringPage {...pageProps} />;
 
     return (
       <UsersManagementPage

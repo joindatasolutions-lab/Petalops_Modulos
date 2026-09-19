@@ -80,6 +80,33 @@ describe("apiClient.listarPedidos", () => {
     expect(secondParsed.searchParams.has("sucursalID")).toBe(false);
   });
 
+  it("consulta seguimiento de tenants con filtros globales", async () => {
+    const fetchMock = vi.fn(async () => ({
+      ok: true,
+      json: async () => ({ items: [], resumen: { tenants: 0, pedidosHoy: 0, pedidosMes: 0 } }),
+    }));
+    vi.stubGlobal("fetch", fetchMock);
+    vi.stubGlobal("localStorage", {
+      getItem: () => "token-joinadmin",
+    });
+
+    const api = createApiClient({ apiBaseUrl: "https://api.test" });
+    await api.listarSeguimientoTenants({
+      fechaHoy: "2026-09-18",
+      anio: 2026,
+      mes: 9,
+    });
+
+    const [url, options] = fetchMock.mock.calls[0];
+    const parsed = new URL(url);
+
+    expect(parsed.pathname).toBe("/seguimiento-tenants/empresas");
+    expect(parsed.searchParams.get("fechaHoy")).toBe("2026-09-18");
+    expect(parsed.searchParams.get("anio")).toBe("2026");
+    expect(parsed.searchParams.get("mes")).toBe("9");
+    expect(options.headers.Authorization).toBe("Bearer token-joinadmin");
+  });
+
   it("preserva codigo, modulo y request_id en errores estructurados del API", async () => {
     const fetchMock = vi.fn(async () => ({
       ok: false,

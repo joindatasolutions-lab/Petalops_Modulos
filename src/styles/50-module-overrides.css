@@ -6644,3 +6644,813 @@
     min-height: 64px !important;
   }
 }
+
+/* Seguimiento PetalOps: vista operativa de empresas */
+.tenant-monitoring-view,
+.tenant-monitoring-view * {
+  box-sizing: border-box;
+}
+
+.tenant-monitoring-view {
+  width: 100%;
+  min-height: 100vh;
+  gap: 14px !important;
+  padding: 18px 22px 26px !important;
+  background:
+    radial-gradient(circle at 9% 0%, rgba(233, 30, 114, 0.08), transparent 30%),
+    linear-gradient(180deg, #fffafe 0%, #f8fafc 48%, #ffffff 100%) !important;
+}
+
+.tenant-monitoring-header.orders-page-header {
+  display: flex !important;
+  align-items: flex-start !important;
+  justify-content: space-between !important;
+  gap: 18px !important;
+  min-height: auto !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.tenant-monitoring-header .orders-page-breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.tenant-monitoring-header .orders-page-breadcrumb span + span::before {
+  content: "|";
+  margin-right: 8px;
+  color: #cbd5e1;
+}
+
+.tenant-monitoring-brand {
+  color: #e91e72 !important;
+  font-weight: 950 !important;
+}
+
+.tenant-monitoring-header .orders-page-title-row h1 {
+  color: #101827 !important;
+  font-size: clamp(30px, 3vw, 38px) !important;
+  font-weight: 950 !important;
+  line-height: 1.08 !important;
+  letter-spacing: 0 !important;
+}
+
+.tenant-monitoring-header .orders-page-description {
+  display: block !important;
+  width: auto !important;
+  max-width: 760px !important;
+  margin-top: 7px !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  color: #64748b !important;
+  font-size: 13px !important;
+  font-weight: 650 !important;
+}
+
+.tenant-monitoring-header-actions {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-end !important;
+  gap: 14px !important;
+  min-width: fit-content;
+  color: #64748b !important;
+  font-size: 12px !important;
+  font-weight: 750 !important;
+  white-space: nowrap;
+}
+
+.tenant-monitoring-header-actions .orders-header-refresh {
+  min-height: 44px !important;
+  padding: 0 18px !important;
+  border: 0 !important;
+  border-radius: 8px !important;
+  background: linear-gradient(135deg, #e91e72 0%, #c12468 100%) !important;
+  color: #ffffff !important;
+  box-shadow: 0 14px 28px rgba(233, 30, 114, 0.22) !important;
+}
+
+.tenant-monitoring-header-actions .orders-header-refresh:disabled {
+  cursor: wait;
+  opacity: 0.78;
+}
+
+.tenant-monitoring-view button:focus-visible,
+.tenant-monitoring-view input:focus-visible,
+.tenant-monitoring-view select:focus-visible {
+  outline: 3px solid rgba(233, 30, 114, 0.18) !important;
+  outline-offset: 2px !important;
+}
+
+.tenant-monitoring-view .is-spinning {
+  animation: tenantMonitoringSpin 0.9s linear infinite;
+}
+
+@keyframes tenantMonitoringSpin {
+  to { transform: rotate(360deg); }
+}
+
+.sr-only {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  padding: 0 !important;
+  margin: -1px !important;
+  overflow: hidden !important;
+  clip: rect(0, 0, 0, 0) !important;
+  white-space: nowrap !important;
+  border: 0 !important;
+}
+
+.tenant-monitoring-summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(160px, 1fr));
+  gap: 14px;
+}
+
+.tenant-monitoring-summary-card {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr);
+  grid-template-rows: auto auto;
+  align-items: center;
+  column-gap: 12px;
+  min-height: 86px;
+  padding: 14px 16px;
+  border: 1px solid #e8dbe3;
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: 0 16px 34px rgba(15, 23, 42, 0.055);
+}
+
+.tenant-monitoring-summary-icon {
+  grid-row: 1 / span 2;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 8px;
+  background: #ffe5f1;
+  color: #e91e72;
+}
+
+.tenant-monitoring-summary-card.is-cart .tenant-monitoring-summary-icon { background: #fff1f6; color: #e91e72; }
+.tenant-monitoring-summary-card.is-calendar .tenant-monitoring-summary-icon { background: #eef6ff; color: #2563eb; }
+.tenant-monitoring-summary-card.is-average .tenant-monitoring-summary-icon { background: #fff7ed; color: #c2410c; }
+
+.tenant-monitoring-summary-card strong {
+  color: #0f172a;
+  font-size: 24px;
+  font-weight: 950;
+  line-height: 1;
+}
+
+.tenant-monitoring-summary-card small {
+  margin-top: 5px;
+  color: #64748b;
+  font-size: 10.5px;
+  font-weight: 900;
+  line-height: 1.15;
+  text-transform: uppercase;
+}
+
+.tenant-monitoring-status {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  min-height: 58px;
+  padding: 12px 16px;
+  border: 1px solid #d5eadf;
+  border-radius: 8px;
+  background: linear-gradient(90deg, #f2fbf6 0%, #ffffff 100%);
+  color: #15803d;
+}
+
+.tenant-monitoring-status.is-neutral {
+  border-color: #dbe4f0;
+  background: linear-gradient(90deg, #f8fafc 0%, #ffffff 100%);
+  color: #2563eb;
+}
+
+.tenant-monitoring-status div {
+  display: grid;
+  gap: 2px;
+}
+
+.tenant-monitoring-status strong {
+  color: #166534;
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.tenant-monitoring-status.is-neutral strong {
+  color: #1e40af;
+}
+
+.tenant-monitoring-status span,
+.tenant-monitoring-status small {
+  color: #4b6475;
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.tenant-monitoring-status small {
+  justify-self: end;
+  white-space: nowrap;
+}
+
+.tenant-monitoring-controls {
+  display: grid;
+  grid-template-columns: minmax(260px, 1fr) minmax(280px, 0.58fr) minmax(220px, 0.38fr);
+  align-items: center;
+  gap: 12px;
+}
+
+.tenant-monitoring-filter-chips {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+
+.tenant-monitoring-filter-chip {
+  min-height: 38px;
+  padding: 0 13px;
+  border: 1px solid #ead7df;
+  border-radius: 999px;
+  background: #ffffff;
+  color: #5d6678;
+  font-size: 12px;
+  font-weight: 850;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.tenant-monitoring-filter-chip.is-active {
+  border-color: #f7c4d8;
+  background: #fdeaf2;
+  color: #e91e72;
+}
+
+.tenant-monitoring-search,
+.tenant-monitoring-sort {
+  display: grid;
+  align-items: center;
+  min-width: 0;
+  min-height: 46px;
+  border: 1px solid #e5d9df;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #8a95a6;
+}
+
+.tenant-monitoring-search {
+  grid-template-columns: 38px minmax(0, 1fr);
+}
+
+.tenant-monitoring-sort {
+  grid-template-columns: minmax(86px, auto) 26px minmax(0, 1fr);
+  padding-left: 12px;
+}
+
+.tenant-monitoring-search svg {
+  justify-self: center;
+}
+
+.tenant-monitoring-sort > span {
+  color: #64748b;
+  font-size: 10px;
+  font-weight: 900;
+}
+
+.tenant-monitoring-search input,
+.tenant-monitoring-sort select {
+  min-height: 44px !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  color: #334155 !important;
+  font-size: 12px !important;
+  font-weight: 750 !important;
+}
+
+.tenant-monitoring-content-grid {
+  display: grid;
+  grid-template-columns: minmax(680px, 1fr) minmax(320px, 0.42fr);
+  align-items: start;
+  gap: 14px;
+  min-width: 0;
+}
+
+.tenant-monitoring-list-panel {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+
+.tenant-monitoring-chart {
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid #e8dbe3;
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.06);
+}
+
+.tenant-monitoring-chart > header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.tenant-monitoring-chart > header h2 {
+  margin: 0;
+  color: #111827;
+  font-size: 15px;
+  font-weight: 900;
+  line-height: 1.25;
+}
+
+.tenant-monitoring-chart > header p {
+  margin: 3px 0 0;
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.tenant-monitoring-chart > header svg {
+  flex: 0 0 auto;
+  color: #e91e72;
+}
+
+.tenant-monitoring-chart-canvas {
+  width: 100%;
+  height: 360px;
+}
+
+.tenant-monitoring-chart .recharts-default-tooltip {
+  border: 1px solid #e8dbe3 !important;
+  border-radius: 6px !important;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.1) !important;
+}
+
+.tenant-monitoring-table-wrap.orders-page-table-wrap {
+  width: 100% !important;
+  padding: 0 !important;
+  overflow-x: auto !important;
+  overflow-y: hidden !important;
+  border: 1px solid #e8dbe3 !important;
+  border-radius: 8px !important;
+  background: #ffffff !important;
+  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.06) !important;
+}
+
+.tenant-monitoring-table-wrap .tenant-monitoring-table {
+  width: 100% !important;
+  min-width: 680px !important;
+  table-layout: fixed !important;
+  border-collapse: collapse !important;
+  border-spacing: 0 !important;
+}
+
+@media (min-width: 761px) {
+  .tenant-monitoring-view .tenant-monitoring-table-wrap .tenant-monitoring-table th:nth-child(n),
+  .tenant-monitoring-view .tenant-monitoring-table-wrap .tenant-monitoring-table td:nth-child(n) {
+    display: table-cell !important;
+  }
+}
+
+.tenant-monitoring-table-wrap .tenant-monitoring-table th,
+.tenant-monitoring-table-wrap .tenant-monitoring-table td {
+  padding: 14px 18px !important;
+  border-bottom: 1px solid #eef2f7 !important;
+  background: #ffffff !important;
+  box-shadow: none !important;
+  color: #273244 !important;
+  vertical-align: middle !important;
+}
+
+.tenant-monitoring-table-wrap .tenant-monitoring-table th {
+  background: #fbfcfe !important;
+  color: #64748b !important;
+  font-size: 10px !important;
+  font-weight: 950 !important;
+  letter-spacing: 0.04em !important;
+  text-transform: uppercase !important;
+}
+
+.tenant-monitoring-table-wrap .tenant-monitoring-table tbody tr:hover td {
+  background: #fff8fb !important;
+}
+
+.tenant-monitoring-table-wrap .tenant-monitoring-table tr:last-child td {
+  border-bottom: 0 !important;
+}
+
+.tenant-monitoring-table col.tenant-monitoring-col-company {
+  width: 46%;
+}
+
+.tenant-monitoring-table col.tenant-monitoring-col-status {
+  width: 18%;
+}
+
+.tenant-monitoring-table col.tenant-monitoring-col-number {
+  width: 18%;
+}
+
+.tenant-monitoring-table th.tenant-monitoring-col-company,
+.tenant-monitoring-table td.tenant-monitoring-col-company {
+  text-align: left !important;
+}
+
+.tenant-monitoring-table th.tenant-monitoring-col-status,
+.tenant-monitoring-table td.tenant-monitoring-col-status,
+.tenant-monitoring-table th.tenant-monitoring-col-number,
+.tenant-monitoring-table td.tenant-monitoring-col-number {
+  text-align: center !important;
+}
+
+.tenant-monitoring-company-cell {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr);
+  align-items: center;
+  column-gap: 12px;
+  row-gap: 4px;
+  min-width: 0;
+}
+
+.tenant-monitoring-company-cell strong {
+  grid-column: 2;
+  min-width: 0;
+  overflow: hidden;
+  color: #111827;
+  font-size: 14px;
+  font-weight: 900;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tenant-monitoring-company-cell small {
+  grid-column: 2;
+  min-width: 0;
+  overflow: hidden;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tenant-monitoring-avatar {
+  grid-row: 1 / span 2;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border: 1px solid #e5eaf2;
+  border-radius: 8px;
+  background: #fff5fa;
+  color: #e91e72;
+  overflow: hidden;
+}
+
+.tenant-monitoring-avatar img {
+  width: 100%;
+  height: 100%;
+  padding: 3px;
+  object-fit: contain;
+  background: #ffffff;
+}
+
+.tenant-monitoring-status-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 26px;
+  padding: 0 10px;
+  border-radius: 999px;
+  background: #f1f5f9;
+  color: #475569;
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.tenant-monitoring-status-badge::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  margin-right: 7px;
+  border-radius: 999px;
+  background: currentColor;
+}
+
+.tenant-monitoring-status-badge.is-active {
+  background: #dcfce7;
+  color: #15803d;
+}
+
+.tenant-monitoring-muted {
+  color: #94a3b8;
+  font-weight: 850;
+}
+
+.tenant-monitoring-col-number strong {
+  color: #0f172a;
+  font-size: 14px;
+  font-weight: 950;
+}
+
+.tenant-monitoring-count {
+  margin: -2px 0 0;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.tenant-monitoring-empty,
+.tenant-monitoring-error,
+.tenant-monitoring-notice {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  padding: 24px;
+  border: 1px solid #e8dbe3;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #64748b;
+  text-align: center;
+  box-shadow: 0 14px 32px rgba(15, 23, 42, 0.05);
+}
+
+.tenant-monitoring-empty strong,
+.tenant-monitoring-error strong {
+  color: #111827;
+  font-size: 16px;
+  font-weight: 950;
+}
+
+.tenant-monitoring-empty span {
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.tenant-monitoring-error {
+  justify-items: start;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  text-align: left;
+}
+
+.tenant-monitoring-notice {
+  justify-items: start;
+  padding: 10px 13px;
+  border-color: #fde7bd;
+  background: #fffbeb;
+  color: #92400e;
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.tenant-monitoring-summary-card.is-skeleton,
+.tenant-monitoring-status.is-skeleton,
+.tenant-monitoring-skeleton-row {
+  position: relative;
+  overflow: hidden;
+}
+
+.tenant-monitoring-summary-card.is-skeleton span,
+.tenant-monitoring-summary-card.is-skeleton strong,
+.tenant-monitoring-summary-card.is-skeleton small,
+.tenant-monitoring-status.is-skeleton span,
+.tenant-monitoring-status.is-skeleton strong,
+.tenant-monitoring-status.is-skeleton small,
+.tenant-monitoring-skeleton-row span {
+  display: block;
+  min-height: 12px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #f1f5f9 0%, #ffffff 45%, #f1f5f9 100%);
+  background-size: 200% 100%;
+  animation: tenantMonitoringSkeleton 1.25s ease-in-out infinite;
+}
+
+.tenant-monitoring-summary-card.is-skeleton span {
+  width: 42px;
+  height: 42px;
+  border-radius: 8px;
+}
+
+.tenant-monitoring-summary-card.is-skeleton strong {
+  width: 44%;
+  height: 22px;
+}
+
+.tenant-monitoring-summary-card.is-skeleton small {
+  width: 74%;
+}
+
+.tenant-monitoring-status.is-skeleton {
+  grid-template-columns: 34px minmax(0, 1fr);
+  border-color: #e8dbe3;
+  background: #ffffff;
+}
+
+.tenant-monitoring-status.is-skeleton > span {
+  width: 30px;
+  height: 30px;
+  border-radius: 999px;
+}
+
+.tenant-monitoring-skeleton-table {
+  display: grid;
+  gap: 0;
+  padding: 10px !important;
+}
+
+.tenant-monitoring-skeleton-row {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) 120px 120px 120px;
+  gap: 18px;
+  padding: 16px;
+  border-bottom: 1px solid #eef2f7;
+}
+
+.tenant-monitoring-skeleton-row:last-child {
+  border-bottom: 0;
+}
+
+@keyframes tenantMonitoringSkeleton {
+  to { background-position: -200% 0; }
+}
+
+@media (max-width: 1060px) {
+  .tenant-monitoring-content-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .tenant-monitoring-chart-canvas {
+    height: 320px;
+  }
+
+  .tenant-monitoring-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .tenant-monitoring-controls {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .tenant-monitoring-filter-chips {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 760px) {
+  .tenant-monitoring-content-grid {
+    display: block;
+  }
+
+  .tenant-monitoring-chart {
+    margin-top: 12px;
+    padding: 14px 10px;
+  }
+
+  .tenant-monitoring-chart-canvas {
+    height: 300px;
+  }
+
+  .tenant-monitoring-view {
+    padding: 14px 12px 22px !important;
+  }
+
+  .tenant-monitoring-header.orders-page-header,
+  .tenant-monitoring-header-actions {
+    display: grid !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    justify-content: stretch !important;
+  }
+
+  .tenant-monitoring-header-actions {
+    gap: 10px !important;
+  }
+
+  .tenant-monitoring-header-actions .orders-header-refresh {
+    width: 100% !important;
+    min-height: 46px !important;
+  }
+
+  .tenant-monitoring-summary,
+  .tenant-monitoring-controls {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .tenant-monitoring-filter-chips {
+    grid-column: auto;
+    margin-inline: -2px;
+    padding-bottom: 6px;
+  }
+
+  .tenant-monitoring-filter-chip {
+    min-height: 44px;
+  }
+
+  .tenant-monitoring-search,
+  .tenant-monitoring-sort {
+    min-height: 46px;
+  }
+
+  .tenant-monitoring-status {
+    grid-template-columns: 30px minmax(0, 1fr);
+  }
+
+  .tenant-monitoring-status small {
+    grid-column: 1 / -1;
+    justify-self: start;
+  }
+
+  .tenant-monitoring-table-wrap.orders-page-table-wrap {
+    border: 0 !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    overflow: visible !important;
+  }
+
+  .tenant-monitoring-table-wrap .tenant-monitoring-table,
+  .tenant-monitoring-table-wrap .tenant-monitoring-table tbody,
+  .tenant-monitoring-table-wrap .tenant-monitoring-table tr,
+  .tenant-monitoring-table-wrap .tenant-monitoring-table td {
+    display: block !important;
+    width: 100% !important;
+    min-width: 0 !important;
+  }
+
+  .tenant-monitoring-table-wrap .tenant-monitoring-table thead {
+    display: none !important;
+  }
+
+  .tenant-monitoring-table-wrap .tenant-monitoring-table tbody {
+    display: grid !important;
+    gap: 10px !important;
+  }
+
+  .tenant-monitoring-table-wrap .tenant-monitoring-table tr {
+    border: 1px solid #e8dbe3 !important;
+    border-radius: 8px !important;
+    background: #ffffff !important;
+    box-shadow: 0 12px 28px rgba(15, 23, 42, 0.055) !important;
+    overflow: hidden !important;
+  }
+
+  .tenant-monitoring-table-wrap .tenant-monitoring-table td {
+    display: grid !important;
+    grid-template-columns: minmax(104px, 0.45fr) minmax(0, 1fr) !important;
+    align-items: center !important;
+    gap: 12px !important;
+    padding: 12px 14px !important;
+    text-align: left !important;
+  }
+
+  .tenant-monitoring-table-wrap .tenant-monitoring-table td::before {
+    content: attr(data-label);
+    color: #64748b;
+    font-size: 10px;
+    font-weight: 950;
+    text-transform: uppercase;
+  }
+
+  .tenant-monitoring-table-wrap .tenant-monitoring-table td[data-label="Empresa"] {
+    display: block !important;
+  }
+
+  .tenant-monitoring-table-wrap .tenant-monitoring-table td[data-label="Empresa"]::before {
+    display: none;
+  }
+
+  .tenant-monitoring-company-cell strong,
+  .tenant-monitoring-company-cell small {
+    white-space: normal;
+  }
+
+  .tenant-monitoring-error {
+    grid-template-columns: 1fr;
+  }
+}

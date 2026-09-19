@@ -27,6 +27,7 @@ export function UsersManagementPage(props) {
     canViewInventario,
     canViewContabilidad,
     canViewClientesPanel,
+    canViewTenantMonitoring,
     onGoPipeline,
     onGoPedidos,
     onGoProduccion,
@@ -36,6 +37,7 @@ export function UsersManagementPage(props) {
     onGoContabilidad,
     onGoClientes,
     onGoUsuarios,
+    onGoTenantMonitoring,
     onLogout,
   } = props;
   const users = useUsersManagementController({ session, canViewUsuariosGlobal });
@@ -68,6 +70,7 @@ export function UsersManagementPage(props) {
           inventario: canViewInventario,
           contabilidad: canViewContabilidad,
           clientes: canViewClientesPanel,
+          seguimiento: canViewTenantMonitoring,
           usuarios: true,
         }}
         navigation={{
@@ -79,6 +82,7 @@ export function UsersManagementPage(props) {
           inventario: onGoInventario,
           contabilidad: onGoContabilidad,
           clientes: onGoClientes,
+          seguimiento: onGoTenantMonitoring,
           usuarios: onGoUsuarios,
         }}
       />
