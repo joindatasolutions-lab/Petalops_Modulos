@@ -3,6 +3,7 @@ import { tenantConfig } from "../../config/tenantConfig.js";
 import { createApiClient } from "../../infrastructure/apiClient.js";
 import { AppSidebar } from "../../shared/AppSidebar.jsx";
 import { useSidebarState } from "../../shared/useSidebarState.js";
+import { useDebouncedValue } from "../../shared/useDebouncedValue.js";
 import { formatDateOnly, formatDateTimeCompact, normalizeStatus, toIsoDateEnd, toIsoDateStart } from "../../shared/utils.js";
 import {
   IconCalendarPlus,
@@ -61,6 +62,7 @@ const BADGE_CLASS_BY_STATUS = {
 const COLOMBIA_UTC_OFFSET_MINUTES = -5 * 60;
 const FLORISTA_REMINDER_INTERVAL_MS = 60 * 60 * 1000;
 const FLORISTA_REMINDER_VISIBLE_MS = 30 * 1000;
+const PRODUCTION_SEARCH_MAX_LENGTH = 32;
 const PRODUCTION_STATUS_CHIP_CLASS = {
   PENDIENTE: "is-pending",
   ENPRODUCCION: "is-production",
@@ -93,6 +95,10 @@ function normalizeSearchText(value) {
     .replace(/[\u0300-\u036f]/g, "")
     .trim()
     .toLowerCase();
+}
+
+function normalizeProductionSearchInput(value) {
+  return String(value || "").replace(/\s+/g, " ").slice(0, PRODUCTION_SEARCH_MAX_LENGTH);
 }
 
 function initialsFromName(value) {
@@ -1404,6 +1410,7 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
   const [submenu, setSubmenu] = useState("pedidos");
   const [productionMenuOpen, setProductionMenuOpen] = useState(false);
   const [busquedaGeneral, setBusquedaGeneral] = useState("");
+  const debouncedBusquedaGeneral = useDebouncedValue(busquedaGeneral, 450);
   const [soloMisAsignados, setSoloMisAsignados] = useState(!canManageProductionActions);
   const [activeMetricFilter, setActiveMetricFilter] = useState(null);
   const [productionPage, setProductionPage] = useState(1);
@@ -1501,12 +1508,12 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
   const shouldGroupVisibleItemsByPedido = !activeMetricFilter || activeMetricFilter === "pendientesHastaHoy";
 
   const visibleItems = useMemo(
-    () => buildVisibleProductionItems(items, currentFloristaId, busquedaGeneral, effectiveSoloMisAsignados, shouldGroupVisibleItemsByPedido, currentFloristaName),
-    [items, currentFloristaId, currentFloristaName, busquedaGeneral, effectiveSoloMisAsignados, shouldGroupVisibleItemsByPedido]
+    () => buildVisibleProductionItems(items, currentFloristaId, debouncedBusquedaGeneral, effectiveSoloMisAsignados, shouldGroupVisibleItemsByPedido, currentFloristaName),
+    [items, currentFloristaId, currentFloristaName, debouncedBusquedaGeneral, effectiveSoloMisAsignados, shouldGroupVisibleItemsByPedido]
   );
   const searchOverridesFilters = useMemo(
-    () => normalizeSearchText(busquedaGeneral).length > 0,
-    [busquedaGeneral]
+    () => normalizeSearchText(debouncedBusquedaGeneral).length > 0,
+    [debouncedBusquedaGeneral]
   );
   const metrics = useMemo(() => {
     const total = visibleItems.length;
@@ -1582,7 +1589,7 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
 
   useEffect(() => {
     setProductionPage(1);
-  }, [activeMetricFilter, busquedaGeneral, fecha, estadosFiltro, soloMisAsignados, productionPageSize]);
+  }, [activeMetricFilter, debouncedBusquedaGeneral, fecha, estadosFiltro, soloMisAsignados, productionPageSize]);
 
   useEffect(() => {
     if (productionPage > productionPages) {
@@ -1635,13 +1642,16 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
     setEstadosFiltro(ESTADOS_UI);
   }, []);
 
-  const loadItems = useCallback(async () => {
+  const loadItems = useCallback(async ({ silent = false } = {}) => {
     const requestId = (loadItemsRequestIdRef.current += 1);
     const isStaleRequest = () => loadItemsRequestIdRef.current !== requestId;
-    setLoading(true);
-    setError("");
+    if (!silent) {
+      setLoading(true);
+      setError("");
+    }
 
     try {
+      const searchTerm = String(debouncedBusquedaGeneral || "").trim();
       const shouldIncludeCanceled = shouldIncludeCanceledProduction(estadosFiltro);
       const backendStatusFilter = productionBackendStatusFilter(estadosFiltro);
       const isDuePendingMetricFilter = activeMetricFilter === "pendientesHastaHoy";
@@ -1653,7 +1663,7 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
         sucursalId,
         fecha: searchOverridesFilters || activeMetricFilter ? undefined : fecha,
         estado: searchOverridesFilters || activeMetricFilter ? undefined : backendStatusFilter,
-        q: searchOverridesFilters ? busquedaGeneral : undefined,
+        q: searchOverridesFilters ? searchTerm : undefined,
         metricFilter: searchOverridesFilters || isDuePendingMetricFilter ? undefined : activeMetricFilter,
         todasFechas: isDuePendingMetricFilter || (!searchOverridesFilters && !activeMetricFilter && !fecha),
         incluirCancelado: shouldIncludeCanceled,
@@ -1681,7 +1691,7 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
         const pipelinePayload = await api.listarPipelinePedidos({
           empresaId,
           sucursalId,
-          numeroPedido: String(busquedaGeneral || "").trim(),
+          numeroPedido: searchTerm,
           soloHoy: false,
           soloAtrasados: false,
           soloEnProduccion: false,
@@ -1724,14 +1734,14 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
         });
         nextItemsRaw = (Array.isArray(fallbackResponse.items) ? fallbackResponse.items : [])
           .map(normalizeProductionItemStatus)
-          .filter(item => productionItemMatchesSearch(item, busquedaGeneral));
+          .filter(item => productionItemMatchesSearch(item, searchTerm));
       }
       if (shouldIncludeCanceled && !activeMetricFilter) {
         try {
           const canceledOrdersPayload = await api.listarPedidos({
             empresaId,
             sucursalId,
-            q: searchOverridesFilters ? busquedaGeneral : "",
+            q: searchOverridesFilters ? searchTerm : "",
             estado: "CANCELADO",
             sinImprimir: false,
             soloTienda: false,
@@ -1751,7 +1761,7 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
       const nextItems = activeMetricFilter
         ? nextItemsRaw.filter(item => !isCanceledProductionStatus(item))
         : searchOverridesFilters
-        ? nextItemsRaw.filter(item => productionItemMatchesSearch(item, busquedaGeneral))
+        ? nextItemsRaw.filter(item => productionItemMatchesSearch(item, searchTerm))
         : nextItemsRaw.filter(item =>
           estadosFiltro.some(estadoItem => normalizeStatus(estadoItem) === normalizeStatus(item.estado))
         );
@@ -1765,19 +1775,21 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
         atrasados: Object.prototype.hasOwnProperty.call(metricas, "atrasados") ? Number(metricas.atrasados || 0) : null,
         pendientesFuturos: Number(metricas.pendientesFuturos || 0),
       });
-      setError("");
+      if (!silent) setError("");
       return nextItems;
     } catch (nextError) {
       console.error("Error cargando producción:", nextError);
       if (isStaleRequest()) return [];
-      setItems([]);
-      setProductionMetricas({ pendientesHoy: null, sinAsignar: null, atrasados: null, pendientesFuturos: 0 });
-      setError("No fue posible cargar el módulo de producción.");
+      if (!silent) {
+        setItems([]);
+        setProductionMetricas({ pendientesHoy: null, sinAsignar: null, atrasados: null, pendientesFuturos: 0 });
+        setError("No fue posible cargar el módulo de producción.");
+      }
       return [];
     } finally {
-      if (!isStaleRequest()) setLoading(false);
+      if (!silent && !isStaleRequest()) setLoading(false);
     }
-  }, [api, fecha, estadosFiltro, activeMetricFilter, empresaId, sucursalId, searchOverridesFilters, busquedaGeneral]);
+  }, [api, fecha, estadosFiltro, activeMetricFilter, empresaId, sucursalId, searchOverridesFilters, debouncedBusquedaGeneral]);
 
   const loadDueUnfinishedOrdersCount = useCallback(async () => {
     try {
@@ -2127,9 +2139,39 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
     setAssignmentItem(null);
   };
 
+  const productionItemMatchesIds = useCallback((candidate, targetIds) => {
+    if (!candidate || targetIds.size === 0) return false;
+    const candidateIds = [
+      candidate.idProduccion,
+      ...(Array.isArray(candidate.produccionIds) ? candidate.produccionIds : []),
+    ];
+    return candidateIds.some(value => targetIds.has(Number(value)));
+  }, []);
+
+  const patchProductionItemsByIds = useCallback((produccionIds, patch) => {
+    const targetIds = new Set((Array.isArray(produccionIds) ? produccionIds : [produccionIds])
+      .map(Number)
+      .filter(value => Number.isFinite(value) && value > 0));
+    if (targetIds.size === 0) return;
+
+    const patchItem = item => (productionItemMatchesIds(item, targetIds) ? { ...item, ...patch } : item);
+    setItems(current => current.map(patchItem));
+    setSelectedItem(current => (current ? patchItem(current) : current));
+    setAssignmentItem(current => (current ? patchItem(current) : current));
+  }, [productionItemMatchesIds]);
+
+  const refreshProductionAfterAction = useCallback(() => {
+    Promise.allSettled([
+      loadItems({ silent: true }),
+      loadDueUnfinishedOrdersCount(),
+    ]).catch(nextError => {
+      console.warn("No fue posible refrescar producción en segundo plano:", nextError);
+    });
+  }, [loadDueUnfinishedOrdersCount, loadItems]);
+
   const refreshAndKeepSelection = async item => {
     const [nextItems] = await Promise.all([loadItems(), loadDueUnfinishedOrdersCount()]);
-    const nextVisible = buildVisibleProductionItems(nextItems, currentFloristaId, busquedaGeneral, effectiveSoloMisAsignados, true, currentFloristaName);
+    const nextVisible = buildVisibleProductionItems(nextItems, currentFloristaId, debouncedBusquedaGeneral, effectiveSoloMisAsignados, true, currentFloristaName);
     const nextSelected = nextVisible.find(candidate => Number(candidate.pedidoID) === Number(item?.pedidoID));
     if (nextSelected) {
       if (assignmentDrawerOpen) {
@@ -2215,7 +2257,8 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
         origenCambio: "panel_produccion_admin",
         cambioAdministrativo: true
       })));
-      await refreshAndKeepSelection(item);
+      patchProductionItemsByIds(produccionIds, { estado: nuevoEstado });
+      refreshProductionAfterAction();
       setMotivoAccion("");
     } catch (nextError) {
       console.error("Error cambiando estado:", nextError);
@@ -2243,7 +2286,8 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
         origenCambio: "panel_produccion_admin_rapido",
         cambioAdministrativo: true
       })));
-      await refreshAndKeepSelection(item);
+      patchProductionItemsByIds(produccionIds, { estado: nuevoEstado });
+      refreshProductionAfterAction();
     } catch (nextError) {
       console.error("Error cambiando estado rápido de admin:", nextError);
       globalThis.alert(productionActionErrorMessage(nextError, "No fue posible cambiar el estado. Verifica transición válida."));
@@ -2274,7 +2318,8 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
         origenCambio: "panel_produccion_florista",
         cambioAdministrativo: false
       })));
-      await Promise.all([loadItems(), loadDueUnfinishedOrdersCount()]);
+      patchProductionItemsByIds(produccionIds, { estado: nuevoEstado });
+      refreshProductionAfterAction();
     } catch (nextError) {
       console.error("Error cambiando estado rápido de florista:", nextError);
       globalThis.alert(productionActionErrorMessage(nextError, "No fue posible cambiar el estado."));
@@ -2425,10 +2470,11 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
                 <Search size={17} strokeWidth={2} aria-hidden="true" />
                 <input
                   type="search"
+                  maxLength={PRODUCTION_SEARCH_MAX_LENGTH}
                   value={busquedaGeneral}
                   onChange={event => {
                     setActiveMetricFilter(null);
-                    setBusquedaGeneral(event.target.value);
+                    setBusquedaGeneral(normalizeProductionSearchInput(event.target.value));
                   }}
                   placeholder="Buscar florista, cliente o pedido..."
                   title="Buscar por florista, cliente o número de pedido"
@@ -2541,10 +2587,11 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
                 <Search size={19} strokeWidth={2} aria-hidden="true" />
                 <input
                   type="search"
+                  maxLength={PRODUCTION_SEARCH_MAX_LENGTH}
                   value={busquedaGeneral}
                   onChange={event => {
                     setActiveMetricFilter(null);
-                    setBusquedaGeneral(event.target.value);
+                    setBusquedaGeneral(normalizeProductionSearchInput(event.target.value));
                   }}
                   placeholder="Buscar pedido, cliente..."
                   title="Buscar por florista, cliente o número de pedido"

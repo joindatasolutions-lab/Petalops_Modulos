@@ -824,7 +824,7 @@ describe("estabilidad de filtros por vista", () => {
     expect(productionItemMatchesSearch(item, "96479")).toBe(true);
   });
 
-  it("Domicilios: buscar numero de pedido ignora fecha y consulta varios estados", () => {
+  it("Domicilios: buscar numero de pedido ignora fecha y usa respaldo acotado", () => {
     const queryPlan = buildDeliveryAdminQueryPlan({
       filtro: "hoy",
       statusFilter: "todos",
@@ -835,8 +835,10 @@ describe("estabilidad de filtros por vista", () => {
     expect(queryPlan.fecha).toBeNull();
     expect(queryPlan.primaryFilter).toBe("todos");
     expect(queryPlan.useFallbackFilters).toBe(true);
+    expect(queryPlan.filtersToFetch).toHaveLength(4);
     expect(queryPlan.filtersToFetch).toContain("pendientes");
     expect(queryPlan.filtersToFetch).toContain("enruta");
+    expect(queryPlan.filtersToFetch).not.toContain("entregado");
   });
 
   it("Domicilios admin: buscar numero de pedido tiene prioridad sobre filtro de estado", () => {
@@ -851,8 +853,8 @@ describe("estabilidad de filtros por vista", () => {
     expect(queryPlan.primaryFilter).toBe("todos");
     expect(queryPlan.useFallbackFilters).toBe(true);
     expect(queryPlan.filtersToFetch).toContain("pendientes");
-    expect(queryPlan.filtersToFetch).toContain("entregado");
     expect(queryPlan.filtersToFetch).toContain("noentregado");
+    expect(queryPlan.filtersToFetch).not.toContain("entregado");
   });
 
   it("Domicilios: sin busqueda numerica conserva fecha y estado seleccionado", () => {
