@@ -1,7 +1,10 @@
 const PEDIDOS_MAX_PAGE_SIZE = 300;
 const LOGIN_TIMEOUT_MS = 30000;
+export const AUTH_EXPIRED_EVENT = "petalops:auth-expired";
 const NETWORK_ERROR_MESSAGE = "Sin conexión con el servidor. Verifica tu red e intenta de nuevo.";
 const NETWORK_RETRY_DELAYS_MS = [500, 1200];
+const SEARCH_PARAM_MAX_LENGTH = 64;
+const ORDER_PARAM_MAX_LENGTH = 16;
 
 function isNetworkError(error) {
   return error instanceof TypeError;
@@ -17,6 +20,50 @@ function toNetworkError(originalError) {
   error.isNetworkError = true;
   error.cause = originalError;
   return error;
+}
+
+function normalizeSearchParam(value, maxLength = SEARCH_PARAM_MAX_LENGTH) {
+  return String(value || "").replace(/\s+/g, " ").trim().slice(0, maxLength);
+}
+
+function normalizeErrorText(value) {
+  return String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .toLowerCase();
+}
+
+function isAuthExpiredError(error) {
+  const status = Number(error?.status || 0);
+  if (status !== 401 && status !== 403) return false;
+
+  const text = normalizeErrorText([
+    error?.detail,
+    error?.message,
+    error?.code,
+  ].filter(Boolean).join(" "));
+
+  return text.includes("token")
+    && (
+      text.includes("expir")
+      || text.includes("invalid")
+      || text.includes("invalido")
+      || text.includes("jwt")
+    );
+}
+
+function notifyAuthExpired(error) {
+  try {
+    globalThis.dispatchEvent(new CustomEvent(AUTH_EXPIRED_EVENT, {
+      detail: {
+        status: error?.status || 401,
+        message: error?.detail || error?.message || "Token invalido o expirado",
+      },
+    }));
+  } catch {
+    // Mantiene el flujo original si el navegador no soporta CustomEvent.
+  }
 }
 
 function buildEmpresaGestionPayload(payload = {}, { includeAdmin = false, includeSucursal = false } = {}) {
@@ -87,7 +134,8 @@ export function createApiClient(config) {
     let module = "";
     let requestId = "";
     try {
-      const payload = await response.json();
+      const jsonSource = typeof response.clone === "function" ? response.clone() : response;
+      const payload = await jsonSource.json();
       if (payload?.error?.message) {
         detail = String(payload.error.message || "").trim();
         code = String(payload.error.code || "").trim();
@@ -97,7 +145,16 @@ export function createApiClient(config) {
         detail = String(payload?.detail || "").trim();
       }
     } catch {
-      detail = "";
+      try {
+        detail = String(await response.text()).trim();
+      } catch {
+        detail = "";
+      }
+    }
+
+    if (response.status === 429) {
+      detail = "El servidor esta ocupado por muchas solicitudes. Espera unos segundos y vuelve a intentar.";
+      code = code || "SERVICE_BUSY";
     }
 
     const contextParts = [code, module ? `modulo ${module}` : "", requestId ? `request_id ${requestId}` : ""].filter(Boolean);
@@ -146,7 +203,11 @@ export function createApiClient(config) {
 
   const requestJson = async (path, options = {}) => {
     const response = await authFetch(path, options);
-    if (!response.ok) throw await toHttpError(response);
+    if (!response.ok) {
+      const error = await toHttpError(response);
+      if (isAuthExpiredError(error)) notifyAuthExpired(error);
+      throw error;
+    }
     return response.json();
   };
 
@@ -213,7 +274,8 @@ export function createApiClient(config) {
       if (empresaId != null) params.set("empresaID", String(empresaId));
       if (sucursalId != null) params.set("sucursalID", String(sucursalId));
       if (estado) params.set("estado", String(estado));
-      if (q) params.set("q", String(q));
+      const safeSearch = normalizeSearchParam(q);
+      if (safeSearch) params.set("q", safeSearch);
       return requestJson(`/auth/usuarios?${params.toString()}`);
     },
 
@@ -313,7 +375,8 @@ export function createApiClient(config) {
     async listarClientes({ empresaId, q = "", celular = "", telefono = "", soloActivos = false, includeMetrics = false, page = null, pageSize = null }) {
       const params = new URLSearchParams();
       params.set("empresaID", String(empresaId));
-      if (q) params.set("q", String(q));
+      const safeSearch = normalizeSearchParam(q);
+      if (safeSearch) params.set("q", safeSearch);
       if (celular) params.set("celular", String(celular));
       if (telefono) params.set("telefono", String(telefono));
       if (soloActivos) params.set("soloActivos", "true");
@@ -426,6 +489,16 @@ export function createApiClient(config) {
 
     async listarEmpresasModulosGestion() {
       return requestJson("/auth/usuarios/empresas/modulos");
+    },
+
+    async listarSeguimientoTenants({ fechaHoy = "", anio = "", mes = "", limit = "" } = {}) {
+      const params = new URLSearchParams();
+      if (fechaHoy) params.set("fechaHoy", String(fechaHoy));
+      if (anio) params.set("anio", String(anio));
+      if (mes) params.set("mes", String(mes));
+      if (limit) params.set("limit", String(limit));
+      const query = params.toString();
+      return requestJson(`/seguimiento-tenants/empresas${query ? `?${query}` : ""}`);
     },
 
     async crearTenantGestion(payload) {
@@ -601,7 +674,8 @@ export function createApiClient(config) {
       if (categoria) params.set("categoria", String(categoria));
       if (estado) params.set("estado", String(estado));
       if (proveedorId != null) params.set("proveedorID", String(proveedorId));
-      if (q) params.set("q", String(q));
+      const safeSearch = normalizeSearchParam(q);
+      if (safeSearch) params.set("q", safeSearch);
       params.set("soloCriticos", soloCriticos ? "true" : "false");
       params.set("soloVendibles", soloVendibles ? "true" : "false");
       return requestJson(`/inventario?${params.toString()}`);
@@ -801,7 +875,8 @@ export function createApiClient(config) {
       const params = new URLSearchParams();
       params.set("empresaID", String(empresaId));
       if (sucursalId != null) params.set("sucursalID", String(sucursalId));
-      if (q) params.set("q", String(q));
+      const safeSearch = normalizeSearchParam(q);
+      if (safeSearch) params.set("q", safeSearch);
       if (estado) params.set("estado", String(estado));
       const normalizedFechaDesde = normalizePedidosDateParam(fechaDesde);
       const normalizedFechaHasta = normalizePedidosDateParam(fechaHasta);
@@ -848,7 +923,8 @@ export function createApiClient(config) {
       if (fechaHasta) params.set("fechaHasta", String(fechaHasta));
       if (domiciliarioId != null && String(domiciliarioId).trim()) params.set("domiciliarioID", String(domiciliarioId).trim());
       if (floristaId != null && String(floristaId).trim()) params.set("floristaID", String(floristaId).trim());
-      if (numeroPedido) params.set("numeroPedido", String(numeroPedido));
+      const safeNumeroPedido = normalizeSearchParam(numeroPedido, ORDER_PARAM_MAX_LENGTH);
+      if (safeNumeroPedido) params.set("numeroPedido", safeNumeroPedido);
       params.set("soloHoy", soloHoy ? "true" : "false");
       params.set("soloAtrasados", soloAtrasados ? "true" : "false");
       params.set("soloEnProduccion", soloEnProduccion ? "true" : "false");
@@ -880,7 +956,8 @@ export function createApiClient(config) {
     async buscarArreglosCatalogo({ empresaId, sucursalId, q = "" }) {
       const params = new URLSearchParams();
       if (sucursalId != null) params.set("sucursalId", String(sucursalId));
-      if (q) params.set("q", q);
+      const safeSearch = normalizeSearchParam(q);
+      if (safeSearch) params.set("q", safeSearch);
       return requestJson(`/catalogo/${empresaId}${params.toString() ? `?${params.toString()}` : ""}`);
     },
 
@@ -888,7 +965,7 @@ export function createApiClient(config) {
       const params = new URLSearchParams();
       params.set("empresa_id", String(empresaId));
       params.set("sucursal_id", String(sucursalId));
-      params.set("q", String(q || ""));
+      params.set("q", normalizeSearchParam(q));
       return requestJson(`/barrios/search?${params.toString()}`);
     },
 
@@ -1208,7 +1285,8 @@ export function createApiClient(config) {
       if (sucursalId != null) params.set("sucursalID", String(sucursalId));
       if (fecha) params.set("fecha", String(fecha));
       if (estado) params.set("estado", String(estado));
-      if (q) params.set("q", String(q));
+      const safeSearch = normalizeSearchParam(q);
+      if (safeSearch) params.set("q", safeSearch);
       if (metricFilter) params.set("metricFilter", String(metricFilter));
       if (todasFechas) params.set("todasFechas", "true");
       params.set("incluirCancelado", incluirCancelado ? "true" : "false");
@@ -1427,7 +1505,8 @@ export function createApiClient(config) {
       if (sucursalId != null) params.set("sucursalID", String(sucursalId));
       params.set("soloActivos", soloActivos ? "true" : "false");
       if (estado) params.set("estado", String(estado));
-      if (q) params.set("q", String(q));
+      const safeSearch = normalizeSearchParam(q);
+      if (safeSearch) params.set("q", safeSearch);
       return requestJson(`/domicilios/domiciliarios?${params.toString()}`);
     },
 
@@ -1486,7 +1565,8 @@ export function createApiClient(config) {
       if (sucursalId != null) params.set("sucursalID", String(sucursalId));
       params.set("filtro", String(filtro));
       if (fecha) params.set("fecha", String(fecha));
-      if (q) params.set("q", String(q));
+      const safeSearch = normalizeSearchParam(q);
+      if (safeSearch) params.set("q", safeSearch);
       if (domiciliarioID != null && String(domiciliarioID).trim()) {
         params.set("domiciliarioID", String(domiciliarioID));
         params.set("domiciliarioId", String(domiciliarioID));

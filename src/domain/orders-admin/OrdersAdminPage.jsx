@@ -210,7 +210,7 @@ function selectPreferredSpanishVoice(synth) {
     .sort((left, right) => right.score - left.score)[0]?.voice || null;
 }
 
-export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canViewCatalogo, canViewProduccion, canViewDomicilios, canViewBarrios, canViewInventario, canViewContabilidad, canViewClientesPanel, canViewUsuariosPanel, onLogout, onGoPipeline, onGoPedidos, onGoProduccion, onGoDomicilios, onGoBarrios, onGoInventario, onGoContabilidad, onGoClientes, onGoUsuarios }) {
+export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canViewCatalogo, canViewProduccion, canViewDomicilios, canViewBarrios, canViewInventario, canViewContabilidad, canViewClientesPanel, canViewUsuariosPanel, canViewTenantMonitoring, onLogout, onGoPipeline, onGoPedidos, onGoProduccion, onGoDomicilios, onGoBarrios, onGoInventario, onGoContabilidad, onGoClientes, onGoUsuarios, onGoTenantMonitoring }) {
   const [filters, setFilters] = useState(initialFilters);
   const [selectedPedidoId, setSelectedPedidoId] = useState(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -2366,6 +2366,7 @@ const ordersOverlayOpen = drawerOpen || newOrderOpen || messageCardOpen || Boole
             inventario: canViewInventario,
             contabilidad: canViewContabilidad,
             clientes: canViewClientesPanel,
+            seguimiento: canViewTenantMonitoring,
             usuarios: canViewUsuariosPanel,
           }}
           navigation={{
@@ -2377,6 +2378,7 @@ const ordersOverlayOpen = drawerOpen || newOrderOpen || messageCardOpen || Boole
             inventario: onGoInventario,
             contabilidad: onGoContabilidad,
             clientes: onGoClientes,
+            seguimiento: onGoTenantMonitoring,
             usuarios: onGoUsuarios,
           }}
           badges={{ pedidos: total }}

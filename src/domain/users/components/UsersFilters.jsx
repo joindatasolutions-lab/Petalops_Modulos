@@ -14,13 +14,16 @@ export function UsersFilters({
   q,
   setQ,
 }) {
+  const isAllCompanies = canViewUsuariosGlobal && (empresaID === "" || empresaID == null);
+
   return (
     <section className="orders-filters orders-page-filters users-filters">
       {canViewUsuariosGlobal ? (
         <div className="filter-field orders-filter-field">
           <div className="orders-filter-control">
             <Building2 size={17} strokeWidth={2} aria-hidden="true" />
-            <select value={empresaID} onChange={event => setEmpresaID(Number(event.target.value))}>
+            <select value={empresaID === "" || empresaID == null ? "" : String(empresaID)} onChange={event => setEmpresaID(event.target.value)}>
+              <option value="">Todos los negocios</option>
               {empresas.map(item => <option key={item.empresaID} value={item.empresaID}>{item.empresaSlug ? `${item.nombre} (ID ${item.empresaID} - ${item.empresaSlug})` : `${item.nombre} (ID ${item.empresaID})`}</option>)}
             </select>
           </div>
@@ -42,7 +45,12 @@ export function UsersFilters({
       <div className="filter-field orders-filter-field">
         <div className="orders-filter-control">
           <Store size={17} strokeWidth={2} aria-hidden="true" />
-          <select value={sucursalID} onChange={event => setSucursalID(event.target.value)}>
+          <select
+            value={isAllCompanies ? "" : sucursalID}
+            onChange={event => setSucursalID(event.target.value)}
+            disabled={isAllCompanies}
+            title={isAllCompanies ? "Selecciona un negocio para filtrar por sucursal" : undefined}
+          >
             <option value="">Todas las sucursales</option>
             {sucursales.map(item => <option key={item.sucursalID} value={item.sucursalID}>Sucursal {item.sucursalID}</option>)}
           </select>

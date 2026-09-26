@@ -7,6 +7,7 @@ import {
   Package2,
   PanelLeftClose,
   PanelLeftOpen,
+  Radar,
   Receipt,
   ShieldUser,
   Truck,
@@ -39,6 +40,7 @@ const SIDEBAR_SECTIONS = [
     items: [
       { key: "contabilidad", label: "Contabilidad", Icon: Receipt, canViewKey: "contabilidad", goKey: "contabilidad" },
       { key: "clientes", label: "Clientes", Icon: UsersRound, canViewKey: "clientes", goKey: "clientes" },
+      { key: "seguimiento", label: "Seguimiento", Icon: Radar, canViewKey: "seguimiento", goKey: "seguimiento" },
       { key: "usuarios", label: "Gestión usuarios", Icon: ShieldUser, canViewKey: "usuarios", goKey: "usuarios" },
     ],
   },

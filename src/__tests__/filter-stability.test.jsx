@@ -6,7 +6,7 @@ import { filterInventoryItems } from "../domain/inventory/InventoryPage.jsx";
 import { filterNeighborhoodItems, sortNeighborhoods } from "../domain/neighborhoods/NeighborhoodsPage.jsx";
 import { buildOrdersMetrics, extractOrdersPayloadItems, filterOrdersByCreatedDateRange, filterOrdersBySearch, filterOrdersByStatus, isStorePickupOrder, localDateEndParam, localDateStartParam, resolveOrdersPayloadTotal, shouldAutoGenerateInvoiceForCompany, shouldShowPendingInvoiceAlert } from "../domain/orders-admin/OrdersAdminPage.jsx";
 import { buildDetailUpdatePayload, buildNewOrderCheckoutPayload, buildQuickSaleOrderPayload } from "../domain/orders-admin/orderPayloadBuilders.js";
-import { buildEditedOrderFinancialBase, buildOrderFinancialPreview, customArrangementPreTaxTotal, getOrderFinancialTotal, isDeliveryDelivered, isValidPaymentBreakdownTotal, normalizePedidosViewStatus, patchOrderItemFromDetail, resolveOrderListTotal } from "../domain/orders-admin/ordersDomain.js";
+import { buildEditedOrderFinancialBase, buildOrderFinancialPreview, customArrangementPreTaxTotal, getOrderFinancialTotal, isDeliveryDelivered, isValidPaymentBreakdownTotal, normalizePedidosViewStatus, patchOrderItemFromDetail, resolveOrderListTotal, resolveOrderProductSummary } from "../domain/orders-admin/ordersDomain.js";
 import { buildSalesExportRows } from "../domain/accounting/accountingExports.js";
 import { applyApprovedOrderCountsToRows } from "../domain/accounting/accountingSelectors.js";
 import {
@@ -72,6 +72,23 @@ describe("estabilidad de filtros por vista", () => {
     expect(isStorePickupOrder({ entrega: { tipo_entrega: "domicilio" }, barrio: "Riomar" })).toBe(false);
     expect(isStorePickupOrder({ tipoEntrega: "domicilio", direccion: "Calle 10 tienda la esquina" })).toBe(false);
     expect(isStorePickupOrder({ tipoEntrega: "domicilio", observacion: "recoger paquete", direccion: "Tienda del barrio" })).toBe(false);
+  });
+
+  it("Pedidos: resume todos los productos del pedido en la tarjeta", () => {
+    const summary = resolveOrderProductSummary({
+      empresaID: 9,
+      productosDetalle: [
+        { codigoProducto: "ROSEGARDEN-0008", nombreProducto: "Chocolate Hershey" },
+        { codigoProducto: "ROSEGARDEN-0072", nombreProducto: "SIX ROSE" },
+      ],
+    });
+
+    expect(summary.productText).toBe("ROSEGARDEN-0008 - Chocolate Hershey, ROSEGARDEN-0072 - SIX ROSE");
+    expect(summary.productLabels).toEqual([
+      "ROSEGARDEN-0008 - Chocolate Hershey",
+      "ROSEGARDEN-0072 - SIX ROSE",
+    ]);
+    expect(summary.title).toBe(summary.productText);
   });
 
   it("Pedidos: bloquea finalizar cuando el pedido ya esta finalizado", () => {
@@ -807,7 +824,7 @@ describe("estabilidad de filtros por vista", () => {
     expect(productionItemMatchesSearch(item, "96479")).toBe(true);
   });
 
-  it("Domicilios: buscar numero de pedido ignora fecha y consulta varios estados", () => {
+  it("Domicilios: buscar numero de pedido ignora fecha y usa respaldo acotado", () => {
     const queryPlan = buildDeliveryAdminQueryPlan({
       filtro: "hoy",
       statusFilter: "todos",
@@ -818,8 +835,10 @@ describe("estabilidad de filtros por vista", () => {
     expect(queryPlan.fecha).toBeNull();
     expect(queryPlan.primaryFilter).toBe("todos");
     expect(queryPlan.useFallbackFilters).toBe(true);
+    expect(queryPlan.filtersToFetch).toHaveLength(4);
     expect(queryPlan.filtersToFetch).toContain("pendientes");
     expect(queryPlan.filtersToFetch).toContain("enruta");
+    expect(queryPlan.filtersToFetch).not.toContain("entregado");
   });
 
   it("Domicilios admin: buscar numero de pedido tiene prioridad sobre filtro de estado", () => {
@@ -834,8 +853,8 @@ describe("estabilidad de filtros por vista", () => {
     expect(queryPlan.primaryFilter).toBe("todos");
     expect(queryPlan.useFallbackFilters).toBe(true);
     expect(queryPlan.filtersToFetch).toContain("pendientes");
-    expect(queryPlan.filtersToFetch).toContain("entregado");
     expect(queryPlan.filtersToFetch).toContain("noentregado");
+    expect(queryPlan.filtersToFetch).not.toContain("entregado");
   });
 
   it("Domicilios: sin busqueda numerica conserva fecha y estado seleccionado", () => {

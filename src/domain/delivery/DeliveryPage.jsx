@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { tenantConfig } from "../../config/tenantConfig.js";
 import { createApiClient } from "../../infrastructure/apiClient.js";
@@ -49,7 +49,8 @@ const DELIVERY_STATUS_BACKEND_FILTER = {
   "no-entregado": "noentregado",
   reprogramado: "reprogramado",
 };
-const DELIVERY_SEARCH_BACKEND_FILTERS = ["hoy", "manana", "pendientes", "asignado", "enruta", "entregado", "noentregado", "reprogramado"];
+const DELIVERY_SEARCH_BACKEND_FILTERS = ["pendientes", "asignado", "enruta", "noentregado"];
+const DELIVERY_SEARCH_MAX_LENGTH = 32;
 
 export function buildDeliveryAdminQueryPlan({ filtro = "hoy", statusFilter = "todos", fechaFiltro = "", deliverySearch = "" } = {}) {
   const backendStatusFilter = DELIVERY_STATUS_BACKEND_FILTER[statusFilter] || null;
@@ -351,6 +352,20 @@ function deliveryStatusMeta(item) {
   if (status === "NOENTREGADO") return { key: "no-entregado", label: label || "No entregado", tone: "failed" };
   if (status === "REPROGRAMADO") return { key: "reprogramado", label: label || "Reprogramado", tone: "rescheduled" };
   return { key: "pendiente", label: label || "Pendiente", tone: "pending" };
+}
+
+function deliveryStatusPatchForAction(action) {
+  const key = String(action || "").trim().toLowerCase();
+  if (key === "en-ruta" || key === "enruta") {
+    return { estado: "EnRuta", estadoEntrega: "EnRuta", estadoEntregaCodigo: "ENRUTA", estadoEntregaNombre: "En ruta" };
+  }
+  if (key === "entregado") {
+    return { estado: "Entregado", estadoEntrega: "Entregado", estadoEntregaCodigo: "ENTREGADO", estadoEntregaNombre: "Entregado" };
+  }
+  if (key === "no-entregado" || key === "noentregado") {
+    return { estado: "NoEntregado", estadoEntrega: "NoEntregado", estadoEntregaCodigo: "NOENTREGADO", estadoEntregaNombre: "No entregado" };
+  }
+  return {};
 }
 
 function hasExplicitDeliveryStatus(item) {
@@ -1574,6 +1589,15 @@ function deliverySearchIsOrderNumber(deliverySearch) {
   return /^#?\d{1,10}$/.test(String(deliverySearch || "").trim());
 }
 
+function normalizeDeliverySearchInput(value) {
+  return String(value || "").replace(/\s+/g, " ").slice(0, DELIVERY_SEARCH_MAX_LENGTH);
+}
+
+function isServiceCapacityError(error) {
+  return Number(error?.status || 0) === 429
+    || String(error?.message || error?.detail || "").toLowerCase().includes("no available instance");
+}
+
 function deliveryMatchesSelectedDate(item, fechaFiltro, deliverySearch) {
   if (!fechaFiltro || deliverySearchIsOrderNumber(deliverySearch)) return true;
   const date = deliveryDateLabel(item);
@@ -1770,6 +1794,7 @@ export function DeliveryPage({
   canViewContabilidad,
   canViewClientesPanel,
   canViewUsuariosPanel,
+  canViewTenantMonitoring,
   onLogout,
   onGoPipeline,
   onGoPedidos,
@@ -1780,6 +1805,7 @@ export function DeliveryPage({
   onGoContabilidad,
   onGoClientes,
   onGoUsuarios,
+  onGoTenantMonitoring,
 }) {
   const api = useMemo(() => createApiClient(tenantConfig), []);
   const empresaId = Number(session?.empresaID || tenantConfig.empresaId);
@@ -1867,6 +1893,7 @@ export function DeliveryPage({
   const [soloMisAsignados, setSoloMisAsignados] = useState(true);
   const [availableItems, setAvailableItems] = useState([]);
   const [myOrdersItems, setMyOrdersItems] = useState([]);
+  const loadRequestIdRef = useRef(0);
   const [availableCoords, setAvailableCoords] = useState(null);
 
   const [selectedDeliveryItem, setSelectedDeliveryItem] = useState(null);
@@ -2036,7 +2063,7 @@ export function DeliveryPage({
     ), 0);
   }, [api, metricsFechaDesde, metricsFechaHasta]);
 
-  const loadDeliveryMetrics = useCallback(async () => {
+  const loadDeliveryMetrics = useCallback(async (isCurrentRequest = () => true) => {
     const [metricsResult, unassignedResult] = await Promise.allSettled([
       api.obtenerMetricasDomicilios({
         empresaId,
@@ -2052,6 +2079,7 @@ export function DeliveryPage({
     if (metricsResult.status !== "fulfilled") throw metricsResult.reason;
 
     const data = metricsResult.value;
+    if (!isCurrentRequest()) return;
     setPerformanceUnassignedCount(unassignedResult.status === "fulfilled" ? unassignedResult.value : 0);
     setMetricsPayload({
       ...DEFAULT_DELIVERY_METRICS_RESPONSE,
@@ -2070,16 +2098,17 @@ export function DeliveryPage({
     });
   }, [api, empresaId, sucursalId, metricsFechaDesde, metricsFechaHasta, metricsDomiciliarioId, metricsGroupBy, modo, loadPerformanceUnassignedCount]);
 
-  const loadNoveltyDeliveries = useCallback(async () => {
+  const loadNoveltyDeliveries = useCallback(async (isCurrentRequest = () => true) => {
     const data = await api.listarDomiciliosAdmin({
       empresaId,
       sucursalId,
       filtro: "noentregado",
     });
+    if (!isCurrentRequest()) return;
     setAdminItems(filterDomicilioItems(normalizeDeliveryItemsPayload(data)).filter(item => !isCanceledDeliveryStatus(item)));
   }, [api, empresaId, sucursalId]);
 
-  const loadAdmin = useCallback(async () => {
+  const loadAdmin = useCallback(async (isCurrentRequest = () => true) => {
     const queryPlan = buildDeliveryAdminQueryPlan({ filtro, statusFilter, fechaFiltro, deliverySearch: debouncedDeliverySearch });
     const baseParams = {
       empresaId,
@@ -2093,10 +2122,12 @@ export function DeliveryPage({
         const primaryData = await api.listarDomiciliosAdmin({ ...baseParams, filtro: queryPlan.primaryFilter });
         const primaryItems = filterDomicilioItems(normalizeDeliveryItemsPayload(primaryData)).filter(item => !isCanceledDeliveryStatus(item));
         if (primaryItems.length > 0) {
+          if (!isCurrentRequest()) return;
           setAdminItems(primaryItems);
           return;
         }
       } catch (primaryError) {
+        if (isServiceCapacityError(primaryError)) throw primaryError;
         console.warn("Busqueda rapida de domicilio por pedido no disponible, usando respaldo por estados:", primaryError);
       }
     }
@@ -2104,9 +2135,12 @@ export function DeliveryPage({
     const results = await Promise.allSettled(
       queryPlan.filtersToFetch.map(nextFilter => api.listarDomiciliosAdmin({ ...baseParams, filtro: nextFilter }))
     );
+    const fulfilledResults = results.filter(result => result.status === "fulfilled");
+    if (results.length > 0 && fulfilledResults.length === 0) {
+      throw results[0].reason;
+    }
     const deduped = new Map();
-    for (const result of results) {
-      if (result.status !== "fulfilled") continue;
+    for (const result of fulfilledResults) {
       const data = result.value;
       for (const item of Array.isArray(data.items) ? data.items : []) {
         const key = String(item?.idEntrega || item?.id_entrega || item?.pedidoID || item?.pedidoId || item?.idPedido || item?.numeroPedido || item?.numero_pedido || "");
@@ -2114,6 +2148,7 @@ export function DeliveryPage({
         deduped.set(key, item);
       }
     }
+    if (!isCurrentRequest()) return;
     setAdminItems(filterDomicilioItems(Array.from(deduped.values())).filter(item => !isCanceledDeliveryStatus(item)));
   }, [api, empresaId, sucursalId, filtro, fechaFiltro, statusFilter, debouncedDeliverySearch]);
 
@@ -2210,16 +2245,19 @@ export function DeliveryPage({
   }, [api, sucursalId]);
 
   const runLoad = useCallback(async loader => {
+    const requestId = (loadRequestIdRef.current += 1);
+    const isCurrentRequest = () => loadRequestIdRef.current === requestId;
     setLoading(true);
     setError("");
 
     try {
-      await loader();
+      await loader(isCurrentRequest);
     } catch (nextError) {
+      if (!isCurrentRequest()) return;
       console.error("Error en módulo de domicilios:", nextError);
       setError(nextError?.detail || nextError?.message || "No fue posible cargar domicilios.");
     } finally {
-      setLoading(false);
+      if (isCurrentRequest()) setLoading(false);
     }
   }, []);
 
@@ -2239,11 +2277,11 @@ export function DeliveryPage({
       return;
     }
     if (modo === "metricas" || modo === "novedades") {
-      runLoad(async () => {
+      runLoad(async isCurrentRequest => {
         await Promise.all([
           loadDomiciliarios(),
-          loadDeliveryMetrics(),
-          ...(modo === "novedades" ? [loadNoveltyDeliveries()] : []),
+          loadDeliveryMetrics(isCurrentRequest),
+          ...(modo === "novedades" ? [loadNoveltyDeliveries(isCurrentRequest)] : []),
         ]);
       }).catch(() => {});
       return;
@@ -2346,15 +2384,15 @@ export function DeliveryPage({
       return;
     }
 
-    await runLoad(async () => {
+    await runLoad(async isCurrentRequest => {
       await loadDomiciliarios();
       if (modo === "admin") {
-        await loadAdmin();
+        await loadAdmin(isCurrentRequest);
       } else if (modo === "metricas" || modo === "novedades") {
         await Promise.all([
           loadDomiciliarios(),
-          loadDeliveryMetrics(),
-          ...(modo === "novedades" ? [loadNoveltyDeliveries()] : []),
+          loadDeliveryMetrics(isCurrentRequest),
+          ...(modo === "novedades" ? [loadNoveltyDeliveries(isCurrentRequest)] : []),
         ]);
       } else if (modo === "domiciliarios") {
         await loadCourierDirectory();
@@ -2607,6 +2645,19 @@ export function DeliveryPage({
     setRegularizationError("");
   };
 
+  const patchDeliveryItemById = useCallback((entregaId, patch) => {
+    const targetId = String(entregaId || "").trim();
+    if (!targetId) return;
+    const matchesTarget = item => String(item?.idEntrega || item?.id_entrega || "").trim() === targetId;
+    const patchItem = item => (matchesTarget(item) ? { ...item, ...patch } : item);
+
+    setAdminItems(current => current.map(patchItem));
+    setMyOrdersItems(current => current.map(patchItem));
+    setAvailableItems(current => current.map(patchItem));
+    setSelectedDeliveryItem(current => (current ? patchItem(current) : current));
+    setStatusModalItem(current => (current ? patchItem(current) : current));
+  }, []);
+
   const updateRegularizationForm = (field, value) => {
     setRegularizationForm(current => ({ ...current, [field]: value }));
   };
@@ -2645,11 +2696,13 @@ export function DeliveryPage({
     }
   };
 
-  const refreshDeliveryListsAfterStatusChange = async () => {
-    await Promise.allSettled([
+  const refreshDeliveryListsAfterStatusChange = () => {
+    Promise.allSettled([
       loadAdmin(),
       loadMyOrders(),
-    ]);
+    ]).catch(nextError => {
+      console.warn("No fue posible refrescar domicilios en segundo plano:", nextError);
+    });
   };
 
   const onSaveStatusChange = async () => {
@@ -2697,7 +2750,8 @@ export function DeliveryPage({
       }
 
       closeStatusModal();
-      await refreshDeliveryListsAfterStatusChange();
+      patchDeliveryItemById(entregaId, deliveryStatusPatchForAction(nextStatus));
+      refreshDeliveryListsAfterStatusChange();
     } catch (nextError) {
       console.error("Error cambiando estado de entrega:", nextError);
       setError(buildActionErrorMessage(nextError, "No fue posible cambiar el estado del pedido."));
@@ -2818,8 +2872,15 @@ export function DeliveryPage({
         limiteEntregasActivas: MAX_ENTREGAS_ACTIVAS_DOMICILIARIO,
       });
       setFeedback("Domiciliario asignado correctamente.");
+      const assignedCourier = domiciliarios.find(dom => Number(courierIdValue(dom)) === Number(domiciliarioValue));
+      patchDeliveryItemById(item.idEntrega, {
+        domiciliarioID: domiciliarioValue ? Number(domiciliarioValue) : null,
+        domiciliarioId: domiciliarioValue ? Number(domiciliarioValue) : null,
+        domiciliario: assignedCourier?.nombre || assignedCourier?.nombreDomiciliario || (domiciliarioValue ? courierName(item) : ""),
+        nombreDomiciliario: assignedCourier?.nombre || assignedCourier?.nombreDomiciliario || "",
+      });
       clearBrowserTextSelection();
-      await refreshAll();
+      refreshDeliveryListsAfterStatusChange();
     } catch (nextError) {
       console.error("Error asignando domiciliario:", nextError);
       setError(buildActionErrorMessage(nextError, "No fue posible asignar domiciliario."));
@@ -2855,10 +2916,8 @@ export function DeliveryPage({
     try {
       await api.marcarEntregaEnRuta({ entregaId, usuarioCambio });
       setFeedback("Pedido marcado como en camino.");
-      await loadMyOrders();
-      if (selectedDeliveryItem?.idEntrega === entregaId) {
-        setSelectedDeliveryItem(current => current ? { ...current, estado: "EnRuta" } : current);
-      }
+      patchDeliveryItemById(entregaId, deliveryStatusPatchForAction("en-ruta"));
+      refreshDeliveryListsAfterStatusChange();
     } catch (nextError) {
       console.error("Error marcando en ruta:", nextError);
       setError(buildActionErrorMessage(nextError, "No fue posible iniciar la entrega."));
@@ -2886,8 +2945,9 @@ export function DeliveryPage({
         observaciones: deliveryForm.observaciones.trim(),
       });
       setFeedback("Entrega confirmada con evidencia.");
+      patchDeliveryItemById(entregaId, deliveryStatusPatchForAction("entregado"));
       closeDeliveryDetail();
-      await loadMyOrders();
+      refreshDeliveryListsAfterStatusChange();
     } catch (nextError) {
       console.error("Error marcando entregado:", nextError);
       setError(buildActionErrorMessage(nextError, "No fue posible marcar entregado."));
@@ -2914,8 +2974,9 @@ export function DeliveryPage({
         observaciones: deliveryForm.observaciones.trim(),
       });
       setFeedback("Pedido marcado como no entregado.");
+      patchDeliveryItemById(entregaId, deliveryStatusPatchForAction("no-entregado"));
       closeDeliveryDetail();
-      await loadMyOrders();
+      refreshDeliveryListsAfterStatusChange();
     } catch (nextError) {
       console.error("Error marcando no entregado:", nextError);
       setError(buildActionErrorMessage(nextError, "No fue posible marcar no entregado."));
@@ -3609,6 +3670,7 @@ export function DeliveryPage({
           contabilidad: canViewContabilidad,
           clientes: canViewClientesPanel,
           usuarios: canViewUsuariosPanel,
+          seguimiento: canViewTenantMonitoring,
         }}
         navigation={{
           pipeline: onGoPipeline,
@@ -3620,6 +3682,7 @@ export function DeliveryPage({
           contabilidad: onGoContabilidad,
           clientes: onGoClientes,
           usuarios: onGoUsuarios,
+          seguimiento: onGoTenantMonitoring,
         }}
         badges={{ domicilios: visibleAdminItems.length }}
       />
@@ -3717,7 +3780,7 @@ export function DeliveryPage({
               <h1>Domicilios</h1>
               <span>{mobileSessionLabel}</span>
             </div>
-            <button type="button" className="delivery-mobile-refresh" onClick={refreshAll} disabled={loading || Boolean(actionKey)} aria-label="Actualizar domicilios">
+            <button type="button" className="delivery-mobile-refresh" onClick={refreshAll} disabled={Boolean(actionKey)} aria-label="Actualizar domicilios">
               <RotateCw size={16} strokeWidth={2.3} aria-hidden="true" />
               <span>{loading ? "..." : "Actualizar"}</span>
             </button>
@@ -3734,7 +3797,7 @@ export function DeliveryPage({
                 type="button"
                 className={modo === item.value ? "is-active" : ""}
                 onClick={() => handleModeChange(item.value)}
-                disabled={loading || Boolean(actionKey)}
+                disabled={Boolean(actionKey)}
               >
                 {DELIVERY_MOBILE_VIEW_LABELS[item.value] || item.label}
               </button>
@@ -3752,7 +3815,8 @@ export function DeliveryPage({
                   <input
                     type="search"
                     value={deliverySearch}
-                    onChange={event => setDeliverySearch(event.target.value)}
+                    maxLength={DELIVERY_SEARCH_MAX_LENGTH}
+                    onChange={event => setDeliverySearch(normalizeDeliverySearchInput(event.target.value))}
                     placeholder="Pedido, cliente..."
                     aria-label="Buscar domicilio"
                   />
@@ -3788,7 +3852,7 @@ export function DeliveryPage({
                   aria-label="Fecha de domicilio"
                 />
                 {adminRole ? (
-                  <button type="button" className="delivery-mobile-regularize" onClick={openRegularizationModal} disabled={loading || Boolean(actionKey)}>
+                  <button type="button" className="delivery-mobile-regularize" onClick={openRegularizationModal} disabled={Boolean(actionKey)}>
                     Regularizar
                   </button>
                 ) : null}
@@ -3940,12 +4004,12 @@ export function DeliveryPage({
                   type="button"
                   className="btn-outline orders-header-refresh"
                   onClick={openRegularizationModal}
-                  disabled={loading || Boolean(actionKey)}
+                  disabled={Boolean(actionKey)}
                 >
                   Regularizar entrega
                 </button>
               ) : null}
-              <button type="button" className="btn-primary orders-header-refresh" onClick={refreshAll} disabled={loading || Boolean(actionKey)}>
+              <button type="button" className="btn-primary orders-header-refresh" onClick={refreshAll} disabled={Boolean(actionKey)}>
                 {loading ? "Actualizando..." : "Actualizar"}
                 <RotateCw size={16} strokeWidth={2.2} aria-hidden="true" />
               </button>
@@ -3960,7 +4024,7 @@ export function DeliveryPage({
               type="button"
               className={`btn-outline inventory-tab-btn ${modo === item.value ? "is-active" : ""}`}
               onClick={() => handleModeChange(item.value)}
-              disabled={loading || Boolean(actionKey)}
+              disabled={Boolean(actionKey)}
             >
               {item.label}
             </button>
@@ -3984,7 +4048,8 @@ export function DeliveryPage({
                   <input
                     type="search"
                     value={deliverySearch}
-                    onChange={event => setDeliverySearch(event.target.value)}
+                    maxLength={DELIVERY_SEARCH_MAX_LENGTH}
+                    onChange={event => setDeliverySearch(normalizeDeliverySearchInput(event.target.value))}
                     placeholder="Pedido, cliente, destinatario o direccion"
                     aria-label="Buscar domicilio por pedido, cliente, destinatario o direccion"
                   />

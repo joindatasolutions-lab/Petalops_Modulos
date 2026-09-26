@@ -4384,6 +4384,18 @@
   font-weight: 950;
 }
 
+.orders-new-order-unit-note {
+  display: block;
+  padding: 10px 12px;
+  border: 1px solid #fecdd3;
+  border-radius: 10px;
+  background: #fff1f2;
+  color: #9f1239;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.45;
+}
+
 .orders-new-order-product-actions {
   display: flex;
   align-items: center;

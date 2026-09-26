@@ -15,6 +15,7 @@ export function AccountingPage({
   canViewClientesPanel,
   canViewUsuariosPanel,
   canViewUsuariosGlobal,
+  canViewTenantMonitoring,
   onGoPipeline,
   onGoPedidos,
   onGoProduccion,
@@ -24,6 +25,7 @@ export function AccountingPage({
   onGoContabilidad,
   onGoClientes,
   onGoUsuarios,
+  onGoTenantMonitoring,
   onLogout,
 }) {
   const { sidebarPinned, sidebarMobileOpen, setSidebarMobileOpen, toggleSidebar } = useSidebarState();
@@ -47,6 +49,7 @@ export function AccountingPage({
           inventario: canViewInventario,
           contabilidad: canViewContabilidad,
           clientes: canViewClientesPanel,
+          seguimiento: canViewTenantMonitoring,
           usuarios: canViewUsuariosPanel,
         }}
         navigation={{
@@ -58,6 +61,7 @@ export function AccountingPage({
           inventario: onGoInventario,
           contabilidad: onGoContabilidad,
           clientes: onGoClientes,
+          seguimiento: onGoTenantMonitoring,
           usuarios: onGoUsuarios,
         }}
       />

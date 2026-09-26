@@ -2,7 +2,7 @@ import { Suspense, lazy, useEffect, useMemo, useState } from "react";
 
 import { LoginPage } from "./domain/auth/LoginPage.jsx";
 import { tenantConfig } from "./config/tenantConfig.js";
-import { createApiClient } from "./infrastructure/apiClient.js";
+import { AUTH_EXPIRED_EVENT, createApiClient } from "./infrastructure/apiClient.js";
 
 const TOKEN_KEY = "petalops_access_token";
 const VIEW_KEY = "petalops_active_view";
@@ -16,6 +16,7 @@ const InventoryPage = lazy(() => import("./domain/inventory/InventoryPage.jsx").
 const OrdersAdminPage = lazy(() => import("./domain/orders-admin/OrdersAdminPage.jsx").then(module => ({ default: module.OrdersAdminPage })));
 const PipelineOperativo = lazy(() => import("./domain/pipeline/PipelineOperativo.jsx").then(module => ({ default: module.PipelineOperativo })));
 const ProductionPage = lazy(() => import("./domain/production/ProductionPage.jsx").then(module => ({ default: module.ProductionPage })));
+const TenantMonitoringPage = lazy(() => import("./domain/tenant-monitoring/TenantMonitoringPage.jsx").then(module => ({ default: module.TenantMonitoringPage })));
 const UsersManagementPage = lazy(() => import("./domain/users/UsersManagementPage.jsx").then(module => ({ default: module.UsersManagementPage })));
 
 export function hasModuleAccess(session, modulo) {
@@ -34,6 +35,17 @@ function isEmpresaAdminRole(session) {
   return role === "admin" || role === "empresa_admin";
 }
 
+export function isJoinAdminSession(session) {
+  if (!session?.esGlobalJoin) return false;
+  const identities = [
+    session?.login,
+    session?.usuario,
+    session?.username,
+    String(session?.email || "").split("@")[0],
+  ].map(value => String(value || "").trim().toLowerCase());
+  return identities.includes("joinadmin");
+}
+
 export function canAccessPipeline(session) {
   return Boolean(hasModuleAccess(session, "pipeline") || isEmpresaAdminRole(session));
 }
@@ -49,6 +61,7 @@ function canAccessView(session, view) {
   if (view === "contabilidad") return hasModuleAccess(session, "contabilidad");
   if (view === "clientes") return hasModuleAccess(session, "clientes");
   if (view === "usuarios") return Boolean(session?.esGlobalJoin || isEmpresaAdminRole(session));
+  if (view === "seguimiento") return isJoinAdminSession(session);
   return false;
 }
 
@@ -92,12 +105,34 @@ function ModuleLoadingFallback() {
   );
 }
 
+function SessionExpiredDialog({ open, onReload, onLogout }) {
+  if (!open) return null;
+
+  return (
+    <div className="session-expired-backdrop" role="presentation">
+      <section className="session-expired-dialog" role="dialog" aria-modal="true" aria-labelledby="session-expired-title">
+        <div className="session-expired-icon" aria-hidden="true">!</div>
+        <div className="session-expired-copy">
+          <span>Sesión vencida</span>
+          <h2 id="session-expired-title">La sesión ha estado abierta por bastante tiempo</h2>
+          <p>Para continuar trabajando sin errores, recarga la página e inicia nuevamente si el sistema lo solicita.</p>
+        </div>
+        <div className="session-expired-actions">
+          <button type="button" className="btn-outline" onClick={onLogout}>Cerrar sesión</button>
+          <button type="button" className="btn-primary" onClick={onReload} autoFocus>Recargar página</button>
+        </div>
+      </section>
+    </div>
+  );
+}
+
 export default function App() {
   const api = useMemo(() => createApiClient(tenantConfig), []);
   const [session, setSession] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [authError, setAuthError] = useState("");
   const [view, setView] = useState(() => readStoredView());
+  const [sessionExpiredOpen, setSessionExpiredOpen] = useState(false);
 
   useEffect(() => {
     const bootstrap = async () => {
@@ -130,6 +165,16 @@ export default function App() {
     }
   }, [session, view]);
 
+  useEffect(() => {
+    const handleAuthExpired = () => {
+      if (!session) return;
+      setSessionExpiredOpen(true);
+    };
+
+    globalThis.addEventListener?.(AUTH_EXPIRED_EVENT, handleAuthExpired);
+    return () => globalThis.removeEventListener?.(AUTH_EXPIRED_EVENT, handleAuthExpired);
+  }, [session]);
+
   const canPedidos = hasModuleAccess(session, "pedidos");
   const canCatalogo = hasModuleAccess(session, "catalogo");
   const canProduccion = hasModuleAccess(session, "produccion");
@@ -141,6 +186,7 @@ export default function App() {
   const canPipeline = canAccessPipeline(session);
   const canUsuariosGlobal = Boolean(session?.esGlobalJoin);
   const canUsuariosPanel = Boolean(canUsuariosGlobal || isEmpresaAdminRole(session));
+  const canTenantMonitoring = isJoinAdminSession(session);
 
   useEffect(() => {
     if (!session) return;
@@ -158,6 +204,7 @@ export default function App() {
     if (view === "contabilidad" && !canContabilidad) return redirectTo(fallbackView);
     if (view === "clientes" && !canClientes) return redirectTo(fallbackView);
     if (view === "usuarios" && !canUsuariosPanel) return redirectTo(fallbackView);
+    if (view === "seguimiento" && !canTenantMonitoring) return redirectTo(fallbackView);
   }, [
     session,
     view,
@@ -170,6 +217,7 @@ export default function App() {
     canContabilidad,
     canClientes,
     canUsuariosPanel,
+    canTenantMonitoring,
   ]);
 
   const handleLogin = async ({ login, password }) => {
@@ -199,8 +247,13 @@ export default function App() {
   const handleLogout = () => {
     globalThis.localStorage?.removeItem(TOKEN_KEY);
     globalThis.localStorage?.removeItem(VIEW_KEY);
+    setSessionExpiredOpen(false);
     setSession(null);
     setView("pipeline");
+  };
+
+  const handleReloadSession = () => {
+    globalThis.location?.reload();
   };
 
   if (authLoading && !session) {
@@ -211,7 +264,7 @@ export default function App() {
     return <LoginPage onSubmit={handleLogin} loading={authLoading} error={authError} />;
   }
 
-  if (!canPipeline && !canPedidos && !canProduccion && !canDomicilios && !canBarrios && !canInventario && !canContabilidad && !canClientes && !canUsuariosPanel) {
+  if (!canPipeline && !canPedidos && !canProduccion && !canDomicilios && !canBarrios && !canInventario && !canContabilidad && !canClientes && !canUsuariosPanel && !canTenantMonitoring) {
     return (
       <main className="auth-view">
         <section className="auth-card">
@@ -236,6 +289,7 @@ export default function App() {
     canViewClientesPanel: canClientes,
     canViewUsuariosPanel: canUsuariosPanel,
     canViewUsuariosGlobal: canUsuariosGlobal,
+    canViewTenantMonitoring: canTenantMonitoring,
     onGoPipeline: () => canPipeline && setView("pipeline"),
     onGoPedidos: () => canPedidos && setView("pedidos"),
     onGoProduccion: () => canProduccion && setView("produccion"),
@@ -245,6 +299,7 @@ export default function App() {
     onGoContabilidad: () => canContabilidad && setView("contabilidad"),
     onGoClientes: () => canClientes && setView("clientes"),
     onGoUsuarios: () => canUsuariosPanel && setView("usuarios"),
+    onGoTenantMonitoring: () => canTenantMonitoring && setView("seguimiento"),
     onLogout: handleLogout,
   };
 
@@ -257,6 +312,7 @@ export default function App() {
     if (view === "inventario") return <InventoryPage {...pageProps} />;
     if (view === "contabilidad") return <AccountingPage {...pageProps} />;
     if (view === "clientes") return <ClientsPage {...pageProps} />;
+    if (view === "seguimiento") return <TenantMonitoringPage {...pageProps} />;
 
     return (
       <UsersManagementPage
@@ -274,6 +330,11 @@ export default function App() {
           <span>Amplia la ventana para operar PetalOps.</span>
         </div>
       </div>
+      <SessionExpiredDialog
+        open={sessionExpiredOpen}
+        onReload={handleReloadSession}
+        onLogout={handleLogout}
+      />
       {activePage}
     </Suspense>
   );
