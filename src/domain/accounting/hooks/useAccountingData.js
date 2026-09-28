@@ -19,6 +19,7 @@ export function useAccountingData({ api, empresaId, sucursalId, selectedSucursal
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [orderRows, setOrderRows] = useState([]);
+  const [cashOrderRows, setCashOrderRows] = useState([]);
   const [orderTotals, setOrderTotals] = useState(null);
   const [arrangementRows, setArrangementRows] = useState([]);
   const [paymentAccountRows, setPaymentAccountRows] = useState([]);
@@ -96,6 +97,8 @@ export function useAccountingData({ api, empresaId, sucursalId, selectedSucursal
       }
 
       setOrderRows(nextOrderRows.length > 0 ? nextOrderRows : applyApprovedOrderCountsToRows(payload?.orderRows, nextDetailRows));
+      // Ventas diarias no necesariamente incluye el recaudo en efectivo.
+      setCashOrderRows(Array.isArray(payload?.orderRows) ? payload.orderRows : []);
       setOrderTotals(nextOrderTotals);
       setArrangementRows(Array.isArray(payload?.arrangementRows) ? payload.arrangementRows : []);
       setPaymentAccountRows(backendPaymentRows);
@@ -105,6 +108,7 @@ export function useAccountingData({ api, empresaId, sucursalId, selectedSucursal
     } catch (nextError) {
       console.error("Error cargando contabilidad:", nextError);
       setOrderRows([]);
+      setCashOrderRows([]);
       setOrderTotals(null);
       setArrangementRows([]);
       setPaymentAccountRows([]);
@@ -126,6 +130,7 @@ export function useAccountingData({ api, empresaId, sucursalId, selectedSucursal
     error,
     setError,
     orderRows,
+    cashOrderRows,
     orderTotals,
     arrangementRows,
     paymentAccountRows,

@@ -34,7 +34,7 @@ export function applyApprovedOrderCountsToRows(orderRows, accountingDetailRows) 
   }));
 }
 
-export function buildSummaryTotals(orderRows, accountingDetailRows) {
+export function buildSummaryTotals(orderRows, accountingDetailRows, cashOrderRows = []) {
   const totals = orderRows.reduce((acc, row) => ({
     cantidadPedidos: acc.cantidadPedidos + Number(row.cantidadPedidos || 0),
     pedidosCancelados: acc.pedidosCancelados + Number(row.pedidosCancelados || 0),
@@ -56,6 +56,13 @@ export function buildSummaryTotals(orderRows, accountingDetailRows) {
     totalDescuentos: 0,
     totalSaldoFavor: 0,
   });
+
+  // El resumen contable conserva el efectivo aunque ventas-diario omita ese campo.
+  // Un cero explicito es valido; no se sustituye por ventas ni por cierres de caja.
+  const cashRows = cashOrderRows.filter(row => row.totalEfectivo != null);
+  if (cashRows.length > 0) {
+    totals.totalEfectivo = roundMoney(cashRows.reduce((sum, row) => sum + Number(row.totalEfectivo), 0));
+  }
 
   if (!accountingDetailRows.length) {
     return {

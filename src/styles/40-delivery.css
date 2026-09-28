@@ -2527,7 +2527,7 @@
 /* Pipeline filters: same visual grammar as Pedidos */
 .orders-filters.orders-page-filters.pipeline-filters-bar {
   display: grid !important;
-  grid-template-columns: minmax(280px, 1.35fr) minmax(180px, 0.6fr) minmax(220px, 0.8fr) !important;
+  grid-template-columns: minmax(360px, 1.4fr) minmax(280px, 1fr) minmax(320px, 1.15fr) !important;
   gap: 10px !important;
   width: 100% !important;
   max-width: 100% !important;
@@ -2579,6 +2579,15 @@
   flex: 0 0 auto !important;
 }
 
+.pipeline-filters-bar .pipeline-filter-label {
+  flex: 0 0 auto !important;
+  color: #8a3252 !important;
+  font-size: 12px !important;
+  font-weight: 850 !important;
+  line-height: 1 !important;
+  white-space: nowrap !important;
+}
+
 .pipeline-filters-bar .orders-filter-control input,
 .pipeline-filters-bar .orders-filter-control select {
   flex: 1 1 auto !important;
@@ -2603,7 +2612,7 @@
 
 @media (max-width: 1180px) {
   .orders-filters.orders-page-filters.pipeline-filters-bar {
-    grid-template-columns: minmax(220px, 1fr) minmax(160px, 0.7fr) minmax(190px, 0.9fr) !important;
+    grid-template-columns: minmax(260px, 1.1fr) minmax(220px, 0.95fr) minmax(260px, 1fr) !important;
   }
 }
 
