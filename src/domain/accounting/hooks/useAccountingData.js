@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import {
   buildDeliveryPersonMetricRows,
@@ -19,7 +19,7 @@ export function useAccountingData({ api, empresaId, sucursalId, selectedSucursal
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [orderRows, setOrderRows] = useState([]);
-  const [cashOrderRows, setCashOrderRows] = useState([]);
+  const requestRef = useRef(0);
   const [orderTotals, setOrderTotals] = useState(null);
   const [arrangementRows, setArrangementRows] = useState([]);
   const [paymentAccountRows, setPaymentAccountRows] = useState([]);
@@ -28,6 +28,7 @@ export function useAccountingData({ api, empresaId, sucursalId, selectedSucursal
   const [accountingDetailRows, setAccountingDetailRows] = useState([]);
 
   const loadAccountingData = useCallback(async () => {
+    const requestId = ++requestRef.current;
     setLoading(true);
     setError("");
     try {
@@ -96,9 +97,8 @@ export function useAccountingData({ api, empresaId, sucursalId, selectedSucursal
         }
       }
 
+      if (requestId !== requestRef.current) return;
       setOrderRows(nextOrderRows.length > 0 ? nextOrderRows : applyApprovedOrderCountsToRows(payload?.orderRows, nextDetailRows));
-      // Ventas diarias no necesariamente incluye el recaudo en efectivo.
-      setCashOrderRows(Array.isArray(payload?.orderRows) ? payload.orderRows : []);
       setOrderTotals(nextOrderTotals);
       setArrangementRows(Array.isArray(payload?.arrangementRows) ? payload.arrangementRows : []);
       setPaymentAccountRows(backendPaymentRows);
@@ -106,9 +106,9 @@ export function useAccountingData({ api, empresaId, sucursalId, selectedSucursal
       setFloristMetricRows(resolvedFloristRows.filter(row => row?.id != null || (row?.nombre && row.nombre !== "Sin florista")));
       setDeliveryPersonMetricRows(resolvedDeliveryRows.filter(row => row?.id != null));
     } catch (nextError) {
+      if (requestId !== requestRef.current) return;
       console.error("Error cargando contabilidad:", nextError);
       setOrderRows([]);
-      setCashOrderRows([]);
       setOrderTotals(null);
       setArrangementRows([]);
       setPaymentAccountRows([]);
@@ -117,12 +117,13 @@ export function useAccountingData({ api, empresaId, sucursalId, selectedSucursal
       setAccountingDetailRows([]);
       setError(nextError?.message || "No fue posible cargar el modulo de contabilidad.");
     } finally {
-      setLoading(false);
+      if (requestId === requestRef.current) setLoading(false);
     }
   }, [api, empresaId, selectedSucursalId, sucursalId, filters.fechaDesde, filters.fechaHasta]);
 
   useEffect(() => {
     loadAccountingData();
+    return () => { requestRef.current += 1; };
   }, [loadAccountingData]);
 
   return {
@@ -130,7 +131,6 @@ export function useAccountingData({ api, empresaId, sucursalId, selectedSucursal
     error,
     setError,
     orderRows,
-    cashOrderRows,
     orderTotals,
     arrangementRows,
     paymentAccountRows,
