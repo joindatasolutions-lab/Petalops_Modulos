@@ -60,7 +60,6 @@ export function useAccountingController({ session, canViewUsuariosGlobal = false
     error,
     setError,
     orderRows,
-    cashOrderRows,
     orderTotals,
     arrangementRows,
     paymentAccountRows,
@@ -252,7 +251,7 @@ export function useAccountingController({ session, canViewUsuariosGlobal = false
     return () => document.removeEventListener("pointerdown", handlePointerDown);
   }, [accountingMenuOpen]);
 
-  const summaryTotals = useMemo(() => buildSummaryTotals(orderRows, accountingDetailRows, cashOrderRows), [orderRows, accountingDetailRows, cashOrderRows]);
+  const summaryTotals = useMemo(() => buildSummaryTotals(orderRows, accountingDetailRows, paymentAccountRows), [orderRows, accountingDetailRows, paymentAccountRows]);
   const salesTableTotals = useMemo(() => {
     if (!orderTotals) return null;
     return {

@@ -1,5 +1,5 @@
 import { normalizeStatus, splitDateTimeParts } from "../../shared/utils.js";
-import { getAdjustmentNoteItems, roundMoney } from "./accountingDomain.js";
+import { extractCashAmount, getAdjustmentNoteItems, roundMoney } from "./accountingDomain.js";
 
 function isApprovedOrder(row) {
   return normalizeStatus(row?.estado) === "APROBADO" && !row?.cancelado;
@@ -34,7 +34,24 @@ export function applyApprovedOrderCountsToRows(orderRows, accountingDetailRows) 
   }));
 }
 
-export function buildSummaryTotals(orderRows, accountingDetailRows, cashOrderRows = []) {
+export function buildCashPaymentTotal(paymentAccountRows, accountingDetailRows) {
+  // Las cuentas contienen importes por medio de pago, no saldos de caja.
+  if (paymentAccountRows.length > 0) {
+    return roundMoney(paymentAccountRows.reduce((sum, row) => {
+      const methods = Array.isArray(row.metodos) ? row.metodos : [];
+      const isCash = methods.length > 0
+        ? methods.every(method => normalizeStatus(method) === "EFECTIVO")
+        : normalizeStatus(row.cuenta) === "EFECTIVO";
+      return sum + (isCash ? Number(row.totalRecaudado || 0) : 0);
+    }, 0));
+  }
+  return roundMoney(accountingDetailRows.reduce((sum, row) => {
+    if (row.cancelado || ["CANCELADO", "RECHAZADO"].includes(normalizeStatus(row.estado))) return sum;
+    return sum + extractCashAmount(row.financiero || row);
+  }, 0));
+}
+
+export function buildSummaryTotals(orderRows, accountingDetailRows, paymentAccountRows = []) {
   const totals = orderRows.reduce((acc, row) => ({
     cantidadPedidos: acc.cantidadPedidos + Number(row.cantidadPedidos || 0),
     pedidosCancelados: acc.pedidosCancelados + Number(row.pedidosCancelados || 0),
@@ -57,12 +74,7 @@ export function buildSummaryTotals(orderRows, accountingDetailRows, cashOrderRow
     totalSaldoFavor: 0,
   });
 
-  // El resumen contable conserva el efectivo aunque ventas-diario omita ese campo.
-  // Un cero explicito es valido; no se sustituye por ventas ni por cierres de caja.
-  const cashRows = cashOrderRows.filter(row => row.totalEfectivo != null);
-  if (cashRows.length > 0) {
-    totals.totalEfectivo = roundMoney(cashRows.reduce((sum, row) => sum + Number(row.totalEfectivo), 0));
-  }
+  totals.totalEfectivo = buildCashPaymentTotal(paymentAccountRows, accountingDetailRows);
 
   if (!accountingDetailRows.length) {
     return {

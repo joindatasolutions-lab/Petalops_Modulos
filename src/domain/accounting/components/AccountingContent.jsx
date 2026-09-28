@@ -187,7 +187,7 @@ export function AccountingContent(contentProps) {
               </article>
               <article className="orders-header-metric-card is-success">
                 <span className="orders-header-metric-icon" aria-hidden="true"><Banknote size={20} strokeWidth={2} /></span>
-                <strong>${formatearCOP(summaryTotals.totalEfectivo)}</strong>
+                <strong>{loading ? "Cargando..." : summaryTotals.totalEfectivo == null ? "No disponible" : `$${formatearCOP(summaryTotals.totalEfectivo)}`}</strong>
                 <span>Efectivo</span>
               </article>
               <article className="orders-header-metric-card is-info">
