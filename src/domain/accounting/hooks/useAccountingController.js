@@ -30,7 +30,7 @@ export function useAccountingController({ session, canViewUsuariosGlobal = false
   const [accountingMenuOpen, setAccountingMenuOpen] = useState(false);
   const accountingMenuRef = useRef(null);
   const [filters, setFilters] = useState(() => {
-    const today = new Date().toISOString().slice(0, 10);
+    const today = formatAccountingLocalDate(new Date());
     return {
       ...initialFilters,
       fechaDesde: today,
@@ -39,7 +39,7 @@ export function useAccountingController({ session, canViewUsuariosGlobal = false
   });
   const [cashForm, setCashForm] = useState(() => ({
     ...initialCashForm,
-    fecha: new Date().toISOString().slice(0, 10),
+    fecha: formatAccountingLocalDate(new Date()),
   }));
   const [info, setInfo] = useState("");
   const [saving, setSaving] = useState(false);
@@ -60,6 +60,7 @@ export function useAccountingController({ session, canViewUsuariosGlobal = false
     error,
     setError,
     orderRows,
+    cashOrderRows,
     orderTotals,
     arrangementRows,
     paymentAccountRows,
@@ -251,7 +252,7 @@ export function useAccountingController({ session, canViewUsuariosGlobal = false
     return () => document.removeEventListener("pointerdown", handlePointerDown);
   }, [accountingMenuOpen]);
 
-  const summaryTotals = useMemo(() => buildSummaryTotals(orderRows, accountingDetailRows), [orderRows, accountingDetailRows]);
+  const summaryTotals = useMemo(() => buildSummaryTotals(orderRows, accountingDetailRows, cashOrderRows), [orderRows, accountingDetailRows, cashOrderRows]);
   const salesTableTotals = useMemo(() => {
     if (!orderTotals) return null;
     return {
