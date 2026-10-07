@@ -326,7 +326,7 @@ export function OrderDetailCustomerSection({
       </p>
       {!canEditClientIdentity ? (
         <p className="order-detail-edit-hint">
-          Solo un usuario administrador puede cambiar nombre o telefono del cliente.
+          Necesitas acceso a Pedidos para cambiar nombre o telefono del cliente.
         </p>
       ) : null}
     </>

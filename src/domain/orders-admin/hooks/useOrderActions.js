@@ -121,7 +121,7 @@ export function useOrderActions({ api, items, empresaId, selectedPedidoId, setIt
     } catch (nextError) {
       if (nextError?.status === 409) await refreshAfterMutation();
       console.error("Error rechazando pedido:", nextError);
-      globalThis.alert(`No fue posible completar la ${actionLabel}.`);
+      globalThis.alert(nextError?.detail || nextError?.message || `No fue posible completar la ${actionLabel}.`);
     }
   };
 
