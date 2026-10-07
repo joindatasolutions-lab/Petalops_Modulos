@@ -742,12 +742,27 @@ export function filterOrdersBySearch(items, searchValue, empresaId = null) {
   const rows = Array.isArray(items) ? items : [];
   if (!search) return rows;
 
-  const orderNumberMatches = rows.filter(item => orderMatchesNumberSearch(item, search));
-  if (orderNumberMatches.length > 0) return orderNumberMatches;
-
   return rows.filter(item => {
+    if (orderMatchesNumberSearch(item, search.replace(/^#/, ""))) return true;
     const productSummary = resolveOrderProductSummary(item, new Map(), empresaId);
+    const fields = [
+      "nombre", "nombreCompleto", "cliente", "clienteNombre", "destinatario",
+      "destinatarioNombre", "nombreDestinatario", "telefono", "telefonoCompleto",
+      "celular", "clienteTelefono", "telefonoCliente", "telefonoDestino", "telefonoDestinatario",
+      "email", "correo", "cedula", "identificacion", "clienteIdentificacion",
+      "numeroIdentificacion", "documento", "numeroDocumento", "barrio", "barrioNombre",
+      "nombreBarrio", "direccion", "direccionEntrega", "direccionDestino",
+      "observaciones", "notas", "nombreProducto", "nombreArreglo", "producto", "arreglo",
+    ].map(key => key.toLowerCase());
+    const sources = [item, item?.cliente, item?.destinatario, item?.entrega, item?.pedido];
+    const extraValues = sources.flatMap(source => {
+      if (!source || typeof source !== "object") return [];
+      return Object.entries(source)
+        .filter(([key, value]) => fields.includes(key.replace(/_/g, "").toLowerCase()) && typeof value !== "object")
+        .map(([, value]) => value);
+    });
     const values = [
+      ...extraValues,
       item?.cliente,
       item?.clienteNombre,
       item?.cliente_nombre,
@@ -762,7 +777,13 @@ export function filterOrdersBySearch(items, searchValue, empresaId = null) {
       productSummary.title,
       ...paymentMethodSearchValues(item),
     ];
-    return values.some(value => normalizeOrderSearchText(value).includes(search));
+    const digits = search.replace(/\D/g, "");
+    const numericSearch = digits.length > 0 && /^[\d\s()+.\-]+$/.test(search);
+    return values.some(value => {
+      if (value == null || typeof value === "object") return false;
+      const text = normalizeOrderSearchText(value);
+      return text.includes(search) || (numericSearch && /^[\d\s()+.\-]+$/.test(text) && text.replace(/\D/g, "").includes(digits));
+    });
   });
 }
 
@@ -820,13 +841,6 @@ export function clampPercentage(value) {
 export function isEmpresaAdminRole(session) {
   const role = String(session?.rol || "").trim().toLowerCase().replace(/\s+/g, "_");
   return Boolean(session?.esGlobalJoin) || role === "admin" || role === "empresa_admin";
-}
-
-export function ensureRappiOption(options) {
-  const normalized = Array.isArray(options)
-    ? options.map(item => String(item || "").trim()).filter(Boolean)
-    : [];
-  return normalized.includes("RAPPI") ? normalized : [...normalized, "RAPPI"];
 }
 
 export function buildOrderFinancialPreview(

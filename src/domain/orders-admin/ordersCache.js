@@ -8,7 +8,7 @@ import { ORDERS_FILTER_CACHE_LIMIT } from "./ordersAdminConstants.js";
  */
 
 export function buildOrdersCacheKey({ empresaId, sucursalId, q, estado, sinImprimir, soloTienda, soloEntregasHoy, metodoPago, fechaDesde, fechaHasta, filtrarPorEntrega, page, pageSize }) {
-  return [
+  return JSON.stringify([
     empresaId,
     sucursalId,
     q || "",
@@ -21,8 +21,8 @@ export function buildOrdersCacheKey({ empresaId, sucursalId, q, estado, sinImpri
     fechaHasta || "",
     filtrarPorEntrega ? "1" : "0",
     page || 1,
-    pageSize || 50,
-  ].join("|");
+    pageSize || 10,
+  ]);
 }
 
 export function rememberOrdersCache(cache, key, value) {
