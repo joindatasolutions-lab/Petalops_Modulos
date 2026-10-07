@@ -7,13 +7,126 @@
   display: none;
 }
 
-.app-shell > .production-page-view:not(.production-page-view--pedidos),
-.orders-admin-view.production-page-view:not(.production-page-view--pedidos) {
+.app-shell > .production-page-view,
+.orders-admin-view.production-page-view {
   grid-template-rows: auto !important;
+  grid-auto-rows: auto !important;
   align-content: start !important;
+  height: auto !important;
   max-height: none !important;
   overflow-x: clip !important;
   overflow-y: auto !important;
+}
+
+/* Let the content determine row heights, including on short landscape screens. */
+@media (min-width: 641px) {
+  .production-page-view .orders-page-header.production-page-header,
+  .production-page-view .orders-filters.production-filters-bar {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    height: auto !important;
+    max-height: none !important;
+    gap: 12px !important;
+    overflow: visible !important;
+  }
+
+  .production-page-view .orders-page-header.production-page-header .orders-page-heading {
+    display: grid !important;
+    flex: 1 1 220px;
+    min-width: 0 !important;
+    gap: 8px !important;
+  }
+
+  .production-page-view .orders-page-header.production-page-header .orders-header-side {
+    display: grid !important;
+    flex: 2 1 520px;
+    grid-template-rows: auto !important;
+    grid-template-columns: minmax(0, 1fr) !important;
+    min-width: 0 !important;
+    height: auto !important;
+    gap: 8px !important;
+  }
+
+  .production-page-view .orders-page-header.production-page-header .header-actions {
+    grid-area: auto !important;
+    display: flex !important;
+    flex-wrap: wrap !important;
+    height: auto !important;
+    gap: 8px !important;
+  }
+
+  .production-page-view .production-header-search {
+    flex: 1 1 220px;
+    width: auto !important;
+    min-width: 0 !important;
+  }
+
+  .production-page-view .orders-page-header.production-page-header .production-header-metrics {
+    grid-area: auto !important;
+    grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)) !important;
+  }
+
+  .production-page-view .production-day-banner--desktop {
+    flex: 1 1 100%;
+  }
+
+  .production-page-view .orders-filters.production-filters-bar {
+    gap: 8px !important;
+  }
+
+  .production-page-view .orders-filters.production-filters-bar > .filter-field {
+    min-width: 0 !important;
+    max-width: 100% !important;
+    height: auto !important;
+  }
+
+  .production-page-view .production-table-wrap.production-table-shell {
+    grid-row: auto !important;
+    height: auto !important;
+    min-height: 180px !important;
+    max-height: max(240px, 60dvh) !important;
+    max-width: 100% !important;
+    overflow: auto !important;
+  }
+
+  .production-page-view .records-pager.production-records-pager {
+    grid-row: auto !important;
+    position: static !important;
+    height: auto !important;
+    overflow: visible !important;
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) !important;
+  }
+  /* Keep the date compact and all statuses on one line at every table width. */
+  .production-page-view .orders-filters.production-filters-bar > .production-filter-field:not(.production-status-filter) {
+    flex: 0 0 150px !important;
+    width: 150px !important;
+  }
+
+  .production-page-view .orders-filters.production-filters-bar .production-filter-control,
+  .production-page-view .orders-filters.production-filters-bar .production-filter-control input {
+    width: 100% !important;
+    min-width: 0 !important;
+  }
+
+  .production-page-view .orders-filters.production-filters-bar > .production-status-filter {
+    flex: 1 1 0 !important;
+    width: auto !important;
+  }
+
+  .production-page-view .orders-filters.production-filters-bar .production-status-chips {
+    display: grid !important;
+    grid-template-columns: repeat(5, minmax(0, 1fr)) !important;
+    gap: 4px !important;
+    width: 100% !important;
+    height: auto !important;
+  }
+
+  .production-page-view .orders-filters.production-filters-bar .production-status-chip {
+    width: 100% !important;
+    min-width: 0 !important;
+    padding-inline: 4px !important;
+    white-space: nowrap !important;
+  }
 }
 
 .production-page-view .orders-page-header.production-page-header .production-day-banner--desktop {
@@ -180,7 +293,7 @@
     width: 100% !important;
     max-width: 100% !important;
     min-width: 0 !important;
-    padding: 0 10px 22px 58px !important;
+    padding: 0 12px 22px !important;
     margin: 0 !important;
     overflow-x: clip !important;
     overflow-y: auto !important;
@@ -212,6 +325,7 @@
   }
 
   .production-mobile-hero {
+    padding-left: 40px;
     display: grid;
     grid-template-columns: minmax(0, 1fr) 44px;
     align-items: start;
@@ -251,8 +365,8 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 42px;
-    height: 42px;
+    width: 44px;
+    height: 44px;
     border: 1px solid rgba(217, 54, 122, 0.32);
     border-radius: 999px;
     background: #ffffff;
@@ -322,7 +436,7 @@
     background: transparent;
     color: #101827;
     font: inherit;
-    font-size: 15px;
+    font-size: 16px;
     font-weight: 800;
   }
 
@@ -332,32 +446,25 @@
 
   .production-mobile-kpis,
   .production-mobile-status-tabs {
-    display: flex;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     width: 100%;
     max-width: 100%;
     min-width: 0;
     gap: 9px;
-    overflow-x: auto;
-    overflow-y: hidden;
-    overscroll-behavior-x: contain;
-    scroll-snap-type: x proximity;
-    -webkit-overflow-scrolling: touch;
-    scrollbar-width: none;
   }
 
-  .production-mobile-kpis::-webkit-scrollbar,
-  .production-mobile-status-tabs::-webkit-scrollbar {
-    display: none;
+  .production-mobile-status-tabs {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .production-mobile-kpi {
-    flex: 0 0 108px;
     display: grid;
     align-content: center;
     gap: 2px;
-    min-width: 108px;
+    min-width: 0;
     height: 54px;
-    padding: 7px 12px;
+    padding: 7px 8px;
     border: 1px solid #dbe4ef;
     border-radius: 9px;
     background: #ffffff;
@@ -391,10 +498,9 @@
   }
 
   .production-mobile-status {
-    flex: 0 0 auto;
-    min-width: 96px;
-    height: 40px;
-    padding: 0 14px;
+    min-width: 0;
+    min-height: 44px;
+    padding: 8px;
     border: 1px solid #dbe4ef;
     border-radius: 9px;
     background: #ffffff;
@@ -402,8 +508,7 @@
     font-size: 13px;
     font-weight: 900;
     line-height: 1;
-    white-space: nowrap;
-    scroll-snap-align: start;
+    white-space: normal;
   }
 
   .production-mobile-status.is-pending {
@@ -559,7 +664,8 @@
     font-size: 13px;
     font-weight: 750;
     line-height: 1.25;
-    white-space: nowrap;
+    white-space: normal;
+    overflow-wrap: anywhere;
   }
 
   .production-mobile-card-body small {
@@ -597,7 +703,7 @@
 
   .production-mobile-card-actions button {
     min-width: 0;
-    height: 38px;
+    min-height: 44px;
     padding: 0 10px;
     border: 1px solid #dbe4ef;
     border-radius: 8px;
@@ -620,6 +726,16 @@
 
   .production-mobile-card-actions button:disabled {
     opacity: 0.55;
+  }
+
+  .production-mobile-card-actions button:last-child:nth-child(odd) {
+    grid-column: 1 / -1;
+  }
+
+  .production-mobile-workspace button:focus-visible,
+  .production-mobile-search:focus-within {
+    outline: 2px solid #c42d6d;
+    outline-offset: 2px;
   }
 
   .production-mobile-pager {
@@ -651,8 +767,8 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 34px;
-    height: 34px;
+    width: 44px;
+    height: 44px;
     border: 1px solid #dbe4ef;
     border-radius: 999px;
     background: #ffffff;
@@ -702,18 +818,8 @@
 }
 
 @media (max-width: 390px) {
-  .app-shell > .production-page-view,
-  .orders-admin-view.production-page-view {
-    padding-left: 52px !important;
-    padding-right: 8px !important;
-  }
-
   .production-mobile-title-block h1 {
     font-size: 27px;
-  }
-
-  .production-mobile-card-actions {
-    grid-template-columns: minmax(0, 1fr);
   }
 
   .production-page-view .production-availability-row .production-availability-meta {
