@@ -126,13 +126,13 @@ describe("estabilidad de filtros por vista", () => {
     expect(filterOrdersBySearch(rows, "mini surtido", 3)).toEqual([rows[1]]);
   });
 
-  it("Pedidos: incluye coincidencias de otros campos junto al numero de pedido", () => {
+  it("Pedidos: prioriza coincidencias por numero de pedido", () => {
     const rows = [
       { numeroPedido: 96657, cliente: "Verena Jimenez" },
       { numeroPedido: 97000, cliente: "Cliente 96657" },
     ];
 
-    expect(filterOrdersBySearch(rows, "96657", 3)).toEqual(rows);
+    expect(filterOrdersBySearch(rows, "96657", 3)).toEqual([rows[0]]);
   });
 
   it("Pedidos: busca por metodo de pago visible o desglose financiero", () => {

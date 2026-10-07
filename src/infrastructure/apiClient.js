@@ -10,13 +10,8 @@ function isNetworkError(error) {
   return error instanceof TypeError;
 }
 
-function delay(ms, signal) {
-  return new Promise((resolve, reject) => {
-    if (signal?.aborted) { reject(signal.reason); return; }
-    const onAbort = () => { clearTimeout(timer); reject(signal.reason); };
-    const timer = setTimeout(() => { signal?.removeEventListener("abort", onAbort); resolve(); }, ms);
-    signal?.addEventListener("abort", onAbort, { once: true });
-  });
+function delay(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
 }
 
 function toNetworkError(originalError) {
@@ -192,7 +187,6 @@ export function createApiClient(config) {
     let lastError;
     for (let attempt = 0; attempt < attempts; attempt += 1) {
       try {
-        options.signal?.throwIfAborted();
         return await fetch(`${baseUrl}${path}`, {
           ...options,
           headers,
@@ -200,7 +194,7 @@ export function createApiClient(config) {
       } catch (error) {
         lastError = error;
         if (!isNetworkError(error) || attempt === attempts - 1) break;
-        await delay(NETWORK_RETRY_DELAYS_MS[attempt], options.signal);
+        await delay(NETWORK_RETRY_DELAYS_MS[attempt]);
       }
     }
 
@@ -378,7 +372,7 @@ export function createApiClient(config) {
       return requestJson(`/auth/usuarios/empresas/${empresaId}`);
     },
 
-    async listarClientes({ empresaId, q = "", celular = "", telefono = "", soloActivos = false, includeMetrics = false, page = null, pageSize = null, signal }) {
+    async listarClientes({ empresaId, q = "", celular = "", telefono = "", soloActivos = false, includeMetrics = false, page = null, pageSize = null }) {
       const params = new URLSearchParams();
       params.set("empresaID", String(empresaId));
       const safeSearch = normalizeSearchParam(q);
@@ -389,7 +383,7 @@ export function createApiClient(config) {
       if (includeMetrics) params.set("includeMetrics", "true");
       if (page != null) params.set("page", String(page));
       if (pageSize != null) params.set("pageSize", String(pageSize));
-      return requestJson(`/clientes?${params.toString()}`, { signal });
+      return requestJson(`/clientes?${params.toString()}`);
     },
 
     async obtenerMetricasClientes({ tenantId, startDate, endDate, comparison = true }) {
@@ -877,7 +871,7 @@ export function createApiClient(config) {
       });
     },
 
-    async listarPedidos({ empresaId, sucursalId, q, estado, fechaDesde, fechaHasta, filtrarPorEntrega, sinImprimir, soloTienda, soloEntregasHoy, ordenConsecutivo, page, pageSize, signal }) {
+    async listarPedidos({ empresaId, sucursalId, q, estado, fechaDesde, fechaHasta, filtrarPorEntrega, sinImprimir, soloTienda, soloEntregasHoy, page, pageSize }) {
       const params = new URLSearchParams();
       params.set("empresaID", String(empresaId));
       if (sucursalId != null) params.set("sucursalID", String(sucursalId));
@@ -892,11 +886,10 @@ export function createApiClient(config) {
       params.set("sinImprimir", sinImprimir ? "true" : "false");
       if (soloTienda) params.set("soloTienda", "true");
       if (soloEntregasHoy) params.set("soloEntregasHoy", "true");
-      if (ordenConsecutivo) params.set("ordenConsecutivo", "true");
       params.set("page", String(page || 1));
       params.set("pageSize", String(normalizePedidosPageSize(pageSize)));
 
-      return requestJson(`/pedidos?${params.toString()}`, { signal });
+      return requestJson(`/pedidos?${params.toString()}`);
     },
 
     async listarAlertasPedidosNuevosCreados({ empresaId, sucursalId, sinceAuditId = 0, sincePedidoId = 0, limit = 20 }) {

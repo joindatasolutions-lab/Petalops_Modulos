@@ -55,16 +55,11 @@ export function getDeliveryFinancialOverride(pedidoId) {
   return override && typeof override === "object" ? { ...override } : null;
 }
 
-export function applyDeliveryGiftOverridesToItems(items) {
-  const overrides = readOverrides();
-  return items.map(item => applyDeliveryGiftOverrideToItem(item, overrides));
-}
-
-export function applyDeliveryGiftOverrideToItem(item, overrides = readOverrides()) {
+export function applyDeliveryGiftOverrideToItem(item) {
   const pedidoId = resolveOrderId(item);
   if (!pedidoId) return item;
 
-  const override = overrides[String(pedidoId)];
+  const override = readOverrides()[String(pedidoId)];
   if (!override) return item;
 
   const financiero = item?.financiero && typeof item.financiero === "object" ? item.financiero : {};
