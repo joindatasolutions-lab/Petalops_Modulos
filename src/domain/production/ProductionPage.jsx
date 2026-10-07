@@ -2617,7 +2617,6 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
                 <button
                   type="button"
                   className={`production-mobile-status is-all${selectedStatusKey === "todos" ? " is-active" : ""}`}
-                  aria-pressed={selectedStatusKey === "todos"}
                   onClick={selectAllProductionStatuses}
                 >
                   Todos
@@ -2627,7 +2626,6 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
                     key={item}
                     type="button"
                     className={`production-mobile-status ${productionStatusChipClass(item)}${selectedStatusKey === normalizeStatus(item).replace(/_/g, "") ? " is-active" : ""}`}
-                    aria-pressed={selectedStatusKey === normalizeStatus(item).replace(/_/g, "")}
                     onClick={() => toggleEstadoFiltro(item)}
                   >
                     {item}
@@ -2636,7 +2634,9 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
               </div>
 
               <div className="production-mobile-counts" aria-live="polite">
-                <span><strong>{productionTotal}</strong> pedidos encontrados</span>
+                <span><strong>{productionTotal}</strong> visibles</span>
+                <span><strong>{metrics.pendientesHoy}</strong> pendientes</span>
+                <span><strong>{metrics.sinAsignar}</strong> sin asignar</span>
               </div>
 
               {error ? <p className="production-mobile-message">{error}</p> : null}
@@ -2658,7 +2658,7 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
                       <article key={`mobile-${item.idProduccion}`} className={`production-mobile-card ${!hasAssignedFlorista(item) ? "is-unassigned" : ""}`}>
                         <div className="production-mobile-card-top">
                           <strong>Pedido #{item.numeroPedido ?? "-"}</strong>
-                          <span>Entrega: {item.horaEntrega || "-"}</span>
+                          <span>{item.horaEntrega || "-"}</span>
                         </div>
                         <div className="production-mobile-card-body">
                           {productImageSrc ? (
@@ -2669,7 +2669,7 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
                           <div>
                             <strong>{item.cliente || "-"}</strong>
                             <span>{productPreview.name || item.producto || "-"} x {item.cantidadProducciones || 1}</span>
-                            <small>Florista: {item.floristaAsignado || "Sin asignar"}</small>
+                            <small>{item.floristaAsignado || "Sin asignar"}</small>
                           </div>
                         </div>
                         <div className="production-mobile-card-meta">
@@ -2678,10 +2678,10 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
                         </div>
                         <div className="production-mobile-card-actions">
                           {canManageProductionActions || canFloristaSelfAssign ? (
-                            <button type="button" onClick={() => openAssignmentDrawer(item)}>{hasAssignedFlorista(item) ? "Reasignar" : "Asignar"}</button>
+                            <button type="button" onClick={() => openAssignmentDrawer(item)}>Asignar</button>
                           ) : null}
                           <button type="button" onClick={() => openActionsDrawer(item)}>Ver detalle</button>
-                          {canManageStateActions && nextFloristaStatus(item.estado) && shouldShowFloristaStateAction(item.estado) ? (
+                          {canManageStateActions && shouldShowFloristaStateAction(item.estado) ? (
                             <button
                               type="button"
                               title={hasAssignedFlorista(item) ? "Actualizar estado de producción" : "Asigna un florista antes de cambiar estado"}
@@ -2691,7 +2691,7 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
                               {nextFloristaLabel(item.estado) || "Listo"}
                             </button>
                           ) : null}
-                          {canFloristaQuickState && nextFloristaStatus(item.estado) && (canChangeOwnProductionState(item) || isProductionReadyForDelivery(item.estado)) && shouldShowFloristaStateAction(item.estado) ? (
+                          {canFloristaQuickState && (canChangeOwnProductionState(item) || isProductionReadyForDelivery(item.estado)) && shouldShowFloristaStateAction(item.estado) ? (
                             <button
                               type="button"
                               onClick={nextFloristaStatus(item.estado) ? () => cambiarEstadoFloristaRapido(item) : undefined}
@@ -2710,11 +2710,11 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
               <footer className="production-mobile-pager" aria-label="Paginación móvil de producción">
                 <span>Mostrando {productionVisibleFrom} a {productionVisibleTo} de {productionTotal}</span>
                 <div>
-                  <button type="button" aria-label="Página anterior" onClick={() => setProductionPage(current => Math.max(1, current - 1))} disabled={productionPage <= 1}>
+                  <button type="button" onClick={() => setProductionPage(current => Math.max(1, current - 1))} disabled={productionPage <= 1}>
                     <ChevronLeft size={17} strokeWidth={2.4} aria-hidden="true" />
                   </button>
                   <strong>{productionPage}</strong>
-                  <button type="button" aria-label="Página siguiente" onClick={() => setProductionPage(current => Math.min(productionPages, current + 1))} disabled={productionPage >= productionPages}>
+                  <button type="button" onClick={() => setProductionPage(current => Math.min(productionPages, current + 1))} disabled={productionPage >= productionPages}>
                     <ChevronRight size={17} strokeWidth={2.4} aria-hidden="true" />
                   </button>
                 </div>
