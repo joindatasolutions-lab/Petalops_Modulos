@@ -1,3 +1,4 @@
+import { hasModuleAccess } from "./shared/moduleAccess.js";
 import { Suspense, lazy, useEffect, useMemo, useState } from "react";
 
 import { LoginPage } from "./domain/auth/LoginPage.jsx";
@@ -19,16 +20,7 @@ const ProductionPage = lazy(() => import("./domain/production/ProductionPage.jsx
 const TenantMonitoringPage = lazy(() => import("./domain/tenant-monitoring/TenantMonitoringPage.jsx").then(module => ({ default: module.TenantMonitoringPage })));
 const UsersManagementPage = lazy(() => import("./domain/users/UsersManagementPage.jsx").then(module => ({ default: module.UsersManagementPage })));
 
-export function hasModuleAccess(session, modulo) {
-  const name = String(modulo || "").toLowerCase();
-  if (!session) return false;
-  if (Boolean(session?.esGlobalJoin)) return true;
-  const modulosPlan = new Set((session.modulosActivosPlan || []).map(item => String(item || "").toLowerCase()));
-  if (!modulosPlan.has(name)) return false;
-
-  const permiso = (session.permisos || []).find(item => String(item.modulo || "").toLowerCase() === name);
-  return Boolean(permiso?.puedeVer);
-}
+export { hasModuleAccess } from "./shared/moduleAccess.js";
 
 function isEmpresaAdminRole(session) {
   const role = String(session?.rol || "").trim().toLowerCase().replace(/\s+/g, "_");
@@ -305,7 +297,7 @@ export default function App() {
 
   const activePage = (() => {
     if (view === "pipeline") return <PipelineOperativo {...pageProps} />;
-    if (view === "pedidos") return <OrdersAdminPage {...pageProps} />;
+    if (view === "pedidos") return canPedidos ? <OrdersAdminPage {...pageProps} /> : null;
     if (view === "produccion") return <ProductionPage {...pageProps} />;
     if (view === "domicilios") return <DeliveryPage {...pageProps} />;
     if (view === "barrios") return <NeighborhoodsPage {...pageProps} />;

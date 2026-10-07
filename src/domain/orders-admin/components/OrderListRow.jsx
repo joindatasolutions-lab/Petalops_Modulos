@@ -1,8 +1,8 @@
+import { hasModuleAccess } from "../../../shared/moduleAccess.js";
 import { Clock3 } from "lucide-react";
 
 import { formatearCOP, normalizeStatus, splitDateTimeParts } from "../../../shared/utils.js";
 import {
-  isEmpresaAdminRole,
   resolveDisplayOrderNumber,
   resolveOrderId,
   resolveOrderListTotal,
@@ -49,8 +49,9 @@ export function OrderListRow({
   const productSummary = resolveOrderProductSummary(item, new Map(), empresaId);
   const waPhone = String(item.telefonoCompleto || item.telefono || "").trim().replace(/\+/g, "");
   const displayOrderNumber = resolveDisplayOrderNumber(item);
-  const canApproveAction = isPendingStatus(item.estado);
-  const canCancelAction = canApproveAction || (isEmpresaAdminRole(session) && canInvoiceStatus(item.estado));
+  const canOperate = hasModuleAccess(session, "pedidos");
+  const canApproveAction = canOperate && isPendingStatus(item.estado);
+  const canCancelAction = canOperate && (isPendingStatus(item.estado) || canInvoiceStatus(item.estado));
   const isApproving = approvingPedidoIds.includes(Number(pedidoId));
   const approvalBlockedByTenant = canApproveAction && item?.puedeAprobar === false;
   const approveDisabled = !canApproveAction || approvalBlockedByTenant || isApproving;
@@ -62,7 +63,7 @@ export function OrderListRow({
   const canDownloadInvoice = Boolean(pedidoId) && canInvoiceStatus(item.estado);
   const canViewMessageCard = canMessageCardStatus(item.estado);
   const isFinalizing = finalizingPedidoIds.includes(Number(pedidoId));
-  const canFinalizeAction = Boolean(pedidoId) && isStorePickupOrder(item) && canInvoiceStatus(item.estado);
+  const canFinalizeAction = canOperate && Boolean(pedidoId) && isStorePickupOrder(item) && canInvoiceStatus(item.estado);
   const finalizeDisabled = isFinalizing || orderFinalized;
   const finalizeLabel = isFinalizing ? "Finalizando..." : orderFinalized ? "Finalizado" : "Finalizar";
   const finalizeTitle = isFinalizing
