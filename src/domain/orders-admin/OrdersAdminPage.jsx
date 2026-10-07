@@ -1,5 +1,3 @@
-import { hasModuleAccess } from "../../shared/moduleAccess.js";
-import { loadOrderPaymentCatalogs, mergeOrderPaymentCatalogs } from "./orderPaymentCatalogs.js";
 import { useOrderEditActions } from "./hooks/useOrderEditActions.js";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { tenantConfig } from "../../config/tenantConfig.js";
@@ -49,7 +47,7 @@ import { useOrdersAdminData } from "./hooks/useOrdersAdminData.js";
 import { useOrdersCatalogs } from "./hooks/useOrdersCatalogs.js";
 import { applyDeliveryGiftOverrideToDetail } from "./deliveryGiftOverrides.js";
 
-import { buildCatalogProductIndex, customArrangementPreTaxTotal, buildEditedOrderFinancialBase, buildOrderFinancialPreview, buildPaginationItems, displayProductCode, extractPaymentAmounts, isCashPaymentMethod, isCustomArrangement, isDeliveryGifted, isValidPaymentBreakdownTotal, isLinkPaymentMethod, normalizePedidosViewStatus, normalizePaymentMethods, normalizeWholePeso, patchOrderItemFromDetail, resolveCatalogProduct, roundCurrency, todayIsoDate, toggleTodayDeliveriesFilters } from "./ordersDomain.js";
+import { buildCatalogProductIndex, customArrangementPreTaxTotal, buildEditedOrderFinancialBase, buildOrderFinancialPreview, buildPaginationItems, displayProductCode, extractPaymentAmounts, isCashPaymentMethod, isCustomArrangement, isEmpresaAdminRole, isDeliveryGifted, isValidPaymentBreakdownTotal, isLinkPaymentMethod, normalizePedidosViewStatus, normalizePaymentMethods, normalizeWholePeso, patchOrderItemFromDetail, resolveCatalogProduct, roundCurrency, todayIsoDate, toggleTodayDeliveriesFilters } from "./ordersDomain.js";
 
 /**
  * Pagina principal del modulo Pedidos.
@@ -80,6 +78,14 @@ export {
 
 function resolveCatalogTenantSlug(session) {
   return String(session?.empresaSlug || "").trim();
+}
+
+function extractActiveCatalogNames(payload) {
+  const items = Array.isArray(payload?.items) ? payload.items : [];
+  return items
+    .filter(item => item?.activo !== false)
+    .map(item => String(item?.nombre || "").trim())
+    .filter(Boolean);
 }
 
 function normalizeIdentificationTypeOptions(payload) {
@@ -438,27 +444,22 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
     [detalle]
   );
   const pedidoMenuFields = useMemo(
-    () => mergeOrderPaymentCatalogs(
-      configuredPedidoMenuFields.length ? configuredPedidoMenuFields : detailPedidoMenuFields,
-      paymentCatalog?.empresaId === empresaId ? paymentCatalog : null
-    ),
-    [configuredPedidoMenuFields, detailPedidoMenuFields, paymentCatalog, empresaId]
+    () => (configuredPedidoMenuFields.length ? configuredPedidoMenuFields : detailPedidoMenuFields),
+    [configuredPedidoMenuFields, detailPedidoMenuFields]
   );
   const paymentFieldConfig = useMemo(
     () => pedidoMenuFields.find(field => field?.codigo === "pedido_metodos_pago" && field?.activo),
     [pedidoMenuFields]
   );
   const paymentFieldOptions = useMemo(
-    () => paymentCatalog?.empresaId === empresaId && Array.isArray(paymentCatalog.paymentOptions)
-      ? paymentCatalog.paymentOptions
-      : Array.isArray(paymentFieldConfig?.opciones) ? paymentFieldConfig.opciones : [],
-    [paymentCatalog, empresaId, paymentFieldConfig]
+    () => paymentCatalog && paymentCatalog.empresaId === empresaId ? paymentCatalog.options : [],
+    [paymentCatalog, empresaId]
   );
   const salesChannelFieldConfig = useMemo(
     () => pedidoMenuFields.find(field => field?.codigo === "pedido_canal_venta" && field?.activo),
     [pedidoMenuFields]
   );
-  const canEditClientIdentity = hasModuleAccess(session, "pedidos");
+  const canEditClientIdentity = useMemo(() => isEmpresaAdminRole(session), [session]);
   const catalogProductIndex = useMemo(
     () => buildCatalogProductIndex(catalogProducts),
     [catalogProducts]
@@ -782,18 +783,32 @@ const messageCard = useMessageCardController({
 
     async function loadPedidoMenuFields() {
       setPaymentCatalog(null);
-      setConfiguredPedidoMenuFields([]);
       if (!empresaId) {
         setConfiguredPedidoMenuFields([]);
         return;
       }
 
       try {
-        const catalog = await loadOrderPaymentCatalogs(api, empresaId);
+        const [menuResponse, paymentResponse, channelResponse] = await Promise.all([
+          api.listarMenuPedidoEmpresa({ empresaId }),
+          api.listarMetodosPagoEmpresa({ empresaId }),
+          api.listarCanalesVentaEmpresa({ empresaId }),
+        ]);
         if (!isCurrent) return;
-        setPaymentCatalog({ empresaId, ...catalog });
-        setConfiguredPedidoMenuFields(catalog.fields);
-        catalog.errors.forEach(error => console.error("Error cargando catalogo del pedido:", error));
+
+        const paymentOptions = extractActiveCatalogNames(paymentResponse);
+        setPaymentCatalog({ empresaId, options: paymentOptions });
+        const channelOptions = extractActiveCatalogNames(channelResponse);
+        const menuItems = Array.isArray(menuResponse?.items) ? menuResponse.items : [];
+        setConfiguredPedidoMenuFields(menuItems.map(field => {
+          if (field?.codigo === "pedido_metodos_pago") {
+            return { ...field, opciones: paymentOptions };
+          }
+          if (field?.codigo === "pedido_canal_venta") {
+            return { ...field, opciones: channelOptions };
+          }
+          return field;
+        }));
       } catch (error) {
         console.error("Error cargando configuracion de pago del pedido:", error);
         if (isCurrent) setConfiguredPedidoMenuFields([]);

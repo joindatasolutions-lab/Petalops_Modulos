@@ -147,11 +147,7 @@ export function createApiClient(config) {
         module = String(payload.error.module || "").trim();
         requestId = String(payload.error.request_id || payload.error.requestId || "").trim();
       } else {
-        const backendDetail = payload?.detail;
-        detail = typeof backendDetail === "string" ? backendDetail.trim()
-          : Array.isArray(backendDetail) ? backendDetail.map(item => item?.msg || "Campo invalido").join("; ")
-          : String(backendDetail?.message || "").trim();
-        code = String(backendDetail?.code || "").trim();
+        detail = String(payload?.detail || "").trim();
       }
     } catch {
       try {
