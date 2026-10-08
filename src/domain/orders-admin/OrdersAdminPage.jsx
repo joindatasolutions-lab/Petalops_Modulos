@@ -2064,8 +2064,9 @@ const openNewOrderModal = () => {
 
   const applyDatePreset = preset => {
     const today = todayIsoDate();
-    const range = preset === "mes" ? thisMonthRangeIso() : { fechaDesde: today, fechaHasta: today };
-    setFilters(current => ({ ...current, ...range, datePeriod: preset === "mes" ? "mes" : "hoy", soloEntregasHoy: false, page: 1 }));
+    const date = preset === "ayer" ? shiftIsoDate(today, -1) : today;
+    const range = preset === "mes" ? thisMonthRangeIso() : { fechaDesde: date, fechaHasta: date };
+    setFilters(current => ({ ...current, ...range, datePeriod: preset, soloEntregasHoy: false, page: 1 }));
   };
 
   const applyDateRange = (fechaDesde, fechaHasta) => {

@@ -7,6 +7,26 @@
   --orders-header-band: auto;
 }
 
+/* Secondary actions stay neutral; only enabled toggles use the rose accent. */
+.orders-admin-view.orders-page-view .orders-page-header.orders-kpi-header .header-actions .btn-primary:is(.orders-header-refresh, .orders-catalog-link) {
+  background: #fff !important;
+  border-color: #dfe6f1 !important;
+  color: #64748b !important;
+  box-shadow: none !important;
+}
+
+.orders-admin-view.orders-page-view .orders-page-header.orders-kpi-header .header-actions .btn-primary:is(.orders-header-refresh, .orders-catalog-link):hover {
+  background: #f8fafc !important;
+  border-color: #94a3b8 !important;
+}
+
+.orders-admin-view.orders-page-view .orders-page-header.orders-kpi-header .header-actions .btn-primary.orders-store-toggle.is-active {
+  background: #fff !important;
+  border-color: #b97890 !important;
+  color: #94536c !important;
+  box-shadow: inset 0 0 0 1px #b97890 !important;
+}
+
 /* Compact action row that reserves its own space above the KPIs. */
 .orders-admin-view.orders-page-view .orders-kpi-header .header-actions {
   display: flex !important;

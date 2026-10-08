@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
-import { CalendarDays, Truck, Filter, RotateCw, ChevronDown, X, ListFilter } from "lucide-react";
+import { CalendarDays, Filter, RotateCw, ChevronDown, X, ListFilter } from "lucide-react";
 import { todayIsoDate } from "../ordersDomain.js";
+import { shiftIsoDate } from "../../../shared/utils.js";
 import { OrdersDatePicker, OrdersFilterPopover } from "./OrdersFilterPopover.jsx";
 import "./OrdersFilters.css";
 
@@ -14,7 +15,8 @@ export function OrdersFilters({ filters, onApplyDatePreset, onApplyDateRange, on
   const searching = Boolean(String(filters.q || "").trim());
   const hasDates = Boolean(filters.fechaDesde || filters.fechaHasta);
   const isToday = filters.soloEntregasHoy || (filters.fechaDesde === todayIsoDate() && filters.fechaHasta === filters.fechaDesde && filters.datePeriod !== "custom");
-  const period = isToday ? "hoy" : hasDates ? (filters.datePeriod === "mes" ? "mes" : "custom") : "todos";
+  const isYesterday = filters.fechaDesde === shiftIsoDate(todayIsoDate(), -1) && filters.fechaHasta === filters.fechaDesde && filters.datePeriod !== "custom";
+  const period = isToday ? "hoy" : isYesterday ? "ayer" : hasDates ? (filters.datePeriod === "mes" ? "mes" : "custom") : "todos";
   const byDelivery = Boolean(filters.filtrarPorEntrega || filters.soloEntregasHoy);
   const dateSubject = byDelivery ? "Pedidos con entrega programada" : "Pedidos creados";
   const dateSummary = searching ? "Filtro de fecha en pausa mientras buscas." : period === "todos" ? "Sin límite de fecha." : period === "hoy" ? `${dateSubject} para hoy.` :
@@ -33,19 +35,25 @@ export function OrdersFilters({ filters, onApplyDatePreset, onApplyDateRange, on
   ];
   return <section className="orders-filter-panel" aria-label="Filtros de pedidos">
     <div className="of-bar">
-      <div className="of-date-group">
+      <label className="of-date-group">
         <span className="of-group-label">Buscar pedidos por</span>
-        <div className="of-date-type" role="group" aria-label="Tipo de fecha: buscar pedidos por">
-          {[[false, "Fecha de creación", CalendarDays], [true, "Fecha de entrega", Truck]].map(([value, label, Icon]) => <button key={label} type="button" aria-pressed={byDelivery === value} onClick={() => onFilterChange("filtrarPorEntrega", value)}><Icon size={14} aria-hidden="true" />{label}</button>)}
-        </div>
-      </div>
+        <select className="of-select" value={byDelivery ? "entrega" : "creacion"} onChange={event => onFilterChange("filtrarPorEntrega", event.target.value === "entrega")}>
+          <option value="creacion">Fecha de creación</option>
+          <option value="entrega">Fecha de entrega</option>
+        </select>
+      </label>
       <div className="of-period-group">
-      <span className="of-group-label">Período</span>
-      <div className="of-period-buttons" role="group" aria-label="Período">
-        <button type="button" aria-pressed={period === "hoy"} onClick={() => onApplyDatePreset("hoy")}>Hoy</button>
-        <button type="button" aria-pressed={period === "mes"} onClick={() => onApplyDatePreset("mes")}>Este Mes</button>
-        <button ref={dateButton} type="button" aria-label={period === "custom" ? `Elegir fechas: ${rangeLabel}` : "Elegir fechas"} aria-pressed={period === "custom"} aria-haspopup="dialog" aria-expanded={popover === "dates"} onClick={() => setPopover("dates")}><CalendarDays size={14} /><span className="of-range-label">{period === "custom" ? rangeLabel : "Elegir fechas"}</span><ChevronDown size={12} /></button>
-      </div>
+        <label className="of-period-label">
+          <span className="of-group-label">Período</span>
+          <select className="of-select" value={period} onChange={event => onApplyDatePreset(event.target.value)}>
+            {period === "todos" && <option value="todos" disabled hidden>Todas las fechas</option>}
+            {period === "custom" && <option value="custom" disabled hidden>Personalizado</option>}
+            <option value="hoy">Hoy</option>
+            <option value="mes">Este mes</option>
+            <option value="ayer">Ayer</option>
+          </select>
+        </label>
+        <button ref={dateButton} type="button" className="of-choose-dates" aria-label={period === "custom" ? `Elegir fechas: ${rangeLabel}` : "Elegir fechas"} aria-pressed={period === "custom"} aria-haspopup="dialog" aria-expanded={popover === "dates"} onClick={() => setPopover("dates")}><CalendarDays size={14} /><span className="of-range-label">{period === "custom" ? rangeLabel : "Elegir fechas"}</span><ChevronDown size={12} /></button>
       </div>
       <button ref={additionalButton} type="button" className="of-toggle" aria-haspopup="dialog" aria-expanded={popover === "additional"} onClick={() => setPopover("additional")}><Filter size={14} />Filtros adicionales{additionalCount > 0 && <span className="of-count">{additionalCount}</span>}<ChevronDown size={12} /></button>
       <div className="of-result-actions">
