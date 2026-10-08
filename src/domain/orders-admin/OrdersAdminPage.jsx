@@ -36,7 +36,7 @@ import {
   VOICE_ALERTS_LAST_PEDIDO_STORAGE_PREFIX,
   VOICE_ALERTS_INTERVAL_MS,
   VOICE_ALERTS_STORAGE_KEY,
-  initialFilters,
+  createInitialOrdersFilters,
 } from "./ordersAdminConstants.js";
 import {
   detailEditBarrioNombreOrFallback,
@@ -211,7 +211,7 @@ function selectPreferredSpanishVoice(synth) {
 }
 
 export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canViewCatalogo, canViewProduccion, canViewDomicilios, canViewBarrios, canViewInventario, canViewContabilidad, canViewClientesPanel, canViewUsuariosPanel, canViewTenantMonitoring, onLogout, onGoPipeline, onGoPedidos, onGoProduccion, onGoDomicilios, onGoBarrios, onGoInventario, onGoContabilidad, onGoClientes, onGoUsuarios, onGoTenantMonitoring }) {
-  const [filters, setFilters] = useState(initialFilters);
+  const [filters, setFilters] = useState(createInitialOrdersFilters);
   const [selectedPedidoId, setSelectedPedidoId] = useState(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [detalle, setDetalle] = useState(null);
@@ -2091,20 +2091,7 @@ const openNewOrderModal = () => {
   };
 
   const clearOrderFilters = () => {
-    const today = todayIsoDate();
-    setFilters(current => ({
-      ...current,
-      q: "",
-      estado: "",
-      sinImprimir: false,
-      soloTienda: false,
-      soloEntregasHoy: false,
-      metodoPago: "",
-      fechaDesde: today,
-      fechaHasta: today,
-      filtrarPorEntrega: false,
-      page: 1,
-    }));
+    setFilters(createInitialOrdersFilters());
   };
 
   const focusOrderMetric = metric => {

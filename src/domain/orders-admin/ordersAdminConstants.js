@@ -30,6 +30,16 @@ export const initialFilters = {
   pageSize: 10
 };
 
+// Calculate on entry so an already-open app uses the current Bogota date.
+export function createInitialOrdersFilters(today = todayIsoDateBogota()) {
+  return {
+    ...initialFilters,
+    fechaDesde: today,
+    fechaHasta: today,
+    datePeriod: "hoy",
+  };
+}
+
 export const DEFAULT_ORDERS_KPIS = {
   ventaHoy: 0,
   pedidosHoy: 0,

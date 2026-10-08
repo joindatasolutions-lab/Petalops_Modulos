@@ -10,16 +10,29 @@ import {
   extractOrdersPayloadItems,
   filterOrdersByCreatedDateRange,
   filterOrdersByPaymentMethod,
-  filterOrdersBySearch,
   filterOrdersByStatus,
-  isOrderNumberSearchTerm,
-  isPaymentSearchTerm,
   localDateEndParam,
   localDateStartParam,
   normalizePedidosViewStatus,
   resolveOrdersPayloadTotal,
   todayIsoDate,
 } from "../ordersDomain.js";
+
+export function buildOrdersRequestFilters(filters, query, empresaId, sucursalId) {
+  const q = String(query || "").replace(/\s+/g, " ").trim().slice(0, 64);
+  const searching = Boolean(q);
+  return {
+    ...filters, empresaId, sucursalId, q,
+    estado: searching ? "" : filters.estado,
+    metodoPago: searching ? "" : filters.metodoPago,
+    sinImprimir: searching ? false : filters.sinImprimir,
+    soloTienda: searching ? false : filters.soloTienda,
+    soloEntregasHoy: searching ? false : filters.soloEntregasHoy,
+    filtrarPorEntrega: searching ? false : filters.filtrarPorEntrega,
+    fechaDesde: searching ? "" : filters.fechaDesde,
+    fechaHasta: searching ? "" : filters.fechaHasta,
+  };
+}
 
 /**
  * Hook de datos de Pedidos.
@@ -59,25 +72,9 @@ export function useOrdersAdminData({
     if (!silent) {
       requestTracker.current = requestId;
     }
-    const requestFilters = {
-      empresaId,
-      sucursalId,
-      q: debouncedQuery,
-      backendQ: isPaymentSearchTerm(debouncedQuery) ? "" : debouncedQuery,
-      estado: filters.estado,
-      sinImprimir: filters.sinImprimir,
-      soloTienda: filters.soloTienda,
-      soloEntregasHoy: filters.soloEntregasHoy,
-      metodoPago: filters.metodoPago,
-      fechaDesde: filters.fechaDesde,
-      fechaHasta: filters.fechaHasta,
-      filtrarPorEntrega: filters.filtrarPorEntrega,
-      page: filters.page,
-      pageSize: filters.pageSize,
-    };
-    const searchByOrderNumber = !requestFilters.soloTienda && isOrderNumberSearchTerm(requestFilters.q);
-    const requestFechaDesde = searchByOrderNumber ? "" : requestFilters.fechaDesde;
-    const requestFechaHasta = searchByOrderNumber ? "" : requestFilters.fechaHasta;
+    const requestFilters = buildOrdersRequestFilters(filters, debouncedQuery, empresaId, sucursalId);
+    const requestFechaDesde = requestFilters.fechaDesde;
+    const requestFechaHasta = requestFilters.fechaHasta;
     const cacheKey = buildOrdersCacheKey({
       ...requestFilters,
       fechaDesde: requestFechaDesde,
@@ -118,7 +115,7 @@ export function useOrdersAdminData({
       const data = await api.listarPedidos({
         empresaId: requestFilters.empresaId,
         sucursalId: requestFilters.sucursalId,
-        q: requestFilters.backendQ,
+        q: requestFilters.q,
         estado: requestFilters.estado,
         sinImprimir: requestFilters.sinImprimir,
         soloTienda: requestFilters.soloTienda,
@@ -141,7 +138,8 @@ export function useOrdersAdminData({
         : filterOrdersByCreatedDateRange(loadedItems, requestFechaDesde, requestFechaHasta);
       const statusItems = filterOrdersByStatus(dateItems, requestFilters.estado);
       const paymentItems = filterOrdersByPaymentMethod(statusItems, requestFilters.metodoPago);
-      const visibleItems = filterOrdersBySearch(paymentItems, requestFilters.q, requestFilters.empresaId);
+      // The server also searches fields omitted from the list response.
+      const visibleItems = paymentItems;
       const backendReturnedOutOfRangeItems = dateItems.length !== loadedItems.length;
       const nextTotal = requestFilters.estado || backendReturnedOutOfRangeItems
         ? visibleItems.length
