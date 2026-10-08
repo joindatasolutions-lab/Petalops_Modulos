@@ -16,6 +16,25 @@ import {
 } from "lucide-react";
 
 import { formatearCOP } from "../../../shared/utils.js";
+import "./OrdersHeader.css";
+import { todayIsoDate } from "../ordersDomain.js";
+
+export function ordersMetricPeriod(filters) {
+  if (String(filters.q || "").trim()) return "Todas las fechas · búsqueda activa";
+  const from = filters.fechaDesde;
+  const to = filters.fechaHasta;
+  const format = value => value.split("T")[0].split("-").reverse().join("/");
+  if (filters.soloEntregasHoy || (from === todayIsoDate() && to === from)) return "Hoy";
+  if (from && to && from === to) return format(from);
+  if (from && to) return `${format(from)} – ${format(to)}`;
+  if (from) return `Desde ${format(from)}`;
+  if (to) return `Hasta ${format(to)}`;
+  return "Todas las fechas";
+}
+
+const metricOrder = ["hoy", "pendientes", "facturas", "aprobados", "cancelados"];
+const metricHints = { hoy: "Ver creados hoy", pendientes: "Requieren revisión", facturas: "Por imprimir", aprobados: "Ver aprobados", cancelados: "Ver cancelados" };
+const formatCount = value => Number(value || 0).toLocaleString("es-CO");
 
 /**
  * Encabezado operativo del modulo Pedidos.
@@ -41,8 +60,11 @@ export function OrdersHeader({
   onNewOrder,
   onFocusMetric,
 }) {
+  const metricPeriod = ordersMetricPeriod(filters);
+  const salesLabel = "Ventas hoy";
+  const ordersLabel = "Pedidos hoy";
   return (
-    <header className="orders-admin-header orders-page-header">
+    <header className="orders-admin-header orders-page-header orders-kpi-header">
       <div className="orders-page-heading">
         <div className="orders-page-breadcrumb" aria-label="Ruta">
           <span>Operaciones</span>
@@ -149,15 +171,17 @@ export function OrdersHeader({
             <ChevronDown size={15} strokeWidth={2.2} />
           </button>
         </div>
-        <div className="orders-header-metrics" aria-label="Resumen de pedidos">
+        <div className="orders-header-metrics orders-kpi-grid" aria-label="Resumen de pedidos">
+          <p className="orders-kpi-scope">Resumen de pedidos · {metricPeriod}. Ventas y pedidos de hoy corresponden al día actual dentro de esta consulta.</p>
           <article className="orders-header-metric-card is-sale">
             <span className="orders-header-metric-icon" aria-hidden="true">
               <IconWallet size={17} stroke={2.2} />
             </span>
             <strong>${formatearCOP(headerSalesSummary)}</strong>
-            <span>Venta hoy</span>
+            <span>{salesLabel}</span>
+            <small>Hoy · COP</small>
           </article>
-          {metricCards.map(card => {
+          {[...metricCards].sort((a, b) => metricOrder.indexOf(a.key) - metricOrder.indexOf(b.key)).map(card => {
             const Icon = card.Icon;
             const isActive = activeMetric === card.key;
             return (
@@ -167,13 +191,16 @@ export function OrdersHeader({
                 className={`orders-header-metric-card ${card.className}${isActive ? " is-active" : ""}`}
                 onClick={() => onFocusMetric(card.key)}
                 aria-pressed={isActive}
-                aria-label={`${card.label}: ${card.value}`}
+                aria-label={`${card.key === "hoy" ? ordersLabel : card.label}: ${card.value}. ${card.key === "hoy" ? "Hoy" : metricPeriod}`}
+                data-metric={card.key}
+                title={card.key === "hoy" ? "Ver pedidos de hoy" : metricHints[card.key]}
               >
                 <span className="orders-header-metric-icon" aria-hidden="true">
                   <Icon size={17} strokeWidth={2.2} />
                 </span>
-                <strong>{card.value}</strong>
-                <span>{card.shortLabel}</span>
+                <strong>{formatCount(card.value)}</strong>
+                <span>{card.key === "hoy" ? ordersLabel : card.shortLabel}</span>
+                <small>{card.key === "hoy" ? "Creados hoy" : isActive ? "Filtro activo" : metricHints[card.key]}</small>
               </button>
             );
           })}
