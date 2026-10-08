@@ -2078,8 +2078,10 @@ const openNewOrderModal = () => {
   };
 
   const focusOrderMetric = metric => {
-    const today = todayIsoDate();
     setFilters(current => {
+      if (metric === "hoy") {
+        return { ...current, estado: "", sinImprimir: false, page: 1 };
+      }
       const base = {
         ...current,
         estado: "",
@@ -2089,9 +2091,6 @@ const openNewOrderModal = () => {
         page: 1,
       };
 
-      if (metric === "hoy") {
-        return { ...base, fechaDesde: today, fechaHasta: today };
-      }
       if (metric === "aprobados") {
         return { ...base, estado: "APROBADO" };
       }
