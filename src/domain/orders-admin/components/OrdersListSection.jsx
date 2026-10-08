@@ -13,6 +13,9 @@ import { resolveOrderId } from "../ordersDomain.js";
 export function OrdersListSection({
   error,
   loading,
+  onRetry,
+  hasLoaded = false,
+  updatedAt,
   items,
   empresaId,
   session,
@@ -32,23 +35,14 @@ export function OrdersListSection({
 }) {
   return (
     <>
-      {error && <p className="orders-message">{error}</p>}
-      {loading && (
-        <div className="orders-loading-card" role="status" aria-live="polite">
-          <span className="orders-loading-orbit" aria-hidden="true">
-            <Search size={16} strokeWidth={2.2} />
-          </span>
-          <div className="orders-loading-copy">
-            <strong>Buscando pedidos</strong>
-            <span>Aplicando filtros y actualizando resultados</span>
+      <section className="orders-page-section" aria-busy={loading}>
+        <div className="orders-list-heading">
+          <h2 className="orders-section-title">Listado de pedidos</h2>
+          <div className="orders-result-status" role="status" aria-live="polite">
+            {loading && !error ? <span>{hasLoaded ? "Actualizando; se muestran los resultados anteriores…" : "Buscando pedidos…"}</span> : null}
+            {error ? <><span title={`${error}${updatedAt ? ` Última actualización: ${new Date(updatedAt).toLocaleTimeString("es-CO")}` : ""}`}>{error}</span><button type="button" onClick={onRetry} disabled={loading}>{loading ? "Reintentando…" : "Reintentar"}</button></> : null}
           </div>
-          <span className="orders-loading-track" aria-hidden="true">
-            <span />
-          </span>
         </div>
-      )}
-      <section className="orders-page-section">
-        <h2 className="orders-section-title">Listado de pedidos</h2>
         {!loading && !error && items.length === 0 ? (
           <div className="orders-empty-state" role="status" aria-live="polite">
             <span className="orders-empty-state-icon" aria-hidden="true">

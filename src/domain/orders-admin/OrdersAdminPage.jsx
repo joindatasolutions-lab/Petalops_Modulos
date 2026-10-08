@@ -2389,6 +2389,8 @@ const ordersOverlayOpen = drawerOpen || newOrderOpen || messageCardOpen || Boole
           />
 
           <OrdersListSection
+            onRetry={() => loadOrders(false)}
+            hasLoaded={items.length > 0}
             error={error}
             loading={loading}
             items={items}
