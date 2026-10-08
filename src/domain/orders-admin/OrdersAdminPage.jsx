@@ -1,13 +1,10 @@
-import { hasModuleAccess } from "../../shared/moduleAccess.js";
-import { loadOrderPaymentCatalogs, mergeOrderPaymentCatalogs } from "./orderPaymentCatalogs.js";
-import { useOrderEditActions } from "./hooks/useOrderEditActions.js";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { tenantConfig } from "../../config/tenantConfig.js";
 import { useRef } from "react";
 import { createApiClient } from "../../infrastructure/apiClient.js";
 import { AppSidebar } from "../../shared/AppSidebar.jsx";
 import { useSidebarState } from "../../shared/useSidebarState.js";
-import { formatearCOP } from "../../shared/utils.js";
+import { formatearCOP, shiftIsoDate } from "../../shared/utils.js";
 import { useDebouncedValue } from "../../shared/useDebouncedValue.js";
 import { MessageCardModal } from "./components/MessageCardModal.jsx";
 import { NewOrderModal } from "./components/NewOrderModal.jsx";
@@ -17,7 +14,7 @@ import { ORDER_METRIC_ICONS, OrdersHeader } from "./components/OrdersHeader.jsx"
 import { OrdersFilters } from "./components/OrdersFilters.jsx";
 import { OrdersListSection } from "./components/OrdersListSection.jsx";
 import { OrdersPager } from "./components/OrdersPager.jsx";
-
+import { canInvoiceStatus } from "./ordersUiRules.js";
 import {
   buildProductoLabel,
   dedupeBarrioItems,
@@ -31,7 +28,16 @@ import {
   normalizeTime,
   toDateInput,
 } from "./orderDateFormatters.js";
-import { AUTO_REFRESH_INTERVAL_MS, DEFAULT_NEW_ORDER_FORM, VOICE_ALERTS_LAST_AUDIT_STORAGE_PREFIX, VOICE_ALERTS_LAST_PEDIDO_STORAGE_PREFIX, VOICE_ALERTS_INTERVAL_MS, VOICE_ALERTS_STORAGE_KEY, createInitialOrdersFilters } from "./ordersAdminConstants.js";
+import {
+  AUTO_REFRESH_INTERVAL_MS,
+  CANCELADO_PEDIDO_ESTADO_ID,
+  DEFAULT_NEW_ORDER_FORM,
+  VOICE_ALERTS_LAST_AUDIT_STORAGE_PREFIX,
+  VOICE_ALERTS_LAST_PEDIDO_STORAGE_PREFIX,
+  VOICE_ALERTS_INTERVAL_MS,
+  VOICE_ALERTS_STORAGE_KEY,
+  createInitialOrdersFilters,
+} from "./ordersAdminConstants.js";
 import {
   detailEditBarrioNombreOrFallback,
   normalizeDeliveryType,
@@ -39,17 +45,71 @@ import {
 import {
   normalizeIdentType,
 } from "./orderDetailFormatters.js";
-import { buildDetailUpdatePayload, buildDuplicateCheckoutPayload as buildDuplicateCheckoutPayloadData, buildNewOrderCheckoutPayload as buildNewOrderManualPayloadData } from "./orderPayloadBuilders.js";
+import {
+  buildAddDetailProductPayload,
+  buildDetailUpdatePayload,
+  buildDuplicateCheckoutPayload as buildDuplicateCheckoutPayloadData,
+  buildNewOrderCheckoutPayload as buildNewOrderManualPayloadData,
+  buildQuickSaleOrderPayload,
+} from "./orderPayloadBuilders.js";
 import { useMessageCardController } from "./hooks/useMessageCardController.js";
 import { useOrderDetailEditor } from "./hooks/useOrderDetailEditor.js";
-import { useNewOrderClientLookup } from "./hooks/useNewOrderClientLookup.js";
-import { useNewOrderCreation } from "./hooks/useNewOrderCreation.js";
-import { useOrderActions } from "./hooks/useOrderActions.js";
 import { useOrdersAdminData } from "./hooks/useOrdersAdminData.js";
 import { useOrdersCatalogs } from "./hooks/useOrdersCatalogs.js";
-import { applyDeliveryGiftOverrideToDetail } from "./deliveryGiftOverrides.js";
+import {
+  applyDeliveryGiftOverrideToDetail,
+  forgetDeliveryGiftOverride,
+  getDeliveryFinancialOverride,
+} from "./deliveryGiftOverrides.js";
 
-import { buildCatalogProductIndex, customArrangementPreTaxTotal, buildEditedOrderFinancialBase, buildOrderFinancialPreview, buildPaginationItems, displayProductCode, extractPaymentAmounts, isCashPaymentMethod, isCustomArrangement, isDeliveryGifted, isValidPaymentBreakdownTotal, isLinkPaymentMethod, normalizePedidosViewStatus, normalizePaymentMethods, normalizeWholePeso, patchOrderItemFromDetail, resolveCatalogProduct, roundCurrency, todayIsoDate, toggleTodayDeliveriesFilters } from "./ordersDomain.js";
+import {
+  buildCatalogProductIndex,
+  customArrangementPreTaxTotal,
+  buildEditedOrderFinancialBase,
+  buildOrderFinancialPreview,
+  buildOrdersMetrics,
+  buildPaginationItems,
+  clampPercentage,
+  displayProductCode,
+  ensureRappiOption,
+  extractOrdersPayloadItems,
+  extractPaymentAmounts,
+  filterOrdersByCreatedDateRange,
+  filterOrdersByPaymentMethod,
+  filterOrdersBySearch,
+  filterOrdersByStatus,
+  filterStorePickupOrders,
+  isCashPaymentMethod,
+  isCustomArrangement,
+  isEmpresaAdminRole,
+  isDeliveryGifted,
+  isValidPaymentBreakdownTotal,
+  isLinkPaymentMethod,
+  isOrderNumberSearchTerm,
+  isStorePickupOrder,
+  localDateEndParam,
+  localDateStartParam,
+  normalizePedidosViewStatus,
+  normalizeOrderProducts,
+  normalizePaymentMethods,
+  normalizeWholePeso,
+  patchOrderItemFromDetail,
+  resolveAssignedOrderNumber,
+  resolveCatalogProduct,
+  resolveFloristaName,
+  resolveOrderId,
+  resolveOrderListTotal,
+  resolveOrderProductSummary,
+  resolveOrdersPayloadTotal,
+  roundCurrency,
+  sanitizeWholePesoInput,
+  shouldAutoGenerateInvoiceForCompany,
+  shouldShowPendingInvoiceAlert,
+  thisMonthRangeIso,
+  thisWeekRangeIso,
+  todayIsoDate,
+  toggleTodayDeliveriesFilters,
+} from "./ordersDomain.js";
 
 /**
  * Pagina principal del modulo Pedidos.
@@ -80,6 +140,14 @@ export {
 
 function resolveCatalogTenantSlug(session) {
   return String(session?.empresaSlug || "").trim();
+}
+
+function extractActiveCatalogNames(payload) {
+  const items = Array.isArray(payload?.items) ? payload.items : [];
+  return items
+    .filter(item => item?.activo !== false)
+    .map(item => String(item?.nombre || "").trim())
+    .filter(Boolean);
 }
 
 function normalizeIdentificationTypeOptions(payload) {
@@ -201,6 +269,9 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
   const [detailAddCantidad, setDetailAddCantidad] = useState(1);
   const [detailAddPrecio, setDetailAddPrecio] = useState(null);
   const [detailAddSaving, setDetailAddSaving] = useState(false);
+  const [approvingPedidoIds, setApprovingPedidoIds] = useState([]);
+  const [finalizingPedidoIds, setFinalizingPedidoIds] = useState([]);
+  const [finalizedPickupPedidoIds, setFinalizedPickupPedidoIds] = useState([]);
   const [openOrderActionsId, setOpenOrderActionsId] = useState(null);
   const [catalogProducts, setCatalogProducts] = useState([]);
   const [orderNotification, setOrderNotification] = useState(null);
@@ -219,7 +290,6 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
   const [newOrderSaving, setNewOrderSaving] = useState(false);
   const [newOrderError, setNewOrderError] = useState("");
   const [configuredPedidoMenuFields, setConfiguredPedidoMenuFields] = useState([]);
-  const [paymentCatalog, setPaymentCatalog] = useState(null);
   const [identificationTypeOptions, setIdentificationTypeOptions] = useState([
     { codigo: "CC", nombre: "Cedula" },
     { codigo: "NIT", nombre: "NIT" },
@@ -230,12 +300,15 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
 
   const api = useMemo(() => createApiClient(tenantConfig), []);
   const loadOrdersRef = useRef(null);
+  const loadTodaySalesSummaryRef = useRef(null);
+  const newOrderLookupPhoneRef = useRef("");
   const detailRequestSeqRef = useRef(0);
   const voiceAlertsPrimedRef = useRef(false);
   const voiceAlertsPollingRef = useRef(false);
   const voiceLastAuditIdRef = useRef(0);
   const voiceLastPedidoIdRef = useRef(0);
   const debouncedQuery = useDebouncedValue(filters.q, 300);
+  const debouncedNewOrderPhone = useDebouncedValue(newOrderForm.clienteTelefono, 500);
   const empresaId = Number(session?.empresaID || tenantConfig.empresaId);
   const sucursalId = Number(session?.sucursalID || tenantConfig.sucursalId);
   const voiceAlertsStorageScopeKey = useMemo(
@@ -259,10 +332,16 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
     items,
     setItems,
     total,
+    facturasPendientesImpresion,
     ordersKpis,
+    metricItems,
+    metricFacturasPendientesImpresion,
+    yesterdayMetrics,
+    todaySalesTotal,
     loadOrders,
+    loadYesterdayMetrics,
+    loadTodaySalesSummary,
     clearOrdersCache,
-    resultPage, resultPageSize, hasLoaded, updatedAt,
   } = useOrdersAdminData({
     api,
     empresaId,
@@ -270,11 +349,6 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
     filters,
     debouncedQuery,
   });
-  const refreshAfterMutation = useCallback(() => {
-    clearOrdersCache();
-    return loadOrdersRef.current?.(true);
-  }, [clearOrdersCache]);
-
   const displayUserName = useMemo(
     () => String(session?.nombre || session?.login || "Usuario").trim() || "Usuario",
     [session]
@@ -388,6 +462,7 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
       showDesktopOrderNotification(title, message);
       speakVoiceAlert("Nuevo Pedido");
       loadOrdersRef.current?.(true);
+      loadTodaySalesSummaryRef.current?.();
     } catch (nextError) {
       console.error("Error consultando alertas de pedidos nuevos:", nextError);
     } finally {
@@ -438,27 +513,22 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
     [detalle]
   );
   const pedidoMenuFields = useMemo(
-    () => mergeOrderPaymentCatalogs(
-      configuredPedidoMenuFields.length ? configuredPedidoMenuFields : detailPedidoMenuFields,
-      paymentCatalog?.empresaId === empresaId ? paymentCatalog : null
-    ),
-    [configuredPedidoMenuFields, detailPedidoMenuFields, paymentCatalog, empresaId]
+    () => (configuredPedidoMenuFields.length ? configuredPedidoMenuFields : detailPedidoMenuFields),
+    [configuredPedidoMenuFields, detailPedidoMenuFields]
   );
   const paymentFieldConfig = useMemo(
     () => pedidoMenuFields.find(field => field?.codigo === "pedido_metodos_pago" && field?.activo),
     [pedidoMenuFields]
   );
   const paymentFieldOptions = useMemo(
-    () => paymentCatalog?.empresaId === empresaId && Array.isArray(paymentCatalog.paymentOptions)
-      ? paymentCatalog.paymentOptions
-      : Array.isArray(paymentFieldConfig?.opciones) ? paymentFieldConfig.opciones : [],
-    [paymentCatalog, empresaId, paymentFieldConfig]
+    () => ensureRappiOption(paymentFieldConfig?.opciones),
+    [paymentFieldConfig]
   );
   const salesChannelFieldConfig = useMemo(
     () => pedidoMenuFields.find(field => field?.codigo === "pedido_canal_venta" && field?.activo),
     [pedidoMenuFields]
   );
-  const canEditClientIdentity = hasModuleAccess(session, "pedidos");
+  const canEditClientIdentity = useMemo(() => isEmpresaAdminRole(session), [session]);
   const catalogProductIndex = useMemo(
     () => buildCatalogProductIndex(catalogProducts),
     [catalogProducts]
@@ -708,7 +778,7 @@ const messageCard = useMessageCardController({
     api,
     selectedPedidoId,
     setDetalle,
-    loadOrders: refreshAfterMutation,
+    loadOrders,
   });
   const messageCardOpen = messageCard.open;
   const openMessageCard = messageCard.openMessageCard;
@@ -716,13 +786,7 @@ const messageCard = useMessageCardController({
   const saveMessageCard = messageCard.saveMessageCard;
 
   useEffect(() => {
-    let disposed = false;
-    loadOrders(false).then(result => {
-      if (!disposed && result && result.page !== Number(filters.page || 1)) {
-        setFilters(current => ({ ...current, page: result.page }));
-      }
-    });
-    return () => { disposed = true; };
+    loadOrders(false);
   }, [loadOrders]);
 
   useEffect(() => {
@@ -738,6 +802,9 @@ const messageCard = useMessageCardController({
     loadOrdersRef.current = loadOrders;
   }, [loadOrders]);
 
+  useEffect(() => {
+    loadTodaySalesSummaryRef.current = loadTodaySalesSummary;
+  }, [loadTodaySalesSummary]);
 
   useEffect(() => {
     voiceAlertsPrimedRef.current = false;
@@ -775,25 +842,43 @@ const messageCard = useMessageCardController({
     return () => globalThis.clearInterval(intervalId);
   }, [empresaId, pollVoiceOrderAlerts, voiceAlertsEnabled]);
 
+  useEffect(() => {
+    loadYesterdayMetrics();
+  }, [loadYesterdayMetrics]);
 
+  useEffect(() => {
+    loadTodaySalesSummary();
+  }, [loadTodaySalesSummary]);
 
   useEffect(() => {
     let isCurrent = true;
 
     async function loadPedidoMenuFields() {
-      setPaymentCatalog(null);
-      setConfiguredPedidoMenuFields([]);
       if (!empresaId) {
         setConfiguredPedidoMenuFields([]);
         return;
       }
 
       try {
-        const catalog = await loadOrderPaymentCatalogs(api, empresaId);
+        const [menuResponse, paymentResponse, channelResponse] = await Promise.all([
+          api.listarMenuPedidoEmpresa({ empresaId }),
+          api.listarMetodosPagoEmpresa({ empresaId }),
+          api.listarCanalesVentaEmpresa({ empresaId }),
+        ]);
         if (!isCurrent) return;
-        setPaymentCatalog({ empresaId, ...catalog });
-        setConfiguredPedidoMenuFields(catalog.fields);
-        catalog.errors.forEach(error => console.error("Error cargando catalogo del pedido:", error));
+
+        const paymentOptions = extractActiveCatalogNames(paymentResponse);
+        const channelOptions = extractActiveCatalogNames(channelResponse);
+        const menuItems = Array.isArray(menuResponse?.items) ? menuResponse.items : [];
+        setConfiguredPedidoMenuFields(menuItems.map(field => {
+          if (field?.codigo === "pedido_metodos_pago") {
+            return { ...field, opciones: paymentOptions };
+          }
+          if (field?.codigo === "pedido_canal_venta") {
+            return { ...field, opciones: channelOptions };
+          }
+          return field;
+        }));
       } catch (error) {
         console.error("Error cargando configuracion de pago del pedido:", error);
         if (isCurrent) setConfiguredPedidoMenuFields([]);
@@ -834,6 +919,7 @@ const messageCard = useMessageCardController({
     const intervalId = globalThis.setInterval(() => {
       if (globalThis.document?.hidden) return;
       loadOrdersRef.current?.(true);
+      loadTodaySalesSummaryRef.current?.();
     }, AUTO_REFRESH_INTERVAL_MS);
     return () => globalThis.clearInterval(intervalId);
   }, []);
@@ -1053,31 +1139,29 @@ const messageCard = useMessageCardController({
 
   const applyFilterValue = (name, value) => {
     setFilters(current => {
-      if (current[name] === value && Number(current.page || 1) === 1 && !(name === "estado" && value && value !== "APROBADO" && current.sinImprimir) && !(name === "filtrarPorEntrega" && current.soloEntregasHoy)) return current;
+      if (current[name] === value && Number(current.page || 1) === 1) return current;
       return {
         ...current,
         [name]: value,
-        ...(name === "filtrarPorEntrega" && current.soloEntregasHoy ? { fechaDesde: todayIsoDate(), fechaHasta: todayIsoDate(), datePeriod: "hoy" } : {}),
-        ...(name === "estado" && value && value !== "APROBADO" ? { sinImprimir: false } : {}),
-        ...(name === "sinImprimir" && value ? { estado: "APROBADO" } : {}),
-        ...(["fechaDesde", "fechaHasta", "filtrarPorEntrega"].includes(name) ? { soloEntregasHoy: false } : {}),
+        ...(name === "fechaDesde" || name === "fechaHasta" ? { soloEntregasHoy: false, filtrarPorEntrega: false } : {}),
         page: 1
       };
     });
   };
 
-  const applyDateRange = (fechaDesde, fechaHasta) => {
-    if (!fechaDesde || !fechaHasta || fechaHasta < fechaDesde) return;
+  const applySingleDateFilter = value => {
     setFilters(current => {
-      if (current.fechaDesde === fechaDesde && current.fechaHasta === fechaHasta && !current.soloEntregasHoy && current.datePeriod === "custom" && Number(current.page || 1) === 1) return current;
-      return { ...current, fechaDesde, fechaHasta, datePeriod: "custom", soloEntregasHoy: false, page: 1 };
+      if (current.fechaDesde === value && current.fechaHasta === value && Number(current.page || 1) === 1) return current;
+      return {
+        ...current,
+        fechaDesde: value,
+        fechaHasta: value,
+        soloEntregasHoy: false,
+        filtrarPorEntrega: false,
+        page: 1
+      };
     });
   };
-
-  const clearDateRange = () => setFilters(current => {
-    if (!current.fechaDesde && !current.fechaHasta && !current.soloEntregasHoy && Number(current.page || 1) === 1) return current;
-    return { ...current, fechaDesde: "", fechaHasta: "", datePeriod: "todos", soloEntregasHoy: false, page: 1 };
-  });
 
   const openDetail = async (pedidoId, detailPatch = null) => {
     const requestedPedidoId = Number(pedidoId || 0);
@@ -1124,14 +1208,196 @@ const messageCard = useMessageCardController({
     }
   };
 
-  const { approveOrder, rejectOrder, finalizeOrder, downloadInvoice,
-    approvingPedidoIds, finalizingPedidoIds, finalizedPickupPedidoIds } = useOrderActions({
-    api, items, empresaId, selectedPedidoId, setItems, setDetalle, setOrderNotification,
-    clearOrdersCache, refreshAfterMutation, reloadDrawer: (...args) => reloadDrawer(...args),
-  });
+  const optimisticStatusPatch = (pedidoId, nextStatus, motivoRechazo = null, extraPatch = {}) => {
+    setItems(current => current.map(item => Number(resolveOrderId(item)) === Number(pedidoId)
+      ? { ...item, estado: nextStatus, ...extraPatch, ...(motivoRechazo !== null ? { motivoRechazo } : {}) }
+      : item));
+
+    setDetalle(current => {
+      if (!current || Number(selectedPedidoId) !== Number(pedidoId)) return current;
+      return { ...current, estado: nextStatus, ...extraPatch, ...(motivoRechazo !== null ? { motivoRechazo } : {}) };
+    });
+  };
+
+  const approveOrder = async pedidoId => {
+    const item = items.find(current => Number(resolveOrderId(current)) === Number(pedidoId));
+    if (item?.puedeAprobar === false) {
+      globalThis.alert(item.motivoBloqueoAprobacion || "Completa la información requerida antes de aprobar.");
+      return;
+    }
+    if (approvingPedidoIds.includes(Number(pedidoId))) {
+      globalThis.alert("Este pedido ya se está aprobando. Espera un momento.");
+      return;
+    }
+
+    setApprovingPedidoIds(current => [...current, Number(pedidoId)]);
+    try {
+      const response = await api.aprobarPedido(pedidoId);
+      const floristaAsignado = resolveFloristaName(response);
+      optimisticStatusPatch(
+        pedidoId,
+        response.estado || "APROBADO",
+        null,
+        floristaAsignado !== "Sin asignar" ? { floristaAsignado } : {}
+      );
+      const refreshed = await loadOrders(true);
+      await loadTodaySalesSummary();
+      const refreshedItem = (Array.isArray(refreshed?.items) ? refreshed.items : [])
+        .find(current => Number(resolveOrderId(current)) === Number(pedidoId));
+      const assignedOrderNumber = resolveAssignedOrderNumber(response, response?.pedido, response?.data, refreshedItem);
+      if (shouldAutoGenerateInvoiceForCompany(empresaId)) {
+        await downloadInvoice(pedidoId, { refreshAfter: false });
+      }
+      setOrderNotification({
+        tone: "success",
+        title: "Pedido aprobado",
+        message: assignedOrderNumber
+          ? `El pedido #${assignedOrderNumber} fue creado correctamente y ya quedó aprobado.`
+          : "El pedido quedó aprobado correctamente. El número se asignará en unos momentos.",
+      });
+    } catch (nextError) {
+      console.error("Error aprobando pedido:", nextError);
+      globalThis.alert(nextError?.detail || nextError?.message || "No fue posible aprobar el pedido.");
+    } finally {
+      setApprovingPedidoIds(current => current.filter(currentId => currentId !== Number(pedidoId)));
+    }
+  };
+
+  const rejectOrder = async pedidoId => {
+    const item = items.find(current => Number(resolveOrderId(current)) === Number(pedidoId));
+    const isCancellation = canInvoiceStatus(item?.estado);
+    const actionLabel = isCancellation ? "cancelación" : "rechazo";
+    const motivo = String(globalThis.prompt(`Motivo de ${actionLabel}`, "") || "").trim();
+    if (!motivo) {
+      globalThis.alert(`Debes ingresar un motivo de ${actionLabel}.`);
+      return;
+    }
+
+    try {
+      const response = isCancellation
+        ? await api.cambiarEstadoPedidoPipeline({ pedidoId, nuevoEstadoId: CANCELADO_PEDIDO_ESTADO_ID })
+        : await api.rechazarPedido(pedidoId, motivo);
+
+      if (isCancellation) {
+        console.info("Respuesta cancelación pedido:", response);
+        clearOrdersCache();
+        const refreshed = await loadOrders(true);
+        await loadTodaySalesSummary();
+        if (Number(selectedPedidoId) === Number(pedidoId)) {
+          await reloadDrawer();
+        }
+        const refreshedItem = (Array.isArray(refreshed?.items) ? refreshed.items : [])
+          .find(current => Number(resolveOrderId(current)) === Number(pedidoId));
+        const orderNumber = resolveAssignedOrderNumber(response, response?.pedido, response?.data, refreshedItem, item);
+        setOrderNotification({
+          tone: "danger",
+          title: "Pedido cancelado",
+          message: orderNumber
+            ? `El pedido #${orderNumber} fue cancelado correctamente.`
+            : "El pedido fue cancelado correctamente.",
+        });
+        return;
+      }
+
+      const nextStatus = response.estado || "RECHAZADO";
+      const orderNumber = resolveAssignedOrderNumber(response, response?.pedido, response?.data, item);
+      optimisticStatusPatch(pedidoId, nextStatus, response.motivo || motivo);
+      clearOrdersCache();
+      await loadOrders(true);
+      await loadTodaySalesSummary();
+      setOrderNotification({
+        tone: "danger",
+        title: "Pedido rechazado",
+        message: orderNumber
+          ? `El pedido #${orderNumber} fue rechazado correctamente.`
+          : "El pedido fue rechazado correctamente.",
+      });
+    } catch (nextError) {
+      console.error("Error rechazando pedido:", nextError);
+      globalThis.alert(`No fue posible completar la ${actionLabel}.`);
+    }
+  };
+
+  const finalizeOrder = async pedidoId => {
+    if (finalizingPedidoIds.includes(Number(pedidoId))) {
+      return;
+    }
+
+    const item = items.find(current => Number(resolveOrderId(current)) === Number(pedidoId));
+    const fallbackNumber = resolveAssignedOrderNumber(null, null, null, item);
+    setFinalizingPedidoIds(current => [...current, Number(pedidoId)]);
+    try {
+      const response = await api.finalizarPedidoRecogidaTienda(pedidoId);
+      setFinalizedPickupPedidoIds(current => Array.from(new Set([...current, Number(pedidoId)])));
+      clearOrdersCache();
+      const refreshed = await loadOrders(true);
+      await loadTodaySalesSummary();
+      if (Number(selectedPedidoId) === Number(pedidoId)) {
+        await reloadDrawer();
+      }
+      const refreshedItem = (Array.isArray(refreshed?.items) ? refreshed.items : [])
+        .find(current => Number(resolveOrderId(current)) === Number(pedidoId));
+      const orderNumber = resolveAssignedOrderNumber(response, response?.pedido, response?.data, refreshedItem, item) || fallbackNumber;
+      setOrderNotification({
+        tone: "success",
+        title: "Pedido finalizado",
+        message: orderNumber
+          ? `El pedido #${orderNumber} quedo finalizado y ya se vera como entregado en el pipeline.`
+          : "El pedido quedo finalizado y ya se vera como entregado en el pipeline.",
+      });
+    } catch (nextError) {
+      console.error("Error finalizando pedido:", nextError);
+      setOrderNotification({
+        tone: "danger",
+        title: "No se puede finalizar",
+        message: nextError?.detail || nextError?.message || "Para finalizar este pedido, produccion debe estar en estado ParaEntrega.",
+      });
+    } finally {
+      setFinalizingPedidoIds(current => current.filter(currentId => currentId !== Number(pedidoId)));
+    }
+  };
+
+  const downloadInvoice = async (pedidoId, options = {}) => {
+    const { refreshAfter = true } = options;
+    if (!pedidoId) {
+      globalThis.alert("No fue posible descargar la factura: el pedido no tiene un identificador válido.");
+      return false;
+    }
+
+    try {
+      const financialOverride = getDeliveryFinancialOverride(pedidoId);
+      if (financialOverride && typeof api.actualizarFinanzasPedidoPipeline === "function") {
+        await api.actualizarFinanzasPedidoPipeline({
+          pedidoId,
+          ...financialOverride,
+          costoDomicilio: financialOverride.domicilio,
+        });
+      }
+      const { blob, filename } = await api.descargarFacturaPedido(pedidoId);
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = filename || `factura_pedido_${pedidoId}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+      if (refreshAfter) {
+        await loadOrders(true);
+      }
+      if (refreshAfter && Number(selectedPedidoId) === Number(pedidoId)) {
+        await reloadDrawer();
+      }
+      return true;
+    } catch (nextError) {
+      console.error("Error descargando factura:", nextError);
+      globalThis.alert(nextError?.detail || nextError?.message || "No fue posible descargar la factura del pedido.");
+      return false;
+    }
+  };
   const refresh = () => {
-    clearOrdersCache();
     loadOrders(false);
+    loadTodaySalesSummary();
   };
 
   const closeDrawer = () => {
@@ -1213,6 +1479,7 @@ const openNewOrderModal = () => {
       clienteTipoIdent: defaultTipoIdent,
       fechaEntrega: todayIsoDate(),
     });
+    newOrderLookupPhoneRef.current = "";
     setNewOrderError("");
     setNewOrderProductQuery("");
     setNewOrderBarrioQuery("");
@@ -1267,9 +1534,124 @@ const openNewOrderModal = () => {
     setNewOrderForm(current => ({ ...current, [name]: value }));
   };
 
-  const hydrateNewOrderClientByPhone = useNewOrderClientLookup({
-    api, empresaId, open: newOrderOpen, form: newOrderForm, setForm: setNewOrderForm,
-  });
+  const normalizePhoneDigits = value => String(value || "").replace(/\D/g, "");
+
+  const resolveClientName = client => (
+    String(client?.nombreCompleto || client?.nombre_completo || client?.nombre || client?.cliente || "").trim()
+  );
+
+  const normalizeClientNameKey = value => (
+    String(value || "")
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .trim()
+      .toLowerCase()
+      .replace(/\s+/g, " ")
+  );
+
+  const clientNamesConflict = (left, right) => {
+    const leftKey = normalizeClientNameKey(left);
+    const rightKey = normalizeClientNameKey(right);
+    return Boolean(leftKey && rightKey && leftKey !== rightKey);
+  };
+
+  const findClientByPhone = async phone => {
+    const digits = normalizePhoneDigits(phone);
+    if (digits.length < 7) return null;
+
+    const payload = await api.listarClientes({
+      empresaId,
+      celular: digits,
+      telefono: digits,
+      q: digits,
+      soloActivos: false,
+    });
+    const rows = [
+      payload?.items,
+      payload?.data?.items,
+      payload?.data?.clientes,
+      payload?.data?.rows,
+      payload?.clientes,
+      payload?.rows,
+      payload,
+    ].find(Array.isArray) || [];
+
+    return rows.find(client => {
+      const phones = [
+        client?.telefono,
+        client?.telefonoCompleto,
+        client?.telefono_completo,
+        client?.celular,
+        client?.celularCompleto,
+        client?.celular_completo,
+      ].map(normalizePhoneDigits).filter(Boolean);
+      return phones.some(candidate => candidate === digits || candidate.endsWith(digits) || digits.endsWith(candidate));
+    }) || rows[0] || null;
+  };
+
+  const hydrateNewOrderClientByPhone = async phone => {
+    const digits = normalizePhoneDigits(phone);
+    if (digits.length < 7) return null;
+
+    try {
+      const client = await findClientByPhone(digits);
+      if (!client) return null;
+
+      let hydratedForm = null;
+      setNewOrderForm(current => {
+        const clientName = resolveClientName(client);
+        if (clientNamesConflict(current.clienteNombre, clientName)) {
+          hydratedForm = {
+            ...current,
+            clienteID: null,
+            clienteTelefono: phone || current.clienteTelefono,
+            clienteIdentificacion: "",
+          };
+          return hydratedForm;
+        }
+
+        hydratedForm = {
+          ...current,
+          clienteID: client.clienteID ?? client.clienteId ?? client.idCliente ?? client.id_cliente ?? client.id ?? current.clienteID,
+          clienteNombre: clientName || current.clienteNombre,
+          clienteTelefono: phone || client.telefonoCompleto || client.telefono || current.clienteTelefono,
+          clienteEmail: client.email || "",
+          clienteTipoIdent: normalizeIdentType(client.tipoIdent || client.tipo_ident || ""),
+          clienteIdentificacion: client.identificacion || client.numeroIdentificacion || client.numero_identificacion || client.documento || "",
+        };
+        return hydratedForm;
+      });
+      return hydratedForm;
+    } catch (nextError) {
+      console.error("Error buscando cliente por telefono:", nextError);
+      return null;
+    }
+  };
+
+  useEffect(() => {
+    if (!newOrderOpen) {
+      newOrderLookupPhoneRef.current = "";
+      return;
+    }
+
+    const digits = normalizePhoneDigits(debouncedNewOrderPhone);
+    if (digits.length < 7) {
+      newOrderLookupPhoneRef.current = "";
+      return;
+    }
+    if (newOrderLookupPhoneRef.current === digits) return;
+
+    // El valor debounced puede quedar "atrasado" (del pedido anterior) justo al
+    // reabrir el modal, porque el campo Celular ya se limpio pero el debounce aun
+    // no alcanza a reflejar ese cambio. Si no coincide con lo que hay ahora mismo
+    // en el formulario, es un valor viejo: se ignora en vez de autocompletar con
+    // el cliente equivocado.
+    const liveDigits = normalizePhoneDigits(newOrderForm.clienteTelefono);
+    if (liveDigits !== digits) return;
+
+    newOrderLookupPhoneRef.current = digits;
+    hydrateNewOrderClientByPhone(digits);
+  }, [debouncedNewOrderPhone, newOrderOpen]);
 
   const buildNewOrderManualPayload = (form = newOrderForm) => buildNewOrderManualPayloadData({
     form,
@@ -1278,9 +1660,62 @@ const openNewOrderModal = () => {
     productoID: Number(form.productoID || 0),
   });
 
-  const onSaveNewOrder = useNewOrderCreation({
-    api, empresaId, sucursalId, newOrderForm, paymentFieldConfig, salesChannelFieldConfig, hydrateNewOrderClientByPhone, buildNewOrderManualPayload, setNewOrderOpen, setOrderNotification, loadQuickSaleInventoryItems, refreshAfterMutation, openDetail, setNewOrderSaving, setNewOrderError
-  });
+  const onSaveNewOrder = async () => {
+    if (newOrderSaving) return;
+    setNewOrderError("");
+
+    if (paymentFieldConfig && !String(newOrderForm.metodoPago || "").trim()) {
+      setNewOrderError(`${paymentFieldConfig.titulo || "Metodo de pago"} es obligatorio.`);
+      return;
+    }
+    if (salesChannelFieldConfig && !String(newOrderForm.canalFlora || "").trim()) {
+      setNewOrderError(`${salesChannelFieldConfig.titulo || "Canal de venta"} es obligatorio.`);
+      return;
+    }
+
+    setNewOrderSaving(true);
+    try {
+      if (newOrderForm.ventaRapida) {
+        const hydratedQuickSaleForm = newOrderForm.registrarClienteVentaRapida
+          ? await hydrateNewOrderClientByPhone(newOrderForm.clienteTelefono)
+          : null;
+        const quickSalePayload = buildQuickSaleOrderPayload({
+          form: hydratedQuickSaleForm || newOrderForm,
+          empresaId,
+          sucursalId,
+        });
+        const created = await api.crearPedidoVentaRapida(quickSalePayload);
+        const createdPedidoId = created?.pedidoID || created?.pedidoId || created?.pedido_id || created?.idPedido || created?.id_pedido || created?.id;
+        setNewOrderOpen(false);
+        setOrderNotification({
+          type: "success",
+          title: "Venta rapida registrada",
+          message: `Pedido #${created?.numeroPedido || created?.pedidoID || ""} guardado y entregado correctamente.`,
+        });
+        await loadQuickSaleInventoryItems();
+        await loadOrders(false);
+        if (createdPedidoId) await openDetail(createdPedidoId);
+        return;
+      }
+
+      const hydratedForm = await hydrateNewOrderClientByPhone(newOrderForm.clienteTelefono);
+      const manualPayload = buildNewOrderManualPayload(hydratedForm || newOrderForm);
+      const created = await api.crearPedidoManual(manualPayload);
+      const createdPedidoId = created?.pedidoID || created?.pedidoId || created?.pedido_id || created?.idPedido || created?.id_pedido || created?.id;
+      setNewOrderOpen(false);
+      setOrderNotification({
+        type: "success",
+        title: "Pedido creado",
+        message: `Pedido #${created?.numeroPedido || created?.pedidoID || ""} registrado correctamente.`,
+      });
+      await loadOrders(false);
+      if (createdPedidoId) await openDetail(createdPedidoId);
+    } catch (nextError) {
+      setNewOrderError(nextError?.detail || nextError?.message || "No fue posible crear el pedido.");
+    } finally {
+      setNewOrderSaving(false);
+    }
+  };
 
   const onToggleDetailEdit = () => {
     if (detailEditSaving) return;
@@ -1443,61 +1878,164 @@ const openNewOrderModal = () => {
     canEditClientIdentity,
   });
 
-  const { onSaveDetailEdit, onAddDetailProduct, onDeleteDetailProduct } = useOrderEditActions({
-    selectedPedidoId,
-    detailEditSaving,
-    setDetailEditError,
-    setDetailEditSaving,
-    detalle,
-    isDuplicatingDetail,
-    detailEditIsCustomArrangement,
-    detailEditPrecio,
-    validatePaymentMethods,
-    validateSalesChannel,
-    api,
-    buildDuplicateCheckoutPayload,
-    getDetailEditPayloadState,
-    canEditClientIdentity,
-    refreshAfterMutation,
-    openDetail,
-    setIsDuplicatingDetail,
-    buildDetailEditApiPayload,
-    reloadDrawer: (...args) => reloadDrawer(...args),
-    setIsEditingDetail,
-    detailAddSaving,
-    detailEditDetalleID,
-    detailAddProductoID,
-    detailAddIsCustomArrangement,
-    detailAddPrecio,
-    setDetailAddSaving,
-    detailAddCantidad,
-    setDetailEditDetalleID,
-    setDetailEditSubview,
-    setDetailAddDropdownOpen,
-    setDetailAddFilterText,
-    setDetailAddProductoID,
-    setDetailAddProductoCodigo,
-    setDetailAddNombreArreglo,
-    setDetailAddCantidad,
-    setDetailAddPrecio,
-    detailEditDeletingDetailId,
-    setDetailEditDeletingDetailId,
-    setDetalle,
-    applySelectedDetailProduct
-  });
+  const onSaveDetailEdit = async () => {
+    if (!selectedPedidoId || detailEditSaving) return;
+    setDetailEditError("");
+    setDetailEditSaving(true);
+    try {
+      const detallePedidoId = Number(detalle?.pedidoID || detalle?.pedidoId || detalle?.idPedido || detalle?.id_pedido || 0);
+      if (!isDuplicatingDetail && detallePedidoId && Number(selectedPedidoId) !== detallePedidoId) {
+        throw new Error("El detalle abierto no corresponde al pedido seleccionado. Cierra y vuelve a abrir el pedido antes de guardar.");
+      }
+      if (detailEditIsCustomArrangement) {
+        const customPrice = normalizeWholePeso(detailEditPrecio);
+        if (!Number.isFinite(customPrice) || customPrice <= 0) {
+          throw new Error("Debes indicar un precio válido para el arreglo personalizado.");
+        }
+      }
+      const paymentValidation = validatePaymentMethods();
+      const validatedCanalFlora = validateSalesChannel();
+      if (isDuplicatingDetail) {
+        const created = await api.crearPedidoCheckout(buildDuplicateCheckoutPayload());
+        await api.actualizarDetallePedidoPipeline(buildDetailUpdatePayload({
+          pedidoId: created.pedidoID,
+          detalle,
+          edit: {
+            ...getDetailEditPayloadState(),
+            detalleID: null,
+          },
+          paymentValidation,
+          canalFlora: validatedCanalFlora,
+          canEditClientIdentity,
+        }));
+        await loadOrders(true);
+        await loadTodaySalesSummary();
+        await openDetail(created.pedidoID);
+        setIsDuplicatingDetail(false);
+      } else {
+        await api.actualizarDetallePedidoPipeline(buildDetailEditApiPayload(selectedPedidoId));
+        forgetDeliveryGiftOverride(selectedPedidoId);
+        await reloadDrawer();
+      }
+      const hasCashPayment = Number.isFinite(paymentValidation.cashAmount) && paymentValidation.cashAmount > 0;
+      if (hasCashPayment && typeof window !== "undefined") {
+        window.dispatchEvent(new Event("pedidoGuardadoEfectivo"));
+      }
+      setIsEditingDetail(false);
+    } catch (nextError) {
+      setDetailEditError(nextError?.message || (isDuplicatingDetail
+        ? "No fue posible crear el pedido duplicado."
+        : "No fue posible guardar la edición del pedido."));
+    } finally {
+      setDetailEditSaving(false);
+    }
+  };
+
+  const onAddDetailProduct = async () => {
+    if (!selectedPedidoId || detailAddSaving) return;
+    setDetailEditError("");
+    const currentDetalleId = String(detailEditDetalleID || "").trim();
+
+    if (!detailAddProductoID) {
+      setDetailEditError("Debes seleccionar el arreglo que quieres agregar.");
+      return;
+    }
+
+    if (detailAddIsCustomArrangement) {
+      const customPrice = normalizeWholePeso(detailAddPrecio);
+      if (!Number.isFinite(customPrice) || customPrice <= 0) {
+        setDetailEditError("Debes indicar un precio válido para el arreglo personalizado.");
+        return;
+      }
+    }
+
+    setDetailAddSaving(true);
+    try {
+      const response = await api.agregarDetallePedidoPipeline(buildAddDetailProductPayload({
+        pedidoId: selectedPedidoId,
+        productoID: detailAddProductoID,
+        cantidad: detailAddCantidad,
+        isCustomArrangement: detailAddIsCustomArrangement,
+        precio: detailAddPrecio,
+      }));
+      await reloadDrawer();
+      if (currentDetalleId) {
+        setDetailEditDetalleID(currentDetalleId);
+      } else if (response?.detalleID != null) {
+        setDetailEditDetalleID(String(response.detalleID));
+      }
+      setDetailEditSubview("edit");
+      setDetailAddDropdownOpen(false);
+      setDetailAddFilterText("");
+      setDetailAddProductoID("");
+      setDetailAddProductoCodigo("");
+      setDetailAddNombreArreglo("");
+      setDetailAddCantidad(1);
+      setDetailAddPrecio(null);
+    } catch (nextError) {
+      setDetailEditError(nextError?.detail || nextError?.message || "No fue posible agregar el arreglo al pedido.");
+    } finally {
+      setDetailAddSaving(false);
+    }
+  };
+
+  const onDeleteDetailProduct = async detalleId => {
+    if (!selectedPedidoId || !detalleId || detailEditDeletingDetailId != null) return;
+    const confirmed = globalThis.confirm("¿Eliminar este arreglo del pedido?");
+    if (!confirmed) return;
+    setDetailEditError("");
+    setDetailEditDeletingDetailId(Number(detalleId));
+    let previousDetalle = null;
+    try {
+      setDetalle(current => {
+        if (!current || current.error || !Array.isArray(current.productos)) return current;
+        previousDetalle = current;
+        const nextProducts = current.productos.filter(
+          item => String(item?.detalleID ?? "") !== String(detalleId)
+        );
+        if (nextProducts.length === 0) {
+          return current;
+        }
+        const currentSelected = String(detailEditDetalleID || "");
+        const fallbackProduct = nextProducts.find(
+          item => String(item?.detalleID ?? "") !== String(detalleId)
+        ) || nextProducts[0];
+        if (currentSelected === String(detalleId) && fallbackProduct) {
+          applySelectedDetailProduct(fallbackProduct);
+        }
+        return {
+          ...current,
+          productos: nextProducts,
+        };
+      });
+      await api.eliminarDetallePedidoPipeline({
+        pedidoId: selectedPedidoId,
+        detalleID: Number(detalleId),
+      });
+      await loadOrders(true);
+      await loadTodaySalesSummary();
+    } catch (nextError) {
+      if (previousDetalle) {
+        setDetalle(previousDetalle);
+      }
+      setDetailEditError(nextError?.detail || nextError?.message || "No fue posible eliminar el arreglo.");
+    } finally {
+      setDetailEditDeletingDetailId(null);
+    }
+  };
 
   const reloadDrawer = async (detailPatch = null) => {
     if (!selectedPedidoId) return;
-    clearOrdersCache();
     const detail = await openDetail(selectedPedidoId, detailPatch);
-    await refreshAfterMutation();
+    await loadOrders(true);
     patchOrderListItemFromDetail(selectedPedidoId, detail);
+    await loadTodaySalesSummary();
   };
 
   const toggleTodayDeliveries = () => {
     const nextSoloEntregasHoy = !filters.soloEntregasHoy;
     const today = todayIsoDate();
-    setFilters(current => ({ ...toggleTodayDeliveriesFilters(current, today), datePeriod: "hoy" }));
+    setFilters(current => toggleTodayDeliveriesFilters(current, today));
     setOrderNotification({
       tone: nextSoloEntregasHoy ? "success" : "info",
       title: nextSoloEntregasHoy ? "Entregas hoy" : "Todos los pedidos",
@@ -1524,16 +2062,31 @@ const openNewOrderModal = () => {
     });
   };
 
-  const applyDatePreset = (preset = "hoy") => {
+  const applyDatePreset = preset => {
     const today = todayIsoDate();
-    const period = preset === "mes" ? "mes" : "hoy";
-    const [year, month] = today.split("-").map(Number);
-    const fechaDesde = period === "mes" ? `${today.slice(0, 7)}-01` : today;
-    const fechaHasta = period === "mes"
-      ? `${today.slice(0, 7)}-${new Date(year, month, 0).getDate()}` : today;
+    const ranges = {
+      hoy: { fechaDesde: today, fechaHasta: today },
+      ayer: { fechaDesde: shiftIsoDate(today, -1), fechaHasta: shiftIsoDate(today, -1) },
+      manana: { fechaDesde: shiftIsoDate(today, 1), fechaHasta: shiftIsoDate(today, 1) },
+      semana: thisWeekRangeIso(),
+      mes: thisMonthRangeIso(),
+    };
+    const range = ranges[preset] || ranges.hoy;
+    // "Hoy" sigue filtrando por fecha de creacion del pedido (comportamiento
+    // historico); los demas presets filtran por fecha de entrega, porque un
+    // pedido no puede haberse creado en el futuro y por eso "Manana"/"Esta
+    // semana"/"Este mes" nunca mostraban nada.
+    const filtrarPorEntrega = preset !== "hoy";
     setFilters(current => {
-      if (current.fechaDesde === fechaDesde && current.fechaHasta === fechaHasta && !current.soloEntregasHoy && current.datePeriod === period && Number(current.page || 1) === 1) return current;
-      return { ...current, fechaDesde, fechaHasta, datePeriod: period, soloEntregasHoy: false, page: 1 };
+      if (
+        current.fechaDesde === range.fechaDesde
+        && current.fechaHasta === range.fechaHasta
+        && Boolean(current.filtrarPorEntrega) === filtrarPorEntrega
+        && Number(current.page || 1) === 1
+      ) {
+        return current;
+      }
+      return { ...current, ...range, filtrarPorEntrega, soloEntregasHoy: false, page: 1 };
     });
   };
 
@@ -1546,16 +2099,15 @@ const openNewOrderModal = () => {
     setFilters(current => {
       const base = {
         ...current,
-        q: "",
         estado: "",
         sinImprimir: false,
         soloEntregasHoy: false,
-
+        filtrarPorEntrega: false,
         page: 1,
       };
 
       if (metric === "hoy") {
-        return { ...base, soloEntregasHoy: current.soloEntregasHoy };
+        return { ...base, fechaDesde: today, fechaHasta: today };
       }
       if (metric === "aprobados") {
         return { ...base, estado: "APROBADO" };
@@ -1573,29 +2125,41 @@ const openNewOrderModal = () => {
     });
   };
 
-  const page = hasLoaded ? resultPage : Number(filters.page || 1);
-  const pageSize = hasLoaded ? resultPageSize : Number(filters.pageSize || 10);
+  const page = Number(filters.page || 1);
+  const pageSize = Number(filters.pageSize || 50);
   const pages = Math.max(1, Math.ceil(Number(total || 0) / pageSize));
   const visibleFrom = items.length > 0 ? ((page - 1) * pageSize) + 1 : 0;
   const visibleTo = items.length > 0 ? Math.min(Number(total || 0), ((page - 1) * pageSize) + items.length) : 0;
   const pagerItems = buildPaginationItems(page, pages);
   const activeOrderMetric = useMemo(() => {
     const today = todayIsoDate();
-    if (String(filters.q || "").trim()) return "";
     if (filters.sinImprimir) return "facturas";
     if (filters.estado === "APROBADO") return "aprobados";
     if (filters.estado === "CREADO") return "pendientes";
     if (filters.estado === "CANCELADO") return "cancelados";
-    if (!filters.filtrarPorEntrega && !filters.soloEntregasHoy && !filters.estado && filters.fechaDesde === today && filters.fechaHasta === today) return "hoy";
+    if (!filters.estado && filters.fechaDesde === today && filters.fechaHasta === today) return "hoy";
     return "";
-  }, [filters.q, filters.filtrarPorEntrega, filters.soloEntregasHoy, filters.estado, filters.fechaDesde, filters.fechaHasta, filters.sinImprimir]);
+  }, [filters.estado, filters.fechaDesde, filters.fechaHasta, filters.sinImprimir]);
+  const activeDatePreset = useMemo(() => {
+    const today = todayIsoDate();
+    const yesterday = shiftIsoDate(today, -1);
+    const tomorrow = shiftIsoDate(today, 1);
+    const week = thisWeekRangeIso();
+    const month = thisMonthRangeIso();
+    if (filters.fechaDesde === today && filters.fechaHasta === today) return "hoy";
+    if (filters.fechaDesde === yesterday && filters.fechaHasta === yesterday) return "ayer";
+    if (filters.fechaDesde === tomorrow && filters.fechaHasta === tomorrow) return "manana";
+    if (filters.fechaDesde === week.fechaDesde && filters.fechaHasta === week.fechaHasta) return "semana";
+    if (filters.fechaDesde === month.fechaDesde && filters.fechaHasta === month.fechaHasta) return "mes";
+    return "";
+  }, [filters.fechaDesde, filters.fechaHasta]);
   const ordersMetrics = ordersKpis;
   const headerSalesSummary = Number(ordersKpis.ventaHoy || 0);
   const orderMetricCards = useMemo(() => {
     const baseCards = [
-      { key: "hoy", label: "Creados hoy", shortLabel: "Creados hoy", value: Number(ordersMetrics.pedidosHoy || 0), tone: "is-primary", Icon: ORDER_METRIC_ICONS.hoy, helperText: "Operacion diaria" },
+      { key: "hoy", label: "Pedidos hoy", shortLabel: "Pedidos hoy", value: Number(ordersMetrics.pedidosHoy || 0), tone: "is-primary", Icon: ORDER_METRIC_ICONS.hoy, helperText: "Operacion diaria" },
       { key: "aprobados", label: "Aprobados", shortLabel: "Aprobados", value: Number(ordersMetrics.aprobados || 0), tone: "is-green", Icon: ORDER_METRIC_ICONS.aprobados, helperText: "Ultimos 7 dias" },
-      { key: "pendientes", label: "Creados", shortLabel: "Creados", value: Number(ordersMetrics.pendientes || 0), tone: "is-blue", Icon: ORDER_METRIC_ICONS.pendientes, helperText: "Requieren atencion" },
+      { key: "pendientes", label: "Pendientes", shortLabel: "Pendientes", value: Number(ordersMetrics.pendientes || 0), tone: "is-blue", Icon: ORDER_METRIC_ICONS.pendientes, helperText: "Requieren atencion" },
       { key: "cancelados", label: "Cancelados", shortLabel: "Cancelados", value: Number(ordersMetrics.cancelados || 0), tone: "is-orange", Icon: ORDER_METRIC_ICONS.cancelados, helperText: "Ultimos 7 dias" },
       { key: "facturas", label: "Facturas no impresas", shortLabel: "Sin imprimir", value: Number(ordersMetrics.sinImprimir || 0), tone: "is-purple", Icon: ORDER_METRIC_ICONS.facturas, helperText: "Por imprimir" },
     ];
@@ -1620,13 +2184,22 @@ const openNewOrderModal = () => {
             ? "is-alert"
             : ""
           : "";
+      const previousValue = Number(yesterdayMetrics?.[card.key === "facturas" ? "facturasNoImpresas" : card.key] || 0);
+      const delta = card.value - previousValue;
+      const comparisonClass = delta > 0 ? "is-up" : delta < 0 ? "is-down" : "is-flat";
+      const comparisonLabel = delta === 0
+        ? "Igual que ayer"
+        : `${delta > 0 ? "+" : "-"}${Math.abs(delta)} vs ayer`;
       return {
         ...card,
         trendRatio: ratio,
+        previousValue,
+        comparisonClass,
+        comparisonLabel,
         className: `${card.tone} ${weightClass}${attentionClass ? ` ${attentionClass}` : ""}`,
       };
     });
-  }, [ordersMetrics]);
+  }, [ordersMetrics, yesterdayMetrics]);
   const {
     detailEditorProps,
     detailAddEditorProps,
@@ -1822,22 +2395,16 @@ const ordersOverlayOpen = drawerOpen || newOrderOpen || messageCardOpen || Boole
           />
 
           <OrdersFilters
-            total={total}
-            loading={loading}
-            paymentOptions={paymentFieldOptions}
             filters={filters}
+            activeDatePreset={activeDatePreset}
             onApplyDatePreset={applyDatePreset}
-            onApplyDateRange={applyDateRange}
+            onApplySingleDateFilter={applySingleDateFilter}
             onFilterChange={applyFilterValue}
             onClearFilters={clearOrderFilters}
-            onClearDateRange={clearDateRange}
           />
 
           <OrdersListSection
             error={error}
-            onRetry={refresh}
-            hasLoaded={hasLoaded}
-            updatedAt={updatedAt}
             loading={loading}
             items={items}
             empresaId={empresaId}

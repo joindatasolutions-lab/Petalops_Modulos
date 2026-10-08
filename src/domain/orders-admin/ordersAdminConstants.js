@@ -23,8 +23,8 @@ export const initialFilters = {
   soloTienda: false,
   soloEntregasHoy: false,
   metodoPago: "",
-  fechaDesde: "",
-  fechaHasta: "",
+  fechaDesde: todayIsoDateBogota(),
+  fechaHasta: todayIsoDateBogota(),
   filtrarPorEntrega: false,
   page: 1,
   pageSize: 10
