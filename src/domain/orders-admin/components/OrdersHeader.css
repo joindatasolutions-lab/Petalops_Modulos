@@ -49,12 +49,13 @@
   display: grid !important;
   grid-template-columns: 28px minmax(0, 1fr) !important;
   grid-template-rows: auto auto auto !important;
-  gap: 3px 8px !important;
+  gap: 2px 8px !important;
+  align-content: start !important;
   width: 100% !important;
   min-width: 0 !important;
   height: auto !important;
-  min-height: 92px !important;
-  padding: 12px !important;
+  min-height: 72px !important;
+  padding: 6px 10px !important;
   text-align: left !important;
   border: 1px solid #dfe6f1 !important;
   background: #fff !important;
