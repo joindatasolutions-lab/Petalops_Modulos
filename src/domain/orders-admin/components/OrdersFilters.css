@@ -35,7 +35,9 @@
 .orders-filter-panel .of-period-buttons button,
 .orders-filter-panel .of-toggle,
 .orders-filter-panel .of-reset,
-.orders-filter-panel .of-results { box-sizing: border-box; min-height: 36px; }
+.orders-filter-panel .of-results { box-sizing: border-box; min-height: 46px; }
+.orders-filter-panel .of-bar button { font-size: 14px; padding: 8px 12px; }
+.orders-filter-panel .of-date-type button { min-height: 40px; }
 .orders-filter-panel .of-date-type button { border-color: transparent; background: transparent; }
 .orders-filter-panel .of-date-type button[aria-pressed="true"] { background: #fff; border-color: #e91474; color: #bd145c; box-shadow: 0 1px 3px #21334a1a; }
 .of-date-summary { margin: 8px 0 0; color: #526681; font-size: 12px; line-height: 1.4; }
@@ -76,7 +78,8 @@
   .of-date-type { flex-basis: 100%; width: 100%; }
   .of-date-type button { flex: 1; }
   .of-period-buttons { flex-basis: 100%; width: 100%; }
-  .of-period-buttons button { flex: 1; min-width: 0; padding: 4px 6px; }
+  .orders-filter-panel .of-period-buttons button { flex: 1; min-width: 0; padding: 8px 6px; }
+  .orders-filter-panel .of-date-type button { min-height: 44px; }
   .orders-filter-panel button { min-height: 44px; }
   .orders-filter-panel .of-period-buttons button,
   .orders-filter-panel .of-toggle,
