@@ -96,6 +96,7 @@ export function OrdersHeader({
             type="button"
             className={`btn-primary orders-header-refresh orders-store-toggle orders-today-toggle${filters.soloEntregasHoy ? " is-active" : ""}`}
             onClick={onToggleTodayDeliveries}
+            aria-pressed={Boolean(filters.soloEntregasHoy)}
             title={filters.soloEntregasHoy ? "Ver todos los pedidos" : "Ver entregas de hoy"}
             aria-label={filters.soloEntregasHoy ? "Ver todos los pedidos" : "Ver entregas de hoy"}
             data-tooltip={filters.soloEntregasHoy ? "Ver todos los pedidos" : "Ver entregas de hoy"}
@@ -107,6 +108,7 @@ export function OrdersHeader({
             type="button"
             className={`btn-primary orders-header-refresh orders-store-toggle${filters.soloTienda ? " is-active" : ""}`}
             onClick={onToggleStoreDeliveries}
+            aria-pressed={Boolean(filters.soloTienda)}
             title={filters.soloTienda ? "Ver todos los pedidos" : "Ver entregas en tienda"}
             aria-label={filters.soloTienda ? "Ver todos los pedidos" : "Ver entregas en tienda"}
             data-tooltip={filters.soloTienda ? "Ver todos los pedidos" : "Ver entregas en tienda"}

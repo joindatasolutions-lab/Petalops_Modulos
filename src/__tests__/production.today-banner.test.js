@@ -37,6 +37,52 @@ describe("banner de pedidos pendientes de hoy y atrasados en produccion", () => 
     expect(countDueUnfinishedProductionOrders(esalgadoItems)).toBe(4);
   });
 
+  it("excluye entregas futuras aunque su preparacion sea de hoy o de dias anteriores", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-08-22T15:00:00Z"));
+    const { countDueUnfinishedProductionOrders, isDueUnfinishedProductionOrder } = await import("../domain/production/ProductionPage.jsx");
+    const items = [
+      { pedidoID: 1, estado: "Pendiente", fechaEntrega: "2026-08-23", fechaProgramadaProduccion: "2026-08-21" },
+      { pedidoID: 2, estado: "EnProduccion", fechaEntrega: "2026-08-24", fechaProgramadaProduccion: "2026-08-22" },
+      { pedidoID: 3, estado: "Pendiente", fechaEntrega: "2026-08-22", fechaProgramadaProduccion: "2026-08-21" },
+      { pedidoID: 4, estado: "EnProduccion", fechaEntrega: "2026-08-20" },
+    ];
+
+    expect(countDueUnfinishedProductionOrders(items)).toBe(2);
+    expect(items.filter(item => isDueUnfinishedProductionOrder(item)).map(item => item.pedidoID)).toEqual([3, 4]);
+  });
+
+  it("usa el dia de Colombia al comparar entregas con zona horaria", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-08-23T04:30:00Z")); // Todavia es 22 en Colombia.
+    const { countDueUnfinishedProductionOrders } = await import("../domain/production/ProductionPage.jsx");
+
+    expect(countDueUnfinishedProductionOrders([
+      { pedidoID: 1, estado: "Pendiente", fechaEntrega: "2026-08-23T04:59:00Z" },
+      { pedidoID: 2, estado: "Pendiente", fechaEntrega: "2026-08-23T05:00:00Z" },
+      { pedidoID: 3, estado: "EnProduccion", fechaEntrega: "2026-08-23T00:00:00-05:00" },
+    ])).toBe(1);
+  });
+
+  it("muestra solo 2 pendientes cuando 16 de los 18 pedidos tienen produccion futura", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-08-22T15:00:00Z"));
+    const { countDueUnfinishedProductionOrders, isDueUnfinishedProductionOrder } = await import("../domain/production/ProductionPage.jsx");
+    const items = [
+      { pedidoID: 1, estado: "Pendiente", fechaEntrega: "2026-08-22", fechaProgramadaProduccion: "2026-08-22" },
+      { pedidoID: 2, estado: "EnProduccion", fechaEntrega: "2026-08-21", fechaProgramadaProduccion: "2026-08-21" },
+      ...Array.from({ length: 16 }, (_, index) => ({
+        pedidoID: index + 3,
+        estado: "Pendiente",
+        fechaEntrega: "2026-08-22",
+        fechaProgramadaProduccion: "2026-08-23",
+      })),
+    ];
+
+    expect(countDueUnfinishedProductionOrders(items)).toBe(2);
+    expect(items.filter(item => isDueUnfinishedProductionOrder(item)).map(item => item.pedidoID)).toEqual([1, 2]);
+  });
+
   it("agrupa productos del mismo pedido en una sola fila aunque tengan estados diferentes", async () => {
     const { buildVisibleProductionItems } = await import("../domain/production/ProductionPage.jsx");
 

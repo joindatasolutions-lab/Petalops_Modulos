@@ -23,12 +23,18 @@
 .orders-filter-panel { grid-row: 2; width: 100%; min-width: 0; box-sizing: border-box; padding: 4px 0; color: #435571; font-size: 11px; }
 .of-bar { display: flex; width: 100%; min-width: 0; align-items: flex-end; flex-wrap: wrap; gap: 12px; }
 .orders-filter-panel button, .orders-filter-popover button { display: inline-flex; align-items: center; justify-content: center; gap: 5px; min-height: 30px; padding: 4px 8px; border: 1px solid #dfe6f1; border-radius: 6px; background: #fff; color: #526681; font: inherit; font-size: 11px; cursor: pointer; white-space: nowrap; }
-.orders-filter-panel button:hover, .orders-filter-popover button:hover { background: #fff6fa; border-color: #f3a6c8; }
-.orders-filter-panel button:focus-visible, .orders-filter-popover :is(button, select, input):focus-visible { outline: 2px solid #dc176a; outline-offset: 2px; }
+.orders-filter-panel button:hover, .orders-filter-popover button:hover { background: #fcf6f8; border-color: #d4a5b5; }
+.orders-filter-panel button:focus-visible, .orders-filter-popover :is(button, select, input):focus-visible { outline: 2px solid #b97890; outline-offset: 2px; }
 .of-date-type, .of-period-buttons, .of-segments { display: flex; gap: 3px; }
 .of-date-group, .of-period-group { display: grid; gap: 6px; min-width: 0; }
 .of-date-group { flex: 1 1 280px; }
-.of-period-group { flex: 1.2 1 300px; }
+.of-period-group { flex: 1.2 1 340px; grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr); align-items: end; }
+.orders-filter-panel .of-choose-dates { min-width: 0; min-height: 46px; }
+.of-period-label { display: grid; gap: 6px; min-width: 0; }
+.of-select { box-sizing: border-box; width: 100%; min-width: 0; min-height: 46px; padding: 8px 12px; border: 1px solid #dfe6f1; border-radius: 6px; background: #fff; color: #526681; font: inherit; font-size: 14px; cursor: pointer; }
+.of-select:hover { border-color: #d4a5b5; }
+.of-select:focus { border-color: #b97890; color: #94536c; }
+.of-select:focus-visible { outline: 2px solid #b97890; outline-offset: 2px; }
 .of-group-label { color: #435571; font-size: 12px; font-weight: 600; }
 .of-date-type { min-width: 0; padding: 3px; border-radius: 8px; background: #edf1f7; }
 .of-period-buttons { min-width: 0; }
@@ -39,14 +45,21 @@
 .orders-filter-panel .of-bar button { font-size: 14px; padding: 8px 12px; }
 .orders-filter-panel .of-date-type button { min-height: 40px; }
 .orders-filter-panel .of-date-type button { border-color: transparent; background: transparent; }
-.orders-filter-panel .of-date-type button[aria-pressed="true"] { background: #fff; border-color: #e91474; color: #bd145c; box-shadow: 0 1px 3px #21334a1a; }
 .of-date-summary { margin: 8px 0 0; color: #526681; font-size: 12px; line-height: 1.4; }
 .of-date-type button, .of-period-buttons button { flex: 1 1 auto; min-width: 0; }
 .of-period-buttons button:last-child { flex: 1.4 1 0; }
 .orders-filter-panel .of-toggle { flex: 1 1 160px; }
 .of-result-actions { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-left: auto; max-width: 100%; }
-.of-period-buttons button[aria-pressed="true"], .orders-filter-popover button[aria-pressed="true"], .orders-filter-popover .of-apply { background: #e91474; border-color: #e91474; color: #fff; }
-.of-count { display: inline-grid; place-items: center; min-width: 17px; height: 17px; border-radius: 50%; background: #ffd6e9; color: #ad1054; }
+.orders-filter-panel button[aria-pressed="true"],
+.orders-filter-popover button[aria-pressed="true"] {
+  background: #fff;
+  border-color: #b97890;
+  color: #94536c;
+  box-shadow: inset 0 0 0 1px #b97890;
+}
+.orders-filter-popover .of-apply { background: #94536c; border-color: #94536c; color: #fff; }
+.orders-filter-popover .of-apply:hover { background: #80455c; border-color: #80455c; }
+.of-count { display: inline-grid; place-items: center; min-width: 17px; height: 17px; border-radius: 50%; background: #f5e8ed; color: #94536c; }
 .of-results { display: inline-flex; align-items: center; justify-content: center; gap: 4px; margin-left: auto; color: #64748b; font-size: 10px; white-space: nowrap; }
 .orders-filter-panel .of-reset { margin-left: auto; background: transparent; border-color: transparent; font-size: 10px; }
 .of-active { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; padding-top: 4px; }
@@ -66,11 +79,12 @@
 .of-calendar-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 3px; text-align: center; }
 .of-calendar-grid > span { padding: 4px 0; color: #758297; }
 .of-calendar-grid button { min-width: 0; min-height: 32px; padding: 3px; }
-.of-calendar-grid button.of-in-range { background: #fff0f6; color: #bd145c; }
+.of-calendar-grid button.of-in-range { background: #f5e8ed; color: #94536c; }
 .of-calendar-grid button[aria-current="date"] { text-decoration: underline; text-underline-offset: 3px; }
 .of-date-inputs { display: flex; gap: 8px; margin-top: 10px; }
 .of-date-inputs label { flex: 1; min-width: 0; }
 @media (max-width: 640px) {
+  .of-select, .orders-filter-panel .of-choose-dates { min-height: 50px; }
   .of-bar { gap: 5px; }
   .of-result-actions { width: 100%; }
   .of-result-actions .of-results { margin-left: 0; white-space: normal; }

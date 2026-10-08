@@ -454,12 +454,32 @@ function isPendingOverdue(item) {
   return programmedDate < todayIsoDate();
 }
 
+export function isDueUnfinishedProductionOrder(item, today = todayIsoDate()) {
+  const status = normalizeStatus(item?.estado).replace(/_/g, "");
+  if (!["PENDIENTE", "ENPRODUCCION"].includes(status)) return false;
+  // Los pedidos clasificados como futuros en Produccion no pertenecen al aviso.
+  const programmedDate = toIsoDate(item?.fechaProgramadaProduccion);
+  if (programmedDate && programmedDate > today) return false;
+  // Delivery determines the day's backlog, not an earlier preparation date.
+  const raw = String(item?.fechaEntrega || item?.fechaProgramadaProduccion || "").trim();
+  if (!raw) return false;
+  let deliveryDate;
+  if (/(?:Z|[+-]\d{2}:?\d{2})$/i.test(raw)) {
+    const parsed = new Date(raw);
+    if (Number.isNaN(parsed.getTime())) return false;
+    deliveryDate = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Bogota", year: "numeric", month: "2-digit", day: "2-digit" }).format(parsed);
+  } else {
+    deliveryDate = raw.slice(0, 10);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(deliveryDate) || Number.isNaN(Date.parse(deliveryDate))) return false;
+  }
+  return deliveryDate <= today;
+}
+
 function matchesProductionMetric(item, metricKey) {
   const normalizedStatus = normalizeStatus(item?.estado).replace(/_/g, "");
   if (metricKey === "pendientesHoy") return normalizedStatus === "PENDIENTE" && resolveProgrammedDate(item) === todayIsoDate();
   if (metricKey === "pendientesHastaHoy") {
-    const programmedDate = resolveProgrammedDate(item);
-    return ["PENDIENTE", "ENPRODUCCION"].includes(normalizedStatus) && Boolean(programmedDate) && programmedDate <= todayIsoDate();
+    return isDueUnfinishedProductionOrder(item);
   }
   if (metricKey === "sinAsignar") return normalizedStatus === "PENDIENTE" && !hasAssignedFlorista(item);
   if (metricKey === "atrasados") return isPendingOverdue(item);
@@ -472,14 +492,10 @@ function matchesProductionMetric(item, metricKey) {
 
 export function countDueUnfinishedProductionOrders(sourceItems) {
   const today = todayIsoDate();
-  const finishedStatuses = new Set(["PARAENTREGA", "ENTREGADO", "CANCELADO", "RECHAZADO"]);
   const pendingOrderKeys = new Set();
 
   for (const item of Array.isArray(sourceItems) ? sourceItems : []) {
-    const programmedDate = resolveProgrammedDate(item);
-    if (!programmedDate || programmedDate > today) continue;
-    const normalizedStatus = normalizeStatus(item?.estado).replace(/_/g, "");
-    if (finishedStatuses.has(normalizedStatus)) continue;
+    if (!isDueUnfinishedProductionOrder(item, today)) continue;
     const key = String(item?.pedidoID || item?.numeroPedido || item?.idProduccion || "").trim();
     if (key) pendingOrderKeys.add(key);
   }
@@ -1506,14 +1522,16 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
 
   const effectiveSoloMisAsignados = soloMisAsignados && currentFloristaId != null;
   const shouldGroupVisibleItemsByPedido = !activeMetricFilter || activeMetricFilter === "pendientesHastaHoy";
+  const isDuePendingView = activeMetricFilter === "pendientesHastaHoy";
+  const effectiveSearch = isDuePendingView ? "" : debouncedBusquedaGeneral;
 
   const visibleItems = useMemo(
-    () => buildVisibleProductionItems(items, currentFloristaId, debouncedBusquedaGeneral, effectiveSoloMisAsignados, shouldGroupVisibleItemsByPedido, currentFloristaName),
-    [items, currentFloristaId, currentFloristaName, debouncedBusquedaGeneral, effectiveSoloMisAsignados, shouldGroupVisibleItemsByPedido]
+    () => buildVisibleProductionItems(items, currentFloristaId, effectiveSearch, effectiveSoloMisAsignados, shouldGroupVisibleItemsByPedido, currentFloristaName),
+    [items, currentFloristaId, currentFloristaName, effectiveSearch, effectiveSoloMisAsignados, shouldGroupVisibleItemsByPedido]
   );
   const searchOverridesFilters = useMemo(
-    () => normalizeSearchText(debouncedBusquedaGeneral).length > 0,
-    [debouncedBusquedaGeneral]
+    () => normalizeSearchText(effectiveSearch).length > 0,
+    [effectiveSearch]
   );
   const metrics = useMemo(() => {
     const total = visibleItems.length;
@@ -1552,7 +1570,7 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
       },
       pendientesHastaHoy: {
         label: "Pendientes hoy y atrasados",
-        description: "Pedidos pendientes con fecha de hoy o de días anteriores.",
+        description: "Pedidos pendientes de entrega hasta hoy, sin aplicar el filtro de fecha.",
       },
       sinAsignar: {
         label: "Pendientes sin asignar",
@@ -1627,6 +1645,7 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
     setEstadosFiltro(["Pendiente", "EnProduccion"]);
     setSoloMisAsignados(currentFloristaId != null);
     setActiveMetricFilter("pendientesHastaHoy");
+    setProductionPage(1);
     window.requestAnimationFrame(() => {
       productionListRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
     });
@@ -1658,7 +1677,14 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
       const expectedMetricCount = activeMetricFilter
         ? Number(productionMetricasRef.current?.[activeMetricFilter] || 0)
         : 0;
-      const produccion = await api.listarProduccion({
+      // El aviso consulta todas las fechas, igual que su contador.
+      const produccion = await api.listarProduccion(isDuePendingMetricFilter ? {
+        empresaId,
+        sucursalId,
+        todasFechas: true,
+        incluirCancelado: false,
+        autoAsignarPendientesHoy: false,
+      } : {
         empresaId,
         sucursalId,
         fecha: searchOverridesFilters || activeMetricFilter ? undefined : fecha,
@@ -3502,6 +3528,3 @@ export function ProductionPage({ session, canViewPipeline, canViewPedidos, canVi
     </div>
   );
 }
-
-
-
