@@ -1143,7 +1143,7 @@ const messageCard = useMessageCardController({
       return {
         ...current,
         [name]: value,
-        ...(name === "fechaDesde" || name === "fechaHasta" ? { soloEntregasHoy: false, filtrarPorEntrega: false } : {}),
+        ...(["fechaDesde", "fechaHasta", "filtrarPorEntrega"].includes(name) ? { soloEntregasHoy: false } : {}),
         page: 1
       };
     });
@@ -2064,30 +2064,13 @@ const openNewOrderModal = () => {
 
   const applyDatePreset = preset => {
     const today = todayIsoDate();
-    const ranges = {
-      hoy: { fechaDesde: today, fechaHasta: today },
-      ayer: { fechaDesde: shiftIsoDate(today, -1), fechaHasta: shiftIsoDate(today, -1) },
-      manana: { fechaDesde: shiftIsoDate(today, 1), fechaHasta: shiftIsoDate(today, 1) },
-      semana: thisWeekRangeIso(),
-      mes: thisMonthRangeIso(),
-    };
-    const range = ranges[preset] || ranges.hoy;
-    // "Hoy" sigue filtrando por fecha de creacion del pedido (comportamiento
-    // historico); los demas presets filtran por fecha de entrega, porque un
-    // pedido no puede haberse creado en el futuro y por eso "Manana"/"Esta
-    // semana"/"Este mes" nunca mostraban nada.
-    const filtrarPorEntrega = preset !== "hoy";
-    setFilters(current => {
-      if (
-        current.fechaDesde === range.fechaDesde
-        && current.fechaHasta === range.fechaHasta
-        && Boolean(current.filtrarPorEntrega) === filtrarPorEntrega
-        && Number(current.page || 1) === 1
-      ) {
-        return current;
-      }
-      return { ...current, ...range, filtrarPorEntrega, soloEntregasHoy: false, page: 1 };
-    });
+    const range = preset === "mes" ? thisMonthRangeIso() : { fechaDesde: today, fechaHasta: today };
+    setFilters(current => ({ ...current, ...range, datePeriod: preset === "mes" ? "mes" : "hoy", soloEntregasHoy: false, page: 1 }));
+  };
+
+  const applyDateRange = (fechaDesde, fechaHasta) => {
+    if (!fechaDesde || !fechaHasta || fechaHasta < fechaDesde) return;
+    setFilters(current => ({ ...current, fechaDesde, fechaHasta, datePeriod: "custom", soloEntregasHoy: false, page: 1 }));
   };
 
   const clearOrderFilters = () => {
@@ -2396,9 +2379,11 @@ const ordersOverlayOpen = drawerOpen || newOrderOpen || messageCardOpen || Boole
 
           <OrdersFilters
             filters={filters}
-            activeDatePreset={activeDatePreset}
             onApplyDatePreset={applyDatePreset}
-            onApplySingleDateFilter={applySingleDateFilter}
+            onApplyDateRange={applyDateRange}
+            total={total}
+            loading={loading}
+            paymentOptions={pedidoMenuFields.find(field => field?.codigo === "pedido_metodos_pago")?.opciones || []}
             onFilterChange={applyFilterValue}
             onClearFilters={clearOrderFilters}
           />

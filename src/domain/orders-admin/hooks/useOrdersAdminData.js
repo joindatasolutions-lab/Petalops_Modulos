@@ -66,6 +66,13 @@ export function useOrdersAdminData({
   }, [filterCache]);
 
   const loadOrders = useCallback(async (silent = false) => {
+    // Invalidate old responses as soon as typing starts, including background refreshes.
+    if (String(filters.q || "").trim() !== String(debouncedQuery || "").trim()) {
+      requestTracker.current += 1;
+      visibleLoadingRequest.current = 0;
+      setLoading(true);
+      return;
+    }
     if (silent && visibleLoadingRequest.current) return;
 
     const requestId = silent ? requestTracker.current : requestTracker.current + 1;
@@ -184,7 +191,7 @@ export function useOrdersAdminData({
         setLoading(false);
       }
     }
-  }, [api, debouncedQuery, empresaId, filterCache, filters.estado, filters.fechaDesde, filters.fechaHasta, filters.filtrarPorEntrega, filters.metodoPago, filters.page, filters.pageSize, filters.sinImprimir, filters.soloEntregasHoy, filters.soloTienda, requestTracker, sucursalId]);
+  }, [api, filters.q, debouncedQuery, empresaId, filterCache, filters.estado, filters.fechaDesde, filters.fechaHasta, filters.filtrarPorEntrega, filters.metodoPago, filters.page, filters.pageSize, filters.sinImprimir, filters.soloEntregasHoy, filters.soloTienda, requestTracker, sucursalId]);
 
   const loadYesterdayMetrics = useCallback(async () => {
     setYesterdayMetrics(buildOrdersMetrics([], 0, shiftIsoDate(todayIsoDate(), -1)));
