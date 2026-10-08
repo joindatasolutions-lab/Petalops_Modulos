@@ -1659,14 +1659,14 @@ export function createApiClient(config) {
       });
     },
 
-    async asignarDomiciliarioEntrega({ entregaId, domiciliarioID, usuarioCambio, limiteEntregasActivas = 15 }) {
+    async asignarDomiciliarioEntrega({ entregaId, domiciliarioID, usuarioCambio, limiteEntregasActivas = 15, permitirSobrecupo = true }) {
       const params = new URLSearchParams();
       params.set("limiteEntregasActivas", String(limiteEntregasActivas));
       params.set("maxEntregasActivas", String(limiteEntregasActivas));
       params.set("limite_activas", String(limiteEntregasActivas));
       params.set("limite", String(limiteEntregasActivas));
       params.set("permitirMultiplesAsignaciones", "true");
-      params.set("permitirSobrecupo", "true");
+      params.set("permitirSobrecupo", String(permitirSobrecupo));
 
       return requestJson(`/domicilios/${entregaId}/asignar?${params.toString()}`, {
         method: "PUT",
@@ -1683,8 +1683,8 @@ export function createApiClient(config) {
           max_activos: limiteEntregasActivas,
           capacidadMaxima: limiteEntregasActivas,
           permitirMultiplesAsignaciones: true,
-          permitirSobrecupo: true,
-          forzarSobrecupo: true
+          permitirSobrecupo,
+          forzarSobrecupo: permitirSobrecupo
         })
       });
     },
