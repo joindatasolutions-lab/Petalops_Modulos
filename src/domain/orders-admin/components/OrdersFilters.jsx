@@ -7,14 +7,14 @@ import "./OrdersFilters.css";
 const STATES = [["", "Todos los estados"], ["CREADO", "Creados"], ["APROBADO", "Aprobados"], ["CANCELADO", "Cancelados / rechazados"]];
 const dateText = value => value ? value.split("-").reverse().join("/") : "…";
 
-export function OrdersFilters({ filters, onApplyDatePreset, onApplyDateRange, onFilterChange, onClearFilters, onClearDateRange, paymentOptions = [], total = 0, loading = false }) {
+export function OrdersFilters({ filters, onApplyDatePreset, onApplyDateRange, onFilterChange, onClearFilters, paymentOptions = [], total = 0, loading = false }) {
   const [popover, setPopover] = useState(null);
   const dateButton = useRef(null);
   const additionalButton = useRef(null);
   const searching = Boolean(String(filters.q || "").trim());
   const hasDates = Boolean(filters.fechaDesde || filters.fechaHasta);
   const isToday = filters.soloEntregasHoy || (filters.fechaDesde === todayIsoDate() && filters.fechaHasta === filters.fechaDesde && filters.datePeriod !== "custom");
-  const period = isToday ? "hoy" : hasDates ? "custom" : "todos";
+  const period = isToday ? "hoy" : hasDates ? (filters.datePeriod === "mes" ? "mes" : "custom") : "todos";
   const byDelivery = Boolean(filters.filtrarPorEntrega || filters.soloEntregasHoy);
   const dateSubject = byDelivery ? "Pedidos con entrega programada" : "Pedidos creados";
   const dateSummary = searching ? "Filtro de fecha en pausa mientras buscas." : period === "todos" ? "Sin límite de fecha." : period === "hoy" ? `${dateSubject} para hoy.` :
@@ -43,7 +43,7 @@ export function OrdersFilters({ filters, onApplyDatePreset, onApplyDateRange, on
       <span className="of-group-label">Período</span>
       <div className="of-period-buttons" role="group" aria-label="Período">
         <button type="button" aria-pressed={period === "hoy"} onClick={() => onApplyDatePreset("hoy")}>Hoy</button>
-        <button type="button" aria-pressed={period === "todos"} onClick={onClearDateRange}>Todas las fechas</button>
+        <button type="button" aria-pressed={period === "mes"} onClick={() => onApplyDatePreset("mes")}>Este Mes</button>
         <button ref={dateButton} type="button" aria-label={period === "custom" ? `Elegir fechas: ${rangeLabel}` : "Elegir fechas"} aria-pressed={period === "custom"} aria-haspopup="dialog" aria-expanded={popover === "dates"} onClick={() => setPopover("dates")}><CalendarDays size={14} /><span className="of-range-label">{period === "custom" ? rangeLabel : "Elegir fechas"}</span><ChevronDown size={12} /></button>
       </div>
       </div>

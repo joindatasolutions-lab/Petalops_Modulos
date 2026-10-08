@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { createOrdersDataController } from "../domain/orders-admin/ordersDataController.js";
 import { effectiveOrdersFilters } from "../domain/orders-admin/ordersDataLoader.js";
-import { initialFilters } from "../domain/orders-admin/ordersAdminConstants.js";
+import { initialFilters, createInitialOrdersFilters } from "../domain/orders-admin/ordersAdminConstants.js";
 
 function useOrdersAdminData({ api, empresaId, sucursalId, filters, debouncedQuery }) {
   const controller = createOrdersDataController(api);
@@ -71,20 +71,21 @@ describe("Pedidos: busqueda independiente de fechas", () => {
     expect(result.items.map(item => item.numeroPedido)).toEqual([1]);
     expect(api.listarPedidos).toHaveBeenCalledTimes(2);
   });
-  it("abre sin fechas y solicita consecutivos descendentes al servidor", async () => {
-    expect(initialFilters.fechaDesde).toBe("");
-    expect(initialFilters.fechaHasta).toBe("");
-    const { api, hook } = setup("", initialFilters);
-    expect((await hook.loadOrders()).items).toHaveLength(1);
+  it.each(["2026-10-07", "2028-02-29", "2026-12-31"])("abre solo con pedidos de hoy (%s) y pagina desde el servidor", async today => {
+    const defaults = createInitialOrdersFilters(today);
+    expect(defaults).toMatchObject({ fechaDesde: today, fechaHasta: today, datePeriod: "hoy", page: 1, pageSize: 10 });
+    const { api, hook } = setup("", defaults);
+    await hook.loadOrders();
+    expect(api.listarPedidos).toHaveBeenCalledTimes(1);
     expect(api.listarPedidos).toHaveBeenCalledWith(expect.objectContaining({
-      fechaDesde: "", fechaHasta: "", ordenConsecutivo: true, page: 1,
+      fechaDesde: `${today} 00:00:00`, fechaHasta: `${today} 23:59:59`, ordenConsecutivo: true, page: 1, pageSize: 10,
     }));
   });
   it("la busqueda tiene prioridad sobre el estado seleccionado", async () => {
     const approved = setup("virgen", { estado: "APROBADO" });
     expect((await approved.hook.loadOrders()).items).toHaveLength(1);
     expect(approved.api.listarPedidos).toHaveBeenCalledWith(expect.objectContaining({
-      estado: "", q: "", fechaDesde: "", fechaHasta: "",
+      estado: "", q: "virgen", fechaDesde: "", fechaHasta: "",
     }));
     const pending = setup("virgen", { estado: "CREADO" });
     expect((await pending.hook.loadOrders()).items).toHaveLength(1);
@@ -99,7 +100,7 @@ describe("Pedidos: busqueda independiente de fechas", () => {
         expect(result.items[0].numeroPedido).toBe(123);
       }
       expect(api.listarPedidos).toHaveBeenLastCalledWith(expect.objectContaining({
-        empresaId: 3, sucursalId: 1, q: "",
+        empresaId: 3, sucursalId: 1, q: "virgen",
         fechaDesde: "", fechaHasta: "", soloEntregasHoy: false, filtrarPorEntrega: false,
       }));
     }

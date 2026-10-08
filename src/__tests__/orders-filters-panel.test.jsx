@@ -9,7 +9,8 @@ describe("Panel de filtros de Pedidos", () => {
   it("abre sin fechas y muestra los filtros disponibles con etiquetas accesibles", () => {
     const html = renderToStaticMarkup(<OrdersFilters {...props} filters={initialFilters} paymentOptions={["Transferencia"]} total={12} />);
     expect(html).toContain('aria-expanded="false"');
-    expect(html).toContain("Todas las fechas");
+    expect(html).toContain("Este Mes");
+    expect(html).not.toContain("Todas las fechas");
     expect(html).toContain("12 pedidos encontrados");
     expect(html).toContain("Tipo de fecha");
     expect(html).toContain("Elegir fechas");

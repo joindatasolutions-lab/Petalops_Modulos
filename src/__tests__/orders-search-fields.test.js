@@ -12,17 +12,23 @@ const order = {
 
 describe("Búsqueda general de pedidos", () => {
   it.each(["maria", "belen", "3001234567", "1023456789", "corazon", "convenio", "olmos"])(
-    "encuentra %s en páginas posteriores y calcula el total antes de paginar", async q => {
-      const api = { listarPedidos: vi.fn(async ({ page }) => ({
-        items: page === 1 ? [{ numeroPedido: 91, cliente: "Otro cliente" }] : [order], total: 2,
-      })) };
-      const result = await fetchOrdersPage(api, { empresaId: 3, sucursalId: 1, q, page: 1, pageSize: 1 }, new AbortController().signal);
+    "env?a %s al servidor sin descargar el historial", async q => {
+      const api = { listarPedidos: vi.fn(async () => ({ items: [order], total: 10000 })) };
+      const result = await fetchOrdersPage(api, { empresaId: 3, sucursalId: 1, q, page: 2, pageSize: 10 }, new AbortController().signal);
       expect(result.items).toEqual([order]);
-      expect(result.total).toBe(1);
-      expect(api.listarPedidos).toHaveBeenCalledTimes(2);
-      expect(api.listarPedidos).toHaveBeenLastCalledWith(expect.objectContaining({ empresaId: 3, sucursalId: 1, q: "", page: 2 }));
+      expect(result.total).toBe(10000);
+      expect(result.page).toBe(2);
+      expect(api.listarPedidos).toHaveBeenCalledTimes(1);
+      expect(api.listarPedidos).toHaveBeenCalledWith(expect.objectContaining({ empresaId: 3, sucursalId: 1, q, page: 2, pageSize: 10 }));
     },
   );
+  it("conserva coincidencias por campos que no vienen en el listado", async () => {
+    const row = { numeroPedido: 90, cliente: "Ana" };
+    const api = { listarPedidos: vi.fn(async () => ({ items: [row], total: 1 })) };
+    const result = await fetchOrdersPage(api, { empresaId: 3, q: "referencia de pago", page: 1, pageSize: 10 }, new AbortController().signal);
+    expect(result.items).toEqual([row]);
+    expect(result.total).toBe(1);
+  });
   it("no oculta una cédula que coincide con otro número de pedido", () => {
     const rows = [{ numeroPedido: 12345 }, { numeroPedido: 99, clienteIdentificacion: "12345" }];
     expect(filterOrdersBySearch(rows, "12345")).toEqual(rows);

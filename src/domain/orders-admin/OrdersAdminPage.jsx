@@ -31,7 +31,7 @@ import {
   normalizeTime,
   toDateInput,
 } from "./orderDateFormatters.js";
-import { AUTO_REFRESH_INTERVAL_MS, DEFAULT_NEW_ORDER_FORM, VOICE_ALERTS_LAST_AUDIT_STORAGE_PREFIX, VOICE_ALERTS_LAST_PEDIDO_STORAGE_PREFIX, VOICE_ALERTS_INTERVAL_MS, VOICE_ALERTS_STORAGE_KEY, initialFilters } from "./ordersAdminConstants.js";
+import { AUTO_REFRESH_INTERVAL_MS, DEFAULT_NEW_ORDER_FORM, VOICE_ALERTS_LAST_AUDIT_STORAGE_PREFIX, VOICE_ALERTS_LAST_PEDIDO_STORAGE_PREFIX, VOICE_ALERTS_INTERVAL_MS, VOICE_ALERTS_STORAGE_KEY, createInitialOrdersFilters } from "./ordersAdminConstants.js";
 import {
   detailEditBarrioNombreOrFallback,
   normalizeDeliveryType,
@@ -143,7 +143,7 @@ function selectPreferredSpanishVoice(synth) {
 }
 
 export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canViewCatalogo, canViewProduccion, canViewDomicilios, canViewBarrios, canViewInventario, canViewContabilidad, canViewClientesPanel, canViewUsuariosPanel, canViewTenantMonitoring, onLogout, onGoPipeline, onGoPedidos, onGoProduccion, onGoDomicilios, onGoBarrios, onGoInventario, onGoContabilidad, onGoClientes, onGoUsuarios, onGoTenantMonitoring }) {
-  const [filters, setFilters] = useState(initialFilters);
+  const [filters, setFilters] = useState(createInitialOrdersFilters);
   const [selectedPedidoId, setSelectedPedidoId] = useState(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [detalle, setDetalle] = useState(null);
@@ -1524,29 +1524,21 @@ const openNewOrderModal = () => {
     });
   };
 
-  const applyDatePreset = () => {
+  const applyDatePreset = (preset = "hoy") => {
     const today = todayIsoDate();
+    const period = preset === "mes" ? "mes" : "hoy";
+    const [year, month] = today.split("-").map(Number);
+    const fechaDesde = period === "mes" ? `${today.slice(0, 7)}-01` : today;
+    const fechaHasta = period === "mes"
+      ? `${today.slice(0, 7)}-${new Date(year, month, 0).getDate()}` : today;
     setFilters(current => {
-      if (current.fechaDesde === today && current.fechaHasta === today && !current.soloEntregasHoy && current.datePeriod !== "custom" && Number(current.page || 1) === 1) return current;
-      return { ...current, fechaDesde: today, fechaHasta: today, datePeriod: "hoy", soloEntregasHoy: false, page: 1 };
+      if (current.fechaDesde === fechaDesde && current.fechaHasta === fechaHasta && !current.soloEntregasHoy && current.datePeriod === period && Number(current.page || 1) === 1) return current;
+      return { ...current, fechaDesde, fechaHasta, datePeriod: period, soloEntregasHoy: false, page: 1 };
     });
   };
 
   const clearOrderFilters = () => {
-    setFilters(current => ({
-      ...current,
-      q: "",
-      estado: "",
-      sinImprimir: false,
-      soloTienda: false,
-      soloEntregasHoy: false,
-      metodoPago: "",
-      fechaDesde: "",
-      fechaHasta: "",
-      datePeriod: "todos",
-      filtrarPorEntrega: false,
-      page: 1,
-    }));
+    setFilters(createInitialOrdersFilters());
   };
 
   const focusOrderMetric = metric => {

@@ -19,7 +19,7 @@ describe("Pedidos: coordinación de consultas", () => {
     expect(controller.getSnapshot().page).toBe(3);
     await controller.loadWhenSettled({ ...filters, page: 1, q: "orquideas" }, "orquideas");
     expect(api.listarPedidos).toHaveBeenCalledTimes(2);
-    expect(api.listarPedidos).toHaveBeenLastCalledWith(expect.objectContaining({ q: "", page: 1 }));
+    expect(api.listarPedidos).toHaveBeenLastCalledWith(expect.objectContaining({ q: "orquideas", page: 1 }));
     expect(controller.getSnapshot().page).toBe(1);
   });
   it("normaliza el texto igual que el API y reutiliza la misma caché", async () => {
@@ -28,7 +28,7 @@ describe("Pedidos: coordinación de consultas", () => {
     await controller.loadWhenSettled({ ...filters, q: "  rosas   rojas  " }, "rosas rojas");
     await controller.loadWhenSettled({ ...filters, q: "rosas rojas" }, "rosas rojas");
     expect(api.listarPedidos).toHaveBeenCalledTimes(1);
-    expect(api.listarPedidos).toHaveBeenCalledWith(expect.objectContaining({ q: "" }));
+    expect(api.listarPedidos).toHaveBeenCalledWith(expect.objectContaining({ q: "rosas rojas" }));
   });
   it("mantiene coincidencias del servidor por dirección junto con su contador", async () => {
     const api = { listarPedidos: vi.fn(async () => ({ items: [{ pedidoID: 1, estado: "APROBADO", direccionEntrega: "Sector Olmos" }], total: 1 })) };

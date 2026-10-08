@@ -2,7 +2,7 @@ import { applyDeliveryGiftOverridesToItems } from "./deliveryGiftOverrides.js";
 import { normalizeOrdersKpis } from "./ordersKpis.js";
 import {
   extractOrdersPayloadItems, filterOrdersByCreatedDateRange, filterOrdersByPaymentMethod,
-  filterOrdersBySearch, filterOrdersByStatus, localDateEndParam,
+  filterOrdersByStatus, localDateEndParam,
   localDateStartParam, normalizePedidosViewStatus, resolveOrdersPayloadTotal,
 } from "./ordersDomain.js";
 
@@ -26,15 +26,14 @@ export function effectiveOrdersFilters(filters, q) {
   };
 }
 
-// Preserve the API contract until filtering/pagination move to SQL in phase 2.
+// Text search is filtered and paginated by the API; only payment filtering is local.
 export async function fetchOrdersPage(api, filters, signal) {
   filters = effectiveOrdersFilters(filters, filters.q);
-  const searching = Boolean(normalizeOrdersQuery(filters.q));
-  const paginateLocally = Boolean(filters.metodoPago || searching);
+  const paginateLocally = Boolean(filters.metodoPago);
   const pageSize = Number(filters.pageSize || 10);
   const requestedPage = Number(filters.page || 1);
   const query = {
-    ...filters, q: searching ? "" : filters.q,
+    ...filters,
     fechaDesde: localDateStartParam(filters.fechaDesde),
     fechaHasta: localDateEndParam(filters.fechaHasta),
     ordenConsecutivo: true, page: paginateLocally ? 1 : requestedPage,
@@ -59,8 +58,8 @@ export async function fetchOrdersPage(api, filters, signal) {
   const byDate = filters.soloTienda || filters.soloEntregasHoy || filters.filtrarPorEntrega
     ? loaded : filterOrdersByCreatedDateRange(loaded, filters.fechaDesde, filters.fechaHasta);
   const byPayment = filterOrdersByPaymentMethod(filterOrdersByStatus(byDate, filters.estado), filters.metodoPago);
-  // Search all candidates before pagination: the API does not search every field.
-  const matching = searching ? filterOrdersBySearch(byPayment, filters.q, filters.empresaId) : byPayment;
+  // Preserve server matches, including fields absent from the list response.
+  const matching = byPayment;
   const total = paginateLocally || byDate.length !== loaded.length
     ? matching.length : resolveOrdersPayloadTotal(data, matching);
   const page = Math.min(requestedPage, Math.max(1, Math.ceil(total / pageSize)));
