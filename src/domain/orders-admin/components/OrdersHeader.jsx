@@ -61,8 +61,12 @@ export function OrdersHeader({
   onFocusMetric,
 }) {
   const metricPeriod = ordersMetricPeriod(filters);
-  const salesLabel = "Ventas hoy";
-  const ordersLabel = "Pedidos hoy";
+  const isToday = metricPeriod === "Hoy";
+  const isMonth = !String(filters.q || "").trim() && !isToday && filters.datePeriod === "mes";
+  const periodSuffix = isToday ? "hoy" : isMonth ? "este mes" : "del período";
+  const salesLabel = `Ventas ${periodSuffix}`;
+  const ordersLabel = `Pedidos ${periodSuffix}`;
+  const dateBasis = filters.filtrarPorEntrega || filters.soloEntregasHoy ? "Fecha de entrega" : "Fecha de creación";
   return (
     <header className="orders-admin-header orders-page-header orders-kpi-header">
       <div className="orders-page-heading">
@@ -172,14 +176,14 @@ export function OrdersHeader({
           </button>
         </div>
         <div className="orders-header-metrics orders-kpi-grid" aria-label="Resumen de pedidos">
-          <p className="orders-kpi-scope">Resumen de pedidos · {metricPeriod}. Ventas y pedidos de hoy corresponden al día actual dentro de esta consulta.</p>
+          <p className="orders-kpi-scope">Resumen de pedidos · {metricPeriod}. Valores de la consulta{String(filters.q || "").trim() ? "." : ` según ${dateBasis.toLowerCase()}.`}</p>
           <article className="orders-header-metric-card is-sale">
             <span className="orders-header-metric-icon" aria-hidden="true">
               <IconWallet size={17} stroke={2.2} />
             </span>
             <strong>${formatearCOP(headerSalesSummary)}</strong>
             <span>{salesLabel}</span>
-            <small>Hoy · COP</small>
+            <small>{metricPeriod} · COP</small>
           </article>
           {[...metricCards].sort((a, b) => metricOrder.indexOf(a.key) - metricOrder.indexOf(b.key)).map(card => {
             const Icon = card.Icon;
@@ -191,16 +195,16 @@ export function OrdersHeader({
                 className={`orders-header-metric-card ${card.className}${isActive ? " is-active" : ""}`}
                 onClick={() => onFocusMetric(card.key)}
                 aria-pressed={isActive}
-                aria-label={`${card.key === "hoy" ? ordersLabel : card.label}: ${card.value}. ${card.key === "hoy" ? "Hoy" : metricPeriod}`}
+                aria-label={`${card.key === "hoy" ? ordersLabel : card.label}: ${card.value}. ${metricPeriod}`}
                 data-metric={card.key}
-                title={card.key === "hoy" ? "Ver pedidos de hoy" : metricHints[card.key]}
+                title={card.key === "hoy" ? `Ver pedidos · ${metricPeriod}` : metricHints[card.key]}
               >
                 <span className="orders-header-metric-icon" aria-hidden="true">
                   <Icon size={17} strokeWidth={2.2} />
                 </span>
                 <strong>{formatCount(card.value)}</strong>
                 <span>{card.key === "hoy" ? ordersLabel : card.shortLabel}</span>
-                <small>{card.key === "hoy" ? "Creados hoy" : isActive ? "Filtro activo" : metricHints[card.key]}</small>
+                <small>{card.key === "hoy" ? metricPeriod : isActive ? "Filtro activo" : metricHints[card.key]}</small>
               </button>
             );
           })}

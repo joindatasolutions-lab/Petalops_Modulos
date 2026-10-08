@@ -1,6 +1,24 @@
-/* Only the filter row changes size; table rows, columns and pager are untouched. */
+/* Keep the list directly below filters without stretching tracks to the viewport. */
 .orders-admin-view.orders-page-view:has(.orders-filter-panel) {
-  grid-template-rows: var(--orders-header-band) auto auto minmax(0, 1fr) var(--orders-pager-band) !important;
+  grid-template-rows: repeat(4, auto) !important;
+  align-content: start !important;
+}
+.orders-admin-view.orders-page-view:has(.orders-filter-panel) .orders-page-section {
+  grid-row: 3 !important;
+  align-self: start !important;
+  align-content: start !important;
+  grid-template-rows: auto auto !important;
+  height: auto !important;
+  margin: 0 !important;
+  gap: 8px !important;
+}
+.orders-admin-view.orders-page-view:has(.orders-filter-panel) .orders-page-table-wrap {
+  height: auto !important;
+  min-height: 0 !important;
+}
+.orders-admin-view.orders-page-view:has(.orders-filter-panel) .orders-records-pager {
+  grid-row: 4 !important;
+  align-self: start !important;
 }
 .orders-filter-panel { grid-row: 2; width: 100%; min-width: 0; box-sizing: border-box; padding: 4px 0; color: #435571; font-size: 11px; }
 .of-bar { display: flex; width: 100%; min-width: 0; align-items: flex-end; flex-wrap: wrap; gap: 12px; }
@@ -51,7 +69,6 @@
 .of-date-inputs { display: flex; gap: 8px; margin-top: 10px; }
 .of-date-inputs label { flex: 1; min-width: 0; }
 @media (max-width: 640px) {
-  .orders-admin-view.orders-page-view:has(.orders-filter-panel) { grid-template-rows: auto auto minmax(0, 1fr) !important; }
   .of-bar { gap: 5px; }
   .of-result-actions { width: 100%; }
   .of-result-actions .of-results { margin-left: 0; white-space: normal; }
