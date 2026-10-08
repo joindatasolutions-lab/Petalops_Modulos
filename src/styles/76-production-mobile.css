@@ -23,6 +23,7 @@
   .production-page-view .orders-page-header.production-page-header,
   .production-page-view .orders-filters.production-filters-bar {
     display: flex !important;
+    flex-direction: row !important;
     flex-wrap: wrap !important;
     height: auto !important;
     max-height: none !important;
@@ -81,12 +82,18 @@
   }
 
   .production-page-view .production-table-wrap.production-table-shell {
+    /* Override the legacy tablet rule that hides the table through 1024px. */
+    display: block !important;
     grid-row: auto !important;
     height: auto !important;
     min-height: 180px !important;
     max-height: max(240px, 60dvh) !important;
     max-width: 100% !important;
     overflow: auto !important;
+  }
+
+  .production-page-view .production-capsules {
+    display: none !important;
   }
 
   .production-page-view .records-pager.production-records-pager {
@@ -96,7 +103,7 @@
     overflow: visible !important;
     grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) !important;
   }
-  /* Keep the date compact and all statuses on one line at every table width. */
+  /* Keep the date compact; wrap statuses when the available width is narrow. */
   .production-page-view .orders-filters.production-filters-bar > .production-filter-field:not(.production-status-filter) {
     flex: 0 0 150px !important;
     width: 150px !important;
@@ -109,13 +116,13 @@
   }
 
   .production-page-view .orders-filters.production-filters-bar > .production-status-filter {
-    flex: 1 1 0 !important;
+    flex: 1 1 440px !important;
     width: auto !important;
   }
 
   .production-page-view .orders-filters.production-filters-bar .production-status-chips {
     display: grid !important;
-    grid-template-columns: repeat(5, minmax(0, 1fr)) !important;
+    grid-template-columns: repeat(auto-fit, minmax(90px, 1fr)) !important;
     gap: 4px !important;
     width: 100% !important;
     height: auto !important;
@@ -125,7 +132,7 @@
     width: 100% !important;
     min-width: 0 !important;
     padding-inline: 4px !important;
-    white-space: nowrap !important;
+    white-space: normal !important;
   }
 }
 
