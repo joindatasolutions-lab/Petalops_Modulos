@@ -1,4 +1,31 @@
 /* Shared containment: wide tables scroll locally instead of widening the page. */
+.app-shell > .orders-admin-view.orders-page-view {
+  height: auto !important;
+  max-height: none !important;
+  grid-template-rows: auto auto auto auto auto !important;
+  align-content: start !important;
+  overflow-y: auto !important;
+}
+
+.orders-admin-view.orders-page-view .orders-page-section {
+  height: auto !important;
+  min-height: 0 !important;
+  max-height: none !important;
+  grid-template-rows: auto auto !important;
+}
+
+.orders-admin-view.orders-page-view .orders-page-table-wrap {
+  height: auto !important;
+}
+
+.orders-admin-view.orders-page-view .records-pager.orders-records-pager {
+  position: static !important;
+  align-self: start !important;
+  height: auto !important;
+  max-height: none !important;
+  overflow: visible !important;
+}
+
 .app-shell > main {
   box-sizing: border-box;
   min-width: 0 !important;
