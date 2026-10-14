@@ -65,6 +65,24 @@ export function filterInventoryItems(items, { stockFiltro = "", subcategoriaFilt
     return true;
   });
 }
+
+function normalizeIngredientSearch(value) {
+  return String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .toLowerCase();
+}
+
+export function filterRecipeIngredientItems(items, query = "") {
+  const term = normalizeIngredientSearch(query);
+  const source = Array.isArray(items) ? items : [];
+  if (!term) return source;
+
+  return source.filter(item => [item?.nombre, item?.codigo, item?.subcategoria, item?.categoria]
+    .some(value => normalizeIngredientSearch(value).includes(term)));
+}
+
 export function buildInventoryMetrics(items, movimientos) {
   return {
     stockTotal: items.reduce((sum, item) => sum + Number(item.stockActual || 0), 0),
@@ -177,6 +195,8 @@ export function buildCreateItemPayload(createForm, empresaId, moduloActivo) {
     tamano: String(createForm.tamano || "").trim() || null,
     unidadMedida: String(createForm.unidadMedida || "Unidad").trim(),
     fechaVencimiento: createForm.fechaVencimiento || null,
+    diasVidaUtil: createForm.diasVidaUtil !== "" ? Number(createForm.diasVidaUtil) : null,
+    observaciones: String(createForm.observaciones || "").trim() || null,
     marca: String(createForm.marca || "").trim() || null,
     precioVenta: moduloActivo === "adicionales" || createForm.vendibleUnidad ? Number(createForm.precioVenta || 0) : null,
     vendibleUnidad: Boolean(createForm.vendibleUnidad),
@@ -184,7 +204,7 @@ export function buildCreateItemPayload(createForm, empresaId, moduloActivo) {
     stockActual: Number(createForm.stockActual || 0),
     stockMinimo: Number(createForm.stockMinimo || 0),
     valorUnitario: Number(createForm.valorUnitario || 0),
-    activo: true,
+    activo: Boolean(createForm.activo),
   };
 }
 export function buildProveedorForm(item) {

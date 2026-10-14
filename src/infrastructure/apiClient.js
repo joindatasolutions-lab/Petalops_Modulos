@@ -825,21 +825,21 @@ export function createApiClient(config) {
       return requestJson(`/inventario/recetas/${recetaId}`);
     },
 
-    async crearReceta({ empresaId, nombre, descripcion }) {
+    async crearReceta({ empresaId, nombre, descripcion, productoID = null, precioVenta = null, imagenUrl = null, capacidadManual = null, codigoProducto = null, categoria = null, coleccion = null, activo = true }) {
       const params = new URLSearchParams();
       params.set("empresaID", String(empresaId));
       return requestJson(`/inventario/recetas?${params.toString()}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ nombre, descripcion }),
+        body: JSON.stringify({ nombre, descripcion, productoID, precioVenta, imagenUrl, capacidadManual, codigoProducto, categoria, coleccion, activo }),
       });
     },
 
-    async actualizarReceta({ recetaId, nombre, descripcion, activo = true }) {
+    async actualizarReceta({ recetaId, nombre, descripcion, productoID = null, precioVenta = null, imagenUrl = null, capacidadManual = null, codigoProducto = null, categoria = null, coleccion = null, activo = true }) {
       return requestJson(`/inventario/recetas/${recetaId}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ nombre, descripcion, activo }),
+        body: JSON.stringify({ nombre, descripcion, productoID, precioVenta, imagenUrl, capacidadManual, codigoProducto, categoria, coleccion, activo }),
       });
     },
 
