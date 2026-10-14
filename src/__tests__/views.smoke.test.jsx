@@ -103,4 +103,13 @@ describe("vistas principales", () => {
     expect(html).toContain("Producción");
     expect(html.length).toBeGreaterThan(500);
   });
+
+  it("presenta las secciones y acciones de inventario como desplegables", () => {
+    const html = renderToStaticMarkup(<InventoryPage {...pageProps} />);
+
+    expect(html).toContain('id="inventory-module-select"');
+    expect(html).toContain("Sección de inventario");
+    expect(html).toContain("Acciones");
+    expect(html).not.toContain('class="inventory-module-tabs"');
+  });
 });

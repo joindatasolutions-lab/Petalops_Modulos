@@ -68,6 +68,8 @@ export function InventoryPage({
   const [error, setError] = useState("");
   const [info, setInfo] = useState("");
   const [openInventoryMenuId, setOpenInventoryMenuId] = useState(null);
+  const [headerActionsOpen, setHeaderActionsOpen] = useState(false);
+  const headerActionsRef = useRef(null);
 
   // ── Datos ──
   const inventarioRequestIdRef = useRef(0);
@@ -462,6 +464,22 @@ export function InventoryPage({
   }, [moduloActivo, vistaActiva, recetaForm.productoModo, catalogoQuery, buscarProductoCatalogo]);
 
   useEffect(() => {
+    if (!headerActionsOpen) return undefined;
+    const closeOnOutsideClick = event => {
+      if (!headerActionsRef.current?.contains(event.target)) setHeaderActionsOpen(false);
+    };
+    const closeOnEscape = event => {
+      if (event.key === "Escape") setHeaderActionsOpen(false);
+    };
+    document.addEventListener("pointerdown", closeOnOutsideClick);
+    document.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.removeEventListener("pointerdown", closeOnOutsideClick);
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [headerActionsOpen]);
+
+  useEffect(() => {
     if (moduloActivo === "arreglos") { loadRecetas().catch(() => {}); loadAllItems().catch(() => {}); }
     else if (moduloActivo === "movimientos") { loadAllItems().catch(() => {}); }
     else { loadInventario().catch(() => {}); }
@@ -814,6 +832,12 @@ export function InventoryPage({
   const moduloLabel = useMemo(() => moduloConfig?.label || "", [moduloConfig]);
   const subcategoriasModulo = useMemo(() => moduloConfig?.subcategorias || [], [moduloConfig]);
   const unidadesModulo = useMemo(() => moduloConfig?.unidades || [], [moduloConfig]);
+  const ActiveModuleIcon = moduloConfig?.icon || Boxes;
+  const nuevoItemLabel = moduloLabel === "Arreglos" ? "Nuevo arreglo" : moduloLabel === "Flores" ? "Nueva flor" : moduloLabel === "Bases" ? "Nueva base" : moduloLabel === "Materiales" ? "Nuevo material" : moduloLabel === "Adicionales" ? "Nuevo adicional" : "Nuevo producto";
+  const runHeaderAction = action => {
+    setHeaderActionsOpen(false);
+    action();
+  };
 
   // ─── RENDER ───────────────────────────────────────────────────────────────
 
@@ -849,45 +873,66 @@ export function InventoryPage({
           </div>
           <div className="orders-header-side">
             <div className="header-actions">
-              <label className="inventory-header-search" aria-label="Buscar en inventario">
+              <div className="inventory-header-search" role="search">
                 <Search size={17} strokeWidth={2} aria-hidden="true" />
                 <input
                   type="search"
                   value={q}
                   onChange={e => setQ(e.target.value)}
                   placeholder={`Buscar en ${moduloLabel.toLowerCase()}...`}
+                  aria-label={`Buscar en ${moduloLabel.toLowerCase()}`}
                 />
-              </label>
-              {moduloActivo !== "movimientos" && moduloActivo !== "proveedores" && vistaActiva === "lista" ? (
-                <button type="button" className="btn-outline inventory-header-action" onClick={() => { setEditingInventoryId(null); setCreateForm(initialCreateForm); setVistaActiva("crear"); }}>
-                  <PackagePlus size={18} strokeWidth={2} aria-hidden="true" />
-                  <span>Nuevo {moduloLabel === "Arreglos" ? "Arreglo" : moduloLabel === "Flores" ? "Flor" : moduloLabel === "Bases" ? "Base" : moduloLabel === "Materiales" ? "Material" : moduloLabel === "Adicionales" ? "Adicional" : ""}</span>
+                {q ? (
+                  <button type="button" className="inventory-search-clear" onClick={() => setQ("")} aria-label="Limpiar búsqueda" title="Limpiar búsqueda">
+                    <X size={16} strokeWidth={2.2} aria-hidden="true" />
+                  </button>
+                ) : null}
+              </div>
+              <div className="inventory-header-actions-menu" ref={headerActionsRef}>
+                <button
+                  type="button"
+                  className="btn-primary inventory-actions-trigger"
+                  aria-haspopup="menu"
+                  aria-expanded={headerActionsOpen}
+                  onClick={() => setHeaderActionsOpen(open => !open)}
+                >
+                  <SlidersHorizontal size={18} strokeWidth={2} aria-hidden="true" />
+                  <span>Acciones</span>
+                  <ChevronDown size={16} strokeWidth={2.2} className="inventory-actions-chevron" aria-hidden="true" />
                 </button>
-              ) : null}
-              {moduloActivo === "proveedores" ? (
-                <button type="button" className="btn-outline inventory-header-action" onClick={openCreateProveedorModal}>
-                  <PackagePlus size={18} strokeWidth={2} aria-hidden="true" />
-                  <span>Nuevo proveedor</span>
-                </button>
-              ) : null}
-              {vistaActiva !== "lista" ? (
-                <button type="button" className="btn-outline inventory-header-action" onClick={() => { setVistaActiva("lista"); setError(""); }}>
-                  <X size={18} strokeWidth={2} aria-hidden="true" />
-                  <span>Cancelar</span>
-                </button>
-              ) : null}
-              {moduloConfig?.categoria && vistaActiva === "lista" ? (
-                <>
-                  <button type="button" className="btn-outline inventory-header-action" onClick={() => startStockMovement(null, "Compra")}><Truck size={18} strokeWidth={2} aria-hidden="true" /><span>Registrar compra</span></button>
-                  <button type="button" className="btn-outline inventory-header-action" onClick={() => startStockMovement(null, "Salida")}><ArrowUpFromLine size={18} strokeWidth={2} aria-hidden="true" /><span>Registrar salida</span></button>
-                  <button type="button" className="btn-outline inventory-header-action" onClick={() => startStockMovement(null, "Daño")}><CircleX size={18} strokeWidth={2} aria-hidden="true" /><span>Registrar daño</span></button>
-                  <button type="button" className="btn-outline inventory-header-action" onClick={() => startStockMovement(null, "Ajuste")}><RotateCcw size={18} strokeWidth={2} aria-hidden="true" /><span>Ajustar stock</span></button>
-                </>
-              ) : null}
-              <button type="button" className="btn-primary inventory-refresh-btn" onClick={refreshAll}>
-                <RefreshCw size={18} strokeWidth={2} aria-hidden="true" />
-                <span>Actualizar</span>
-              </button>
+                {headerActionsOpen ? (
+                  <div className="inventory-header-actions-popover" role="menu" aria-label={`Acciones de ${moduloLabel}`}>
+                    {moduloActivo !== "movimientos" && moduloActivo !== "proveedores" && vistaActiva === "lista" ? (
+                      <button type="button" role="menuitem" onClick={() => runHeaderAction(() => { setEditingInventoryId(null); setCreateForm(initialCreateForm); setVistaActiva("crear"); })}>
+                        <PackagePlus size={18} strokeWidth={2} aria-hidden="true" /><span>{nuevoItemLabel}</span>
+                      </button>
+                    ) : null}
+                    {moduloActivo === "proveedores" && vistaActiva === "lista" ? (
+                      <button type="button" role="menuitem" onClick={() => runHeaderAction(openCreateProveedorModal)}>
+                        <PackagePlus size={18} strokeWidth={2} aria-hidden="true" /><span>Nuevo proveedor</span>
+                      </button>
+                    ) : null}
+                    {vistaActiva !== "lista" ? (
+                      <button type="button" role="menuitem" onClick={() => runHeaderAction(() => { setVistaActiva("lista"); setError(""); })}>
+                        <X size={18} strokeWidth={2} aria-hidden="true" /><span>Cancelar edición</span>
+                      </button>
+                    ) : null}
+                    {moduloConfig?.categoria && vistaActiva === "lista" ? (
+                      <>
+                        <span className="inventory-actions-group-label">Movimientos de stock</span>
+                        <button type="button" role="menuitem" onClick={() => runHeaderAction(() => startStockMovement(null, "Compra"))}><Truck size={18} strokeWidth={2} aria-hidden="true" /><span>Registrar compra</span></button>
+                        <button type="button" role="menuitem" onClick={() => runHeaderAction(() => startStockMovement(null, "Salida"))}><ArrowUpFromLine size={18} strokeWidth={2} aria-hidden="true" /><span>Registrar salida</span></button>
+                        <button type="button" role="menuitem" onClick={() => runHeaderAction(() => startStockMovement(null, "Daño"))}><CircleX size={18} strokeWidth={2} aria-hidden="true" /><span>Registrar daño</span></button>
+                        <button type="button" role="menuitem" onClick={() => runHeaderAction(() => startStockMovement(null, "Ajuste"))}><RotateCcw size={18} strokeWidth={2} aria-hidden="true" /><span>Ajustar stock</span></button>
+                      </>
+                    ) : null}
+                    <span className="inventory-actions-separator" aria-hidden="true" />
+                    <button type="button" role="menuitem" onClick={() => runHeaderAction(refreshAll)}>
+                      <RefreshCw size={18} strokeWidth={2} aria-hidden="true" /><span>Actualizar información</span>
+                    </button>
+                  </div>
+                ) : null}
+              </div>
             </div>
           </div>
           {moduloActivo === "bases" ? (
@@ -966,24 +1011,17 @@ export function InventoryPage({
         {info ? <p className="orders-message">{info}</p> : null}
         {loading ? <p className="orders-message">Cargando...</p> : null}
 
-        {/* ── TABS DE MÓDULO ── */}
-        <div className="inventory-module-tabs" role="tablist">
-          {MODULES.map(mod => {
-            const Icon = mod.icon;
-            return (
-              <button
-                key={mod.key}
-                type="button"
-                role="tab"
-                aria-selected={moduloActivo === mod.key}
-                className={`inventory-module-tab${moduloActivo === mod.key ? " is-active" : ""}`}
-                onClick={() => cambiarModulo(mod.key)}
-              >
-                <Icon size={15} strokeWidth={2} aria-hidden="true" />
-                <span>{mod.label}</span>
-              </button>
-            );
-          })}
+        {/* ── SELECTOR DE SECCIÓN ── */}
+        <div className="inventory-module-selector">
+          <label htmlFor="inventory-module-select">Sección de inventario</label>
+          <div className="inventory-module-select-control">
+            <ActiveModuleIcon size={19} strokeWidth={2} aria-hidden="true" />
+            <select id="inventory-module-select" value={moduloActivo} onChange={event => cambiarModulo(event.target.value)}>
+              {MODULES.map(mod => <option key={mod.key} value={mod.key}>{mod.label}</option>)}
+            </select>
+            <ChevronDown size={18} strokeWidth={2.2} aria-hidden="true" />
+          </div>
+          <span>Selecciona la sección que deseas consultar o administrar.</span>
         </div>
 
         {/* ════════════════════════════════════════════════════
