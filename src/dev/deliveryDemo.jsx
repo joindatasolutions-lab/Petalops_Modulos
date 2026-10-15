@@ -9,7 +9,7 @@ if (!import.meta.env.DEV) throw new Error("La demo solo está disponible en desa
 
 const date = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Bogota", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
 const couriers = [
-  { idDomiciliario: 101, nombre: "Juan Pérez", estado: "Activo", activo: true },
+  { idDomiciliario: 101, usuarioID: 1001, nombre: "Juan Pérez", estado: "Activo", activo: true },
   { idDomiciliario: 102, nombre: "Camila Rojas", estado: "Activo", activo: true },
   { idDomiciliario: 103, nombre: "Andrés Mora", estado: "Inactivo", activo: false },
 ];
@@ -30,6 +30,7 @@ let items = names.map((nombre, index) => ({
   domiciliario: index < 6 ? "" : "Juan Pérez",
 }));
 const copy = value => structuredClone(value);
+items.push({ ...items[7], idEntrega: 209, idPedido: 309, numeroPedido: 98072, estado: "Entregado", estadoEntregaCodigo: "ENTREGADO", estadoEntregaNombre: "Entregado" });
 const api = {
   listarDomiciliarios: async () => ({ items: copy(couriers) }),
   listarDomiciliosAdmin: async ({ filtro, fecha, q }) => {
@@ -69,7 +70,7 @@ function Demo() {
       }}>Simular asignación externa de #98047</button>{" "}
       <button type="button" onClick={() => window.location.reload()}>Reiniciar demo</button>
     </div>
-    <DeliveryPage apiClient={api} session={{ rol: "empresa_admin", empresaID: 1, sucursalID: 1, nombre: "Administrador demo" }} canViewDomicilios onGoDomicilios={() => {}} onLogout={() => window.location.reload()} />
+    <DeliveryPage apiClient={api} session={{ userID: 1001, rol: "empresa_admin", empresaID: 1, sucursalID: 1, nombre: "Administrador demo" }} canViewDomicilios onGoDomicilios={() => {}} onLogout={() => window.location.reload()} />
   </>;
 }
 

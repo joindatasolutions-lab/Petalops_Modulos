@@ -5,12 +5,22 @@ import {
   deliveryArrangementName,
   isDeliveryAllowedProductionStatus,
   deliveryMatchesSearch,
+  deliveryMatchesOperationalView,
   deliveryOrderCodeLabel,
   isStorePickupDelivery,
   resolveDetailArrangementName,
 } from "../domain/delivery/DeliveryPage.jsx";
 
 describe("filtros de domicilios", () => {
+  it("organiza las vistas operativas con los estados existentes", () => {
+    const delivered = { estadoEntregaCodigo: "ENTREGADO" };
+    expect(deliveryMatchesOperationalView(delivered, "operativos")).toBe(false);
+    expect(deliveryMatchesOperationalView(delivered, "finalizados")).toBe(true);
+    expect(deliveryMatchesOperationalView(delivered, "todos")).toBe(true);
+    expect(deliveryMatchesOperationalView({ estadoEntregaCodigo: "NOENTREGADO" }, "incidencias")).toBe(true);
+    expect(deliveryMatchesOperationalView({ estadoEntregaCodigo: "REPROGRAMADO" }, "incidencias")).toBe(true);
+    expect(deliveryMatchesOperationalView({ estadoEntregaCodigo: "ASIGNADO" }, "incidencias")).toBe(false);
+  });
   it("encuentra pedidos entregados cuando el backend responde campos snake_case", () => {
     const deliveredOrder = {
       estado_entrega_codigo: "ENTREGADO",

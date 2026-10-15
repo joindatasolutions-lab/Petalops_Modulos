@@ -40,6 +40,15 @@ describe("asignación administrativa por lote", () => {
     expect(results[1].message).toBe("Sin conexión");
   });
 
+  it("conserva como conflicto un HTTP 409 ocurrido después de la consulta previa", async () => {
+    const assign = vi.fn(async item => {
+      if (item.idEntrega === 2) throw Object.assign(new Error("Ya fue asignado"), { status: 409 });
+    });
+    const results = await assignDeliveryBatch({ items, freshItems: items, isEligible, assign });
+    expect(results.map(item => item.status)).toEqual(["success", "conflict", "success"]);
+    expect(assign).toHaveBeenCalledTimes(3);
+  });
+
   it("envía el mismo domiciliario sin forzar sobrecupo cuando se solicita", async () => {
     const original = globalThis.fetch;
     const fetch = vi.fn().mockResolvedValue({ ok: true, json: async () => ({}) });

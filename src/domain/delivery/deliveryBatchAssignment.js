@@ -17,7 +17,7 @@ export async function assignDeliveryBatch({ items, freshItems, isEligible, assig
       await assign(fresh);
       results.push({ item, status: "success", message: "Asignado correctamente." });
     } catch (error) {
-      results.push({ item, status: "error", message: error?.detail || error?.message || "No fue posible asignar. Actualiza antes de reintentar." });
+      results.push({ item, status: Number(error?.status) === 409 ? "conflict" : "error", message: error?.detail || error?.message || "No fue posible asignar. Actualiza antes de reintentar." });
     }
   }
   return results;

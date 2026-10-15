@@ -871,6 +871,18 @@ export function createApiClient(config) {
       });
     },
 
+    async obtenerEvidenciasDomicilio({ empresaId, sucursalId, numeroPedido }) {
+      const params = new URLSearchParams({ empresaID: String(empresaId) });
+      if (sucursalId != null) params.set("sucursalID", String(sucursalId));
+      try {
+        return await requestJson(`/domicilios/pedidos/${encodeURIComponent(numeroPedido)}/evidencias?${params.toString()}`, { cache: "no-store" });
+      } catch (error) {
+        // A 401 must request a new session even when the backend does not mention a token.
+        if (error?.status === 401 && !isAuthExpiredError(error)) notifyAuthExpired(error);
+        throw error;
+      }
+    },
+
     async listarPedidos({ empresaId, sucursalId, q, estado, fechaDesde, fechaHasta, filtrarPorEntrega, sinImprimir, soloTienda, soloEntregasHoy, page, pageSize }) {
       const params = new URLSearchParams();
       params.set("empresaID", String(empresaId));

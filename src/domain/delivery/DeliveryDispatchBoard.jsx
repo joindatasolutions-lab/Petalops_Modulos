@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import "./deliveryDispatchBoard.css";
+import { DeliveryActionMenu, DeliveryDialog } from "./DeliveryActionMenu.jsx";
 
 export function DeliveryDispatchBoard({ rows, couriers, contextKey, busy, loading, offline, canAssign, onOpen, onMap, onEvidence, onNovelty, onStatus, onAssign, onRefresh }) {
   const [selectedIds, setSelectedIds] = useState([]);
@@ -7,6 +8,9 @@ export function DeliveryDispatchBoard({ rows, couriers, contextKey, busy, loadin
   const [review, setReview] = useState(false);
   const [results, setResults] = useState([]);
   const [error, setError] = useState("");
+  const [assignmentOpen, setAssignmentOpen] = useState(false);
+  const [selectionNotice, setSelectionNotice] = useState("");
+  const previousContext = useRef(contextKey);
   const submitting = useRef(false);
   const selectAll = useRef(null);
   const eligible = rows.filter(row => row.eligible);
@@ -16,9 +20,12 @@ export function DeliveryDispatchBoard({ rows, couriers, contextKey, busy, loadin
   const allSelected = eligible.length > 0 && eligible.every(row => selectedIds.includes(String(row.id)));
 
   useEffect(() => {
+    if (previousContext.current === contextKey) return;
+    previousContext.current = contextKey;
+    if (selectedIds.length) setSelectionNotice("Selección descartada al cambiar los filtros. Selecciona los pedidos de esta vista.");
     setSelectedIds([]);
     setReview(false);
-    setResults([]);
+    setAssignmentOpen(false);
     setError("");
   }, [contextKey]);
   useEffect(() => {
@@ -34,9 +41,9 @@ export function DeliveryDispatchBoard({ rows, couriers, contextKey, busy, loadin
   }, [selected.length, allSelected]);
   useEffect(() => { setReview(false); }, [selected.map(row => row.id).join(","), courierId]);
 
-  const changeSelection = ids => { setSelectedIds(ids); setReview(false); setResults([]); setError(""); };
+  const changeSelection = ids => { setSelectedIds(ids); setReview(false); setSelectionNotice(""); setError(""); };
   const confirm = async () => {
-    if (submitting.current || locked || !review || !courier || !selected.length) return;
+    if (submitting.current || locked || !canAssign || !review || !courier || !selected.length) return;
     submitting.current = true;
     setError("");
     try {
@@ -46,6 +53,7 @@ export function DeliveryDispatchBoard({ rows, couriers, contextKey, busy, loadin
       // may have committed on the server even when its response was lost.
       setSelectedIds([]);
       setReview(false);
+      setAssignmentOpen(false);
     } catch (nextError) {
       setError(nextError?.message || "No se pudo comprobar la disponibilidad. No se inició el lote.");
       setReview(false);
@@ -57,28 +65,28 @@ export function DeliveryDispatchBoard({ rows, couriers, contextKey, busy, loadin
       <div className="dispatch-table-panel">
         <div className="dispatch-table-heading">
           <div><h2>Pedidos para despacho</h2><span>{rows.length} pedidos · {eligible.length} sin asignar</span></div>
-          {canAssign && <button type="button" disabled={locked || !selectedIds.length} onClick={() => changeSelection([])}>Limpiar selección ({selected.length})</button>}
+          {canAssign && selected.length > 0 && <div className="dispatch-selection-bar" aria-label="Acciones de selección">
+            <strong>{selected.length} seleccionados</strong>
+            <button type="button" disabled={locked} onClick={() => changeSelection([])}>Limpiar selección ({selected.length})</button>
+            <button type="button" className="dispatch-primary" disabled={locked} onClick={() => { setReview(false); setAssignmentOpen(true); }}>Asignar domiciliario</button>
+          </div>}
         </div>
+        {selectionNotice && <p role="status" className="dispatch-table-note">{selectionNotice}</p>}
         <div className="dispatch-table-scroll">
           <table className="dispatch-table">
             <thead><tr>
               {canAssign && <th><input ref={selectAll} type="checkbox" aria-label="Seleccionar todos los pedidos elegibles visibles" checked={allSelected} disabled={locked || !eligible.length} onChange={event => changeSelection(event.target.checked ? eligible.map(row => String(row.id)) : [])} /></th>}
-              <th>Pedido / Hora</th><th>Destinatario / Dirección</th><th>Barrio</th><th>Domiciliario</th><th>Estado</th><th>Acciones</th>
+              <th>Pedido</th><th>Hora</th><th>Destinatario / Dirección</th><th>Zona</th><th>Domiciliario</th><th>Estado</th><th>Acciones</th>
             </tr></thead>
             <tbody>{rows.map(row => (
               <tr key={row.id} className={`${selectedIds.includes(String(row.id)) && row.eligible ? "is-batch-selected" : ""} ${row.late ? "is-late" : ""}`}>
                 {canAssign && <td><input type="checkbox" aria-label={`Seleccionar pedido ${row.code}`} checked={row.eligible && selectedIds.includes(String(row.id))} disabled={locked || !row.eligible} onChange={event => changeSelection(event.target.checked ? [...selectedIds, String(row.id)] : selectedIds.filter(id => id !== String(row.id)))} title={row.eligible ? "Incluir en el lote" : "Solo se pueden seleccionar entregas pendientes y sin asignar"} /></td>}
-                <td><button type="button" className="dispatch-order-link" onClick={() => onOpen(row.item)}>#{row.code}</button><span>{row.time}</span>{row.late && <small className="dispatch-warning">Atrasado</small>}</td>
-                <td><strong>{row.recipient}</strong><span>{row.address}</span>{row.surprise && <small className="dispatch-warning">Es sorpresa · verifica a quién contactar</small>}</td>
+                <td><button type="button" className="dispatch-order-link" onClick={() => onOpen(row.item)}>#{row.code}</button>{row.late && <small className="dispatch-warning">Atrasado</small>}</td>
+                <td className="dispatch-time" title={row.date}>{row.time}</td>
+                <td className="dispatch-destination"><strong>{row.recipient}</strong><span title={row.address}>{row.address}</span>{row.surprise && <small className="dispatch-warning">Es sorpresa · verifica a quién contactar</small>}</td>
                 <td>{row.neighborhood}</td><td>{row.courier}</td>
                 <td><span className={`dispatch-status is-${row.tone}`}>{row.status}</span></td>
-                <td><details className="dispatch-row-menu"><summary aria-label={`Acciones del pedido ${row.code}`}>•••</summary><div>
-                  <button type="button" onClick={() => onOpen(row.item)}>Ver detalle</button>
-                  <button type="button" onClick={() => onMap(row.item)}>Ver mapa</button>
-                  <button type="button" onClick={() => onEvidence(row.item)}>Evidencias</button>
-                  <button type="button" onClick={() => onNovelty(row.item)}>Novedades</button>
-                  <button type="button" disabled={busy} onClick={() => onStatus(row.item)}>Cambiar estado</button>
-                </div></details></td>
+                <td><DeliveryActionMenu row={row} busy={busy} onOpen={onOpen} onMap={onMap} onEvidence={onEvidence} onNovelty={onNovelty} onStatus={onStatus} /></td>
               </tr>
             ))}</tbody>
           </table>
@@ -87,7 +95,8 @@ export function DeliveryDispatchBoard({ rows, couriers, contextKey, busy, loadin
         <p className="dispatch-table-note">{canAssign ? "Selecciona pedidos sin asignar para agruparlos en un solo despacho." : "Consulta el detalle para supervisar cada entrega."}</p>
       </div>
 
-      {canAssign && <aside className="dispatch-batch-panel" aria-label="Asignar lote">
+      {canAssign && assignmentOpen && <DeliveryDialog title="Asignar domiciliario" locked={busy} onClose={() => { setAssignmentOpen(false); setReview(false); }}>
+        <div className="dispatch-batch-panel">
         <h2>{review ? "Revisar asignación" : "Asignar lote"}</h2>
         <p aria-live="polite">{selected.length ? `${selected.length} pedidos seleccionados` : "Selecciona pedidos en la lista para empezar."}</p>
         <label>Domiciliario<select aria-label="Domiciliario del lote" value={courierId} disabled={locked} onChange={event => { setCourierId(event.target.value); setReview(false); }}>
@@ -101,12 +110,14 @@ export function DeliveryDispatchBoard({ rows, couriers, contextKey, busy, loadin
         {error && <p role="alert" className="dispatch-warning">{error}</p>}
         <button type="button" className="dispatch-primary" disabled={locked || !courier || !selected.length} onClick={review ? confirm : () => setReview(true)}>{busy ? "Asignando…" : review ? `Confirmar asignación (${selected.length})` : `Revisar asignación (${selected.length})`}</button>
         {review && <button type="button" disabled={locked} onClick={() => setReview(false)}>Volver a selección</button>}
+        <button type="button" disabled={busy} onClick={() => { setAssignmentOpen(false); setReview(false); }}>Cancelar</button>
+        </div>
+      </DeliveryDialog>}
         {results.length > 0 && <section className="dispatch-results" aria-label="Resultado del lote" aria-live="polite">
           <h3>{results.filter(item => item.status === "success").length} de {results.length} asignados</h3>
           <ul>{results.map(result => <li key={result.item.idEntrega} className={result.status === "success" ? "is-success" : "dispatch-warning"}><strong>#{result.item.numeroPedido || result.item.idEntrega}</strong> {result.message}</li>)}</ul>
           {results.some(item => item.status !== "success") && <><p>Actualiza y vuelve a seleccionar solo los pedidos que sigan sin asignar.</p><button type="button" disabled={busy || loading} onClick={onRefresh}>Actualizar pedidos</button></>}
         </section>}
-      </aside>}
     </section>
   );
 }
