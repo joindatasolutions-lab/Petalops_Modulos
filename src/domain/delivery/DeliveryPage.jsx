@@ -1,5 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import { DeliveryDispatchBoard } from "./DeliveryDispatchBoard.jsx";
+import { assignDeliveryBatch } from "./deliveryBatchAssignment.js";
+import { deliveryEvidenceErrorMessage, loadDeliveryEvidence } from "./deliveryEvidence.js";
+
 import { tenantConfig } from "../../config/tenantConfig.js";
 import { createApiClient } from "../../infrastructure/apiClient.js";
 import { AppSidebar } from "../../shared/AppSidebar.jsx";
@@ -74,7 +78,20 @@ const DELIVERY_VIEWS = [
   { value: "metricas", label: "Métricas" },
   { value: "domiciliarios", label: "Domiciliarios" },
 ];
-const DELIVERY_SUPPORTED_MODES = new Set([...DELIVERY_VIEWS.map(item => item.value), "disponibles", "mis-pedidos"]);
+const DELIVERY_SUPPORTED_MODES = new Set(DELIVERY_VIEWS.map(item => item.value));
+const DISPATCH_VIEWS = [
+  { key: "operativos", label: "Por gestionar" },
+  { key: "todos", label: "Todos" },
+  { key: "finalizados", label: "Finalizados" },
+  { key: "incidencias", label: "Incidencias" },
+];
+export function deliveryMatchesOperationalView(item, view) {
+  const status = deliveryStatusMeta(item).key;
+  if (view === "finalizados") return status === "entregado";
+  if (view === "incidencias") return ["no-entregado", "reprogramado"].includes(status);
+  if (view === "operativos") return status !== "entregado";
+  return true;
+}
 
 const DELIVERY_STATUS_FILTERS = [
   { key: "todos", label: "Todos", icon: Truck },
@@ -226,7 +243,7 @@ function isAdminRole(session) {
 }
 
 function todayIso() {
-  return new Date().toISOString().slice(0, 10);
+  return new Intl.DateTimeFormat("en-CA", { timeZone: COLOMBIA_TIME_ZONE, year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
 }
 
 function monthStartIso() {
@@ -979,6 +996,18 @@ function deliveryEvidenceDateFrom(value) {
 
 function buildDeliveryEvidenceRecords(item) {
   const records = [];
+  if (item && "evidencia_entrega_url" in item && "evidencia_firma_url" in item) {
+    return [
+      { label: "Foto de entrega", url: item.evidencia_entrega_url },
+      { label: "Firma del receptor", url: item.evidencia_firma_url },
+    ].filter(({ url }) => typeof url === "string" && url.trim()).map(record => ({
+      ...record,
+      key: record.label,
+      url: normalizeDeliveryAssetUrl(record.url.trim()),
+      date: deliveryDateTimeLabel(item),
+      note: record.label === "Firma del receptor" ? deliveryFirstText(item.firma_nombre) : "",
+    }));
+  }
   const directEvidence = [
     ["Firma", item?.firmaImagenUrl || item?.firma_imagen_url || item?.firmaimagenurl || item?.firma || item?.firmaUrl || item?.firma_url],
     ["Foto de entrega", item?.evidenciaFotoUrl || item?.evidencia_foto_url || item?.fotoEntregaUrl || item?.foto_entrega_url || item?.fotoEvidenciaUrl || item?.foto_evidencia_url],
@@ -1069,7 +1098,7 @@ function buildDeliveryNoveltyRecords(item) {
   return rows;
 }
 
-function buildDeliveryEvidenceSummary(item) {
+export function buildDeliveryEvidenceSummary(item) {
   return {
     order: deliveryOrderCodeLabel(item),
     arrangement: deliveryArrangementName(item) || "Arreglo sin nombre",
@@ -1783,8 +1812,18 @@ function partitionMyOrders(items) {
   );
 }
 
+export function isBatchEligible(item) {
+  const status = deliveryRawStatus(item);
+  return Boolean(item?.idEntrega || item?.id_entrega)
+    && deliveryCourierIdValue(item) == null
+    && ["PENDIENTE", "PARAENTREGA"].includes(compactStatusValue(status.code || status.name))
+    && !isCanceledDeliveryStatus(item)
+    && filterDomicilioItems([item]).length === 1;
+}
+
 export function DeliveryPage({
   session,
+  apiClient,
   canViewPipeline,
   canViewPedidos,
   canViewProduccion,
@@ -1807,27 +1846,13 @@ export function DeliveryPage({
   onGoUsuarios,
   onGoTenantMonitoring,
 }) {
-  const api = useMemo(() => createApiClient(tenantConfig), []);
+  const api = useMemo(() => apiClient || createApiClient(tenantConfig), [apiClient]);
   const empresaId = Number(session?.empresaID || tenantConfig.empresaId);
   const sucursalId = Number(session?.sucursalID || tenantConfig.sucursalId);
   const usuarioCambio = String(session?.email || session?.nombre || "admin");
   const pedidosRole = isPedidosRole(session);
   const adminRole = isAdminRole(session);
-  const [asignacionDomicilioActiva, setAsignacionDomicilioActiva] = useState(true);
-  const canDomiciliarioSelfAssign = !adminRole && asignacionDomicilioActiva;
-
-  useEffect(() => {
-    if (adminRole || !empresaId) return;
-    let disposed = false;
-    api.obtenerConfiguracionAsignacion({ empresaId })
-      .then(data => {
-        if (!disposed) setAsignacionDomicilioActiva(Boolean(data?.asignacionDomicilioActiva));
-      })
-      .catch(nextError => {
-        console.error("Error cargando configuracion de asignacion:", nextError);
-      });
-    return () => { disposed = true; };
-  }, [api, empresaId, adminRole]);
+  const canDomiciliarioSelfAssign = false;
   const displayUserName = useMemo(
     () => String(session?.nombre || session?.login || "Usuario").trim() || "Usuario",
     [session]
@@ -1850,6 +1875,9 @@ export function DeliveryPage({
   const [deliveryProductNames, setDeliveryProductNames] = useState({});
   const [filtro, setFiltro] = useState("hoy");
   const [statusFilter, setStatusFilter] = useState("todos");
+  const [dispatchBarrio, setDispatchBarrio] = useState("");
+  const [dispatchView, setDispatchView] = useState("operativos");
+  const [dispatchFiltersOpen, setDispatchFiltersOpen] = useState(false);
   const [fechaFiltro, setFechaFiltro] = useState(todayIso());
   const [metricsRangePreset, setMetricsRangePreset] = useState("mes");
   const [metricsFechaDesde, setMetricsFechaDesde] = useState(monthStartIso());
@@ -1881,6 +1909,14 @@ export function DeliveryPage({
   const [courierSearch, setCourierSearch] = useState("");
   const [openDeliveryActionsKey, setOpenDeliveryActionsKey] = useState("");
   const [evidenceModalItem, setEvidenceModalItem] = useState(null);
+  const [evidenceQuery, setEvidenceQuery] = useState({ item: null, data: null, error: "" });
+  const [evidenceImageErrors, setEvidenceImageErrors] = useState({});
+  const [evidenceRetry, setEvidenceRetry] = useState(0);
+  const openEvidenceModal = useCallback(item => {
+    setEvidenceQuery({ item, data: null, error: "" });
+    setEvidenceImageErrors({});
+    setEvidenceModalItem(item);
+  }, []);
   const [noveltiesModalItem, setNoveltiesModalItem] = useState(null);
   const [statusModalItem, setStatusModalItem] = useState(null);
   const [statusForm, setStatusForm] = useState(DEFAULT_STATUS_FORM);
@@ -1890,7 +1926,6 @@ export function DeliveryPage({
 
   const [modo, setModo] = useState("admin");
   const [domiciliarioId, setDomiciliarioId] = useState("");
-  const [soloMisAsignados, setSoloMisAsignados] = useState(true);
   const [availableItems, setAvailableItems] = useState([]);
   const [myOrdersItems, setMyOrdersItems] = useState([]);
   const loadRequestIdRef = useRef(0);
@@ -1928,10 +1963,30 @@ export function DeliveryPage({
   );
 
   const myOrdersGrouped = useMemo(() => partitionMyOrders(myOrdersItems), [myOrdersItems]);
-  const evidenceModalSummary = useMemo(
-    () => evidenceModalItem ? buildDeliveryEvidenceSummary(evidenceModalItem) : null,
-    [evidenceModalItem]
-  );
+  useEffect(() => {
+    if (!evidenceModalItem) return;
+    let active = true;
+    setEvidenceQuery({ item: evidenceModalItem, data: null, error: "" });
+    setEvidenceImageErrors({});
+    loadDeliveryEvidence(api, evidenceModalItem, { empresaId, sucursalId }).then(
+      data => { if (active) setEvidenceQuery({ item: evidenceModalItem, data, error: "" }); },
+      error => { if (active) setEvidenceQuery({ item: evidenceModalItem, data: null, error: deliveryEvidenceErrorMessage(error) }); }
+    );
+    return () => { active = false; };
+  }, [api, empresaId, sucursalId, evidenceModalItem, evidenceRetry]);
+  const evidenceData = evidenceQuery.item === evidenceModalItem ? evidenceQuery.data : null;
+  const evidenceError = evidenceQuery.item === evidenceModalItem ? evidenceQuery.error : "";
+  const evidenceLoading = !evidenceData && !evidenceError;
+  const evidenceModalSummary = useMemo(() => {
+    if (!evidenceModalItem) return null;
+    const summary = buildDeliveryEvidenceSummary({ ...evidenceModalItem, ...evidenceData });
+    return { ...summary,
+      receivedBy: deliveryFirstText(evidenceData?.firma_nombre),
+      receivedDocument: deliveryFirstText(evidenceData?.firma_documento),
+      observations: deliveryFirstText(evidenceData?.observaciones),
+      evidences: evidenceData ? buildDeliveryEvidenceRecords(evidenceData) : [],
+    };
+  }, [evidenceModalItem, evidenceData]);
   const noveltiesModalSummary = useMemo(
     () => noveltiesModalItem ? buildDeliveryEvidenceSummary(noveltiesModalItem) : null,
     [noveltiesModalItem]
@@ -1961,10 +2016,8 @@ export function DeliveryPage({
     () => inferCurrentDomiciliarioId(session, domiciliarios),
     [session, domiciliarios]
   );
-  const visibleAdminItems = useMemo(() => {
-    if (!soloMisAsignados || currentDomiciliarioId == null) return adminItems;
-    return adminItems.filter(item => deliveryCourierIdValue(item) === Number(currentDomiciliarioId));
-  }, [adminItems, soloMisAsignados, currentDomiciliarioId]);
+  // This is the administrative workspace, even when the user is also a courier.
+  const visibleAdminItems = adminItems;
   const visibleDeliveryViews = useMemo(() => DELIVERY_VIEWS, []);
 
   useEffect(() => {
@@ -1986,13 +2039,6 @@ export function DeliveryPage({
     });
   }, [barriosItems, barriosSearch]);
 
-  useEffect(() => {
-    if (currentDomiciliarioId == null) {
-      setSoloMisAsignados(false);
-      return;
-    }
-    setSoloMisAsignados(true);
-  }, [currentDomiciliarioId]);
 
   useEffect(() => {
     setDeliveryForm(DEFAULT_DELIVERY_FORM);
@@ -2109,7 +2155,8 @@ export function DeliveryPage({
   }, [api, empresaId, sucursalId]);
 
   const loadAdmin = useCallback(async (isCurrentRequest = () => true) => {
-    const queryPlan = buildDeliveryAdminQueryPlan({ filtro, statusFilter, fechaFiltro, deliverySearch: debouncedDeliverySearch });
+    // Fetch the date context once; operational views and status cards filter locally.
+    const queryPlan = buildDeliveryAdminQueryPlan({ filtro, fechaFiltro, deliverySearch: debouncedDeliverySearch });
     const baseParams = {
       empresaId,
       sucursalId,
@@ -2150,7 +2197,7 @@ export function DeliveryPage({
     }
     if (!isCurrentRequest()) return;
     setAdminItems(filterDomicilioItems(Array.from(deduped.values())).filter(item => !isCanceledDeliveryStatus(item)));
-  }, [api, empresaId, sucursalId, filtro, fechaFiltro, statusFilter, debouncedDeliverySearch]);
+  }, [api, empresaId, sucursalId, filtro, fechaFiltro, debouncedDeliverySearch]);
 
   const loadAvailableOrders = useCallback(async coords => {
     const [snapshotResult, availableResult] = await Promise.allSettled([
@@ -2402,9 +2449,6 @@ export function DeliveryPage({
     });
   };
 
-  const onChangeSoloMisAsignados = checked => {
-    setSoloMisAsignados(checked);
-  };
 
   const onCrearDomiciliario = async () => {
     if (courierSaving) return;
@@ -2889,6 +2933,59 @@ export function DeliveryPage({
     }
   };
 
+  const bulkAssignRunning = useRef(false);
+  const onAssignBatch = async (items, nextCourierId) => {
+    if (!adminRole || actionKey || bulkAssignRunning.current || isOffline) {
+      throw new Error("La asignación no está disponible. Revisa la conexión y espera a que termine la operación actual.");
+    }
+    bulkAssignRunning.current = true;
+    setBusy("asignar-lote");
+    try {
+      // Re-read tenant-scoped pending deliveries and the courier directory.
+      // The server remains responsible for checking concurrent writes.
+      const [deliveryData, courierData] = await Promise.all([
+        api.listarDomiciliosAdmin({ empresaId, sucursalId, filtro: "pendientes" }),
+        api.listarDomiciliarios({ empresaId, sucursalId, soloActivos: false }),
+      ]);
+      const courier = (courierData?.items || []).find(item => courierIdValue(item) === Number(nextCourierId));
+      if (!courier || courier.activo === false || normalizeStatus(courierBackendStatus(courier)) !== "ACTIVO") {
+        throw new Error("El domiciliario ya no está activo. Elige otro responsable.");
+      }
+      if (!Array.isArray(deliveryData?.items) && !Array.isArray(deliveryData)) {
+        throw new Error("No se pudo comprobar la disponibilidad de los pedidos. No se inició el lote.");
+      }
+      const results = await assignDeliveryBatch({
+        items,
+        freshItems: normalizeDeliveryItemsPayload(deliveryData).map(item => ({ ...item, idEntrega: item.idEntrega || item.id_entrega })),
+        isEligible: isBatchEligible,
+        assign: async item => {
+          await api.asignarDomiciliarioEntrega({
+            entregaId: item.idEntrega,
+            domiciliarioID: Number(nextCourierId),
+            usuarioCambio,
+            limiteEntregasActivas: MAX_ENTREGAS_ACTIVAS_DOMICILIARIO,
+            permitirSobrecupo: false,
+          });
+          patchDeliveryItemById(item.idEntrega, {
+            domiciliarioID: Number(nextCourierId),
+            domiciliarioId: Number(nextCourierId),
+            domiciliario: courier.nombre || courier.nombreDomiciliario || "Domiciliario",
+            nombreDomiciliario: courier.nombre || courier.nombreDomiciliario || "Domiciliario",
+            estadoEntregaCodigo: "ASIGNADO",
+            estadoEntregaNombre: "Asignado",
+          });
+        },
+      });
+      try { await loadAdmin(); } catch {
+        setError("El lote terminó, pero no se pudo actualizar la lista. Consulta los resultados y pulsa Actualizar.");
+      }
+      return results;
+    } finally {
+      bulkAssignRunning.current = false;
+      clearBusy();
+    }
+  };
+
   const onTomar = async item => {
     setBusy(`tomar-${item.idEntrega}`);
     try {
@@ -3103,8 +3200,10 @@ export function DeliveryPage({
     dispatchItems.filter(item => (
       deliveryMatchesSelectedDate(item, fechaFiltro, effectiveDeliverySearch)
       && deliveryMatchesSearch(item, effectiveDeliverySearch)
+      && (!dispatchBarrio || String(item.barrio || item.barrionombre || item.barrioNombre || "").trim() === dispatchBarrio)
+      && (adminOrderSearchActive || deliveryMatchesOperationalView(item, dispatchView))
     ))
-  ), [effectiveDeliverySearch, dispatchItems, fechaFiltro]);
+  ), [effectiveDeliverySearch, dispatchItems, fechaFiltro, dispatchBarrio, adminOrderSearchActive, dispatchView]);
 
   const filteredDispatchItems = useMemo(() => {
     const byStatus = statusFilter === "todos" || adminOrderSearchActive
@@ -3858,16 +3957,6 @@ export function DeliveryPage({
                 ) : null}
               </section>
 
-              {modo === "admin" && currentDomiciliarioId != null ? (
-                <label className="delivery-mobile-toggle">
-                  <input
-                    type="checkbox"
-                    checked={soloMisAsignados}
-                    onChange={event => onChangeSoloMisAsignados(event.target.checked)}
-                  />
-                  <span>Solo mis asignados</span>
-                </label>
-              ) : null}
 
               <section className="delivery-mobile-list" aria-label="Listado móvil de domicilios">
                 <div className="delivery-mobile-summary">
@@ -3959,7 +4048,7 @@ export function DeliveryPage({
                           </button>
                           {openDeliveryActionsKey === itemKey ? (
                             <div className="delivery-mobile-menu-panel">
-                              <button type="button" onClick={() => { setOpenDeliveryActionsKey(""); setEvidenceModalItem(item); }}>
+                              <button type="button" onClick={() => { setOpenDeliveryActionsKey(""); openEvidenceModal(item); }}>
                                 <Eye size={15} /> Evidencias
                               </button>
                               <button type="button" onClick={() => { setOpenDeliveryActionsKey(""); setNoveltiesModalItem(item); }}>
@@ -3991,7 +4080,7 @@ export function DeliveryPage({
             <div className="orders-page-title-row">
               <h1>Domicilios</h1>
             </div>
-            <p className="orders-admin-subtitle orders-page-description">Pedidos listos para entrega, toma segura y cierre con evidencia reutilizando el flujo actual.</p>
+            <p className="orders-admin-subtitle orders-page-description">Organiza, asigna y supervisa las entregas.</p>
             <span className="orders-user-pill">
               <span aria-hidden="true" />
               Sesion activa: {displayUserName}
@@ -4036,11 +4125,11 @@ export function DeliveryPage({
             {error ? <p className="orders-message delivery-error">{error}</p> : null}
             {loading ? <p className="orders-message">Cargando domicilios...</p> : null}
 
-            <section className="delivery-current-panel-title" aria-label="Panel actual">
-              <h2>Pedidos</h2>
-            </section>
+            <nav className="dispatch-view-tabs" aria-label="Vista operativa">
+              {DISPATCH_VIEWS.map(view => <button key={view.key} type="button" aria-pressed={dispatchView === view.key} disabled={Boolean(actionKey)} onClick={() => { setDispatchView(view.key); setStatusFilter("todos"); }}>{view.label}</button>)}
+            </nav>
 
-            <section className="delivery-dispatch-controls">
+            <section className={`delivery-dispatch-controls dispatch-compact-filters ${dispatchFiltersOpen ? "is-expanded" : ""}`}>
               <label className="filter-field delivery-dispatch-search">
                 <span>Buscar</span>
                 <div className="delivery-dispatch-search-control">
@@ -4055,44 +4144,47 @@ export function DeliveryPage({
                   />
                 </div>
               </label>
+              <button className="dispatch-filters-toggle" type="button" aria-expanded={dispatchFiltersOpen} onClick={() => setDispatchFiltersOpen(value => !value)}>Filtros</button>
+              <label className="filter-field">
+                <span>Zona de entrega</span>
+                <select aria-label="Filtrar domicilios por barrio" value={dispatchBarrio} onChange={event => setDispatchBarrio(event.target.value)} disabled={Boolean(actionKey)}>
+                  <option value="">Todas las zonas</option>
+                  {[...new Set(dispatchItems.map(item => String(item.barrio || item.barrionombre || item.barrioNombre || "").trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b, "es")).map(barrio => <option key={barrio} value={barrio}>{barrio}</option>)}
+                </select>
+              </label>
               <div className="filter-field">
-                <span>Operacion</span>
-                <strong>{activeModeLabel}</strong>
-              </div>
-              <div className="filter-field">
-                <span>Filtro</span>
+                <span>Período</span>
                 <select
-                  value={filtro}
+                  aria-label="Período de entrega"
+                  value={filtro === "todos" ? "custom" : fechaFiltro === todayIso() ? "hoy" : filtro === "manana" ? "manana" : "custom"}
                   onChange={event => {
-                    setFiltro(event.target.value);
-                    setStatusFilter("todos");
+                    const value = event.target.value;
+                    if (value === "hoy") { setFiltro("hoy"); setFechaFiltro(todayIso()); }
+                    else if (value === "manana") {
+                      const tomorrow = new Date(`${todayIso()}T12:00:00Z`);
+                      tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
+                      setFiltro("manana"); setFechaFiltro(tomorrow.toISOString().slice(0, 10));
+                    } else { setFiltro("todos"); }
                   }}
                 >
-                  {FILTROS.map(item => <option key={item.value} value={item.value}>{item.label}</option>)}
+                  <option value="hoy">Hoy</option><option value="manana">Mañana</option><option value="custom">Fecha personalizada</option>
                 </select>
               </div>
               <div className="filter-field">
                 <span>Fecha</span>
                 <input
                   type="date"
+                  aria-label="Fecha de entrega"
                   value={fechaFiltro}
-                  onChange={event => setFechaFiltro(event.target.value)}
+                  onChange={event => { if (event.target.value) { setFechaFiltro(event.target.value); setFiltro("todos"); } }}
                 />
               </div>
-              {modo === "admin" && currentDomiciliarioId != null ? (
-                <label className="delivery-dispatch-toggle">
-                  <input
-                    type="checkbox"
-                    checked={soloMisAsignados}
-                    onChange={event => onChangeSoloMisAsignados(event.target.checked)}
-                  />
-                  <span>Solo mis asignados</span>
-                </label>
-              ) : null}
+              <button type="button" className="dispatch-reset" disabled={Boolean(actionKey)} onClick={() => { setDeliverySearch(""); setDispatchBarrio(""); setFiltro("hoy"); setFechaFiltro(todayIso()); setStatusFilter("todos"); setDispatchView("operativos"); }}>Restablecer</button>
               <div className={`delivery-signal ${isOffline ? "is-offline" : "is-online"}`}>
                 {isOffline ? "Sin internet" : availableCoords ? "GPS activo" : "Operacion en linea"}
               </div>
             </section>
+            <p className="dispatch-filter-summary" role="status">{adminOrderSearchActive ? "Búsqueda por número: se ignoran la fecha, la vista operativa y el estado. La zona sigue activa." : `${DISPATCH_VIEWS.find(view => view.key === dispatchView)?.label} · ${fechaFiltro} · ${statusFilter === "todos" ? "Todos los estados" : DELIVERY_STATUS_FILTERS.find(item => item.key === statusFilter)?.label}`} · {dispatchBarrio || "Todas las zonas"}</p>
 
             <div className="orders-header-metrics delivery-header-metrics delivery-status-filters" aria-label="Filtros por estado de domicilios">
               {DELIVERY_STATUS_FILTERS.map(item => {
@@ -4113,145 +4205,37 @@ export function DeliveryPage({
               })}
             </div>
 
-            <section className="delivery-dispatch-board">
-              <aside className="delivery-dispatch-list-panel">
-                <div className="delivery-active-summary">
-                  <strong>{filteredDispatchItems.length} pedidos activos</strong>
-                  <span>{DELIVERY_STATUS_FILTERS.find(item => item.key === statusFilter)?.label || availableSummary}</span>
-                </div>
-
-                <div className="delivery-dispatch-list">
-                  {filteredDispatchItems.length === 0 ? (
-                    <p className="orders-message">No hay domicilios para los filtros seleccionados.</p>
-                  ) : filteredDispatchItems.map(item => {
-                    const meta = deliveryStatusMeta(item);
-                    const timeLate = isDeliveryTimeLate(item);
-                    const selected = selectedDispatchItem?.idEntrega === item.idEntrega;
-                    const address = deliveryAddressParts(item);
-                    const payment = deliveryPaymentMeta(item);
-                    const itemKey = deliveryItemKey(item);
-                    const imageUrl = resolveDeliveryImageUrl(item, catalogProductIndex) || deliveryProductImages[itemKey] || "";
-                    const arrangementName = deliveryArrangementName(item) || deliveryProductNames[itemKey] || "";
-                    return (
-                      <article
-                        key={item.idEntrega || item.numeroPedido}
-                        className={`delivery-dispatch-card is-${meta.tone}${timeLate ? " is-late" : ""}${selected ? " is-selected" : ""}`}
-                        onClick={() => openDeliveryDetail(item)}
-                      >
-                        <div className="delivery-card-order">
-                          <div className="delivery-card-topline">
-                            <strong>#{deliveryOrderCodeLabel(item)}</strong>
-                            {isSurpriseDelivery(item) ? <span className="delivery-urgent-pill">Es sorpresa</span> : null}
-                          </div>
-                          <strong className="delivery-card-product-name">{arrangementName || "Producto sin nombre"}</strong>
-                          <span className="delivery-card-time"><Clock3 size={14} /> {deliveryDateTimeLabel(item)}</span>
-                          <div className="delivery-product-thumb" aria-hidden="true">
-                            {imageUrl ? <img src={imageUrl} alt="" loading="lazy" /> : <span />}
-                          </div>
-                        </div>
-
-                        <div className="delivery-card-section delivery-card-client">
-                          <span>Cliente</span>
-                          <strong>{item.cliente || item.destinatario || "Cliente sin nombre"}</strong>
-                          <p><Phone size={14} /> {deliveryPhone(item) || "Sin telefono"}</p>
-                          {isSurpriseDelivery(item) ? <button type="button" className="delivery-soft-chip" onClick={event => event.stopPropagation()}>Es sorpresa</button> : null}
-                        </div>
-
-                        <div className="delivery-card-section delivery-card-recipient">
-                          <span>Destinatario</span>
-                          <strong>{item.destinatario || item.nombreDestinatario || item.recibe || "Sin destinatario"}</strong>
-                          <p><Phone size={14} /> {item.telefonoDestino || item.telefonoDestinatario || item.telefonoRecibe || "Sin telefono"}</p>
-                        </div>
-
-                        <div className="delivery-card-section delivery-card-address-block">
-                          <span>Direccion</span>
-                          <strong>{address.primary}</strong>
-                          <p>{address.secondary}</p>
-                          <button type="button" className="delivery-soft-chip" onClick={event => { event.stopPropagation(); openMaps(item); }}>
-                            <MapPin size={14} /> Mapa
-                          </button>
-                        </div>
-
-                        <div className="delivery-card-section delivery-card-courier">
-                          <span>Domiciliario</span>
-                          <strong>{courierName(item)}</strong>
-                          <span className={`delivery-payment-pill is-${payment.tone}`}>{payment.label}</span>
-                        </div>
-
-                        <div className="delivery-card-section delivery-card-state">
-                          <span>Estado</span>
-                          <span className={`delivery-status-pill is-${meta.tone}`}>{meta.label}</span>
-                          {timeLate ? (
-                            <>
-                              <p>Retraso</p>
-                              <strong className="delivery-time-left is-late">{deliveryRemainingLabel(item)}</strong>
-                            </>
-                          ) : null}
-                        </div>
-
-                        <div className="delivery-card-actions" onClick={event => event.stopPropagation()}>
-                          <select
-                            className="delivery-assign-select"
-                            value=""
-                            onChange={event => {
-                              const nextDomiciliarioId = event.target.value;
-                              if (!nextDomiciliarioId) return;
-                              onAsignar(item, nextDomiciliarioId);
-                            }}
-                            disabled={actionKey === `asignar-${item.idEntrega}` || domiciliarios.length === 0}
-                            aria-label={deliveryCourierIdValue(item) ? "Reasignar domiciliario" : "Asignar domiciliario"}
-                          >
-                            <option value="">
-                              {actionKey === `asignar-${item.idEntrega}`
-                                ? "Guardando..."
-                                : deliveryCourierIdValue(item)
-                                  ? "Reasignar"
-                                  : "Asignar"}
-                            </option>
-                            {domiciliarios.map(dom => {
-                              const domId = courierIdValue(dom);
-                              if (domId == null) return null;
-                              const activeCount = courierActiveOrders(dom, adminItems);
-                              return (
-                                <option key={domId} value={domId}>
-                                  {dom.nombre || dom.nombreDomiciliario || "Domiciliario"} ({activeCount} activos)
-                                </option>
-                              );
-                            })}
-                          </select>
-                          <div className="delivery-actions-menu">
-                            <button
-                              type="button"
-                              className="delivery-actions-menu-trigger"
-                              title="Mas opciones"
-                              aria-label="Mas opciones"
-                              aria-expanded={openDeliveryActionsKey === itemKey}
-                              onClick={() => setOpenDeliveryActionsKey(current => current === itemKey ? "" : itemKey)}
-                            >
-                              <MoreVertical size={17} />
-                            </button>
-                            {openDeliveryActionsKey === itemKey ? (
-                              <div className="orders-row-menu-panel delivery-actions-menu-panel">
-                                <button type="button" className="orders-row-menu-item" onClick={() => { setOpenDeliveryActionsKey(""); setEvidenceModalItem(item); }}>
-                                  <Eye size={15} /> Evidencias
-                                </button>
-                                <button type="button" className="orders-row-menu-item" onClick={() => { setOpenDeliveryActionsKey(""); setNoveltiesModalItem(item); }}>
-                                  <MessageCircle size={15} /> Novedades
-                                </button>
-                                <button type="button" className="orders-row-menu-item" onClick={() => { setOpenDeliveryActionsKey(""); openStatusModal(item); }}>
-                                  <Pencil size={15} /> Estados
-                                </button>
-                              </div>
-                            ) : null}
-                          </div>
-                        </div>
-                      </article>
-                    );
-                  })}
-                </div>
-              </aside>
-
-            </section>
+            <DeliveryDispatchBoard
+              rows={filteredDispatchItems.map(item => {
+                const meta = deliveryStatusMeta(item);
+                const address = deliveryAddressParts(item);
+                const delivery = { ...item, idEntrega: item.idEntrega || item.id_entrega, numeroPedido: item.numeroPedido || item.numero_pedido };
+                return {
+                  id: delivery.idEntrega || deliveryItemKey(item), item: delivery,
+                  code: deliveryOrderCodeLabel(item),
+                  time: deliveryTimeLabel(item), date: deliveryDateTimeLabel(item),
+                  recipient: item.destinatario || item.nombreDestinatario || item.cliente || "Sin destinatario",
+                  address: address.primary,
+                  neighborhood: item.barrio || item.barrionombre || item.barrioNombre || address.secondary || "Sin barrio",
+                  courier: deliveryCourierIdValue(item) ? courierName(item) : "Sin asignar",
+                  status: meta.label, tone: meta.tone,
+                  late: !["entregado", "no-entregado"].includes(meta.key) && isDeliveryTimeLate(item),
+                  surprise: isSurpriseDelivery(item),
+                  eligible: isBatchEligible(item),
+                };
+              })}
+              couriers={domiciliarios.filter(item => courierIdValue(item) != null).map(item => ({
+                id: courierIdValue(item), name: item.nombre || item.nombreDomiciliario || "Domiciliario",
+                available: item.activo !== false && normalizeStatus(courierBackendStatus(item)) === "ACTIVO",
+                visibleLoad: dispatchFilteredBaseItems.filter(order => deliveryCourierIdValue(order) === courierIdValue(item)
+                  && ["asignado", "en-camino"].includes(deliveryStatusMeta(order).key)).length,
+              }))}
+              contextKey={`${empresaId}:${sucursalId}:${modo}:${filtro}:${fechaFiltro}:${normalizeSearchText(effectiveDeliverySearch)}:${statusFilter}:${dispatchBarrio}:${dispatchView}`}
+              canAssign={adminRole} busy={Boolean(actionKey)} loading={loading} offline={isOffline}
+              onOpen={openDeliveryDetail} onMap={openMaps}
+              onEvidence={openEvidenceModal} onNovelty={setNoveltiesModalItem}
+              onStatus={openStatusModal} onAssign={onAssignBatch} onRefresh={refreshAll}
+            />
           </div>
         ) : null}
 
@@ -4278,19 +4262,6 @@ export function DeliveryPage({
                 })}
               </select>
             </div>
-            {modo === "admin" && currentDomiciliarioId != null ? (
-              <div className="filter-field">
-                <span>Asignación propia</span>
-                <div className="filter-checkbox">
-                  <input
-                    type="checkbox"
-                    checked={soloMisAsignados}
-                    onChange={event => onChangeSoloMisAsignados(event.target.checked)}
-                  />
-                  <span>Solo mis pedidos asignados</span>
-                </div>
-              </div>
-            ) : null}
             <div className="delivery-filter-hint">
               {isOffline ? "Sin internet" : modo === "admin" ? "Vista administrativa" : "Vista domiciliario"}
             </div>
@@ -5510,27 +5481,39 @@ export function DeliveryPage({
                 <p><span>Cliente</span><strong>{evidenceModalSummary.client}</strong></p>
                 <p><span>Domiciliario</span><strong>{evidenceModalSummary.courier}</strong></p>
                 <p><span>Estado</span><strong>{evidenceModalSummary.status}</strong></p>
-                <p><span>Recibe</span><strong>{evidenceModalSummary.receivedBy || "-"}</strong></p>
-                <p><span>Documento</span><strong>{evidenceModalSummary.receivedDocument || "-"}</strong></p>
-                <p><span>Observaciones</span><strong>{evidenceModalSummary.observations || "-"}</strong></p>
+                {evidenceModalSummary.receivedBy ? <p><span>Recibe</span><strong>{evidenceModalSummary.receivedBy}</strong></p> : null}
+                {evidenceModalSummary.receivedDocument ? <p><span>Documento</span><strong>{evidenceModalSummary.receivedDocument}</strong></p> : null}
+                {evidenceModalSummary.observations ? <p><span>Observaciones</span><strong>{evidenceModalSummary.observations}</strong></p> : null}
               </div>
 
               <section className="delivery-evidence-section">
                 <div className="delivery-evidence-section-title">
                   <h5>Evidencias</h5>
-                  <span>{evidenceModalSummary.evidences.length}</span>
+                  <span>{evidenceData ? evidenceModalSummary.evidences.length : "—"}</span>
                 </div>
-                {evidenceModalSummary.evidences.length === 0 ? (
-                  <p className="delivery-evidence-empty">No hay evidencias registradas para este pedido.</p>
+                {evidenceLoading ? (
+                  <p role="status">Cargando evidencias y datos del receptor…</p>
+                ) : evidenceError ? (
+                  <div role="alert">
+                    <p>{evidenceError}</p>
+                    <button type="button" onClick={() => { setEvidenceQuery({ item: evidenceModalItem, data: null, error: "" }); setEvidenceRetry(value => value + 1); }}>Reintentar</button>
+                  </div>
+                ) : evidenceModalSummary.evidences.length === 0 ? (
+                  <p className="delivery-evidence-empty">Este pedido no tiene evidencias registradas</p>
                 ) : (
                   <div className="delivery-evidence-list">
                     {evidenceModalSummary.evidences.map(record => (
                       <a key={record.key} className="delivery-evidence-item" href={record.url} target="_blank" rel="noreferrer">
                         <span className="delivery-evidence-thumb">
-                          <img src={record.url} alt="" loading="lazy" />
+                          {evidenceImageErrors[record.key] ? (
+                            <AlertTriangle size={24} aria-hidden="true" />
+                          ) : (
+                            <img src={record.url} alt={record.label} loading="lazy" onError={() => setEvidenceImageErrors(current => ({ ...current, [record.key]: true }))} />
+                          )}
                         </span>
                         <span>
                           <strong>{record.label}</strong>
+                          {evidenceImageErrors[record.key] ? <span role="alert">No se pudo cargar la imagen. Abre el enlace para reintentar.</span> : null}
                           <small>{record.date || "Sin fecha"}</small>
                           {record.note ? <em>{record.note}</em> : null}
                         </span>

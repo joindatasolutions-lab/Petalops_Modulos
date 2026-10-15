@@ -871,6 +871,18 @@ export function createApiClient(config) {
       });
     },
 
+    async obtenerEvidenciasDomicilio({ empresaId, sucursalId, numeroPedido }) {
+      const params = new URLSearchParams({ empresaID: String(empresaId) });
+      if (sucursalId != null) params.set("sucursalID", String(sucursalId));
+      try {
+        return await requestJson(`/domicilios/pedidos/${encodeURIComponent(numeroPedido)}/evidencias?${params.toString()}`, { cache: "no-store" });
+      } catch (error) {
+        // A 401 must request a new session even when the backend does not mention a token.
+        if (error?.status === 401 && !isAuthExpiredError(error)) notifyAuthExpired(error);
+        throw error;
+      }
+    },
+
     async listarPedidos({ empresaId, sucursalId, q, estado, fechaDesde, fechaHasta, filtrarPorEntrega, sinImprimir, soloTienda, soloEntregasHoy, page, pageSize }) {
       const params = new URLSearchParams();
       params.set("empresaID", String(empresaId));
@@ -1659,14 +1671,14 @@ export function createApiClient(config) {
       });
     },
 
-    async asignarDomiciliarioEntrega({ entregaId, domiciliarioID, usuarioCambio, limiteEntregasActivas = 15 }) {
+    async asignarDomiciliarioEntrega({ entregaId, domiciliarioID, usuarioCambio, limiteEntregasActivas = 15, permitirSobrecupo = true }) {
       const params = new URLSearchParams();
       params.set("limiteEntregasActivas", String(limiteEntregasActivas));
       params.set("maxEntregasActivas", String(limiteEntregasActivas));
       params.set("limite_activas", String(limiteEntregasActivas));
       params.set("limite", String(limiteEntregasActivas));
       params.set("permitirMultiplesAsignaciones", "true");
-      params.set("permitirSobrecupo", "true");
+      params.set("permitirSobrecupo", String(permitirSobrecupo));
 
       return requestJson(`/domicilios/${entregaId}/asignar?${params.toString()}`, {
         method: "PUT",
@@ -1683,8 +1695,8 @@ export function createApiClient(config) {
           max_activos: limiteEntregasActivas,
           capacidadMaxima: limiteEntregasActivas,
           permitirMultiplesAsignaciones: true,
-          permitirSobrecupo: true,
-          forzarSobrecupo: true
+          permitirSobrecupo,
+          forzarSobrecupo: permitirSobrecupo
         })
       });
     },
