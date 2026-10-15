@@ -593,6 +593,7 @@ describe("apiClient.listarPedidos", () => {
     const api = createApiClient({ apiBaseUrl: "https://api.test" });
     await api.actualizarDetallePedidoPipeline({
       pedidoId: 77,
+      version: 7,
       barrioNombre: "El Prado",
       direccion: "Calle 1 #2-3",
       domicilio: 0,
@@ -632,6 +633,7 @@ describe("apiClient.listarPedidos", () => {
     const api = createApiClient({ apiBaseUrl: "https://api.test" });
     await api.actualizarDetallePedidoPipeline({
       pedidoId: 77,
+      version: 7,
       detalleID: 10,
       productoID: 20,
       precioUnitario: 85000,
@@ -678,6 +680,7 @@ describe("apiClient.listarPedidos", () => {
     const api = createApiClient({ apiBaseUrl: "https://api.test" });
     await api.actualizarFinanzasPedidoPipeline({
       pedidoId: 77,
+      version: 7,
       subtotal: 350000,
       iva: 0,
       domicilio: 8000,

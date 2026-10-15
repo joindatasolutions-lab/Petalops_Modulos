@@ -1370,6 +1370,7 @@ const messageCard = useMessageCardController({
         await api.actualizarFinanzasPedidoPipeline({
           pedidoId,
           ...financialOverride,
+          version: (await api.obtenerDetallePedido(pedidoId)).version,
           costoDomicilio: financialOverride.domicilio,
         });
       }
@@ -1899,7 +1900,7 @@ const openNewOrderModal = () => {
         const created = await api.crearPedidoCheckout(buildDuplicateCheckoutPayload());
         await api.actualizarDetallePedidoPipeline(buildDetailUpdatePayload({
           pedidoId: created.pedidoID,
-          detalle,
+          detalle: { ...detalle, version: (await api.obtenerDetallePedido(created.pedidoID)).version },
           edit: {
             ...getDetailEditPayloadState(),
             detalleID: null,
@@ -1953,6 +1954,7 @@ const openNewOrderModal = () => {
     try {
       const response = await api.agregarDetallePedidoPipeline(buildAddDetailProductPayload({
         pedidoId: selectedPedidoId,
+        version: detalle?.version,
         productoID: detailAddProductoID,
         cantidad: detailAddCantidad,
         isCustomArrangement: detailAddIsCustomArrangement,
@@ -2011,9 +2013,9 @@ const openNewOrderModal = () => {
       await api.eliminarDetallePedidoPipeline({
         pedidoId: selectedPedidoId,
         detalleID: Number(detalleId),
+        version: detalle?.version,
       });
-      await loadOrders(true);
-      await loadTodaySalesSummary();
+      await reloadDrawer();
     } catch (nextError) {
       if (previousDetalle) {
         setDetalle(previousDetalle);

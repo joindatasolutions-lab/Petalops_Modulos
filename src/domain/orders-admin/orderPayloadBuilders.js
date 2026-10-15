@@ -297,6 +297,7 @@ export function buildDetailUpdatePayload({
 
   return {
     pedidoId,
+    version: detalle?.version,
     detalleID: edit.detalleID ? Number(edit.detalleID) : null,
     productoID: edit.productoID ? Number(edit.productoID) : null,
     cantidad: Number(edit.cantidad || 1),
@@ -346,6 +347,7 @@ export function buildDetailUpdatePayload({
 
 export function buildAddDetailProductPayload({
   pedidoId,
+  version,
   productoID,
   cantidad,
   isCustomArrangement,
@@ -354,6 +356,7 @@ export function buildAddDetailProductPayload({
   const precioUnitario = isCustomArrangement ? normalizeWholePeso(precio) : null;
   return {
     pedidoId,
+    version,
     productoID: Number(productoID),
     cantidad: Number(cantidad || 1),
     precioUnitario,

@@ -35,7 +35,9 @@ export function useMessageCardController({
 
     setOrder(item || null);
     try {
+      const detail = await api.obtenerDetallePedido(pedidoId);
       const payload = await api.obtenerMensajeTarjeta(pedidoId);
+      setOrder({ ...item, version: detail.version });
       setData(payload);
       setDraft(String(payload?.mensaje || ""));
       setError("");
@@ -62,20 +64,17 @@ export function useMessageCardController({
     try {
       await api.actualizarDetallePedidoPipeline({
         pedidoId,
+        version: order?.version,
         mensajeTarjeta: draft,
       });
+      const updatedDetail = await api.obtenerDetallePedido(pedidoId);
+      setOrder(current => ({ ...current, version: updatedDetail.version }));
       setData(current => ({
         ...(current || {}),
         mensaje: draft,
       }));
       if (Number(selectedPedidoId) === pedidoId) {
-        setDetalle(current => current ? ({
-          ...current,
-          destinatario: {
-            ...(current.destinatario || {}),
-            mensajeTarjeta: draft,
-          },
-        }) : current);
+        setDetalle(updatedDetail);
       }
       await loadOrders(true);
     } catch (nextError) {

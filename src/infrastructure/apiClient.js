@@ -1,3 +1,10 @@
+function requirePedidoVersion(version) {
+  if (!Number.isInteger(version) || version < 1) {
+    throw new Error("Falta la versión del pedido. Cierra y vuelve a abrir el pedido antes de guardar.");
+  }
+  return version;
+}
+
 const PEDIDOS_MAX_PAGE_SIZE = 300;
 const LOGIN_TIMEOUT_MS = 30000;
 export const AUTH_EXPIRED_EVENT = "petalops:auth-expired";
@@ -1058,6 +1065,7 @@ export function createApiClient(config) {
 
     async actualizarDetallePedidoPipeline({
       pedidoId,
+      version,
       detalleID,
       productoID,
       cantidad,
@@ -1105,6 +1113,7 @@ export function createApiClient(config) {
           "Content-Type": "application/json"
         },
         body: JSON.stringify({
+          version: requirePedidoVersion(version),
           pedidoID: pedidoId != null ? Number(pedidoId) : null,
           detalleID: detalleID != null ? Number(detalleID) : null,
           productoID: productoID != null ? Number(productoID) : null,
@@ -1159,6 +1168,7 @@ export function createApiClient(config) {
 
     async actualizarFinanzasPedidoPipeline({
       pedidoId,
+      version,
       subtotal,
       iva,
       domicilio,
@@ -1182,6 +1192,7 @@ export function createApiClient(config) {
           "Content-Type": "application/json"
         },
         body: JSON.stringify({
+          version: requirePedidoVersion(version),
           subtotal: subtotal != null ? Number(subtotal) : null,
           iva: iva != null ? Number(iva) : null,
           domicilio: domicilioValue,
@@ -1206,6 +1217,7 @@ export function createApiClient(config) {
 
     async agregarDetallePedidoPipeline({
       pedidoId,
+      version,
       productoID,
       cantidad,
       productoObservaciones,
@@ -1219,6 +1231,7 @@ export function createApiClient(config) {
           "Content-Type": "application/json"
         },
         body: JSON.stringify({
+          version: requirePedidoVersion(version),
           productoID: productoID != null ? Number(productoID) : null,
           cantidad: cantidad != null ? Number(cantidad) : 1,
           productoObservaciones: productoObservaciones ?? null,
@@ -1228,8 +1241,8 @@ export function createApiClient(config) {
       });
     },
 
-    async eliminarDetallePedidoPipeline({ pedidoId, detalleID }) {
-      return requestJson(`/pedido/${pedidoId}/detalle/${detalleID}`, {
+    async eliminarDetallePedidoPipeline({ pedidoId, detalleID, version }) {
+      return requestJson(`/pedido/${pedidoId}/detalle/${detalleID}?version=${requirePedidoVersion(version)}`, {
         method: "DELETE",
       });
     },
