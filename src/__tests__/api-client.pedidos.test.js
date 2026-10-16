@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { AUTH_EXPIRED_EVENT, createApiClient } from "../infrastructure/apiClient.js";
+import { AUTH_EXPIRED_EVENT, createApiClient, createIdempotencyKey } from "../infrastructure/apiClient.js";
 
 describe("apiClient.listarPedidos", () => {
   afterEach(() => {
@@ -725,7 +725,7 @@ describe("apiClient.listarPedidos", () => {
       domicilio: 0,
       domicilioOriginal: 15000,
       descuentoDomicilio: 15000,
-    });
+    }, { idempotencyKey: "pedido-manual-prueba-123" });
 
     const [url, options] = fetchMock.mock.calls[0];
     const parsed = new URL(url);
@@ -733,10 +733,37 @@ describe("apiClient.listarPedidos", () => {
 
     expect(parsed.pathname).toBe("/pedido/manual");
     expect(options.method).toBe("POST");
+    expect(options.headers["Idempotency-Key"]).toBe("pedido-manual-prueba-123");
     expect(body.domicilio).toBe(0);
     expect(body.domicilioOriginal).toBe(15000);
     expect(body.descuentoDomicilio).toBe(15000);
     expect(body.domicilioObsequiado).toBe(true);
     expect(body.omitirCostoDomicilio).toBe(true);
+  });
+
+  it("genera Idempotency-Key para todas las rutas de creacion de pedidos", async () => {
+    const fetchMock = vi.fn(async () => ({
+      ok: true,
+      json: async () => ({ pedidoID: 123 }),
+    }));
+    vi.stubGlobal("fetch", fetchMock);
+    vi.stubGlobal("localStorage", { getItem: () => "token-test" });
+
+    const api = createApiClient({ apiBaseUrl: "https://api.test" });
+    await api.crearPedidoCheckout({ empresaId: 3 });
+    await api.crearPedidoManual({ empresaID: 3 });
+    await api.crearPedidoVentaRapida({ empresaID: 3 });
+
+    const keys = fetchMock.mock.calls.map(([, options]) => options.headers["Idempotency-Key"]);
+    expect(keys).toHaveLength(3);
+    expect(keys.every(key => typeof key === "string" && key.length >= 1 && key.length <= 128)).toBe(true);
+    expect(new Set(keys).size).toBe(3);
+  });
+
+  it("crea claves de idempotencia validas aun sin UUID nativo", () => {
+    const key = createIdempotencyKey("pedido-manual");
+
+    expect(key).toMatch(/^pedido-manual-/);
+    expect(key.length).toBeLessThanOrEqual(128);
   });
 });

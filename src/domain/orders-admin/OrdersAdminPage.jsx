@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { tenantConfig } from "../../config/tenantConfig.js";
 import { useRef } from "react";
-import { createApiClient } from "../../infrastructure/apiClient.js";
+import { createApiClient, createIdempotencyKey } from "../../infrastructure/apiClient.js";
 import { AppSidebar } from "../../shared/AppSidebar.jsx";
 import { useSidebarState } from "../../shared/useSidebarState.js";
 import { formatearCOP, shiftIsoDate } from "../../shared/utils.js";
@@ -170,6 +170,17 @@ function normalizeIdentificationTypeOptions(payload) {
   return options;
 }
 
+function stableCreationIdentity(ref, payload, prefix) {
+  const signature = JSON.stringify(payload);
+  if (!ref.current || ref.current.signature !== signature) {
+    ref.current = {
+      signature,
+      key: createIdempotencyKey(prefix),
+    };
+  }
+  return ref.current.key;
+}
+
 const SPANISH_FEMALE_VOICE_HINTS = [
   "sabina",
   "helena",
@@ -302,6 +313,8 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
   const loadOrdersRef = useRef(null);
   const loadTodaySalesSummaryRef = useRef(null);
   const newOrderLookupPhoneRef = useRef("");
+  const newOrderCreationRef = useRef(null);
+  const duplicateOrderCreationRef = useRef(null);
   const detailRequestSeqRef = useRef(0);
   const voiceAlertsPrimedRef = useRef(false);
   const voiceAlertsPollingRef = useRef(false);
@@ -1480,6 +1493,7 @@ const openNewOrderModal = () => {
       fechaEntrega: todayIsoDate(),
     });
     newOrderLookupPhoneRef.current = "";
+    newOrderCreationRef.current = null;
     setNewOrderError("");
     setNewOrderProductQuery("");
     setNewOrderBarrioQuery("");
@@ -1519,6 +1533,7 @@ const openNewOrderModal = () => {
 
   const closeNewOrderModal = () => {
     if (newOrderSaving) return;
+    newOrderCreationRef.current = null;
     setNewOrderOpen(false);
     setNewOrderError("");
   };
@@ -1684,7 +1699,8 @@ const openNewOrderModal = () => {
           empresaId,
           sucursalId,
         });
-        const created = await api.crearPedidoVentaRapida(quickSalePayload);
+        const idempotencyKey = stableCreationIdentity(newOrderCreationRef, quickSalePayload, "pedido-venta-rapida");
+        const created = await api.crearPedidoVentaRapida(quickSalePayload, { idempotencyKey });
         const createdPedidoId = created?.pedidoID || created?.pedidoId || created?.pedido_id || created?.idPedido || created?.id_pedido || created?.id;
         setNewOrderOpen(false);
         setOrderNotification({
@@ -1695,12 +1711,14 @@ const openNewOrderModal = () => {
         await loadQuickSaleInventoryItems();
         await loadOrders(false);
         if (createdPedidoId) await openDetail(createdPedidoId);
+        newOrderCreationRef.current = null;
         return;
       }
 
       const hydratedForm = await hydrateNewOrderClientByPhone(newOrderForm.clienteTelefono);
       const manualPayload = buildNewOrderManualPayload(hydratedForm || newOrderForm);
-      const created = await api.crearPedidoManual(manualPayload);
+      const idempotencyKey = stableCreationIdentity(newOrderCreationRef, manualPayload, "pedido-manual");
+      const created = await api.crearPedidoManual(manualPayload, { idempotencyKey });
       const createdPedidoId = created?.pedidoID || created?.pedidoId || created?.pedido_id || created?.idPedido || created?.id_pedido || created?.id;
       setNewOrderOpen(false);
       setOrderNotification({
@@ -1710,6 +1728,7 @@ const openNewOrderModal = () => {
       });
       await loadOrders(false);
       if (createdPedidoId) await openDetail(createdPedidoId);
+      newOrderCreationRef.current = null;
     } catch (nextError) {
       setNewOrderError(nextError?.detail || nextError?.message || "No fue posible crear el pedido.");
     } finally {
@@ -1733,6 +1752,7 @@ const openNewOrderModal = () => {
 
   const onStartDuplicateDetail = () => {
     if (!detalle || detalle.error || detailEditSaving) return;
+    duplicateOrderCreationRef.current = null;
     setDetailEditError("");
     setIsDuplicatingDetail(true);
     setIsEditingDetail(true);
@@ -1896,7 +1916,9 @@ const openNewOrderModal = () => {
       const paymentValidation = validatePaymentMethods();
       const validatedCanalFlora = validateSalesChannel();
       if (isDuplicatingDetail) {
-        const created = await api.crearPedidoCheckout(buildDuplicateCheckoutPayload());
+        const duplicatePayload = buildDuplicateCheckoutPayload();
+        const idempotencyKey = stableCreationIdentity(duplicateOrderCreationRef, duplicatePayload, "pedido-duplicado");
+        const created = await api.crearPedidoCheckout(duplicatePayload, { idempotencyKey });
         await api.actualizarDetallePedidoPipeline(buildDetailUpdatePayload({
           pedidoId: created.pedidoID,
           detalle,
@@ -1912,6 +1934,7 @@ const openNewOrderModal = () => {
         await loadTodaySalesSummary();
         await openDetail(created.pedidoID);
         setIsDuplicatingDetail(false);
+        duplicateOrderCreationRef.current = null;
       } else {
         await api.actualizarDetallePedidoPipeline(buildDetailEditApiPayload(selectedPedidoId));
         forgetDeliveryGiftOverride(selectedPedidoId);

@@ -6,6 +6,23 @@ const NETWORK_RETRY_DELAYS_MS = [500, 1200];
 const SEARCH_PARAM_MAX_LENGTH = 64;
 const ORDER_PARAM_MAX_LENGTH = 16;
 
+export function createIdempotencyKey(prefix = "pedido") {
+  const safePrefix = String(prefix || "pedido").replace(/[^a-z0-9_-]/gi, "-").slice(0, 24) || "pedido";
+  if (typeof globalThis.crypto?.randomUUID === "function") {
+    return `${safePrefix}-${globalThis.crypto.randomUUID()}`;
+  }
+
+  const randomPart = typeof globalThis.crypto?.getRandomValues === "function"
+    ? Array.from(globalThis.crypto.getRandomValues(new Uint32Array(4)), value => value.toString(16).padStart(8, "0")).join("")
+    : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+  return `${safePrefix}-${randomPart}`.slice(0, 128);
+}
+
+function idempotencyHeaders(idempotencyKey, prefix) {
+  const key = String(idempotencyKey || "").trim() || createIdempotencyKey(prefix);
+  return { "Idempotency-Key": key.slice(0, 128) };
+}
+
 function isNetworkError(error) {
   return error instanceof TypeError;
 }
@@ -1026,31 +1043,34 @@ export function createApiClient(config) {
       });
     },
 
-    async crearPedidoCheckout(payload) {
+    async crearPedidoCheckout(payload, { idempotencyKey } = {}) {
       return requestJson("/pedido/checkout", {
         method: "POST",
         headers: {
-          "Content-Type": "application/json"
+          "Content-Type": "application/json",
+          ...idempotencyHeaders(idempotencyKey, "pedido-checkout"),
         },
         body: JSON.stringify(payload)
       });
     },
 
-    async crearPedidoManual(payload) {
+    async crearPedidoManual(payload, { idempotencyKey } = {}) {
       return requestJson("/pedido/manual", {
         method: "POST",
         headers: {
-          "Content-Type": "application/json"
+          "Content-Type": "application/json",
+          ...idempotencyHeaders(idempotencyKey, "pedido-manual"),
         },
         body: JSON.stringify(payload)
       });
     },
 
-    async crearPedidoVentaRapida(payload) {
+    async crearPedidoVentaRapida(payload, { idempotencyKey } = {}) {
       return requestJson("/pedido/venta-rapida", {
         method: "POST",
         headers: {
-          "Content-Type": "application/json"
+          "Content-Type": "application/json",
+          ...idempotencyHeaders(idempotencyKey, "pedido-venta-rapida"),
         },
         body: JSON.stringify(payload)
       });
