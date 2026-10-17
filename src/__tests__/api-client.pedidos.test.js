@@ -770,3 +770,20 @@ describe("apiClient.listarPedidos", () => {
     expect(key.length).toBeLessThanOrEqual(128);
   });
 });
+
+
+describe("Eliminar arreglo: errores del backend", () => {
+  afterEach(() => vi.unstubAllGlobals());
+  it("conserva el mensaje y codigo del rechazo sin convertirlo en object Object", async () => {
+    vi.stubGlobal("localStorage", { getItem: () => "token-test" });
+    vi.stubGlobal("fetch", vi.fn(async () => ({
+      ok: false, status: 400,
+      json: async () => ({ detail: { code: "PRODUCCION_TRANSITION_INVALID", message: "No hay transicion configurada para cancelar la produccion del arreglo." } }),
+    })));
+    const api = createApiClient({ apiBaseUrl: "https://api.test" });
+    await expect(api.eliminarDetallePedidoPipeline({ pedidoId: 100205, detalleID: 2, version: 1 })).rejects.toMatchObject({
+      status: 400, code: "PRODUCCION_TRANSITION_INVALID",
+      detail: "No hay transicion configurada para cancelar la produccion del arreglo.",
+    });
+  });
+});

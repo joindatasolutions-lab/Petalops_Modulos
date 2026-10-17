@@ -80,7 +80,7 @@ export function OrderDetailProductSwitcher({
                 className="order-detail-product-chip-remove"
                 title="Eliminar arreglo"
                 onClick={() => onDeleteDetail(detalleId)}
-                disabled={deletingDetailId === Number(detalleId)}
+                disabled={deletingDetailId != null}
               >
                 <IconX size={12} stroke={2.2} />
               </button>

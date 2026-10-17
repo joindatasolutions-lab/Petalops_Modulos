@@ -2006,29 +2006,7 @@ const openNewOrderModal = () => {
     if (!confirmed) return;
     setDetailEditError("");
     setDetailEditDeletingDetailId(Number(detalleId));
-    let previousDetalle = null;
     try {
-      setDetalle(current => {
-        if (!current || current.error || !Array.isArray(current.productos)) return current;
-        previousDetalle = current;
-        const nextProducts = current.productos.filter(
-          item => String(item?.detalleID ?? "") !== String(detalleId)
-        );
-        if (nextProducts.length === 0) {
-          return current;
-        }
-        const currentSelected = String(detailEditDetalleID || "");
-        const fallbackProduct = nextProducts.find(
-          item => String(item?.detalleID ?? "") !== String(detalleId)
-        ) || nextProducts[0];
-        if (currentSelected === String(detalleId) && fallbackProduct) {
-          applySelectedDetailProduct(fallbackProduct);
-        }
-        return {
-          ...current,
-          productos: nextProducts,
-        };
-      });
       await api.eliminarDetallePedidoPipeline({
         pedidoId: selectedPedidoId,
         detalleID: Number(detalleId),
@@ -2036,9 +2014,6 @@ const openNewOrderModal = () => {
       });
       await reloadDrawer();
     } catch (nextError) {
-      if (previousDetalle) {
-        setDetalle(previousDetalle);
-      }
       setDetailEditError(nextError?.detail || nextError?.message || "No fue posible eliminar el arreglo.");
     } finally {
       setDetailEditDeletingDetailId(null);

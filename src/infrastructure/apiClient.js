@@ -166,7 +166,14 @@ export function createApiClient(config) {
         module = String(payload.error.module || "").trim();
         requestId = String(payload.error.request_id || payload.error.requestId || "").trim();
       } else {
-        detail = String(payload?.detail || "").trim();
+        const responseDetail = payload?.detail;
+        if (responseDetail && typeof responseDetail === "object" && !Array.isArray(responseDetail)) {
+          detail = String(responseDetail.message || "").trim();
+          code = String(responseDetail.code || "").trim();
+          module = String(responseDetail.module || "").trim();
+        } else {
+          detail = String(responseDetail || "").trim();
+        }
       }
     } catch {
       try {

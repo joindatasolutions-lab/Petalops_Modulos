@@ -81,6 +81,8 @@ export function OrderDetailDrawer({
                     </button>
                   </div>
 
+                  {editor.error ? <p className="orders-message" role="alert">{editor.error}</p> : null}
+                  {editor.deletingDetailId != null ? <p role="status">Eliminando arreglo...</p> : null}
                   <OrderDetailProductSwitcher
                     products={editor.products}
                     selectedDetailId={editor.detalleId}
@@ -123,7 +125,6 @@ export function OrderDetailDrawer({
                       <OrderDetailNotesSection {...editor.notesSection} />
                       <OrderDetailPaymentSection {...payment} />
                       <OrderDetailEditActions
-                        error={editor.error}
                         saving={editor.saving}
                         isDuplicating={editor.isDuplicating}
                         onSave={actions.onSave}
