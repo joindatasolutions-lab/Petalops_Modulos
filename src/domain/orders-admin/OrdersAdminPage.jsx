@@ -1,3 +1,4 @@
+import { updateOrdersFilter } from "./ordersAdminConstants.js";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { tenantConfig } from "../../config/tenantConfig.js";
 import { useRef } from "react";
@@ -1153,12 +1154,7 @@ const messageCard = useMessageCardController({
   const applyFilterValue = (name, value) => {
     setFilters(current => {
       if (current[name] === value && Number(current.page || 1) === 1) return current;
-      return {
-        ...current,
-        [name]: value,
-        ...(["fechaDesde", "fechaHasta", "filtrarPorEntrega"].includes(name) ? { soloEntregasHoy: false } : {}),
-        page: 1
-      };
+      return updateOrdersFilter(current, name, value);
     });
   };
 
@@ -2090,7 +2086,7 @@ const openNewOrderModal = () => {
   const applyDatePreset = preset => {
     const today = todayIsoDate();
     const date = preset === "ayer" ? shiftIsoDate(today, -1) : today;
-    const range = preset === "mes" ? thisMonthRangeIso() : { fechaDesde: date, fechaHasta: date };
+    const range = preset === "todos" ? { fechaDesde: "", fechaHasta: "" } : preset === "mes" ? thisMonthRangeIso() : { fechaDesde: date, fechaHasta: date };
     setFilters(current => ({ ...current, ...range, datePeriod: preset, soloEntregasHoy: false, page: 1 }));
   };
 

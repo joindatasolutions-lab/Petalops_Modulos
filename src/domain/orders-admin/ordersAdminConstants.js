@@ -95,3 +95,19 @@ export const MESSAGE_CARD_FONT_OPTIONS = [
   { value: "'Crimson Text', serif", label: "Crimson Text" },
   { value: "'Great Vibes', cursive", label: "Great Vibes" }
 ];
+
+// Clear restrictions only when entering a new text search.
+export function updateOrdersFilter(current, name, value) {
+  const startingSearch = name === "q" && !String(current.q || "").trim() && Boolean(String(value || "").trim());
+  return {
+    ...current,
+    ...(startingSearch ? {
+      fechaDesde: "", fechaHasta: "", datePeriod: "todos",
+      estado: "", metodoPago: "", sinImprimir: false, soloTienda: false,
+      soloEntregasHoy: false, filtrarPorEntrega: false,
+    } : {}),
+    [name]: value,
+    ...(["fechaDesde", "fechaHasta", "filtrarPorEntrega"].includes(name) ? { soloEntregasHoy: false } : {}),
+    page: 1,
+  };
+}

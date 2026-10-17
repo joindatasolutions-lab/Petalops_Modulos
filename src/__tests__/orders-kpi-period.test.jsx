@@ -9,7 +9,7 @@ describe("Período visible de KPI", () => {
     [{ fechaDesde: todayIsoDate(), fechaHasta: todayIsoDate() }, "hoy", "Hoy"],
     [{ fechaDesde: "2026-10-01", fechaHasta: "2026-10-31", datePeriod: "mes" }, "este mes", "01/10/2026 – 31/10/2026"],
     [{ fechaDesde: "2020-01-02", fechaHasta: "2020-01-05", datePeriod: "custom" }, "del período", "02/01/2020 – 05/01/2020"],
-    [{ q: "rosa", datePeriod: "mes" }, "del período", "Todas las fechas · búsqueda activa"],
+    [{ q: "rosa", datePeriod: "mes" }, "del período", "Todas las fechas"],
   ])("refleja la consulta en títulos, detalles y accesibilidad: %j", (filters, suffix, period) => {
     const html = renderToStaticMarkup(<OrdersHeader
       filters={filters}
@@ -33,7 +33,7 @@ describe("Período visible de KPI", () => {
     expect(ordersMetricPeriod({})).toBe("Todas las fechas");
     expect(ordersMetricPeriod({ fechaDesde: "2020-01-02" })).toBe("Desde 02/01/2020");
     expect(ordersMetricPeriod({ fechaHasta: "2020-01-02" })).toBe("Hasta 02/01/2020");
-    expect(ordersMetricPeriod({ q: "rosa", soloEntregasHoy: true })).toBe("Todas las fechas · búsqueda activa");
+    expect(ordersMetricPeriod({ q: "rosa", soloEntregasHoy: true })).toBe("Hoy");
     expect(ordersMetricPeriod({ soloEntregasHoy: true })).toBe("Hoy");
   });
 });

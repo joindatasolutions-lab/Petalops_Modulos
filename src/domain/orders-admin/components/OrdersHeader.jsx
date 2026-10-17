@@ -20,7 +20,6 @@ import "./OrdersHeader.css";
 import { todayIsoDate } from "../ordersDomain.js";
 
 export function ordersMetricPeriod(filters) {
-  if (String(filters.q || "").trim()) return "Todas las fechas · búsqueda activa";
   const from = filters.fechaDesde;
   const to = filters.fechaHasta;
   const format = value => value.split("T")[0].split("-").reverse().join("/");
@@ -62,7 +61,7 @@ export function OrdersHeader({
 }) {
   const metricPeriod = ordersMetricPeriod(filters);
   const isToday = metricPeriod === "Hoy";
-  const isMonth = !String(filters.q || "").trim() && !isToday && filters.datePeriod === "mes";
+  const isMonth = !isToday && Boolean(filters.fechaDesde || filters.fechaHasta) && filters.datePeriod === "mes";
   const periodSuffix = isToday ? "hoy" : isMonth ? "este mes" : "del período";
   const salesLabel = `Ventas ${periodSuffix}`;
   const ordersLabel = `Pedidos ${periodSuffix}`;
@@ -178,7 +177,7 @@ export function OrdersHeader({
           </button>
         </div>
         <div className="orders-header-metrics orders-kpi-grid" aria-label="Resumen de pedidos">
-          <p className="orders-kpi-scope">Resumen de pedidos · {metricPeriod}. Valores de la consulta{String(filters.q || "").trim() ? "." : ` según ${dateBasis.toLowerCase()}.`}</p>
+          <p className="orders-kpi-scope">Resumen de pedidos · {metricPeriod}. Valores de la consulta según {dateBasis.toLowerCase()}.</p>
           <article className="orders-header-metric-card is-sale">
             <span className="orders-header-metric-icon" aria-hidden="true">
               <IconWallet size={17} stroke={2.2} />

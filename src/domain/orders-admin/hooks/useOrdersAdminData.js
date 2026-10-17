@@ -8,9 +8,6 @@ import { applyDeliveryGiftOverrideToItem } from "../deliveryGiftOverrides.js";
 import {
   buildOrdersMetrics,
   extractOrdersPayloadItems,
-  filterOrdersByCreatedDateRange,
-  filterOrdersByPaymentMethod,
-  filterOrdersByStatus,
   localDateEndParam,
   localDateStartParam,
   normalizePedidosViewStatus,
@@ -20,18 +17,7 @@ import {
 
 export function buildOrdersRequestFilters(filters, query, empresaId, sucursalId) {
   const q = String(query || "").replace(/\s+/g, " ").trim().slice(0, 64);
-  const searching = Boolean(q);
-  return {
-    ...filters, empresaId, sucursalId, q,
-    estado: searching ? "" : filters.estado,
-    metodoPago: searching ? "" : filters.metodoPago,
-    sinImprimir: searching ? false : filters.sinImprimir,
-    soloTienda: searching ? false : filters.soloTienda,
-    soloEntregasHoy: searching ? false : filters.soloEntregasHoy,
-    filtrarPorEntrega: searching ? false : filters.filtrarPorEntrega,
-    fechaDesde: searching ? "" : filters.fechaDesde,
-    fechaHasta: searching ? "" : filters.fechaHasta,
-  };
+  return { ...filters, empresaId, sucursalId, q };
 }
 
 /**
@@ -89,21 +75,12 @@ export function useOrdersAdminData({
     });
     const cached = !silent ? filterCache.get(cacheKey) : null;
 
-    const skipCreatedDateRefilter = requestFilters.soloTienda || requestFilters.soloEntregasHoy || requestFilters.filtrarPorEntrega;
-
     if (cached) {
-      const cachedItems = skipCreatedDateRefilter
-        ? cached.items
-        : filterOrdersByCreatedDateRange(cached.items, requestFechaDesde, requestFechaHasta);
-      const cachedMetricItems = skipCreatedDateRefilter
-        ? cached.metricItems
-        : filterOrdersByCreatedDateRange(cached.metricItems, requestFechaDesde, requestFechaHasta);
-      const cachedHadOutOfRangeItems = cachedItems.length !== (Array.isArray(cached.items) ? cached.items.length : 0);
-      setItems(cachedItems);
-      setTotal(cachedHadOutOfRangeItems ? cachedItems.length : cached.total);
+      setItems(cached.items);
+      setTotal(cached.total);
       setFacturasPendientesImpresion(cached.facturasPendientesImpresion);
       setOrdersKpis(cached.kpis || DEFAULT_ORDERS_KPIS);
-      setMetricItems(cachedMetricItems);
+      setMetricItems(cached.metricItems);
       setMetricFacturasPendientesImpresion(cached.metricFacturasPendientesImpresion);
       setError("");
       if (!silent) {
@@ -124,6 +101,7 @@ export function useOrdersAdminData({
         sucursalId: requestFilters.sucursalId,
         q: requestFilters.q,
         estado: requestFilters.estado,
+        metodoPago: requestFilters.metodoPago,
         sinImprimir: requestFilters.sinImprimir,
         soloTienda: requestFilters.soloTienda,
         soloEntregasHoy: requestFilters.soloEntregasHoy,
@@ -140,17 +118,9 @@ export function useOrdersAdminData({
       const loadedItems = extractOrdersPayloadItems(data)
         .map(applyDeliveryGiftOverrideToItem)
         .map(normalizePedidosViewStatus);
-      const dateItems = skipCreatedDateRefilter
-        ? loadedItems
-        : filterOrdersByCreatedDateRange(loadedItems, requestFechaDesde, requestFechaHasta);
-      const statusItems = filterOrdersByStatus(dateItems, requestFilters.estado);
-      const paymentItems = filterOrdersByPaymentMethod(statusItems, requestFilters.metodoPago);
-      // The server also searches fields omitted from the list response.
-      const visibleItems = paymentItems;
-      const backendReturnedOutOfRangeItems = dateItems.length !== loadedItems.length;
-      const nextTotal = requestFilters.estado || backendReturnedOutOfRangeItems
-        ? visibleItems.length
-        : resolveOrdersPayloadTotal(data, visibleItems);
+      // List, count and KPIs share the server-side filters and pagination.
+      const visibleItems = loadedItems;
+      const nextTotal = resolveOrdersPayloadTotal(data, visibleItems);
       const nextFacturasPendientesImpresion = Number(data.facturasPendientesImpresion || 0);
       const nextKpis = normalizeOrdersKpis(data?.kpis, nextFacturasPendientesImpresion);
       const nextCacheValue = {

@@ -19,7 +19,7 @@ export function OrdersFilters({ filters, onApplyDatePreset, onApplyDateRange, on
   const period = isToday ? "hoy" : isYesterday ? "ayer" : hasDates ? (filters.datePeriod === "mes" ? "mes" : "custom") : "todos";
   const byDelivery = Boolean(filters.filtrarPorEntrega || filters.soloEntregasHoy);
   const dateSubject = byDelivery ? "Pedidos con entrega programada" : "Pedidos creados";
-  const dateSummary = searching ? "Filtro de fecha en pausa mientras buscas." : period === "todos" ? "Sin límite de fecha." : period === "hoy" ? `${dateSubject} para hoy.` :
+  const dateSummary = period === "todos" ? "Sin límite de fecha." : period === "hoy" ? `${dateSubject} para hoy.` :
     filters.fechaDesde === filters.fechaHasta ? `${dateSubject} el ${dateText(filters.fechaDesde)}.` :
     !filters.fechaDesde ? `${dateSubject} hasta el ${dateText(filters.fechaHasta)}.` :
     !filters.fechaHasta ? `${dateSubject} desde el ${dateText(filters.fechaDesde)}.` :
@@ -46,7 +46,7 @@ export function OrdersFilters({ filters, onApplyDatePreset, onApplyDateRange, on
         <label className="of-period-label">
           <span className="of-group-label">Período</span>
           <select className="of-select" value={period} onChange={event => onApplyDatePreset(event.target.value)}>
-            {period === "todos" && <option value="todos" disabled hidden>Todas las fechas</option>}
+            <option value="todos">Todas las fechas</option>
             {period === "custom" && <option value="custom" disabled hidden>Personalizado</option>}
             <option value="hoy">Hoy</option>
             <option value="mes">Este mes</option>
@@ -64,7 +64,7 @@ export function OrdersFilters({ filters, onApplyDatePreset, onApplyDateRange, on
     <p className="of-date-summary" aria-live="polite">{dateSummary}</p>
     {(chips.length > 0 || searching) && <div className="of-active">
       {chips.map(chip => <button type="button" key={chip.label} onClick={chip.clear} aria-label={`Quitar ${chip.label}`}>{chip.label}<X size={12} /></button>)}
-      {searching && <span className="of-search-note">La búsqueda tiene prioridad sobre todos los filtros. Al borrar el texto, se aplicarán nuevamente.</span>}
+      {searching && <span className="of-search-note">Los filtros se aplican a los resultados de búsqueda</span>}
     </div>}
     {popover === "dates" && <OrdersFilterPopover anchor={dateButton} title="Elegir fechas" onClose={() => setPopover(null)}><OrdersDatePicker filters={filters} onClose={() => setPopover(null)} onApply={(start, end) => { onApplyDateRange(start, end); setPopover(null); }} /></OrdersFilterPopover>}
     {popover === "additional" && <OrdersFilterPopover anchor={additionalButton} title="Filtros adicionales" onClose={() => setPopover(null)}>

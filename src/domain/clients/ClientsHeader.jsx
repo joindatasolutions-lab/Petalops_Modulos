@@ -39,11 +39,11 @@ export function ClientsHeader({
             </button>
             {clientsMenuOpen ? <ClientsViewMenu activeView={activeView} onSelectView={onSelectView} /> : null}
           </div>
-          <button type="button" className="btn-primary orders-header-refresh" onClick={onRefresh} disabled={loading}>
+          <button type="button" className="btn-outline orders-header-refresh clients-refresh-btn" onClick={onRefresh} disabled={loading}>
             <RefreshCw size={18} strokeWidth={2} aria-hidden="true" />
-            <span>{loading ? "Actualizando..." : "Actualizar"}</span>
+            <span>Actualizar</span>
           </button>
-          <button type="button" className="btn-primary orders-header-refresh" onClick={onCreate}>
+          <button type="button" className="btn-primary orders-header-refresh clients-add-btn" onClick={onCreate}>
             <Plus size={18} strokeWidth={2} aria-hidden="true" />
             <span>Agregar</span>
           </button>
