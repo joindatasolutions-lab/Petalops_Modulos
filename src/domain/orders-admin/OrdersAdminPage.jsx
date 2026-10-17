@@ -2139,10 +2139,10 @@ const openNewOrderModal = () => {
     return "";
   }, [filters.fechaDesde, filters.fechaHasta]);
   const ordersMetrics = ordersKpis;
-  const headerSalesSummary = Number(ordersKpis.ventaHoy || 0);
+  const headerSalesSummary = Number(ordersKpis.ventaPeriodo || 0);
   const orderMetricCards = useMemo(() => {
     const baseCards = [
-      { key: "hoy", label: "Pedidos hoy", shortLabel: "Pedidos hoy", value: Number(ordersMetrics.pedidosHoy || 0), tone: "is-primary", Icon: ORDER_METRIC_ICONS.hoy, helperText: "Operacion diaria" },
+      { key: "hoy", label: "Pedidos del periodo", shortLabel: "Pedidos del periodo", value: Number(ordersMetrics.pedidosPeriodo || 0), tone: "is-primary", Icon: ORDER_METRIC_ICONS.hoy, helperText: "Periodo consultado" },
       { key: "aprobados", label: "Aprobados", shortLabel: "Aprobados", value: Number(ordersMetrics.aprobados || 0), tone: "is-green", Icon: ORDER_METRIC_ICONS.aprobados, helperText: "Ultimos 7 dias" },
       { key: "pendientes", label: "Pendientes", shortLabel: "Pendientes", value: Number(ordersMetrics.pendientes || 0), tone: "is-blue", Icon: ORDER_METRIC_ICONS.pendientes, helperText: "Requieren atencion" },
       { key: "cancelados", label: "Cancelados", shortLabel: "Cancelados", value: Number(ordersMetrics.cancelados || 0), tone: "is-orange", Icon: ORDER_METRIC_ICONS.cancelados, helperText: "Ultimos 7 dias" },

@@ -41,6 +41,8 @@ export function createInitialOrdersFilters(today = todayIsoDateBogota()) {
 }
 
 export const DEFAULT_ORDERS_KPIS = {
+  ventaPeriodo: 0,
+  pedidosPeriodo: 0,
   ventaHoy: 0,
   pedidosHoy: 0,
   aprobados: 0,
