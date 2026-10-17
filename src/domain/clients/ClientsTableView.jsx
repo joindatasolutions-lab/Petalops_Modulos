@@ -1,7 +1,7 @@
 import { Download, Search } from "lucide-react";
 import { formatearCOP } from "../../shared/utils.js";
 
-export function ClientsTableView({ canManageClients, items, q, onEdit, onExport, onSearchChange }) {
+export function ClientsTableView({ canManageClients, items, q, onEdit, onExport, onSearchChange, loading = false, initialLoading = false, loadError = "" }) {
   return (
     <>
       <section className="clients-table-toolbar" aria-label="Busqueda de clientes">
@@ -26,7 +26,10 @@ export function ClientsTableView({ canManageClients, items, q, onEdit, onExport,
         </div>
       </section>
       <section className="orders-table-wrap clients-table-wrap">
-        <table className="orders-table users-table clients-table">
+        <table className="orders-table users-table clients-table" aria-busy={loading}>
+          <caption className="clients-table-status">
+            <span role="status" aria-live="polite">{loading ? "Cargando clientes..." : ""}</span>
+          </caption>
           <thead>
             <tr>
               <th>ID</th><th>Tipo Doc</th><th>Documento</th><th>Nombre</th><th>Telefono</th>
@@ -34,7 +37,15 @@ export function ClientsTableView({ canManageClients, items, q, onEdit, onExport,
             </tr>
           </thead>
           <tbody>
-            {items.length === 0 ? (
+            {initialLoading && items.length === 0 ? Array.from({ length: 5 }, (_, row) => (
+              <tr key={row} className="clients-skeleton-row" aria-hidden="true">
+                {Array.from({ length: 13 }, (_, column) => (
+                  <td key={column}><span className="clients-skeleton-bar" /></td>
+                ))}
+              </tr>
+            )) : items.length === 0 && !loading && loadError ? (
+              <tr><td colSpan={13}>No fue posible cargar clientes. Intenta actualizar.</td></tr>
+            ) : items.length === 0 && !loading ? (
               <tr><td colSpan={13}>No hay clientes registrados.</td></tr>
             ) : items.map(item => <ClientRow key={item.clienteID} item={item} canManageClients={canManageClients} onEdit={onEdit} />)}
           </tbody>

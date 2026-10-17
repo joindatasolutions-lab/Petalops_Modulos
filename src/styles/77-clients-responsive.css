@@ -1,3 +1,49 @@
+/* Loading stays inside the table; static placeholders also suit reduced motion. */
+.clients-page-view .clients-table-status {
+  height: 30px;
+  padding: 4px 12px;
+  text-align: left;
+  color: #64748b;
+  font-size: 12px;
+  line-height: 22px;
+}
+
+.clients-page-view .clients-skeleton-row {
+  height: 54px;
+}
+
+.clients-page-view .clients-skeleton-bar {
+  display: block;
+  width: 80%;
+  min-width: 28px;
+  height: 12px;
+  border-radius: 6px;
+  background: #e8edf3;
+}
+
+.clients-page-view .clients-skeleton-row:nth-child(even) .clients-skeleton-bar {
+  width: 65%;
+}
+
+.clients-page-view .clients-page-header .header-actions .clients-refresh-btn {
+  background: #fff !important;
+  color: #64748b !important;
+  border-color: #dce3ec !important;
+  box-shadow: none !important;
+}
+
+.clients-page-view .clients-page-header .header-actions .clients-add-btn {
+  background: var(--orders-primary, #e91e72) !important;
+  color: #fff !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .clients-page-view .clients-page-header .header-actions .orders-header-refresh {
+    transition: none !important;
+    transform: none !important;
+  }
+}
+
 /* Clientes header canonical layout (mismo esquema que Contabilidad/Produccion).
    Cargado al final para neutralizar overrides cruzados de otros modulos. */
 .clients-page-view {

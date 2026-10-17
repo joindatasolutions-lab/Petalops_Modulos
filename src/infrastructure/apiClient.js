@@ -907,13 +907,14 @@ export function createApiClient(config) {
       }
     },
 
-    async listarPedidos({ empresaId, sucursalId, q, estado, fechaDesde, fechaHasta, filtrarPorEntrega, sinImprimir, soloTienda, soloEntregasHoy, page, pageSize }) {
+    async listarPedidos({ empresaId, sucursalId, q, estado, metodoPago, fechaDesde, fechaHasta, filtrarPorEntrega, sinImprimir, soloTienda, soloEntregasHoy, page, pageSize }) {
       const params = new URLSearchParams();
       params.set("empresaID", String(empresaId));
       if (sucursalId != null) params.set("sucursalID", String(sucursalId));
       const safeSearch = normalizeSearchParam(q);
       if (safeSearch) params.set("q", safeSearch);
       if (estado) params.set("estado", String(estado));
+      if (metodoPago) params.set("metodoPago", String(metodoPago));
       const normalizedFechaDesde = normalizePedidosDateParam(fechaDesde);
       const normalizedFechaHasta = normalizePedidosDateParam(fechaHasta);
       if (normalizedFechaDesde) params.set("fechaDesde", normalizedFechaDesde);

@@ -62,7 +62,9 @@ export function ClientsPage({
 
   const [activeView, setActiveView] = useState("clientes");
   const [clientsMenuOpen, setClientsMenuOpen] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [clientsLoaded, setClientsLoaded] = useState(false);
+  const [clientsLoadError, setClientsLoadError] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [info, setInfo] = useState("");
@@ -118,6 +120,7 @@ export function ClientsPage({
 
   const loadClientes = useCallback(async () => {
     setLoading(true);
+    setClientsLoadError("");
     setError("");
     try {
       const data = await loadAllClientPages(
@@ -126,9 +129,10 @@ export function ClientsPage({
         { pageSize: CLIENTS_API_PAGE_SIZE }
       );
       setItems(data);
+      setClientsLoaded(true);
     } catch (nextError) {
       console.error("Error cargando clientes:", nextError);
-      setItems([]);
+      setClientsLoadError(nextError?.message || "No fue posible cargar clientes.");
       setError(nextError?.message || "No fue posible cargar clientes.");
     } finally {
       setLoading(false);
@@ -218,14 +222,7 @@ export function ClientsPage({
     }
   }, [api, empresaId, segmentPage]);
 
-  useEffect(() => {
-    if (activeView !== "metricas") return;
-    loadCustomerMetrics().catch(() => {});
-    if (selectedSegment || selectedPriority) {
-      loadSegment({ segment: selectedSegment, priority: selectedPriority, nextPage: segmentPage }).catch(() => {});
-    }
-    if (selectedOpportunity) loadOpportunities(segmentPage).catch(() => {});
-  }, [activeView, loadCustomerMetrics, loadOpportunities, loadSegment, selectedOpportunity, selectedPriority, selectedSegment, segmentPage]);
+
 
   useEffect(() => {
     if (!clientsMenuOpen) return undefined;
@@ -422,41 +419,12 @@ export function ClientsPage({
 
         {error ? <p className="orders-message">{error}</p> : null}
         {info ? <p className="orders-message">{info}</p> : null}
-        {loading ? <p className="orders-message">Cargando clientes...</p> : null}
 
         {activeView === "metricas" ? (
-          <ClientsMetricsView
-            clientsIntelligence={clientsIntelligence}
-            itemsCount={items.length}
-            loading={loading}
-            metricsDatePreset={metricsDatePreset}
-            metricsDateRange={metricsDateRange}
-            metricsLoading={metricsLoading}
-            segmentLoading={segmentLoading}
-            segmentPage={segmentPage}
-            segmentPages={segmentTotalPages}
-            segmentPagerItems={segmentPagerItems}
-            segmentTotal={segmentTotal}
-            segmentVisibleFrom={segmentVisibleFrom}
-            segmentVisibleTo={segmentVisibleTo}
-            selectedOpportunity={selectedOpportunity}
-            selectedPriority={selectedPriority}
-            selectedSegment={selectedSegment}
-            segmentItems={segmentItems}
-            onExport={exportMetricasExcel}
-            onChangeMetricsDateRange={onChangeMetricsDateRange}
-            onSegmentPageChange={setSegmentPage}
-            onSelectMetricsDatePreset={onSelectMetricsDatePreset}
-            onSelectOpportunities={onSelectOpportunities}
-            onSelectPriority={onSelectPriority}
-            onRefresh={refreshMetricsView}
-            onShowDirectory={() => setActiveView("clientes")}
-            onSelectSegment={onSelectSegment}
-            onViewClient={openEdit}
-          />
+          <ClientsMetricsView />
         ) : (
           <>
-            <ClientsTableView canManageClients={canManageClients} items={pagedItems} q={q} onEdit={openEdit} onExport={exportClientesExcel} onSearchChange={setQ} />
+            <ClientsTableView loading={loading} initialLoading={loading && !clientsLoaded && items.length === 0} loadError={clientsLoadError} canManageClients={canManageClients} items={pagedItems} q={q} onEdit={openEdit} onExport={exportClientesExcel} onSearchChange={setQ} />
             <ClientsPager
               total={items.length}
               visibleFrom={visibleFrom}
