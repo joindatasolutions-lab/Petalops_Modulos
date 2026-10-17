@@ -68,6 +68,7 @@ export function PipelineOperativo({
 
   const onOpen = async item => {
     setSelected(item);
+    setSelectedDetail(null);
     try {
       const detail = await api.obtenerDetallePedido(item.id_pedido);
       setSelectedDetail(detail);
@@ -77,7 +78,7 @@ export function PipelineOperativo({
   const onCloseModal = () => { setSelected(null); setSelectedDetail(null); };
 
   const onSavePedidoEdit = async ({ pedidoId, productoID, fechaEntrega, horaEntrega }) => {
-    await api.actualizarDetallePedidoPipeline({ pedidoId, productoID, fechaEntrega, horaEntrega });
+    await api.actualizarDetallePedidoPipeline({ pedidoId, version: selectedDetail?.pedidoID === Number(pedidoId) ? selectedDetail.version : undefined, productoID, fechaEntrega, horaEntrega });
     const [detail] = await Promise.all([api.obtenerDetallePedido(pedidoId), loadBoard()]);
     setSelectedDetail(detail);
     setSelected(current => {

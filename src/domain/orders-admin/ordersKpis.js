@@ -8,6 +8,8 @@
 export function normalizeOrdersKpis(value, fallbackFacturasPendientesImpresion = 0) {
   const source = value && typeof value === "object" ? value : {};
   return {
+    ventaPeriodo: Number(source.ventaPeriodo ?? 0),
+    pedidosPeriodo: Number(source.pedidosPeriodo ?? 0),
     ventaHoy: Number(source.ventaHoy || 0),
     pedidosHoy: Number(source.pedidosHoy || 0),
     aprobados: Number(source.aprobados || 0),
