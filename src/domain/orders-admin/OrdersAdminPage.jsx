@@ -72,7 +72,6 @@ import {
   buildPaginationItems,
   clampPercentage,
   displayProductCode,
-  ensureRappiOption,
   extractOrdersPayloadItems,
   extractPaymentAmounts,
   filterOrdersByCreatedDateRange,
@@ -90,6 +89,7 @@ import {
   isStorePickupOrder,
   localDateEndParam,
   localDateStartParam,
+  normalizeConfiguredPaymentOptions,
   normalizePedidosViewStatus,
   normalizeOrderProducts,
   normalizePaymentMethods,
@@ -535,7 +535,7 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
     [pedidoMenuFields]
   );
   const paymentFieldOptions = useMemo(
-    () => ensureRappiOption(paymentFieldConfig?.opciones),
+    () => normalizeConfiguredPaymentOptions(paymentFieldConfig?.opciones),
     [paymentFieldConfig]
   );
   const salesChannelFieldConfig = useMemo(

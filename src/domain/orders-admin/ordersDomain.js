@@ -822,11 +822,10 @@ export function isEmpresaAdminRole(session) {
   return Boolean(session?.esGlobalJoin) || role === "admin" || role === "empresa_admin";
 }
 
-export function ensureRappiOption(options) {
-  const normalized = Array.isArray(options)
+export function normalizeConfiguredPaymentOptions(options) {
+  return Array.isArray(options)
     ? options.map(item => String(item || "").trim()).filter(Boolean)
     : [];
-  return normalized.includes("RAPPI") ? normalized : [...normalized, "RAPPI"];
 }
 
 export function buildOrderFinancialPreview(
