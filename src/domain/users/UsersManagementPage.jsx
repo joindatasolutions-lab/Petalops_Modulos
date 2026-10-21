@@ -15,6 +15,12 @@ import { filterVisibleRoles as domainFilterVisibleRoles } from "./usersDomain.js
 
 export const filterVisibleRoles = domainFilterVisibleRoles;
 
+function canManageCompanyActions(session, canViewUsuariosGlobal) {
+  if (canViewUsuariosGlobal) return true;
+  const role = String(session?.rol || "").trim().toLowerCase().replace(/\s+/g, "_");
+  return role === "admin" || role === "empresa_admin";
+}
+
 export function UsersManagementPage(props) {
   const {
     session,
@@ -41,9 +47,10 @@ export function UsersManagementPage(props) {
     onLogout,
   } = props;
   const users = useUsersManagementController({ session, canViewUsuariosGlobal });
+  const canManageActions = canManageCompanyActions(session, canViewUsuariosGlobal);
   const isTenantsPanel = canViewUsuariosGlobal && users.activePanel === "tenants";
-  const isAccionesPanel = canViewUsuariosGlobal && users.activePanel === "acciones";
-  const isUsuariosPanel = !canViewUsuariosGlobal || users.activePanel === "usuarios";
+  const isAccionesPanel = canManageActions && users.activePanel === "acciones";
+  const isUsuariosPanel = !isTenantsPanel && !isAccionesPanel;
   const isRefreshing = users.loading || users.empresasModulesLoading || users.asignacionLoading;
 
   const openTenantCreate = () => {
@@ -130,13 +137,11 @@ export function UsersManagementPage(props) {
             <UsersRound size={16} strokeWidth={2} aria-hidden="true" />
             Usuarios
           </button>
-          {canViewUsuariosGlobal ? (
-            <>
-              <button type="button" className={isAccionesPanel ? "is-active" : ""} onClick={() => users.setActivePanel("acciones")}>
-                <SlidersHorizontal size={16} strokeWidth={2} aria-hidden="true" />
-                Acciones
-              </button>
-            </>
+          {canManageActions ? (
+            <button type="button" className={isAccionesPanel ? "is-active" : ""} onClick={() => users.setActivePanel("acciones")}>
+              <SlidersHorizontal size={16} strokeWidth={2} aria-hidden="true" />
+              Acciones
+            </button>
           ) : null}
         </nav>
 

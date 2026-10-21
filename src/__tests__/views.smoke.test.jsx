@@ -104,6 +104,19 @@ describe("vistas principales", () => {
     expect(html.length).toBeGreaterThan(500);
   });
 
+  it("muestra Acciones de empresa al administrador de una floristeria", () => {
+    const html = renderToStaticMarkup(
+      <UsersManagementPage
+        {...pageProps}
+        canViewUsuariosGlobal={false}
+        session={{ ...session, esGlobalJoin: false, empresaID: 3, rol: "empresa_admin" }}
+      />
+    );
+
+    expect(html).toContain("Acciones");
+    expect(html).not.toContain("Empresas");
+  });
+
   it("presenta las secciones y acciones de inventario como desplegables", () => {
     const html = renderToStaticMarkup(<InventoryPage {...pageProps} />);
 
