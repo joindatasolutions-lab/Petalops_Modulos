@@ -55,6 +55,9 @@ export function useAccountingController({ session, canViewUsuariosGlobal = false
   const [activeDeliveryPersonOrdersStatus, setActiveDeliveryPersonOrdersStatus] = useState("");
   const [cashHistoryRows, setCashHistoryRows] = useState([]);
   const [cashLoading, setCashLoading] = useState(false);
+  const [cashExpenses, setCashExpenses] = useState([]);
+  const [cashExpensesLoading, setCashExpensesLoading] = useState(false);
+  const [cashExpenseSaving, setCashExpenseSaving] = useState(false);
   const {
     loading,
     error,
@@ -125,6 +128,29 @@ export function useAccountingController({ session, canViewUsuariosGlobal = false
       .filter(Boolean)
       .find(row => row.fecha === targetFecha) || null;
   }, [api, empresaId, sucursalId]);
+
+  const loadCashExpenses = useCallback(async () => {
+    if (!cashForm.fecha || !empresaId || !sucursalId) return;
+    setCashExpensesLoading(true);
+    try {
+      const payload = await api.listarGastosCaja({
+        empresaId,
+        sucursalId,
+        fecha: cashForm.fecha,
+      });
+      const items = Array.isArray(payload?.items) ? payload.items : [];
+      const total = Number(payload?.totalGastos ?? items.reduce((sum, item) => sum + Number(item?.monto || 0), 0));
+      setCashExpenses(items);
+      setCashForm(current => ({ ...current, gasto: Number.isFinite(total) ? String(total) : current.gasto }));
+    } catch (nextError) {
+      setCashExpenses([]);
+      if (nextError?.status !== 404 && nextError?.status !== 503) {
+        setError(nextError?.detail || nextError?.message || "No fue posible consultar los gastos de caja.");
+      }
+    } finally {
+      setCashExpensesLoading(false);
+    }
+  }, [api, cashForm.fecha, empresaId, setError, sucursalId]);
 
   const loadCashDayFromAccountingSummary = useCallback(async () => {
     const payload = await api.obtenerResumenContabilidad({
@@ -229,7 +255,8 @@ export function useAccountingController({ session, canViewUsuariosGlobal = false
   useEffect(() => {
     if (activeView !== "caja") return;
     loadCashDay();
-  }, [activeView, loadCashDay]);
+    loadCashExpenses();
+  }, [activeView, loadCashDay, loadCashExpenses]);
 
   useEffect(() => {
     const handleCashOrderSaved = () => {
@@ -666,6 +693,40 @@ export function useAccountingController({ session, canViewUsuariosGlobal = false
     }
   };
 
+  const createCashExpense = async ({ concepto, descripcion, monto }) => {
+    if (!cashForm.fecha || !empresaId || !sucursalId) {
+      setInfo("Selecciona una fecha valida antes de registrar el gasto.");
+      return false;
+    }
+    const amount = parseMoneyInput(monto);
+    if (!String(concepto || "").trim() || !Number.isFinite(amount) || amount <= 0) {
+      setInfo("Selecciona un concepto e ingresa un valor mayor que cero.");
+      return false;
+    }
+
+    setCashExpenseSaving(true);
+    setError("");
+    try {
+      await api.crearGastoCaja({
+        empresaId,
+        sucursalId,
+        fecha: cashForm.fecha,
+        concepto: String(concepto).trim(),
+        descripcion: String(descripcion || "").trim(),
+        monto: amount,
+        usuarioId: session?.userID || session?.usuarioID || session?.idUsuario || null,
+      });
+      await Promise.all([loadCashExpenses(), loadCashDay(), loadCashClosings()]);
+      setInfo(`Gasto registrado y caja actualizada para ${cashForm.fecha}.`);
+      return true;
+    } catch (nextError) {
+      setError(nextError?.detail || nextError?.message || "No fue posible registrar el gasto de caja.");
+      return false;
+    } finally {
+      setCashExpenseSaving(false);
+    }
+  };
+
   const saveCashClosing = async () => {
     if (!cashForm.fecha) {
       setInfo("Selecciona una fecha para guardar el cierre.");
@@ -685,7 +746,7 @@ export function useAccountingController({ session, canViewUsuariosGlobal = false
     }
     const values = [baseValue, efectivoValue, gastoValue, totalContadoValue, guardadoValue];
     if (values.some(value => !Number.isFinite(value) || value < 0)) {
-      setInfo("Base, efectivo, gastos, total contado y guardado deben ser valores mayores o iguales a cero.");
+      setInfo("Base, efectivo, gastos, total contado y caja menor deben ser valores mayores o iguales a cero.");
       return;
     }
     if (totalEfectivoCaja < 0) {
@@ -693,7 +754,7 @@ export function useAccountingController({ session, canViewUsuariosGlobal = false
       return;
     }
     if (guardadoValue > totalContadoValue) {
-      setInfo("El monto guardado no puede superar el total fisico contado.");
+      setInfo("La caja menor no puede superar el total fisico contado.");
       return;
     }
 
@@ -840,10 +901,14 @@ export function useAccountingController({ session, canViewUsuariosGlobal = false
     baseValue,
     canEditCashClosing,
     cashDashboardTotals,
+    cashExpenses,
+    cashExpensesLoading,
+    cashExpenseSaving,
     cashForm,
     cashHistoryRows,
     cashLoading,
     clearAllArrangements,
+    createCashExpense,
     clearDeliveryPersonOrdersDetail,
     deliveryPersonMetricRows,
     deliveryPersonOrdersDetail,

@@ -112,7 +112,7 @@ export function buildCashExportRows(rows) {
     TotalContado: row.totalContado,
     Sobrante: row.sobrante,
     Faltante: row.faltante,
-    Guardado: row.guardado,
+    CajaMenor: row.guardado,
     NuevaBase: row.nuevaBase,
     Observacion: row.observacion,
   }));

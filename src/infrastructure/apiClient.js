@@ -1530,6 +1530,30 @@ export function createApiClient(config) {
       return requestJson(`/contabilidad/caja/efectivo?${params.toString()}`);
     },
 
+    async listarGastosCaja({ empresaId, sucursalId, fecha }) {
+      const params = new URLSearchParams();
+      params.set("empresaID", String(empresaId));
+      params.set("sucursalID", String(sucursalId));
+      params.set("fecha", String(fecha));
+      return requestJson(`/contabilidad/caja/gastos?${params.toString()}`);
+    },
+
+    async crearGastoCaja({ empresaId, sucursalId, fecha, concepto, descripcion, monto, usuarioId }) {
+      return requestJson("/contabilidad/caja/gastos", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          empresaID: empresaId,
+          sucursalID: sucursalId,
+          fecha,
+          concepto,
+          descripcion: descripcion || "",
+          monto,
+          usuarioID: usuarioId ?? null,
+        }),
+      });
+    },
+
     async guardarCierreCaja({ empresaId, sucursalId, fecha, base, efectivo, gasto, totalEfectivo, totalContado, guardado, nuevaBase, observacion, usuarioId }) {
       return requestJson("/contabilidad/caja/cierre", {
         method: "PUT",
