@@ -66,8 +66,12 @@ export function AccountingCashView({
   ), [denominationCounts]);
 
   const updateDenomination = (value, rawQuantity) => {
-    const quantity = Math.max(0, Math.trunc(Number(rawQuantity) || 0));
-    const nextCounts = { ...denominationCounts, [value]: quantity };
+    const nextCounts = { ...denominationCounts };
+    if (String(rawQuantity).trim() === "") {
+      delete nextCounts[value];
+    } else {
+      nextCounts[value] = Math.max(0, Math.trunc(Number(rawQuantity) || 0));
+    }
     const nextTotal = CASH_DENOMINATIONS.reduce(
       (total, item) => total + item.value * Number(nextCounts[item.value] || 0), 0,
     );
@@ -146,12 +150,13 @@ export function AccountingCashView({
           <div className="cash-count-table-head"><span>Denominacion</span><span>Cantidad</span><span>Subtotal</span></div>
           <div className="cash-denomination-list">
             {CASH_DENOMINATIONS.map(item => {
-              const quantity = Number(denominationCounts[item.value] || 0);
+              const rawQuantity = denominationCounts[item.value];
+              const quantity = Number(rawQuantity || 0);
               return (
                 <label key={item.value} className="cash-denomination-row">
                   <span className={`cash-denomination-icon is-${item.kind}`} aria-hidden="true">{item.kind === "coin" ? <Coins size={17} /> : <Banknote size={18} />}</span>
                   <span>{item.label}</span>
-                  <input type="number" min="0" step="1" inputMode="numeric" value={quantity} onChange={event => updateDenomination(item.value, event.target.value)} disabled={!canEditCashClosing} aria-label={`Cantidad de ${item.label}`} />
+                  <input type="number" min="0" step="1" inputMode="numeric" value={rawQuantity ?? ""} placeholder="0" onChange={event => updateDenomination(item.value, event.target.value)} onFocus={event => event.currentTarget.select()} disabled={!canEditCashClosing} aria-label={`Cantidad de ${item.label}`} />
                   <strong>$ {formatearCOP(item.value * quantity)}</strong>
                 </label>
               );
