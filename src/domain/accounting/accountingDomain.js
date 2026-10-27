@@ -694,6 +694,8 @@ export function hasCashClosingData(raw) {
     "monto_guardado",
     "nuevaBase",
     "nueva_base",
+    "totalContado",
+    "total_contado",
   ].some(key => Object.prototype.hasOwnProperty.call(source, key));
 }
 export function normalizeCashClosingRow(raw, fallbackFecha = "") {
@@ -712,7 +714,11 @@ export function normalizeCashClosingRow(raw, fallbackFecha = "") {
   const gasto = roundMoney(source.gasto ?? source.gastos ?? source.totalGastos ?? source.total_gastos);
   const totalEfectivo = roundMoney(source.totalEfectivo ?? source.total_efectivo ?? (base + efectivo - gasto));
   const guardado = roundMoney(source.guardado ?? source.montoGuardado ?? source.monto_guardado);
-  const nuevaBase = roundMoney(source.nuevaBase ?? source.nueva_base);
+  const rawTotalContado = source.totalContado ?? source.total_contado;
+  const totalContado = rawTotalContado == null ? null : roundMoney(rawTotalContado);
+  const sobrante = roundMoney(source.sobrante ?? (totalContado == null ? 0 : Math.max(totalContado - totalEfectivo, 0)));
+  const faltante = roundMoney(source.faltante ?? (totalContado == null ? 0 : Math.max(totalEfectivo - totalContado, 0)));
+  const nuevaBase = roundMoney(source.nuevaBase ?? source.nueva_base ?? ((totalContado ?? totalEfectivo) - guardado));
   const observacion = String(source.observacion ?? "").trim();
   return {
     fecha,
@@ -722,6 +728,9 @@ export function normalizeCashClosingRow(raw, fallbackFecha = "") {
     totalEfectivo,
     guardado,
     nuevaBase,
+    totalContado,
+    sobrante,
+    faltante,
     observacion,
   };
 }

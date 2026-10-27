@@ -30,6 +30,7 @@ export const initialCashForm = {
   base: "",
   efectivo: "",
   gasto: "",
+  totalContado: "",
   guardado: "",
   totalEfectivo: "",
   observacion: "",

@@ -1,212 +1,181 @@
-import { Activity, BadgeDollarSign, Banknote, BarChart3, Brain, CircleAlert, CircleCheck, Columns3, CreditCard, Download, Package, Search, Sparkles, Tag, Truck, Users, Wallet, XCircle } from "lucide-react";
-import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { useMemo, useRef, useState } from "react";
+import {
+  ArrowDown, ArrowUp, Banknote, Calculator, CheckCircle2, CircleAlert, Coins,
+  Eye, Landmark, ListChecks, LockKeyhole, Save, Trash2, WalletCards,
+} from "lucide-react";
 
 import { formatearCOP } from "../../../../shared/utils.js";
-import { getAdjustmentNoteItems, roundMoney } from "../../accountingDomain.js";
-import { AccountingRanking, AccountingSalesTooltip, renderBarChartRows } from "../../AccountingViewParts.jsx";
-export function AccountingCashView({
-  activeExportAction,
-  activePeriodPreset,
-  activeView,
-  accountingMenuOpen,
-  accountingMenuRef,
-  applyFilter,
-  applyPeriodPreset,
-  arrangementChartRows,
-  arrangementRows,
-  arrangementSummary,
-  baseValue,
-  canEditCashClosing,
-  cashDashboardTotals,
-  cashForm,
-  cashHistoryRows,
-  cashLoading,
-  clearAllArrangements,
-  deliveryPersonMetricRows,
-  detailChartRows,
-  detailFilter,
-  detailInsight,
-  displayUserName,
-  efectivoValue,
-  error,
-  exportArreglos,
-  exportCaja,
-  exportCuentas,
-  exportDetalleVentas,
-  exportPersonal,
-  exportVentas,
-  filteredAccountingDetailRows,
-  filters,
-  floristMetricRows,
-  gastoValue,
-  guardadoValue,
-  info,
-  loadAccountingData,
-  loading,
-  moneyMapRows,
-  monthlySalesRows,
-  nuevaBaseValue,
-  orderRows,
-  paymentAccountRows,
-  paymentSummary,
-  personnelDashboardRows,
-  personnelDashboardSummary,
-  personnelMode,
-  personnelSearch,
-  personnelSummary,
-  personnelTypeFilter,
-  personnelTypeOptions,
-  salesTrendRows,
-  saveCashClosing,
-  saving,
-  selectAllArrangements,
-  selectedAccountingCase,
-  selectedArrangementKeys,
-  selectedArrangementRows,
-  setAccountingMenuOpen,
-  setActiveView,
-  setCashForm,
-  setDetailFilter,
-  setPersonnelMode,
-  setPersonnelSearch,
-  setPersonnelTypeFilter,
-  setSelectedAccountingCase,
-  showAccountingDetail,
-  summaryTotals,
-  todayCashDate,
-  toggleArrangementSelection,
-  topArrangementBySales,
-  topArrangementByUnits,
-  topPaymentAccount,
-  totalEfectivoCaja,}) {
+import { parseMoneyInput, roundMoney } from "../../accountingDomain.js";
+
+const CASH_DENOMINATIONS = [
+  { value: 100000, label: "Billete de $100.000", kind: "note" },
+  { value: 50000, label: "Billete de $50.000", kind: "note" },
+  { value: 20000, label: "Billete de $20.000", kind: "note" },
+  { value: 10000, label: "Billete de $10.000", kind: "note" },
+  { value: 5000, label: "Billete de $5.000", kind: "note" },
+  { value: 2000, label: "Billete de $2.000", kind: "note" },
+  { value: 1000, label: "Moneda de $1.000", kind: "coin" },
+  { value: 500, label: "Moneda de $500", kind: "coin" },
+  { value: 200, label: "Moneda de $200", kind: "coin" },
+  { value: 100, label: "Moneda de $100", kind: "coin" },
+  { value: 50, label: "Moneda de $50", kind: "coin" },
+];
+
+function formatCashDate(value) {
+  if (!value) return "la fecha seleccionada";
+  const parsed = new Date(`${String(value).slice(0, 10)}T00:00:00`);
+  if (Number.isNaN(parsed.getTime())) return String(value);
+  return new Intl.DateTimeFormat("es-CO", { day: "numeric", month: "long", year: "numeric" }).format(parsed);
+}
+
+function CashKpi({ icon: Icon, label, value, tone }) {
   return (
-    <>
-      {activeView === "caja" ? (
-          <section className="order-block accounting-cash-panel">
-            <div className="looker-header">
-              <div>
-                <h4>Caja</h4>
-                <p className="orders-admin-subtitle">Cierre de efectivo por fecha. Los datos se consultan y guardan en base de datos.</p>
-              </div>
-            </div>
+    <article className={`cash-workspace-kpi is-${tone}`}>
+      <span className="cash-workspace-kpi-icon" aria-hidden="true"><Icon size={22} strokeWidth={2.2} /></span>
+      <span><small>{label}</small><strong>${formatearCOP(value)}</strong></span>
+    </article>
+  );
+}
 
-            <section className="accounting-analytics-panel accounting-cash-dashboard">
-              <div className="accounting-panel-head">
-                <div>
-                  <span>Dashboard de caja</span>
-                  <h3>{cashDashboardTotals.source === "period" ? "Balance financiero del periodo" : "Balance financiero del cierre"}</h3>
-                </div>
-                <Wallet size={22} strokeWidth={2} aria-hidden="true" />
-              </div>
-              <div className="accounting-cash-kpis">
-                {[
-                  ["Caja inicial", cashDashboardTotals.base],
-                  ["Ingresos efectivo", cashDashboardTotals.efectivo],
-                  ["Gastos", cashDashboardTotals.gasto],
-                  ["Caja final", cashDashboardTotals.totalEfectivo],
-                  ["Guardado", cashDashboardTotals.guardado],
-                  ["Nueva base", cashDashboardTotals.nuevaBase],
-                ].map(([label, value]) => (
-                  <article key={label} className="accounting-cash-kpi">
-                    <span>{label}</span>
-                    <strong>${formatearCOP(value)}</strong>
-                  </article>
-                ))}
-              </div>
-              <div className={`accounting-cash-balance ${cashDashboardTotals.nuevaBase >= 0 ? "is-ok" : "is-risk"}`}>
-                {cashDashboardTotals.nuevaBase >= 0 ? <CircleCheck size={18} strokeWidth={2} aria-hidden="true" /> : <CircleAlert size={18} strokeWidth={2} aria-hidden="true" />}
-                <span>{cashDashboardTotals.nuevaBase >= 0 ? "Cuadre correcto" : "Diferencia encontrada"}</span>
-                <strong>${formatearCOP(Math.abs(cashDashboardTotals.nuevaBase))}</strong>
-              </div>
-            </section>
+export function AccountingCashView({
+  activeView, canEditCashClosing, cashDashboardTotals, cashForm, cashHistoryRows,
+  cashLoading, efectivoValue, exportCaja, nuevaBaseValue, saveCashClosing, saving,
+  setCashForm, todayCashDate, totalEfectivoCaja,
+}) {
+  const [denominationCounts, setDenominationCounts] = useState({});
+  const [activeSection, setActiveSection] = useState("cierre");
+  const [expandedHistoryDate, setExpandedHistoryDate] = useState("");
+  const closeRef = useRef(null);
+  const countRef = useRef(null);
+  const historyRef = useRef(null);
+  const pettyCashRef = useRef(null);
 
-            <div className="accounting-cash-grid">
-              <label className="order-detail-edit-label">
-                Fecha
-                <input type="date" max={todayCashDate} value={cashForm.fecha} onChange={event => setCashForm(current => ({ ...current, fecha: event.target.value }))} />
-              </label>
-              <label className="order-detail-edit-label">
-                Base
-                <input type="number" min="0" step="0.01" value={cashForm.base} onChange={event => setCashForm(current => ({ ...current, base: event.target.value }))} placeholder="0.00" disabled={!canEditCashClosing} />
-              </label>
-              <label className="order-detail-edit-label">
-                Efectivo
-                <input type="text" value={`$${formatearCOP(efectivoValue)}`} readOnly className="order-detail-edit-readonly" />
-              </label>
-              <label className="order-detail-edit-label">
-                Gasto
-                <input type="number" min="0" step="0.01" value={cashForm.gasto} onChange={event => setCashForm(current => ({ ...current, gasto: event.target.value }))} placeholder="0.00" disabled={!canEditCashClosing} />
-              </label>
-              <label className="order-detail-edit-label">
-                T. Efectivo
-                <input type="text" value={`$${formatearCOP(totalEfectivoCaja)}`} readOnly className="order-detail-edit-readonly" />
-              </label>
-              <label className="order-detail-edit-label">
-                Guardado
-                <input type="number" min="0" step="0.01" value={cashForm.guardado} onChange={event => setCashForm(current => ({ ...current, guardado: event.target.value }))} placeholder="0.00" disabled={!canEditCashClosing} />
-              </label>
-              <label className="order-detail-edit-label">
-                Nueva Base
-                <input type="text" value={`$${formatearCOP(nuevaBaseValue)}`} readOnly className="order-detail-edit-readonly" />
-              </label>
-              <label className="order-detail-edit-label">
-                Observación
-                <input type="text" value={cashForm.observacion} onChange={event => setCashForm(current => ({ ...current, observacion: event.target.value }))} placeholder="Observación del cierre" disabled={!canEditCashClosing} />
-              </label>
-            </div>
+  const totalContadoValue = parseMoneyInput(cashForm.totalContado);
+  const hasTotalContado = String(cashForm.totalContado ?? "").trim() !== "";
+  const diferenciaCaja = hasTotalContado ? roundMoney(totalContadoValue - totalEfectivoCaja) : 0;
+  const sobranteValue = Math.max(diferenciaCaja, 0);
+  const faltanteValue = Math.max(-diferenciaCaja, 0);
+  const balanceDifference = cashDashboardTotals.sobrante || -cashDashboardTotals.faltante || 0;
 
-            <div className="order-detail-edit-actions">
-              <button type="button" className="btn-primary" onClick={saveCashClosing} disabled={saving || !canEditCashClosing}>
-                {saving ? "Guardando..." : "Guardar cierre"}
-              </button>
-              <button type="button" className="btn-outline" onClick={exportCaja} disabled={cashHistoryRows.length === 0}>
-                Descargar Excel
-              </button>
-            </div>
+  const denominationTotal = useMemo(() => CASH_DENOMINATIONS.reduce(
+    (total, item) => total + item.value * Number(denominationCounts[item.value] || 0), 0,
+  ), [denominationCounts]);
 
-            <section className="orders-table-wrap accounting-cash-history">
-              <div className="accounting-cash-history-head">
-                <div>
-                  <h4>Dias cerrados</h4>
-                  <p className="orders-admin-subtitle">Historial de cierres guardados para esta empresa y sucursal.</p>
-                </div>
-                <span>{cashHistoryRows.length} cierres</span>
-              </div>
-              <table className="orders-table accounting-table">
-                <thead>
-                  <tr>
-                    <th>Dia cerrado</th>
-                    <th>Base</th>
-                    <th>Efectivo</th>
-                    <th>Gasto</th>
-                    <th>Total_Efectivo</th>
-                    <th>Guardado</th>
-                    <th>Nueva_Base</th>
-                    <th>Observacion</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {cashHistoryRows.length === 0 ? (
-                    <tr>
-                      <td colSpan={8}>{cashLoading ? "Cargando cierres de caja..." : "No hay cierres de caja guardados en base de datos para el rango filtrado."}</td>
-                    </tr>
-                  ) : cashHistoryRows.map(row => (
-                    <tr key={row.fecha}>
-                      <td>{row.fecha}</td>
-                      <td>${formatearCOP(row.base)}</td>
-                      <td>${formatearCOP(row.efectivo)}</td>
-                      <td>${formatearCOP(row.gasto)}</td>
-                      <td>${formatearCOP(row.totalEfectivo)}</td>
-                      <td>${formatearCOP(row.guardado)}</td>
-                      <td>${formatearCOP(row.nuevaBase)}</td>
-                      <td>{row.observacion || "-"}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </section>
-          </section>
-        ) : null}
-    </>
+  const updateDenomination = (value, rawQuantity) => {
+    const quantity = Math.max(0, Math.trunc(Number(rawQuantity) || 0));
+    const nextCounts = { ...denominationCounts, [value]: quantity };
+    const nextTotal = CASH_DENOMINATIONS.reduce(
+      (total, item) => total + item.value * Number(nextCounts[item.value] || 0), 0,
+    );
+    setDenominationCounts(nextCounts);
+    setCashForm(current => ({ ...current, totalContado: String(nextTotal) }));
+  };
+
+  const clearCount = () => {
+    setDenominationCounts({});
+    setCashForm(current => ({ ...current, totalContado: "" }));
+  };
+
+  const navigateTo = (section) => {
+    const refs = { cierre: closeRef, movimientos: historyRef, arqueo: countRef, cajaMenor: pettyCashRef };
+    setActiveSection(section);
+    refs[section]?.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+
+  if (activeView !== "caja") return null;
+
+  return (
+    <section className="cash-workspace">
+      <section className="cash-balance-card">
+        <div className="cash-balance-head">
+          <div><h2>Balance del dia</h2><p>Resumen de la caja al {formatCashDate(cashForm.fecha)}</p></div>
+          <div className={`cash-balance-status ${balanceDifference === 0 ? "is-ok" : "is-risk"}`}>
+            {balanceDifference === 0 ? <CheckCircle2 size={20} aria-hidden="true" /> : <CircleAlert size={20} aria-hidden="true" />}
+            <strong>{balanceDifference === 0 ? "Cuadre correcto" : balanceDifference > 0 ? "Sobrante" : "Faltante"}</strong>
+            <span>Diferencia</span><b>${formatearCOP(Math.abs(balanceDifference))}</b>
+          </div>
+        </div>
+        <div className="cash-workspace-kpis">
+          <CashKpi icon={WalletCards} label="Base inicial" value={cashDashboardTotals.base} tone="pink" />
+          <CashKpi icon={ArrowUp} label="Ingresos en efectivo" value={cashDashboardTotals.efectivo} tone="green" />
+          <CashKpi icon={ArrowDown} label="Gastos en efectivo" value={cashDashboardTotals.gasto} tone="red" />
+          <CashKpi icon={Calculator} label="Total efectivo esperado" value={cashDashboardTotals.totalEfectivo} tone="blue" />
+          <CashKpi icon={Coins} label="Total contado (arqueo)" value={cashDashboardTotals.totalContado} tone="purple" />
+        </div>
+      </section>
+
+      <nav className="cash-section-tabs" aria-label="Secciones de caja">
+        <button type="button" className={activeSection === "cierre" ? "is-active" : ""} onClick={() => navigateTo("cierre")}><LockKeyhole size={17} />Cierre de caja</button>
+        <button type="button" className={activeSection === "movimientos" ? "is-active" : ""} onClick={() => navigateTo("movimientos")}><ListChecks size={17} />Movimientos</button>
+        <button type="button" className={activeSection === "arqueo" ? "is-active" : ""} onClick={() => navigateTo("arqueo")}><Coins size={17} />Arqueo de efectivo</button>
+        <button type="button" className={activeSection === "cajaMenor" ? "is-active" : ""} onClick={() => navigateTo("cajaMenor")}><Landmark size={17} />Caja menor</button>
+      </nav>
+
+      <div className="cash-closing-layout">
+        <section className="cash-closing-form" ref={closeRef}>
+          <div className="cash-form-grid">
+            <label>Fecha de cierre<input type="date" max={todayCashDate} value={cashForm.fecha} onChange={event => setCashForm(current => ({ ...current, fecha: event.target.value }))} /></label>
+            <label>Total efectivo esperado<input type="text" value={`$ ${formatearCOP(totalEfectivoCaja)}`} readOnly /></label>
+            <label>Base inicial<input type="number" min="0" step="0.01" value={cashForm.base} onChange={event => setCashForm(current => ({ ...current, base: event.target.value }))} disabled={!canEditCashClosing} /></label>
+            <label>Total contado (arqueo)<input type="text" value={hasTotalContado ? `$ ${formatearCOP(totalContadoValue)}` : "Pendiente de conteo"} readOnly /></label>
+            <label>Ingresos en efectivo<input type="text" value={`$ ${formatearCOP(efectivoValue)}`} readOnly /></label>
+            <label>Diferencia<input className={diferenciaCaja === 0 ? "is-balanced" : "is-difference"} type="text" value={`${diferenciaCaja < 0 ? "-" : ""}$ ${formatearCOP(Math.abs(diferenciaCaja))}`} readOnly /></label>
+            <label>Gastos en efectivo<input type="number" min="0" step="0.01" value={cashForm.gasto} onChange={event => setCashForm(current => ({ ...current, gasto: event.target.value }))} disabled={!canEditCashClosing} /></label>
+            <label ref={pettyCashRef}>Monto guardado<input type="number" min="0" step="0.01" value={cashForm.guardado} onChange={event => setCashForm(current => ({ ...current, guardado: event.target.value }))} disabled={!canEditCashClosing} /></label>
+            <label>Nueva base<input type="text" value={`$ ${formatearCOP(nuevaBaseValue)}`} readOnly /></label>
+            <label>Resultado del arqueo<input type="text" value={faltanteValue > 0 ? `Faltante: $ ${formatearCOP(faltanteValue)}` : sobranteValue > 0 ? `Sobrante: $ ${formatearCOP(sobranteValue)}` : "Caja cuadrada"} readOnly /></label>
+            <label className="cash-observation-field">Observacion del cierre<textarea value={cashForm.observacion} onChange={event => setCashForm(current => ({ ...current, observacion: event.target.value }))} placeholder="Observacion del cierre" disabled={!canEditCashClosing} /></label>
+          </div>
+          <div className="cash-form-actions"><button type="button" className="btn-primary" onClick={saveCashClosing} disabled={saving || !canEditCashClosing}><Save size={17} aria-hidden="true" />{saving ? "Guardando..." : "Guardar cierre"}</button></div>
+        </section>
+
+        <aside className="cash-count-panel" ref={countRef}>
+          <div className="cash-count-head"><div><h3>Arqueo de billetes y monedas</h3><p>Ingrese la cantidad fisica contada.</p></div><Banknote size={22} aria-hidden="true" /></div>
+          <div className="cash-count-table-head"><span>Denominacion</span><span>Cantidad</span><span>Subtotal</span></div>
+          <div className="cash-denomination-list">
+            {CASH_DENOMINATIONS.map(item => {
+              const quantity = Number(denominationCounts[item.value] || 0);
+              return (
+                <label key={item.value} className="cash-denomination-row">
+                  <span className={`cash-denomination-icon is-${item.kind}`} aria-hidden="true">{item.kind === "coin" ? <Coins size={17} /> : <Banknote size={18} />}</span>
+                  <span>{item.label}</span>
+                  <input type="number" min="0" step="1" inputMode="numeric" value={quantity} onChange={event => updateDenomination(item.value, event.target.value)} disabled={!canEditCashClosing} aria-label={`Cantidad de ${item.label}`} />
+                  <strong>$ {formatearCOP(item.value * quantity)}</strong>
+                </label>
+              );
+            })}
+          </div>
+          <div className="cash-count-total"><span>Total contado</span><strong>$ {formatearCOP(denominationTotal || totalContadoValue)}</strong></div>
+          <button type="button" className="btn-outline cash-clear-count" onClick={clearCount} disabled={!canEditCashClosing || (!hasTotalContado && denominationTotal === 0)}><Trash2 size={16} />Limpiar conteo</button>
+        </aside>
+      </div>
+
+      <section className="cash-history-card" ref={historyRef}>
+        <div className="cash-history-head">
+          <div><h3>Historial de cierres</h3><p>Cierres guardados para esta empresa y sucursal.</p></div>
+          <div className="cash-history-actions"><span>{cashHistoryRows.length} {cashHistoryRows.length === 1 ? "cierre" : "cierres"}</span><button type="button" className="btn-outline" onClick={exportCaja} disabled={cashHistoryRows.length === 0}>Exportar Excel</button></div>
+        </div>
+        <div className="cash-history-scroll">
+          <table className="orders-table accounting-table cash-history-table">
+            <thead><tr><th>Fecha</th><th>Base</th><th>Ingresos</th><th>Gastos</th><th>Total esperado</th><th>Total contado</th><th>Diferencia</th><th>Guardado</th><th>Nueva base</th><th>Observacion</th><th>Acciones</th></tr></thead>
+            <tbody>
+              {cashHistoryRows.length === 0 ? <tr><td colSpan={11}>{cashLoading ? "Cargando cierres de caja..." : "No hay cierres de caja guardados para el rango filtrado."}</td></tr> : cashHistoryRows.map(row => {
+                const rowDifference = Number(row.sobrante || 0) - Number(row.faltante || 0);
+                const expanded = expandedHistoryDate === row.fecha;
+                return [
+                  <tr key={row.fecha}>
+                    <td>{row.fecha}</td><td>$ {formatearCOP(row.base)}</td><td>$ {formatearCOP(row.efectivo)}</td><td>$ {formatearCOP(row.gasto)}</td><td>$ {formatearCOP(row.totalEfectivo)}</td>
+                    <td>{row.totalContado == null ? "Sin arqueo" : `$ ${formatearCOP(row.totalContado)}`}</td><td><span className={`cash-difference-pill ${rowDifference === 0 ? "is-ok" : "is-risk"}`}>{rowDifference < 0 ? "-" : rowDifference > 0 ? "+" : ""}$ {formatearCOP(Math.abs(rowDifference))}</span></td>
+                    <td>$ {formatearCOP(row.guardado)}</td><td>$ {formatearCOP(row.nuevaBase)}</td><td>{row.observacion || "-"}</td>
+                    <td><button type="button" className="cash-icon-button" onClick={() => setExpandedHistoryDate(expanded ? "" : row.fecha)} title={expanded ? "Ocultar detalle" : "Ver detalle"} aria-expanded={expanded}><Eye size={18} /></button></td>
+                  </tr>,
+                  expanded ? <tr key={`${row.fecha}-detail`} className="cash-history-detail"><td colSpan={11}>Sobrante: <strong>$ {formatearCOP(row.sobrante)}</strong><span />Faltante: <strong>$ {formatearCOP(row.faltante)}</strong><span />Estado: <strong>{row.totalContado == null ? "Historico sin arqueo" : "Arqueo registrado"}</strong></td></tr> : null,
+                ];
+              })}
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </section>
   );
 }

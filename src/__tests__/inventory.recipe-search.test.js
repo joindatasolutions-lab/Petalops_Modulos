@@ -43,4 +43,40 @@ describe("datos del formulario de producto", () => {
       activo: false,
     });
   });
+
+  it("envia costos por paquete y precios publicos de flores", () => {
+    const payload = buildCreateItemPayload({
+      codigo: "FLO-002",
+      nombre: "Rosa Explorer",
+      categoria: "Flores",
+      unidadMedida: "Tallo",
+      valorUnitario: "2500",
+      costoPaquete: "30000",
+      precioVenta: "4000",
+      precioVentaPaquete: "45000",
+      activo: true,
+    }, 3, "flores");
+
+    expect(payload).toMatchObject({
+      valorUnitario: 2500,
+      costoPaquete: 30000,
+      precioVenta: 4000,
+      precioVentaPaquete: 45000,
+    });
+  });
+
+  it("no envia precio de venta por paquete fuera de flores", () => {
+    const payload = buildCreateItemPayload({
+      codigo: "BAS-001",
+      nombre: "Base cilindrica",
+      categoria: "Bases",
+      unidadMedida: "Unidad",
+      costoPaquete: "80000",
+      precioVentaPaquete: "120000",
+      activo: true,
+    }, 3, "bases");
+
+    expect(payload.costoPaquete).toBe(80000);
+    expect(payload.precioVentaPaquete).toBeNull();
+  });
 });

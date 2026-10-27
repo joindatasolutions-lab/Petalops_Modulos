@@ -198,12 +198,14 @@ export function buildCreateItemPayload(createForm, empresaId, moduloActivo) {
     diasVidaUtil: createForm.diasVidaUtil !== "" ? Number(createForm.diasVidaUtil) : null,
     observaciones: String(createForm.observaciones || "").trim() || null,
     marca: String(createForm.marca || "").trim() || null,
-    precioVenta: moduloActivo === "adicionales" || createForm.vendibleUnidad ? Number(createForm.precioVenta || 0) : null,
+    precioVenta: ["adicionales", "flores"].includes(moduloActivo) ? Number(createForm.precioVenta || 0) : null,
+    precioVentaPaquete: moduloActivo === "flores" && createForm.precioVentaPaquete !== "" ? Number(createForm.precioVentaPaquete) : null,
     vendibleUnidad: Boolean(createForm.vendibleUnidad),
     proveedorID: createForm.proveedorID ? Number(createForm.proveedorID) : null,
     stockActual: Number(createForm.stockActual || 0),
     stockMinimo: Number(createForm.stockMinimo || 0),
     valorUnitario: Number(createForm.valorUnitario || 0),
+    costoPaquete: createForm.costoPaquete !== "" ? Number(createForm.costoPaquete) : null,
     activo: Boolean(createForm.activo),
   };
 }

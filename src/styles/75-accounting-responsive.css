@@ -745,3 +745,359 @@
     white-space: normal !important;
   }
 }
+
+/* Caja: cierre y arqueo operativo */
+.accounting-page-view .accounting-cash-title-icon {
+  align-items: center;
+  background: #fff0f6;
+  border: 1px solid #f4bad2;
+  border-radius: 8px;
+  color: #e91e72;
+  display: inline-flex;
+  height: 44px;
+  justify-content: center;
+  width: 44px;
+}
+
+.accounting-page-view .cash-workspace {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+}
+
+.accounting-page-view .cash-balance-card,
+.accounting-page-view .cash-closing-form,
+.accounting-page-view .cash-count-panel,
+.accounting-page-view .cash-history-card {
+  background: #ffffff;
+  border: 1px solid #e4e9f1;
+  border-radius: 8px;
+  box-shadow: 0 8px 22px rgba(15, 23, 42, 0.045);
+  min-width: 0;
+}
+
+.accounting-page-view .cash-balance-card {
+  padding: 16px;
+}
+
+.accounting-page-view .cash-balance-head,
+.accounting-page-view .cash-count-head,
+.accounting-page-view .cash-history-head,
+.accounting-page-view .cash-history-actions,
+.accounting-page-view .cash-form-actions {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+}
+
+.accounting-page-view .cash-balance-head h2,
+.accounting-page-view .cash-count-head h3,
+.accounting-page-view .cash-history-head h3 {
+  color: #0f172a;
+  font-size: 18px;
+  font-weight: 900;
+  margin: 0;
+}
+
+.accounting-page-view .cash-balance-head p,
+.accounting-page-view .cash-count-head p,
+.accounting-page-view .cash-history-head p {
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 650;
+  margin: 4px 0 0;
+}
+
+.accounting-page-view .cash-balance-status {
+  align-items: center;
+  border-radius: 8px;
+  display: grid;
+  gap: 8px;
+  grid-template-columns: auto minmax(110px, 1fr) auto auto;
+  min-height: 48px;
+  padding: 0 14px;
+}
+
+.accounting-page-view .cash-balance-status.is-ok {
+  background: #eafaf1;
+  color: #148044;
+}
+
+.accounting-page-view .cash-balance-status.is-risk {
+  background: #fff1f2;
+  color: #be123c;
+}
+
+.accounting-page-view .cash-balance-status strong,
+.accounting-page-view .cash-balance-status span {
+  font-size: 12px;
+}
+
+.accounting-page-view .cash-balance-status b {
+  font-size: 22px;
+}
+
+.accounting-page-view .cash-workspace-kpis {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  margin-top: 14px;
+}
+
+.accounting-page-view .cash-workspace-kpi {
+  --cash-kpi-color: #e91e72;
+  --cash-kpi-bg: #fff2f7;
+  align-items: center;
+  background: var(--cash-kpi-bg);
+  border: 1px solid color-mix(in srgb, var(--cash-kpi-color) 15%, #e5e7eb);
+  border-radius: 8px;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: 38px minmax(0, 1fr);
+  min-height: 76px;
+  padding: 12px;
+}
+
+.accounting-page-view .cash-workspace-kpi.is-green { --cash-kpi-color: #16a34a; --cash-kpi-bg: #effbf3; }
+.accounting-page-view .cash-workspace-kpi.is-red { --cash-kpi-color: #dc2626; --cash-kpi-bg: #fff3f3; }
+.accounting-page-view .cash-workspace-kpi.is-blue { --cash-kpi-color: #2563eb; --cash-kpi-bg: #eff5ff; }
+.accounting-page-view .cash-workspace-kpi.is-purple { --cash-kpi-color: #7c3aed; --cash-kpi-bg: #f6f1ff; }
+
+.accounting-page-view .cash-workspace-kpi-icon {
+  align-items: center;
+  background: #ffffff;
+  border-radius: 8px;
+  color: var(--cash-kpi-color);
+  display: inline-flex;
+  height: 38px;
+  justify-content: center;
+  width: 38px;
+}
+
+.accounting-page-view .cash-workspace-kpi small,
+.accounting-page-view .cash-workspace-kpi strong {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.accounting-page-view .cash-workspace-kpi small {
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 750;
+}
+
+.accounting-page-view .cash-workspace-kpi strong {
+  color: #111827;
+  font-size: 20px;
+  margin-top: 5px;
+}
+
+.accounting-page-view .cash-section-tabs {
+  align-items: stretch;
+  background: #ffffff;
+  border: 1px solid #e4e9f1;
+  border-radius: 8px 8px 0 0;
+  display: flex;
+  overflow-x: auto;
+  width: fit-content;
+  max-width: 100%;
+}
+
+.accounting-page-view .cash-section-tabs button {
+  align-items: center;
+  background: #f8fafc;
+  border: 0;
+  border-right: 1px solid #e4e9f1;
+  color: #475569;
+  cursor: pointer;
+  display: inline-flex;
+  font-size: 12px;
+  font-weight: 800;
+  gap: 7px;
+  min-height: 44px;
+  padding: 0 16px;
+  white-space: nowrap;
+}
+
+.accounting-page-view .cash-section-tabs button:last-child { border-right: 0; }
+.accounting-page-view .cash-section-tabs button.is-active {
+  background: #fff0f6;
+  box-shadow: inset 0 -3px #e91e72;
+  color: #d11e65;
+}
+
+.accounting-page-view .cash-closing-layout {
+  align-items: stretch;
+  display: grid;
+  gap: 14px;
+  grid-template-columns: minmax(0, 1.9fr) minmax(360px, 1fr);
+}
+
+.accounting-page-view .cash-closing-form,
+.accounting-page-view .cash-count-panel {
+  padding: 16px;
+  scroll-margin-top: 16px;
+}
+
+.accounting-page-view .cash-form-grid {
+  display: grid;
+  gap: 12px 16px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.accounting-page-view .cash-form-grid label {
+  color: #5c6b83;
+  display: grid;
+  font-size: 12px;
+  font-weight: 700;
+  gap: 6px;
+  min-width: 0;
+}
+
+.accounting-page-view .cash-form-grid input,
+.accounting-page-view .cash-form-grid textarea,
+.accounting-page-view .cash-denomination-row input {
+  background: #ffffff;
+  border: 1px solid #d9e0ea;
+  border-radius: 6px;
+  color: #0f172a;
+  font: inherit;
+  min-height: 40px;
+  padding: 8px 11px;
+  width: 100%;
+}
+
+.accounting-page-view .cash-form-grid input[readonly] { background: #f1f5f9; }
+.accounting-page-view .cash-form-grid input.is-balanced { background: #ebfaf1; color: #15803d; }
+.accounting-page-view .cash-form-grid input.is-difference { background: #fff1f2; color: #be123c; }
+.accounting-page-view .cash-form-grid textarea { min-height: 74px; resize: vertical; }
+.accounting-page-view .cash-observation-field { grid-column: 1 / -1; }
+.accounting-page-view .cash-form-actions { margin-top: 14px; }
+.accounting-page-view .cash-form-actions .btn-primary { margin-left: auto; }
+.accounting-page-view .cash-form-actions button,
+.accounting-page-view .cash-clear-count { align-items: center; display: inline-flex; gap: 7px; justify-content: center; }
+
+.accounting-page-view .cash-count-table-head,
+.accounting-page-view .cash-denomination-row {
+  align-items: center;
+  display: grid;
+  gap: 8px;
+  grid-template-columns: 32px minmax(130px, 1fr) 74px 94px;
+}
+
+.accounting-page-view .cash-count-table-head {
+  color: #64748b;
+  font-size: 10px;
+  font-weight: 900;
+  margin-top: 12px;
+  padding: 7px 0;
+  text-transform: uppercase;
+}
+
+.accounting-page-view .cash-count-table-head span:first-child { grid-column: 1 / 3; }
+.accounting-page-view .cash-count-table-head span:last-child { text-align: right; }
+.accounting-page-view .cash-denomination-list { display: grid; max-height: 402px; overflow-y: auto; }
+
+.accounting-page-view .cash-denomination-row {
+  border-top: 1px solid #eef2f7;
+  color: #526179;
+  font-size: 12px;
+  min-height: 42px;
+}
+
+.accounting-page-view .cash-denomination-icon {
+  align-items: center;
+  background: #eaf5ee;
+  border-radius: 5px;
+  color: #397a52;
+  display: inline-flex;
+  height: 26px;
+  justify-content: center;
+  width: 30px;
+}
+
+.accounting-page-view .cash-denomination-icon.is-coin { background: #fff5cf; color: #b7791f; border-radius: 50%; width: 26px; }
+.accounting-page-view .cash-denomination-row input { min-height: 30px; padding: 4px 7px; }
+.accounting-page-view .cash-denomination-row strong { color: #111827; font-size: 12px; text-align: right; white-space: nowrap; }
+
+.accounting-page-view .cash-count-total {
+  align-items: center;
+  background: #eafaf1;
+  border-radius: 7px;
+  color: #15803d;
+  display: flex;
+  justify-content: space-between;
+  margin-top: 10px;
+  padding: 12px;
+}
+
+.accounting-page-view .cash-count-total span { font-size: 13px; font-weight: 800; }
+.accounting-page-view .cash-count-total strong { font-size: 21px; }
+.accounting-page-view .cash-clear-count { margin-top: 10px; width: 100%; }
+
+.accounting-page-view .cash-history-card { overflow: hidden; scroll-margin-top: 16px; }
+.accounting-page-view .cash-history-head { border-bottom: 1px solid #e4e9f1; padding: 14px 16px; }
+.accounting-page-view .cash-history-actions > span {
+  background: #fff0f6;
+  border-radius: 999px;
+  color: #d11e65;
+  font-size: 11px;
+  font-weight: 850;
+  padding: 7px 11px;
+  white-space: nowrap;
+}
+.accounting-page-view .cash-history-scroll { overflow-x: auto; }
+.accounting-page-view .cash-history-table { min-width: 1160px; }
+.accounting-page-view .cash-history-table th,
+.accounting-page-view .cash-history-table td { padding: 11px 12px !important; white-space: nowrap; }
+.accounting-page-view .cash-difference-pill { border-radius: 999px; display: inline-flex; font-size: 11px; font-weight: 900; padding: 5px 9px; }
+.accounting-page-view .cash-difference-pill.is-ok { background: #dcfce7; color: #15803d; }
+.accounting-page-view .cash-difference-pill.is-risk { background: #fee2e2; color: #b91c1c; }
+.accounting-page-view .cash-icon-button {
+  align-items: center;
+  background: #ffffff;
+  border: 1px solid #dbe3ed;
+  border-radius: 50%;
+  color: #1e3a5f;
+  cursor: pointer;
+  display: inline-flex;
+  height: 34px;
+  justify-content: center;
+  width: 34px;
+}
+.accounting-page-view .cash-history-detail td { background: #f8fafc !important; color: #64748b !important; }
+.accounting-page-view .cash-history-detail span { border-left: 1px solid #cbd5e1; margin: 0 14px; }
+
+@media (max-width: 1280px) {
+  .accounting-page-view .cash-workspace-kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .accounting-page-view .cash-closing-layout { grid-template-columns: minmax(0, 1.35fr) minmax(340px, 0.8fr); }
+}
+
+@media (max-width: 980px) {
+  .accounting-page-view .cash-workspace-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .accounting-page-view .cash-closing-layout { grid-template-columns: minmax(0, 1fr); }
+  .accounting-page-view .cash-balance-head { align-items: stretch; flex-direction: column; }
+  .accounting-page-view .cash-balance-status { width: 100%; }
+}
+
+@media (max-width: 620px) {
+  .accounting-page-view .cash-balance-card,
+  .accounting-page-view .cash-closing-form,
+  .accounting-page-view .cash-count-panel { padding: 12px; }
+  .accounting-page-view .cash-workspace-kpis,
+  .accounting-page-view .cash-form-grid { grid-template-columns: minmax(0, 1fr); }
+  .accounting-page-view .cash-observation-field { grid-column: auto; }
+  .accounting-page-view .cash-balance-status { grid-template-columns: auto 1fr auto; }
+  .accounting-page-view .cash-balance-status span { display: none; }
+  .accounting-page-view .cash-section-tabs { width: 100%; }
+  .accounting-page-view .cash-section-tabs button { flex: 0 0 auto; }
+  .accounting-page-view .cash-history-head { align-items: flex-start; flex-direction: column; }
+  .accounting-page-view .cash-history-actions { justify-content: space-between; width: 100%; }
+  .accounting-page-view .cash-count-table-head,
+  .accounting-page-view .cash-denomination-row { grid-template-columns: 28px minmax(105px, 1fr) 62px 82px; gap: 5px; }
+  .accounting-page-view .cash-denomination-row strong { font-size: 10px; }
+}

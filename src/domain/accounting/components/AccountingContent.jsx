@@ -1,4 +1,4 @@
-import { Banknote, CalendarDays, ChevronDown, FileSpreadsheet, FileText, Filter, ListChecks, MoreHorizontal, Package, Receipt, RefreshCw, ShoppingCart, XCircle } from "lucide-react";
+import { Banknote, CalendarDays, ChevronDown, FileSpreadsheet, FileText, Filter, ListChecks, MoreHorizontal, Package, Receipt, RefreshCw, ShoppingCart, WalletCards, XCircle } from "lucide-react";
 import { formatearCOP } from "../../../shared/utils.js";
 import { ACCOUNTING_VIEWS, ACCOUNTING_VIEW_ICONS } from "../accountingConstants.js";
 import { AccountingArrangementsView, AccountingCashView, AccountingDetailView, AccountingPaymentAccountsView, AccountingPersonnelView, AccountingSalesView } from "./AccountingViews.jsx";
@@ -107,6 +107,7 @@ export function AccountingContent(contentProps) {
   toggleDatosTransferenciaCatalogo,
   } = contentProps;
   const isPaymentMethodsConfigView = activeView === "metodosPago";
+  const isCashView = activeView === "caja";
   const refreshing = isPaymentMethodsConfigView ? paymentMethodsLoading : loading;
   return (
       <main className={`orders-admin-view accounting-view accounting-page-view ${activeView === "personal" ? "is-personal-view" : ""}`}>
@@ -118,15 +119,16 @@ export function AccountingContent(contentProps) {
               <strong>Contabilidad</strong>
             </div>
             <div className="orders-page-title-row">
-              <h1>Contabilidad</h1>
+              {isCashView ? <span className="accounting-cash-title-icon" aria-hidden="true"><WalletCards size={28} /></span> : null}
+              <h1>{isCashView ? "Caja" : "Contabilidad"}</h1>
             </div>
             <p className="orders-admin-subtitle orders-page-description">
-              Controla ventas, recaudos, descuentos, saldos a favor y cierres de caja por periodo.
+              {isCashView ? "Control de efectivo, ingresos, gastos y cierre de caja." : "Controla ventas, recaudos, descuentos, saldos a favor y cierres de caja por periodo."}
             </p>
-            <span className="orders-user-pill">
+            {!isCashView ? <span className="orders-user-pill">
               <span aria-hidden="true" />
               Sesion activa: {displayUserName}
-            </span>
+            </span> : null}
           </div>
           <div className="orders-header-side">
             <div className="header-actions">
@@ -178,7 +180,7 @@ export function AccountingContent(contentProps) {
                 {refreshing ? "Actualizando..." : "Actualizar"}
             </button>
           </div>
-          {activeView !== "personal" && !isPaymentMethodsConfigView ? (
+          {activeView !== "personal" && !isPaymentMethodsConfigView && !isCashView ? (
           <div className="orders-header-metrics accounting-header-metrics" aria-label="Resumen contabilidad">
             <article className="orders-header-metric-card is-primary">
                 <span className="orders-header-metric-icon" aria-hidden="true"><ShoppingCart size={20} strokeWidth={2} /></span>

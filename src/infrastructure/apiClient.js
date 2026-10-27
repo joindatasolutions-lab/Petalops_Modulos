@@ -1530,7 +1530,7 @@ export function createApiClient(config) {
       return requestJson(`/contabilidad/caja/efectivo?${params.toString()}`);
     },
 
-    async guardarCierreCaja({ empresaId, sucursalId, fecha, base, efectivo, gasto, totalEfectivo, guardado, nuevaBase, observacion, usuarioId }) {
+    async guardarCierreCaja({ empresaId, sucursalId, fecha, base, efectivo, gasto, totalEfectivo, totalContado, guardado, nuevaBase, observacion, usuarioId }) {
       return requestJson("/contabilidad/caja/cierre", {
         method: "PUT",
         headers: {
@@ -1544,6 +1544,7 @@ export function createApiClient(config) {
           efectivo,
           gasto,
           totalEfectivo,
+          totalContado,
           guardado,
           nuevaBase,
           observacion: observacion || "",

@@ -116,11 +116,13 @@ export function InventoryPage({
     observaciones: "",
     marca: "",
     precioVenta: "0",
+    precioVentaPaquete: "",
     vendibleUnidad: false,
     proveedorID: "",
     stockActual: "0",
     stockMinimo: "5",
     valorUnitario: "0",
+    costoPaquete: "",
     activo: true,
   }), [moduloConfig]);
 
@@ -672,11 +674,13 @@ export function InventoryPage({
       observaciones: item.observaciones || "",
       marca: item.marca || "",
       precioVenta: item.precioVenta != null ? String(item.precioVenta) : "0",
+      precioVentaPaquete: item.precioVentaPaquete != null ? String(item.precioVentaPaquete) : "",
       vendibleUnidad: Boolean(item.vendibleUnidad),
       proveedorID: item.proveedorID ? String(item.proveedorID) : "",
       stockActual: item.stockActual != null ? String(item.stockActual) : "0",
       stockMinimo: item.stockMinimo != null ? String(item.stockMinimo) : "0",
       valorUnitario: item.valorUnitario != null ? String(item.valorUnitario) : "0",
+      costoPaquete: item.costoPaquete != null ? String(item.costoPaquete) : "",
       activo: Boolean(item.activo),
     });
     setVistaActiva("crear");
@@ -1355,8 +1359,12 @@ export function InventoryPage({
                       <input type="number" min="0" step="0.01" value={createForm.stockMinimo} onChange={e => setCreateForm(f => ({ ...f, stockMinimo: e.target.value }))} required />
                     </label>
                     <label className="inventory-field">
-                      <span>Costo unitario</span>
+                      <span>Costo por unidad</span>
                       <input type="number" min="0" step="0.01" value={createForm.valorUnitario} onChange={e => setCreateForm(f => ({ ...f, valorUnitario: e.target.value }))} required />
+                    </label>
+                    <label className="inventory-field">
+                      <span>Costo por paquete</span>
+                      <input type="number" min="0" step="0.01" placeholder="Opcional" value={createForm.costoPaquete} onChange={e => setCreateForm(f => ({ ...f, costoPaquete: e.target.value }))} />
                     </label>
                     <label className="inventory-field">
                       <span>Días de vida útil</span>
@@ -1374,10 +1382,16 @@ export function InventoryPage({
                         <span>Vendible por unidad</span>
                       </label>
                     ) : null}
-                    {(moduloActivo === "adicionales" || createForm.vendibleUnidad) ? (
+                    {(moduloActivo === "adicionales" || moduloActivo === "flores") ? (
                       <label className="inventory-field">
-                        <span>Precio de venta</span>
+                        <span>{moduloActivo === "flores" ? "Precio de venta por unidad" : "Precio de venta"}</span>
                         <input type="number" min="0" step="0.01" value={createForm.precioVenta} onChange={e => setCreateForm(f => ({ ...f, precioVenta: e.target.value }))} />
+                      </label>
+                    ) : null}
+                    {moduloActivo === "flores" ? (
+                      <label className="inventory-field">
+                        <span>Precio de venta por paquete</span>
+                        <input type="number" min="0" step="0.01" placeholder="Opcional" value={createForm.precioVentaPaquete} onChange={e => setCreateForm(f => ({ ...f, precioVentaPaquete: e.target.value }))} />
                       </label>
                     ) : null}
                   </div>
@@ -1541,8 +1555,12 @@ export function InventoryPage({
                   <div><dt>Marca</dt><dd>{detailModalItem.marca || "-"}</dd></div>
                   <div><dt>Proveedor</dt><dd>{detailModalItem.proveedor || "-"}</dd></div>
                   <div><dt>Código proveedor</dt><dd>{detailModalItem.codigoProveedor || "-"}</dd></div>
-                  <div><dt>Costo unitario</dt><dd>${formatearCOP(detailModalItem.valorUnitario || 0)}</dd></div>
-                  <div><dt>Precio de venta</dt><dd>{detailModalItem.precioVenta != null ? `$${formatearCOP(detailModalItem.precioVenta)}` : "-"}</dd></div>
+                  <div><dt>Costo por unidad</dt><dd>${formatearCOP(detailModalItem.valorUnitario || 0)}</dd></div>
+                  <div><dt>Costo por paquete</dt><dd>{detailModalItem.costoPaquete != null ? `$${formatearCOP(detailModalItem.costoPaquete)}` : "-"}</dd></div>
+                  <div><dt>Precio de venta por unidad</dt><dd>{detailModalItem.precioVenta != null ? `$${formatearCOP(detailModalItem.precioVenta)}` : "-"}</dd></div>
+                  {String(detailModalItem.categoria || "").toLowerCase() === "flores" ? (
+                    <div><dt>Precio de venta por paquete</dt><dd>{detailModalItem.precioVentaPaquete != null ? `$${formatearCOP(detailModalItem.precioVentaPaquete)}` : "-"}</dd></div>
+                  ) : null}
                   <div><dt>Días de vida útil</dt><dd>{detailModalItem.diasVidaUtil != null ? `${detailModalItem.diasVidaUtil} días` : "-"}</dd></div>
                   <div><dt>Vencimiento</dt><dd>{detailModalItem.fechaVencimiento ? String(detailModalItem.fechaVencimiento).slice(0, 10) : "-"}</dd></div>
                   <div><dt>Vendible por unidad</dt><dd>{detailModalItem.vendibleUnidad ? "Sí" : "No"}</dd></div>

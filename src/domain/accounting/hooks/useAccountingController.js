@@ -160,6 +160,7 @@ export function useAccountingController({ session, canViewUsuariosGlobal = false
           base: savedClosing.base ?? "",
           efectivo: savedClosing.efectivo ?? "",
           gasto: savedClosing.gasto ?? "",
+          totalContado: savedClosing.totalContado ?? "",
           guardado: savedClosing.guardado ?? "",
           totalEfectivo: savedClosing.totalEfectivo ?? "",
           observacion: savedClosing.observacion ?? "",
@@ -181,6 +182,7 @@ export function useAccountingController({ session, canViewUsuariosGlobal = false
         base: row?.base ?? "",
         efectivo: row?.efectivo ?? "",
         gasto: row?.gasto ?? "",
+        totalContado: row?.totalContado ?? "",
         guardado: row?.guardado ?? "",
         totalEfectivo: row?.totalEfectivo ?? "",
         observacion: row?.observacion ?? "",
@@ -205,6 +207,7 @@ export function useAccountingController({ session, canViewUsuariosGlobal = false
         base: "",
         efectivo: "",
         gasto: "",
+        totalContado: "",
         guardado: "",
         totalEfectivo: "",
         observacion: "",
@@ -498,10 +501,15 @@ export function useAccountingController({ session, canViewUsuariosGlobal = false
   const baseValue = parseMoneyInput(cashForm.base);
   const efectivoValue = parseMoneyInput(cashForm.efectivo);
   const gastoValue = parseMoneyInput(cashForm.gasto);
+  const totalContadoValue = parseMoneyInput(cashForm.totalContado);
+  const hasTotalContado = String(cashForm.totalContado ?? "").trim() !== "";
   const guardadoInputValue = parseMoneyInput(cashForm.guardado);
   const totalEfectivoCaja = roundMoney(baseValue + efectivoValue - gastoValue);
   const guardadoValue = roundMoney(guardadoInputValue);
-  const nuevaBaseValue = roundMoney(totalEfectivoCaja - guardadoValue);
+  const diferenciaCajaValue = hasTotalContado ? roundMoney(totalContadoValue - totalEfectivoCaja) : 0;
+  const sobranteValue = roundMoney(Math.max(diferenciaCajaValue, 0));
+  const faltanteValue = roundMoney(Math.max(-diferenciaCajaValue, 0));
+  const nuevaBaseValue = roundMoney((hasTotalContado ? totalContadoValue : totalEfectivoCaja) - guardadoValue);
   const cashDashboardTotals = useMemo(() => {
     if (cashHistoryRows.length === 0) {
       return {
@@ -509,6 +517,9 @@ export function useAccountingController({ session, canViewUsuariosGlobal = false
         efectivo: efectivoValue,
         gasto: gastoValue,
         totalEfectivo: totalEfectivoCaja,
+        totalContado: hasTotalContado ? totalContadoValue : totalEfectivoCaja,
+        sobrante: sobranteValue,
+        faltante: faltanteValue,
         guardado: guardadoValue,
         nuevaBase: nuevaBaseValue,
         source: "day",
@@ -520,6 +531,9 @@ export function useAccountingController({ session, canViewUsuariosGlobal = false
       efectivo: acc.efectivo + Number(row.efectivo || 0),
       gasto: acc.gasto + Number(row.gasto || 0),
       totalEfectivo: acc.totalEfectivo + Number(row.totalEfectivo || 0),
+      totalContado: acc.totalContado + Number(row.totalContado ?? row.totalEfectivo ?? 0),
+      sobrante: acc.sobrante + Number(row.sobrante || 0),
+      faltante: acc.faltante + Number(row.faltante || 0),
       guardado: acc.guardado + Number(row.guardado || 0),
       nuevaBase: acc.nuevaBase + Number(row.nuevaBase || 0),
     }), {
@@ -527,6 +541,9 @@ export function useAccountingController({ session, canViewUsuariosGlobal = false
       efectivo: 0,
       gasto: 0,
       totalEfectivo: 0,
+      totalContado: 0,
+      sobrante: 0,
+      faltante: 0,
       guardado: 0,
       nuevaBase: 0,
     });
@@ -536,11 +553,14 @@ export function useAccountingController({ session, canViewUsuariosGlobal = false
       efectivo: roundMoney(totals.efectivo),
       gasto: roundMoney(totals.gasto),
       totalEfectivo: roundMoney(totals.totalEfectivo),
+      totalContado: roundMoney(totals.totalContado),
+      sobrante: roundMoney(totals.sobrante),
+      faltante: roundMoney(totals.faltante),
       guardado: roundMoney(totals.guardado),
       nuevaBase: roundMoney(totals.nuevaBase),
       source: "period",
     };
-  }, [baseValue, cashHistoryRows, efectivoValue, gastoValue, guardadoValue, nuevaBaseValue, totalEfectivoCaja]);
+  }, [baseValue, cashHistoryRows, efectivoValue, faltanteValue, gastoValue, guardadoValue, hasTotalContado, nuevaBaseValue, sobranteValue, totalContadoValue, totalEfectivoCaja]);
   const todayCashDate = formatAccountingLocalDate(new Date());
   const selectedCashDate = String(cashForm.fecha || "").slice(0, 10);
   const selectedCashClosingExists = cashHistoryRows.some(row => row.fecha === selectedCashDate);
@@ -659,9 +679,21 @@ export function useAccountingController({ session, canViewUsuariosGlobal = false
       setInfo("No se puede operar una caja futura.");
       return;
     }
-    const values = [baseValue, efectivoValue, gastoValue, totalEfectivoCaja, guardadoValue, nuevaBaseValue];
+    if (String(cashForm.totalContado ?? "").trim() === "") {
+      setInfo("Ingresa el total fisico contado para realizar el arqueo.");
+      return;
+    }
+    const values = [baseValue, efectivoValue, gastoValue, totalContadoValue, guardadoValue];
     if (values.some(value => !Number.isFinite(value) || value < 0)) {
-      setInfo("Todos los valores de caja deben ser números mayores o iguales a cero.");
+      setInfo("Base, efectivo, gastos, total contado y guardado deben ser valores mayores o iguales a cero.");
+      return;
+    }
+    if (totalEfectivoCaja < 0) {
+      setInfo("Los gastos no pueden superar la base inicial mas los ingresos en efectivo.");
+      return;
+    }
+    if (guardadoValue > totalContadoValue) {
+      setInfo("El monto guardado no puede superar el total fisico contado.");
       return;
     }
 
@@ -675,6 +707,7 @@ export function useAccountingController({ session, canViewUsuariosGlobal = false
         efectivo: efectivoValue,
         gasto: gastoValue,
         totalEfectivo: totalEfectivoCaja,
+        totalContado: totalContadoValue,
         guardado: guardadoValue,
         nuevaBase: nuevaBaseValue,
         observacion: cashForm.observacion || "",
@@ -690,6 +723,7 @@ export function useAccountingController({ session, canViewUsuariosGlobal = false
           base: savedRow.base ?? current.base,
           efectivo: savedRow.efectivo ?? current.efectivo,
           gasto: savedRow.gasto ?? current.gasto,
+          totalContado: savedRow.totalContado ?? current.totalContado,
           guardado: savedRow.guardado ?? current.guardado,
           totalEfectivo: savedRow.totalEfectivo ?? current.totalEfectivo,
           observacion: savedRow.observacion ?? current.observacion,
