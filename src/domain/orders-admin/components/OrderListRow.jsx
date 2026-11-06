@@ -2,7 +2,7 @@ import { Clock3 } from "lucide-react";
 
 import { formatearCOP, normalizeStatus, splitDateTimeParts } from "../../../shared/utils.js";
 import {
-  isEmpresaAdminRole,
+  canCancelOrderForSession,
   resolveDisplayOrderNumber,
   resolveOrderId,
   resolveOrderListTotal,
@@ -50,7 +50,7 @@ export function OrderListRow({
   const waPhone = String(item.telefonoCompleto || item.telefono || "").trim().replace(/\+/g, "");
   const displayOrderNumber = resolveDisplayOrderNumber(item);
   const canApproveAction = isPendingStatus(item.estado);
-  const canCancelAction = canApproveAction || (isEmpresaAdminRole(session) && canInvoiceStatus(item.estado));
+  const canCancelAction = canCancelOrderForSession(session, item.estado);
   const isApproving = approvingPedidoIds.includes(Number(pedidoId));
   const approvalBlockedByTenant = canApproveAction && item?.puedeAprobar === false;
   const approveDisabled = !canApproveAction || approvalBlockedByTenant || isApproving;

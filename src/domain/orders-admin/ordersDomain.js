@@ -822,7 +822,7 @@ export function isEmpresaAdminRole(session) {
   return Boolean(session?.esGlobalJoin) || role === "admin" || role === "empresa_admin";
 }
 
-export function canEditOrderClientIdentity(session) {
+export function hasOrdersModuleAccess(session) {
   if (isEmpresaAdminRole(session)) return true;
 
   const activeModules = new Set(
@@ -834,6 +834,15 @@ export function canEditOrderClientIdentity(session) {
     item => String(item?.modulo || "").trim().toLowerCase() === "pedidos"
   );
   return Boolean(permission?.puedeVer || permission?.puedeEditar);
+}
+
+export function canEditOrderClientIdentity(session) {
+  return hasOrdersModuleAccess(session);
+}
+
+export function canCancelOrderForSession(session, status) {
+  if (!hasOrdersModuleAccess(session)) return false;
+  return ["CREADO", "PENDIENTE", "APROBADO"].includes(normalizeStatus(status));
 }
 
 export function normalizeConfiguredPaymentOptions(options) {

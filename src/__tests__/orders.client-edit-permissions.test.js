@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { canEditOrderClientIdentity } from "../domain/orders-admin/ordersDomain.js";
+import {
+  canCancelOrderForSession,
+  canEditOrderClientIdentity,
+} from "../domain/orders-admin/ordersDomain.js";
 
 
 describe("permisos para editar datos del cliente desde Pedidos", () => {
@@ -23,5 +26,33 @@ describe("permisos para editar datos del cliente desde Pedidos", () => {
       modulosActivosPlan: ["produccion"],
       permisos: [{ modulo: "produccion", puedeVer: true, puedeEditar: true }],
     })).toBe(false);
+  });
+});
+
+describe("permisos para cancelar desde Pedidos", () => {
+  const pedidosSession = {
+    rol: "Pedidos",
+    modulosActivosPlan: ["pedidos"],
+    permisos: [{ modulo: "pedidos", puedeVer: true, puedeEditar: true }],
+  };
+
+  it.each(["CREADO", "PENDIENTE", "APROBADO"])(
+    "permite cancelar pedidos en estado %s",
+    status => {
+      expect(canCancelOrderForSession(pedidosSession, status)).toBe(true);
+    }
+  );
+
+  it("mantiene bloqueados estados finales", () => {
+    expect(canCancelOrderForSession(pedidosSession, "ENTREGADO")).toBe(false);
+    expect(canCancelOrderForSession(pedidosSession, "CANCELADO")).toBe(false);
+  });
+
+  it("bloquea usuarios sin el modulo Pedidos", () => {
+    expect(canCancelOrderForSession({
+      rol: "Florista",
+      modulosActivosPlan: ["produccion"],
+      permisos: [{ modulo: "produccion", puedeVer: true, puedeEditar: true }],
+    }, "APROBADO")).toBe(false);
   });
 });
