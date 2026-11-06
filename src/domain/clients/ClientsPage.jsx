@@ -24,7 +24,7 @@ import {
   loadAllClientPages,
   normalizeCustomerMetricItem,
   normalizeDashboardMetrics,
-  isEmpresaAdminRole,
+  canEditClients,
 } from "./clientsDomain.js";
 
 const CLIENTS_PAGE_SIZE = 50;
@@ -57,7 +57,7 @@ export function ClientsPage({
 }) {
   const api = useMemo(() => createApiClient(tenantConfig), []);
   const empresaId = Number(session?.empresaID || tenantConfig.empresaId);
-  const canManageClients = isEmpresaAdminRole(session);
+  const canManageClients = canEditClients(session);
   const { sidebarPinned, sidebarMobileOpen, setSidebarMobileOpen, toggleSidebar } = useSidebarState();
 
   const [activeView, setActiveView] = useState("clientes");
@@ -247,7 +247,7 @@ export function ClientsPage({
 
   const openEdit = item => {
     if (!canManageClients) {
-      setError("Solo administradores pueden editar clientes.");
+      setError("No tienes permiso para editar clientes.");
       return;
     }
     setEditingClienteId(item.clienteID);

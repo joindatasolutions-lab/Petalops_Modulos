@@ -71,7 +71,7 @@ function ClientRow({ canManageClients, item, onEdit }) {
       <td data-label="Aniversario">{item.fechaAniversario || "-"}</td>
       <td data-label="Estado"><span className={`order-badge ${item.activo ? "is-entregado" : "is-cancelado"}`}>{item.activo ? "Activo" : "Inactivo"}</span></td>
       <td data-label="Acciones">
-        <button type="button" className="btn-outline" onClick={() => onEdit(item)} disabled={!canManageClients} title={canManageClients ? "Editar cliente" : "Solo administradores pueden editar clientes"}>Editar</button>
+        <button type="button" className="btn-outline" onClick={() => onEdit(item)} disabled={!canManageClients} title={canManageClients ? "Editar cliente" : "No tienes permiso para editar clientes"}>Editar</button>
       </td>
     </tr>
   );
