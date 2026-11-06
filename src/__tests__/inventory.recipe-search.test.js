@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { buildCreateItemPayload, filterRecipeIngredientItems } from "../domain/inventory/inventoryDomain.js";
+import { buildCreateItemPayload, filterInventoryItems, filterProviders, filterRecipeIngredientItems, normalizeInventorySubcategory } from "../domain/inventory/inventoryDomain.js";
 
 const items = [
   { inventarioID: 1, nombre: "Rosa Freedom", codigo: "FLO-001", categoria: "Flores", subcategoria: "Rosas" },
@@ -21,6 +21,27 @@ describe("buscador de ingredientes de recetas", () => {
 
   it("conserva todos los insumos cuando no hay busqueda", () => {
     expect(filterRecipeIngredientItems(items, "")).toEqual(items);
+  });
+});
+
+describe("buscador de proveedores", () => {
+  const providers = [
+    { nombre: "Flores de la Sabana", codigoProveedor: "PROV-01", telefono: "3001234567", email: "ventas@sabana.test", direccion: "Bogota" },
+    { nombre: "Cultivos El Rosal", codigoProveedor: "PROV-02", telefono: "3017654321", email: "contacto@rosal.test", direccion: "Madrid" },
+  ];
+
+  it("busca por cualquier dato visible sin depender de tildes o mayusculas", () => {
+    expect(filterProviders(providers, "SABANA")).toEqual([providers[0]]);
+    expect(filterProviders(providers, "3017654321")).toEqual([providers[1]]);
+    expect(filterProviders(providers, "bogotá")).toEqual([providers[0]]);
+  });
+});
+
+describe("compatibilidad de subcategoria de bases", () => {
+  it("muestra y filtra el valor historico Canasta como Canasto", () => {
+    const legacy = [{ nombre: "Base tejida", subcategoria: "Canasta", stockActual: 4, stockMinimo: 1 }];
+    expect(normalizeInventorySubcategory("Canasta")).toBe("Canasto");
+    expect(filterInventoryItems(legacy, { subcategoriaFiltro: "Canasto" })).toEqual(legacy);
   });
 });
 

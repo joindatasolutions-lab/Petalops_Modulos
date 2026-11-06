@@ -828,7 +828,7 @@ export function createApiClient(config) {
       return requestJson(`/inventario/proveedores?${params.toString()}`);
     },
 
-    async crearProveedorInventario({ empresaId, nombre, codigoProveedor, activo = true }) {
+    async crearProveedorInventario({ empresaId, nombre, codigoProveedor, telefono = null, email = null, direccion = null, activo = true }) {
       const params = new URLSearchParams();
       params.set("empresaID", String(empresaId));
       return requestJson(`/inventario/proveedores?${params.toString()}`, {
@@ -839,6 +839,28 @@ export function createApiClient(config) {
         body: JSON.stringify({
           nombre,
           codigoProveedor,
+          telefono,
+          email,
+          direccion,
+          activo,
+        })
+      });
+    },
+
+    async actualizarProveedorInventario({ empresaId, proveedorId, nombre, codigoProveedor, telefono = null, email = null, direccion = null, activo = true }) {
+      const params = new URLSearchParams();
+      params.set("empresaID", String(empresaId));
+      return requestJson(`/inventario/proveedores/${proveedorId}?${params.toString()}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          nombre,
+          codigoProveedor,
+          telefono,
+          email,
+          direccion,
           activo,
         })
       });

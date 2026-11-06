@@ -38,7 +38,7 @@ import {
   X,
 } from "lucide-react";
 import { COLOR_OPTIONS, MODULES, MOTIVOS_AJUSTE, MOTIVOS_DANO_BY_MODULE, MOTIVOS_SALIDA, MOVIMIENTO_TIPO_OPTIONS, initialProveedorForm } from "./inventoryConfig.jsx";
-import { buildBasesMetrics, buildCreateItemPayload, buildExpiryAlerts, buildInventoryMetrics, buildProveedorForm, buildProveedorPayload, buildRecetaResumen, buildSimulacionPedido, filterInventoryItems, filterRecipeIngredientItems, inventoryRowClass, isExpired, isNearExpiry, statusClass } from "./inventoryDomain.js";
+import { buildBasesMetrics, buildCreateItemPayload, buildExpiryAlerts, buildInventoryMetrics, buildProveedorForm, buildProveedorPayload, buildRecetaResumen, buildSimulacionPedido, filterInventoryItems, filterProviders, filterRecipeIngredientItems, inventoryRowClass, isExpired, isNearExpiry, normalizeInventorySubcategory, statusClass } from "./inventoryDomain.js";
 export { filterInventoryItems } from "./inventoryDomain.js";
 
 // ─── Configuración de módulos ────────────────────────────────────────────────
@@ -313,6 +313,7 @@ export function InventoryPage({
   const basesMetrics = useMemo(() => buildBasesMetrics(items, movimientos, proveedores), [items, movimientos, proveedores]);
 
   const visibleItems = useMemo(() => filterInventoryItems(items, { stockFiltro, subcategoriaFiltro, metricFilter }), [items, metricFilter, stockFiltro, subcategoriaFiltro]);
+  const visibleProviders = useMemo(() => filterProviders(proveedores, q), [proveedores, q]);
   const usesCompactInventoryTable = ["flores", "bases", "materiales", "adicionales"].includes(moduloActivo);
   const isAdditionalTable = moduloActivo === "adicionales";
   const ingredientesFiltrados = useMemo(
@@ -664,7 +665,7 @@ export function InventoryPage({
       codigo: item.codigo || "",
       nombre: item.nombre || "",
       categoria: item.categoria || moduloConfig?.categoria || "Flores",
-      subcategoria: item.subcategoria || "",
+      subcategoria: normalizeInventorySubcategory(item.subcategoria),
       color: item.color || "",
       descripcion: item.descripcion || "",
       tamano: item.tamano || "",
@@ -1152,12 +1153,12 @@ export function InventoryPage({
                             <td data-label={isAdditionalTable ? "Producto" : "Nombre"}>
                               <div className="inventory-product-cell">
                                 <strong>{item.nombre}</strong>
-                            {!usesCompactInventoryTable && item.subcategoria ? <span className="inventory-subcategoria-badge">{item.subcategoria}</span> : null}
+                            {!usesCompactInventoryTable && item.subcategoria ? <span className="inventory-subcategoria-badge">{normalizeInventorySubcategory(item.subcategoria)}</span> : null}
                               </div>
                             </td>
                             {isAdditionalTable ? (
                               <>
-                                <td data-label="Subcategoría">{item.subcategoria || "-"}</td>
+                                <td data-label="Subcategoría">{normalizeInventorySubcategory(item.subcategoria) || "-"}</td>
                                 <td data-label="Color">{item.color || "-"}</td>
                                 <td data-label="Tamaño">{item.tamano || "-"}</td>
                                 <td data-label="Marca">{item.marca || "-"}</td>
@@ -1168,7 +1169,7 @@ export function InventoryPage({
                               </>
                             ) : usesCompactInventoryTable ? (
                               <>
-                                <td data-label="Subcategoría">{item.subcategoria || "-"}</td>
+                                <td data-label="Subcategoría">{normalizeInventorySubcategory(item.subcategoria) || "-"}</td>
                                 <td data-label="Color">{item.color || "-"}</td>
                                 {moduloActivo !== "flores" ? <td data-label="Tamaño">{item.tamano || "-"}</td> : null}
                                 <td data-label={moduloActivo === "flores" ? "Stock" : "Cantidad"}>
@@ -1193,7 +1194,7 @@ export function InventoryPage({
                             ) : (
                               <>
                                 <td data-label="Categoría">{item.categoria || "-"}</td>
-                                <td data-label="Subcategoría">{item.subcategoria || "-"}</td>
+                                <td data-label="Subcategoría">{normalizeInventorySubcategory(item.subcategoria) || "-"}</td>
                                 <td data-label="Marca">{item.marca || "-"}</td>
                                 <td data-label="Stock">
                                   <strong className="inventory-stock-number">{Number(item.stockActual || 0)}</strong>
@@ -2089,7 +2090,7 @@ export function InventoryPage({
                 <p>Nombre, código, contacto y estado usados por el selector de <strong>Proveedor</strong> en inventario.</p>
               </div>
               <div className="inventory-table-scroll">
-                <table className="orders-table users-table inventory-table">
+                <table className="orders-table users-table inventory-table inventory-provider-table">
                   <thead>
                     <tr>
                       <th>ID</th>
@@ -2103,7 +2104,7 @@ export function InventoryPage({
                     </tr>
                   </thead>
                   <tbody>
-                    {proveedores.map(item => (
+                    {visibleProviders.map(item => (
                       <tr key={item.idProveedor}>
                         <td data-label="ID">{item.idProveedor}</td>
                         <td data-label="Nombre">{item.nombre}</td>
@@ -2124,8 +2125,8 @@ export function InventoryPage({
                         </td>
                       </tr>
                     ))}
-                    {proveedores.length === 0 ? (
-                      <tr><td colSpan="8" className="inventory-empty-note">Sin proveedores registrados.</td></tr>
+                    {visibleProviders.length === 0 ? (
+                      <tr><td colSpan="8" className="inventory-empty-note">{q ? "No hay proveedores que coincidan con la búsqueda." : "Sin proveedores registrados."}</td></tr>
                     ) : null}
                   </tbody>
                 </table>

@@ -3391,10 +3391,56 @@
   white-space: nowrap;
 }
 
+/* Proveedores: tabla y formulario compactos sin alterar las tablas de las
+   demas categorias de inventario. */
+.inventory-page-view .inventory-provider-table {
+  min-width: 900px;
+  table-layout: auto;
+}
+
+.inventory-page-view .inventory-provider-table th,
+.inventory-page-view .inventory-provider-table td {
+  padding: 9px 10px !important;
+  line-height: 1.3;
+  vertical-align: middle;
+}
+
+.inventory-page-view .inventory-provider-table td {
+  max-width: 220px;
+  overflow-wrap: anywhere;
+}
+
+.inventory-page-view .inventory-provider-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.inventory-page-view .inventory-provider-form .inventory-field:nth-child(1),
+.inventory-page-view .inventory-provider-form .inventory-field:nth-child(2),
+.inventory-page-view .inventory-provider-form .inventory-provider-actions {
+  grid-column: 1 / -1;
+}
+
+.inventory-page-view .inventory-provider-form input:not([type="checkbox"]),
+.inventory-page-view .inventory-provider-form select {
+  min-height: 42px !important;
+  padding: 8px 11px !important;
+}
+
 @media (max-width: 640px) {
   .inventory-page-view .inventory-provider-modal {
     padding: 16px 16px 20px;
     border-radius: 14px;
+  }
+
+  .inventory-page-view .inventory-provider-form {
+    grid-template-columns: 1fr;
+  }
+
+  .inventory-page-view .inventory-provider-form .inventory-field,
+  .inventory-page-view .inventory-provider-form .inventory-provider-actions {
+    grid-column: auto;
   }
 }
 

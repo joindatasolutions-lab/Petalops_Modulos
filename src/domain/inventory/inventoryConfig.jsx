@@ -13,7 +13,7 @@ export const MODULES = [
     label: "Bases",
     categoria: "Bases",
     icon: Boxes,
-    subcategorias: ["Box", "Madera", "Vidrio", "Ceramica", "Canasta", "Florero", "Otros"],
+    subcategorias: ["Box", "Madera", "Vidrio", "Ceramica", "Canasto", "Florero", "Otros"],
     unidades: ["Unidad", "Caja", "Paquete"],
   },
   {
@@ -67,8 +67,10 @@ export const initialProveedorForm = {
 };
 export const COLOR_OPTIONS = [
   "", "Rojo", "Rosado", "Blanco", "Amarillo", "Naranja",
-  "Lila", "Morado", "Azul", "Verde", "Dorado", "Plateado", "Multicolor",
-  "Beige", "Cafe", "Gris", "Negro", "Transparente",
+  "Lila", "Morado", "Azul", "Verde", "Verde claro", "Verde esmeralda",
+  "Dorado", "Plateado", "Multicolor", "Bicolor", "Beige", "Cafe", "Gris",
+  "Terracota", "Rojo oscuro", "Fucsia", "Mamon", "Vino tinto", "Mango",
+  "Negro", "Transparente",
 ];
 export const MOVIMIENTO_TIPO_OPTIONS = ["Compra", "Entrada", "Salida", "Ajuste", "Daño", "Pérdida"];
 export const INVENTORY_STATUS_CLASS = {

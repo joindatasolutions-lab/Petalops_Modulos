@@ -58,12 +58,17 @@ export function filterInventoryItems(items, { stockFiltro = "", subcategoriaFilt
   return (Array.isArray(items) ? items : []).filter(item => {
     const level = stockLevel(item);
     if (stockFiltro && level.key !== stockFiltro) return false;
-    if (subcategoriaFiltro && String(item.subcategoria || "").toLowerCase() !== subcategoriaFiltro.toLowerCase()) return false;
+    if (subcategoriaFiltro && normalizeInventorySubcategory(item.subcategoria).toLowerCase() !== normalizeInventorySubcategory(subcategoriaFiltro).toLowerCase()) return false;
     if (metricFilter === "bajoStock" && level.key !== "low") return false;
     if (metricFilter === "agotados" && level.key !== "out") return false;
     if (metricFilter === "porVencer" && !(isExpired(item.fechaVencimiento) || isNearExpiry(item.fechaVencimiento))) return false;
     return true;
   });
+}
+
+export function normalizeInventorySubcategory(value) {
+  const subcategory = String(value || "").trim();
+  return subcategory.toLowerCase() === "canasta" ? "Canasto" : subcategory;
 }
 
 function normalizeIngredientSearch(value) {
@@ -81,6 +86,20 @@ export function filterRecipeIngredientItems(items, query = "") {
 
   return source.filter(item => [item?.nombre, item?.codigo, item?.subcategoria, item?.categoria]
     .some(value => normalizeIngredientSearch(value).includes(term)));
+}
+
+export function filterProviders(providers, query = "") {
+  const term = normalizeIngredientSearch(query);
+  const source = Array.isArray(providers) ? providers : [];
+  if (!term) return source;
+
+  return source.filter(provider => [
+    provider?.nombre,
+    provider?.codigoProveedor,
+    provider?.telefono,
+    provider?.email,
+    provider?.direccion,
+  ].some(value => normalizeIngredientSearch(value).includes(term)));
 }
 
 export function buildInventoryMetrics(items, movimientos) {
