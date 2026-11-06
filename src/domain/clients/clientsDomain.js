@@ -118,20 +118,6 @@ export function isEmpresaAdminRole(session) {
   const role = String(session?.rol || "").trim().toLowerCase().replace(/\s+/g, "_");
   return Boolean(session?.esGlobalJoin) || role === "admin" || role === "empresa_admin";
 }
-
-export function canEditClients(session) {
-  if (isEmpresaAdminRole(session)) return true;
-
-  const activeModules = new Set(
-    (session?.modulosActivosPlan || []).map(item => String(item || "").trim().toLowerCase())
-  );
-  if (!activeModules.has("clientes")) return false;
-
-  const permission = (session?.permisos || []).find(
-    item => String(item?.modulo || "").trim().toLowerCase() === "clientes"
-  );
-  return Boolean(permission?.puedeEditar);
-}
 export function initialsFromName(value) {
   const words = String(value || "").trim().split(/\s+/).filter(Boolean);
   if (words.length === 0) return "CL";

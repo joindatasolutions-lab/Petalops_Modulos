@@ -81,7 +81,7 @@ import {
   filterStorePickupOrders,
   isCashPaymentMethod,
   isCustomArrangement,
-  isEmpresaAdminRole,
+  canEditOrderClientIdentity,
   isDeliveryGifted,
   isValidPaymentBreakdownTotal,
   isLinkPaymentMethod,
@@ -542,7 +542,7 @@ export function OrdersAdminPage({ session, canViewPipeline, canViewPedidos, canV
     () => pedidoMenuFields.find(field => field?.codigo === "pedido_canal_venta" && field?.activo),
     [pedidoMenuFields]
   );
-  const canEditClientIdentity = useMemo(() => isEmpresaAdminRole(session), [session]);
+  const canEditClientIdentity = useMemo(() => canEditOrderClientIdentity(session), [session]);
   const catalogProductIndex = useMemo(
     () => buildCatalogProductIndex(catalogProducts),
     [catalogProducts]

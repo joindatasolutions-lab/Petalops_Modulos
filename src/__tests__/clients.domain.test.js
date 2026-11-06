@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { canEditClients, loadAllClientPages } from "../domain/clients/clientsDomain.js";
+import { loadAllClientPages } from "../domain/clients/clientsDomain.js";
 
 describe("dominio de clientes", () => {
   it("carga todas las paginas cuando el backend reporta mas clientes que el pageSize", async () => {
@@ -41,30 +41,4 @@ describe("dominio de clientes", () => {
     expect(api.listarClientes).toHaveBeenCalledTimes(3);
   });
 
-  it("permite editar a quien tiene Clientes asignado con permiso de edicion", () => {
-    const session = {
-      rol: "Pedidos",
-      modulosActivosPlan: ["pedidos", "clientes"],
-      permisos: [
-        { modulo: "pedidos", puedeVer: true, puedeEditar: true },
-        { modulo: "clientes", puedeVer: true, puedeEditar: true },
-      ],
-    };
-
-    expect(canEditClients(session)).toBe(true);
-  });
-
-  it("no permite editar si Clientes no esta asignado o no tiene puedeEditar", () => {
-    expect(canEditClients({
-      rol: "Pedidos",
-      modulosActivosPlan: ["pedidos"],
-      permisos: [{ modulo: "clientes", puedeVer: true, puedeEditar: true }],
-    })).toBe(false);
-
-    expect(canEditClients({
-      rol: "Pedidos",
-      modulosActivosPlan: ["clientes"],
-      permisos: [{ modulo: "clientes", puedeVer: true, puedeEditar: false }],
-    })).toBe(false);
-  });
 });

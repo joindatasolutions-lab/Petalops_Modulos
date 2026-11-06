@@ -822,6 +822,20 @@ export function isEmpresaAdminRole(session) {
   return Boolean(session?.esGlobalJoin) || role === "admin" || role === "empresa_admin";
 }
 
+export function canEditOrderClientIdentity(session) {
+  if (isEmpresaAdminRole(session)) return true;
+
+  const activeModules = new Set(
+    (session?.modulosActivosPlan || []).map(item => String(item || "").trim().toLowerCase())
+  );
+  if (!activeModules.has("pedidos")) return false;
+
+  const permission = (session?.permisos || []).find(
+    item => String(item?.modulo || "").trim().toLowerCase() === "pedidos"
+  );
+  return Boolean(permission?.puedeVer || permission?.puedeEditar);
+}
+
 export function normalizeConfiguredPaymentOptions(options) {
   return Array.isArray(options)
     ? options.map(item => String(item || "").trim()).filter(Boolean)
