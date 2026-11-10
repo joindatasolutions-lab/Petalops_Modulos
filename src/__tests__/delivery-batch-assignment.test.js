@@ -1,12 +1,35 @@
 import { describe, expect, it, vi } from "vitest";
 import { assignDeliveryBatch } from "../domain/delivery/deliveryBatchAssignment.js";
 import { createApiClient } from "../infrastructure/apiClient.js";
-import { isBatchEligible } from "../domain/delivery/DeliveryPage.jsx";
+import { isBatchEligible, isBatchReassignEligible, deliveryAssignmentUnchanged } from "../domain/delivery/DeliveryPage.jsx";
 
 const items = [{ idEntrega: 1 }, { idEntrega: 2 }, { idEntrega: 3 }];
 const isEligible = item => !item.domiciliarioID;
 
 describe("asignación administrativa por lote", () => {
+  it("permite reasignar solo entregas asignadas con responsable", () => {
+    const assigned = { idEntrega: 1, estado: "Asignado", domiciliarioID: 42 };
+    expect(isBatchReassignEligible(assigned)).toBe(true);
+    expect(isBatchReassignEligible({ id_entrega: 1, estado_entrega_codigo: "ASIGNADO", domiciliario_id: 42 })).toBe(true);
+    for (const estado of ["Pendiente", "Entregado", "EnRuta", "NoEntregado", "Cancelado"]) {
+      expect(isBatchReassignEligible({ ...assigned, estado })).toBe(false);
+    }
+    expect(isBatchReassignEligible({ ...assigned, domiciliarioID: null })).toBe(false);
+    expect(isBatchReassignEligible({ ...assigned, tipoEntrega: "recogida_en_tienda" })).toBe(false);
+  });
+
+  it("reasigna varias entregas y omite cambios de responsable o estado", async () => {
+    const selected = [1, 2, 3, 4].map(idEntrega => ({ idEntrega, estado: "Asignado", domiciliarioID: 42 }));
+    const freshItems = selected.map(item => item.idEntrega === 2 ? { ...item, domiciliarioID: 99 }
+      : item.idEntrega === 3 ? { ...item, estado: "EnRuta" } : item);
+    const assign = vi.fn().mockResolvedValue({});
+    const results = await assignDeliveryBatch({ items: selected, freshItems, isEligible: isBatchReassignEligible,
+      isUnchanged: deliveryAssignmentUnchanged, reassign: true, assign });
+    expect(assign.mock.calls.map(([item]) => item.idEntrega)).toEqual([1, 4]);
+    expect(results.map(item => item.status)).toEqual(["success", "conflict", "conflict", "success"]);
+    expect(results[0].message).toBe("Reasignado correctamente.");
+  });
+
   it("solo selecciona entregas listas, identificadas y sin responsable", () => {
     expect(isBatchEligible({ idEntrega: 1, estado: "Pendiente", estadoProduccion: "ParaEntrega" })).toBe(true);
     expect(isBatchEligible({ id_entrega: 1, estado_entrega_codigo: "PENDIENTE" })).toBe(true);
