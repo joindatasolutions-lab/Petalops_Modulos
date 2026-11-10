@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { DeliveryDispatchBoard } from "./DeliveryDispatchBoard.jsx";
+import { buildNoveltyResolution, noveltyDeliveryId } from "./deliveryNoveltyResolution.js";
+import { mergeNoveltyOrderDetail } from "./deliveryNoveltyDetail.js";
 import { assignDeliveryBatch } from "./deliveryBatchAssignment.js";
 import { deliveryEvidenceErrorMessage, loadDeliveryEvidence } from "./deliveryEvidence.js";
 
@@ -81,15 +83,17 @@ const DELIVERY_VIEWS = [
 const DELIVERY_SUPPORTED_MODES = new Set(DELIVERY_VIEWS.map(item => item.value));
 const DISPATCH_VIEWS = [
   { key: "operativos", label: "Por gestionar" },
-  { key: "todos", label: "Todos" },
-  { key: "finalizados", label: "Finalizados" },
+  { key: "en-camino", label: "En camino" },
   { key: "incidencias", label: "Incidencias" },
+  { key: "finalizados", label: "Entregados" },
+  { key: "todos", label: "Todos" },
 ];
 export function deliveryMatchesOperationalView(item, view) {
   const status = deliveryStatusMeta(item).key;
   if (view === "finalizados") return status === "entregado";
   if (view === "incidencias") return ["no-entregado", "reprogramado"].includes(status);
-  if (view === "operativos") return status !== "entregado";
+  if (view === "operativos") return ["pendiente", "asignado"].includes(status);
+  if (view === "en-camino") return status === "en-camino";
   return true;
 }
 
@@ -1261,6 +1265,18 @@ export function deliveryArrangementName(item) {
   return productNames.join(" + ");
 }
 
+function DeliveryArrangementImage({ src, name }) {
+  const [failed, setFailed] = useState(false);
+  return (
+    <figure className="delivery-detail-arrangement">
+      {src && !failed ? (
+        <img src={src} alt={`Arreglo: ${name || "pedido seleccionado"}`} onError={() => setFailed(true)} />
+      ) : <p>Imagen del arreglo no disponible</p>}
+      {name ? <figcaption>{name}</figcaption> : null}
+    </figure>
+  );
+}
+
 function deliveryImageUrl(item) {
   return item?.imagenUrl || item?.imagen || item?.fotoProducto || item?.productoImagen || item?.imageUrl || "";
 }
@@ -1598,6 +1614,14 @@ function deliveryTimeLabel(item) {
   return item?.horaEntrega || formatTimeOnly(item?.fechaEntregaProgramada) || "-";
 }
 
+function deliveryZoneLabel(item) {
+  const name = [item?.nombreZona, item?.zona]
+    .find(value => typeof value === "string" && value.trim());
+  if (name) return name.trim();
+  const id = item?.zonaId ?? item?.zonaID ?? item?.zona_id;
+  return id != null && String(id).trim() ? `Zona ${id}` : "Sin zona registrada";
+}
+
 function deliveryDateLabel(item) {
   const value = item?.fechaEntrega
     || item?.fecha_entrega
@@ -1821,6 +1845,20 @@ export function isBatchEligible(item) {
     && filterDomicilioItems([item]).length === 1;
 }
 
+export function isBatchReassignEligible(item) {
+  const status = deliveryRawStatus(item);
+  return Boolean(item?.idEntrega || item?.id_entrega)
+    && deliveryCourierIdValue(item) != null
+    && compactStatusValue(status.code || status.name) === "ASIGNADO"
+    && !isCanceledDeliveryStatus(item)
+    && filterDomicilioItems([item]).length === 1;
+}
+
+export function deliveryAssignmentUnchanged(fresh, original) {
+  return deliveryCourierIdValue(fresh) === deliveryCourierIdValue(original)
+    && deliveryStatusMeta(fresh).key === deliveryStatusMeta(original).key;
+}
+
 export function DeliveryPage({
   session,
   apiClient,
@@ -1875,7 +1913,7 @@ export function DeliveryPage({
   const [deliveryProductNames, setDeliveryProductNames] = useState({});
   const [filtro, setFiltro] = useState("hoy");
   const [statusFilter, setStatusFilter] = useState("todos");
-  const [dispatchBarrio, setDispatchBarrio] = useState("");
+  const [dispatchZona, setDispatchZona] = useState("");
   const [dispatchView, setDispatchView] = useState("operativos");
   const [dispatchFiltersOpen, setDispatchFiltersOpen] = useState(false);
   const [fechaFiltro, setFechaFiltro] = useState(todayIso());
@@ -1893,11 +1931,13 @@ export function DeliveryPage({
   const [deliverySearch, setDeliverySearch] = useState("");
   const debouncedDeliverySearch = useDebouncedValue(deliverySearch, 350);
   const [noveltySearch, setNoveltySearch] = useState("");
-  const [noveltyStatusFilter, setNoveltyStatusFilter] = useState("novedades");
+  const [noveltyStatusFilter, setNoveltyStatusFilter] = useState("todos");
   const [noveltyTypeFilter, setNoveltyTypeFilter] = useState("todas");
   const [noveltyDraft, setNoveltyDraft] = useState({ pedidoId: "", tipo: "", observacion: "" });
-  const [resolvedNoveltyKeys, setResolvedNoveltyKeys] = useState([]);
-  const [resolvedNoveltyObservations, setResolvedNoveltyObservations] = useState({});
+  const [noveltyPayload, setNoveltyPayload] = useState({ items: [], abiertas: 0, resueltas: 0, total: 0 });
+  const [noveltyOffset, setNoveltyOffset] = useState(0);
+  const noveltyPageSize = 50;
+  const noveltyResolutionRunning = useRef(false);
   const [resolvingNoveltyRow, setResolvingNoveltyRow] = useState(null);
   const [noveltyResolveForm, setNoveltyResolveForm] = useState({
     accion: "entregar",
@@ -1932,6 +1972,9 @@ export function DeliveryPage({
   const [availableCoords, setAvailableCoords] = useState(null);
 
   const [selectedDeliveryItem, setSelectedDeliveryItem] = useState(null);
+  const [noveltyDetailLoading, setNoveltyDetailLoading] = useState(false);
+  const [noveltyDetailError, setNoveltyDetailError] = useState("");
+  const noveltyDetailRequest = useRef(0);
   const [deliveryDrawerOpen, setDeliveryDrawerOpen] = useState(false);
   const [deliveryForm, setDeliveryForm] = useState(DEFAULT_DELIVERY_FORM);
   const [courierForm, setCourierForm] = useState(DEFAULT_COURIER_FORM);
@@ -2145,14 +2188,34 @@ export function DeliveryPage({
   }, [api, empresaId, sucursalId, metricsFechaDesde, metricsFechaHasta, metricsDomiciliarioId, metricsGroupBy, modo, loadPerformanceUnassignedCount]);
 
   const loadNoveltyDeliveries = useCallback(async (isCurrentRequest = () => true) => {
-    const data = await api.listarDomiciliosAdmin({
-      empresaId,
+    setNoveltyPayload({ items: [], abiertas: 0, resueltas: 0, total: 0 });
+    const data = await api.listarNovedadesDomicilios({
       sucursalId,
-      filtro: "noentregado",
+      estado: noveltyStatusFilter === "pending" ? "abierta" : noveltyStatusFilter === "resolved" ? "resuelta" : undefined,
+      limite: noveltyPageSize,
+      offset: noveltyOffset,
     });
     if (!isCurrentRequest()) return;
-    setAdminItems(filterDomicilioItems(normalizeDeliveryItemsPayload(data)).filter(item => !isCanceledDeliveryStatus(item)));
-  }, [api, empresaId, sucursalId]);
+    const items = Array.isArray(data?.items) ? data.items : [];
+    const details = new Map();
+    const missingIds = [...new Set(items.filter(item => deliveryOrderCodeLabel(item) === "-").map(item => item.idEntrega).filter(Boolean))];
+    // Limit concurrent detail requests; multiple reports may share an attempt.
+    for (let index = 0; index < missingIds.length; index += 5) {
+      if (!isCurrentRequest()) return;
+      await Promise.all(missingIds.slice(index, index + 5).map(async id => {
+        try {
+          const detail = await api.obtenerDetalleDomicilio(id);
+          const delivery = detail?.entrega || detail?.item || detail;
+          details.set(id, { ...delivery, estadoEntrega: delivery?.estadoEntrega || delivery?.estado, numeroPedido: delivery?.numeroPedido || delivery?.numero_pedido || detail?.pedido?.numeroPedido || detail?.pedido?.numero_pedido });
+        } catch { /* Keep the report visible without substituting an internal ID. */ }
+      }));
+    }
+    if (!isCurrentRequest()) return;
+    setNoveltyPayload({ ...data, items: items.map(item => ({
+      ...details.get(item.idEntrega), ...item,
+      numeroPedido: deliveryOrderCodeLabel(item) !== "-" ? deliveryOrderCodeLabel(item) : details.get(item.idEntrega)?.numeroPedido,
+    })) });
+  }, [api, empresaId, sucursalId, noveltyStatusFilter, noveltyOffset]);
 
   const loadAdmin = useCallback(async (isCurrentRequest = () => true) => {
     // Fetch the date context once; operational views and status cards filter locally.
@@ -2327,8 +2390,7 @@ export function DeliveryPage({
       runLoad(async isCurrentRequest => {
         await Promise.all([
           loadDomiciliarios(),
-          loadDeliveryMetrics(isCurrentRequest),
-          ...(modo === "novedades" ? [loadNoveltyDeliveries(isCurrentRequest)] : []),
+          modo === "novedades" ? loadNoveltyDeliveries(isCurrentRequest) : loadDeliveryMetrics(isCurrentRequest),
         ]);
       }).catch(() => {});
       return;
@@ -2438,8 +2500,7 @@ export function DeliveryPage({
       } else if (modo === "metricas" || modo === "novedades") {
         await Promise.all([
           loadDomiciliarios(),
-          loadDeliveryMetrics(isCurrentRequest),
-          ...(modo === "novedades" ? [loadNoveltyDeliveries(isCurrentRequest)] : []),
+          modo === "novedades" ? loadNoveltyDeliveries(isCurrentRequest) : loadDeliveryMetrics(isCurrentRequest),
         ]);
       } else if (modo === "domiciliarios") {
         await loadCourierDirectory();
@@ -2633,13 +2694,35 @@ export function DeliveryPage({
     }
   };
 
-  const openDeliveryDetail = item => {
+  const openDeliveryDetail = async item => {
     if (!item) return;
+    const requestId = ++noveltyDetailRequest.current;
+    setNoveltyDetailError("");
+    setNoveltyDetailLoading(false);
     setSelectedDeliveryItem(item);
     setDeliveryDrawerOpen(true);
+    if (modo !== "novedades") return;
+    const pedidoId = item.pedidoID || item.idPedido || item.id_pedido;
+    if (!pedidoId) {
+      setNoveltyDetailError("No se pudo identificar el pedido para cargar el detalle completo.");
+      return;
+    }
+    setNoveltyDetailLoading(true);
+    try {
+      const detail = await api.obtenerDetallePedido(pedidoId);
+      if (noveltyDetailRequest.current !== requestId) return;
+      setSelectedDeliveryItem(mergeNoveltyOrderDetail(item, detail));
+    } catch (nextError) {
+      if (noveltyDetailRequest.current !== requestId) return;
+      setNoveltyDetailError(nextError?.message || "No fue posible cargar el detalle completo del pedido.");
+    } finally {
+      if (noveltyDetailRequest.current === requestId) setNoveltyDetailLoading(false);
+    }
   };
 
   const closeDeliveryDetail = () => {
+    noveltyDetailRequest.current += 1;
+    setNoveltyDetailLoading(false);
     setDeliveryDrawerOpen(false);
     setSelectedDeliveryItem(null);
   };
@@ -2814,11 +2897,13 @@ export function DeliveryPage({
   };
 
   const onOpenResolveNovelty = row => {
+    if (actionKey || noveltyResolutionRunning.current) return;
     setError("");
     setNoveltyResolveError("");
     setResolvingNoveltyRow(row);
     setNoveltyResolveForm({
       accion: "entregar",
+      reprogramarPara: "",
       recibidoNombre: "",
       recibidoDocumento: "",
       observacion: "",
@@ -2826,81 +2911,43 @@ export function DeliveryPage({
   };
 
   const onCloseResolveNovelty = () => {
+    if (noveltyResolutionRunning.current) return;
     setResolvingNoveltyRow(null);
     setNoveltyResolveError("");
     setNoveltyResolveForm({
       accion: "entregar",
+      reprogramarPara: "",
       recibidoNombre: "",
       recibidoDocumento: "",
       observacion: "",
     });
   };
 
-  const removeNoveltyFromMetrics = useCallback(entregaId => {
-    const targetId = String(entregaId || "").trim();
-    if (!targetId) return;
-    const detailKeys = [
-      "novedadesDetalle",
-      "detalleNovedades",
-      "pedidosConNovedad",
-      "pedidosNovedades",
-      "novedadesPedidos",
-      "novedadesPorPedido",
-    ];
-
-    setMetricsPayload(current => detailKeys.reduce((nextPayload, key) => {
-      if (!Array.isArray(nextPayload?.[key])) return nextPayload;
-      return {
-        ...nextPayload,
-        [key]: nextPayload[key].filter(item => String(item?.idEntrega || item?.id_entrega || "").trim() !== targetId),
-      };
-    }, current));
-  }, []);
-
   const onSaveResolveNovelty = async () => {
-    if (!resolvingNoveltyRow) return;
-    const entregaId = resolvingNoveltyRow.item?.idEntrega || resolvingNoveltyRow.raw?.idEntrega;
-    if (!entregaId) {
-      setNoveltyResolveError("No fue posible identificar la entrega para resolver la novedad.");
+    if (!resolvingNoveltyRow || actionKey || noveltyResolutionRunning.current) return;
+    let payload;
+    try {
+      payload = buildNoveltyResolution(resolvingNoveltyRow, noveltyResolveForm, usuarioCambio);
+    } catch (nextError) {
+      setNoveltyResolveError(nextError.message);
       return;
     }
-    if (!noveltyResolveForm.observacion.trim()) {
-      setNoveltyResolveError("Debes diligenciar la observacion para resolver la novedad.");
-      return;
-    }
-
+    const { entregaId } = payload;
+    noveltyResolutionRunning.current = true;
     setNoveltyResolveError("");
     setBusy(`resolver-novedad-${entregaId}`);
     try {
-      await api.resolverNovedadEntrega({
-        entregaId,
-        usuarioCambio,
-        observaciones: noveltyResolveForm.observacion.trim(),
-        firmaNombre: noveltyResolveForm.recibidoNombre.trim(),
-        firmaDocumento: noveltyResolveForm.recibidoDocumento.trim(),
-      });
-      const nextResolvedKeys = [
-        entregaId,
-        resolvingNoveltyRow.raw?.idNovedad,
-        resolvingNoveltyRow.raw?.id_novedad,
-        resolvingNoveltyRow.raw?.idPedido,
-        resolvingNoveltyRow.raw?.id_pedido,
-        resolvingNoveltyRow.orderCode,
-      ].filter(value => value != null && String(value).trim()).map(value => String(value).trim());
-      const resolutionObservation = noveltyResolveForm.observacion.trim();
-      setResolvedNoveltyKeys(prev => Array.from(new Set([...prev, ...nextResolvedKeys])));
-      setResolvedNoveltyObservations(prev => nextResolvedKeys.reduce((acc, key) => ({
-        ...acc,
-        [key]: resolutionObservation,
-      }), prev));
-      setFeedback(`Novedad resuelta para el pedido ${resolvingNoveltyRow.orderCode}.`);
-      onCloseResolveNovelty();
-      removeNoveltyFromMetrics(entregaId);
+      await api.resolverNovedadEntrega(payload);
+      setFeedback(`Novedad resuelta: ${payload.accion === "entregar" ? "entrega confirmada" : payload.accion === "nuevo_intento" ? "nuevo intento creado" : "pedido devuelto a disponibles"}.`);
+      setResolvingNoveltyRow(null);
       await refreshAll();
     } catch (nextError) {
       console.error("Error resolviendo novedad:", nextError);
-      setNoveltyResolveError(buildActionErrorMessage(nextError, "No fue posible resolver la novedad."));
+      setNoveltyResolveError(Number(nextError?.status) === 409
+        ? "Este intento ya no está vigente. Actualiza las novedades antes de continuar."
+        : String(nextError?.detail || nextError?.message || "No fue posible resolver la novedad."));
     } finally {
+      noveltyResolutionRunning.current = false;
       clearBusy();
     }
   };
@@ -2941,23 +2988,27 @@ export function DeliveryPage({
     bulkAssignRunning.current = true;
     setBusy("asignar-lote");
     try {
-      // Re-read tenant-scoped pending deliveries and the courier directory.
+      // Re-read tenant-scoped deliveries and the courier directory.
       // The server remains responsible for checking concurrent writes.
-      const [deliveryData, courierData] = await Promise.all([
-        api.listarDomiciliosAdmin({ empresaId, sucursalId, filtro: "pendientes" }),
+      const filters = [...new Set(items.map(item => isBatchReassignEligible(item) ? "asignado" : "pendientes"))];
+      const [deliveryResponses, courierData] = await Promise.all([
+        Promise.all(filters.map(filtro => api.listarDomiciliosAdmin({ empresaId, sucursalId, filtro }))),
         api.listarDomiciliarios({ empresaId, sucursalId, soloActivos: false }),
       ]);
       const courier = (courierData?.items || []).find(item => courierIdValue(item) === Number(nextCourierId));
       if (!courier || courier.activo === false || normalizeStatus(courierBackendStatus(courier)) !== "ACTIVO") {
         throw new Error("El domiciliario ya no está activo. Elige otro responsable.");
       }
-      if (!Array.isArray(deliveryData?.items) && !Array.isArray(deliveryData)) {
+      if (deliveryResponses.some(data => !Array.isArray(data?.items) && !Array.isArray(data))) {
         throw new Error("No se pudo comprobar la disponibilidad de los pedidos. No se inició el lote.");
       }
       const results = await assignDeliveryBatch({
         items,
-        freshItems: normalizeDeliveryItemsPayload(deliveryData).map(item => ({ ...item, idEntrega: item.idEntrega || item.id_entrega })),
-        isEligible: isBatchEligible,
+        freshItems: deliveryResponses.flatMap(normalizeDeliveryItemsPayload).map(item => ({ ...item, idEntrega: item.idEntrega || item.id_entrega })),
+        reassign: isBatchReassignEligible,
+        isUnchanged: deliveryAssignmentUnchanged,
+        isEligible: item => (isBatchReassignEligible(item) || isBatchEligible(item))
+          && deliveryCourierIdValue(item) !== Number(nextCourierId),
         assign: async item => {
           await api.asignarDomiciliarioEntrega({
             entregaId: item.idEntrega,
@@ -3200,21 +3251,21 @@ export function DeliveryPage({
     dispatchItems.filter(item => (
       deliveryMatchesSelectedDate(item, fechaFiltro, effectiveDeliverySearch)
       && deliveryMatchesSearch(item, effectiveDeliverySearch)
-      && (!dispatchBarrio || String(item.barrio || item.barrionombre || item.barrioNombre || "").trim() === dispatchBarrio)
-      && (adminOrderSearchActive || deliveryMatchesOperationalView(item, dispatchView))
+      && (!dispatchZona || deliveryZoneLabel(item) === dispatchZona)
     ))
-  ), [effectiveDeliverySearch, dispatchItems, fechaFiltro, dispatchBarrio, adminOrderSearchActive, dispatchView]);
+  ), [effectiveDeliverySearch, dispatchItems, fechaFiltro, dispatchZona]);
 
   const filteredDispatchItems = useMemo(() => {
-    const byStatus = statusFilter === "todos" || adminOrderSearchActive
+    return adminOrderSearchActive
       ? dispatchFilteredBaseItems
-      : dispatchFilteredBaseItems.filter(item => deliveryStatusMeta(item).key === statusFilter);
-
-    return byStatus;
-  }, [adminOrderSearchActive, dispatchFilteredBaseItems, statusFilter]);
+      : dispatchFilteredBaseItems.filter(item => deliveryMatchesOperationalView(item, dispatchView));
+  }, [adminOrderSearchActive, dispatchFilteredBaseItems, dispatchView]);
 
   useEffect(() => {
-    const missingItems = filteredDispatchItems
+    const detailItems = deliveryDrawerOpen && selectedDeliveryItem
+      ? [selectedDeliveryItem, ...filteredDispatchItems.filter(item => deliveryItemKey(item) !== deliveryItemKey(selectedDeliveryItem))]
+      : filteredDispatchItems;
+    const missingItems = detailItems
       .filter(item => {
         const key = deliveryItemKey(item);
         if (!key || deliveryPedidoId(item) == null) return false;
@@ -3255,7 +3306,12 @@ export function DeliveryPage({
     });
 
     return () => { disposed = true; };
-  }, [api, catalogProductIndex, deliveryProductImages, deliveryProductNames, filteredDispatchItems]);
+  }, [api, catalogProductIndex, deliveryProductImages, deliveryProductNames, filteredDispatchItems, deliveryDrawerOpen, selectedDeliveryItem]);
+
+  const selectedArrangementImage = resolveDeliveryImageUrl(selectedDeliveryItem, catalogProductIndex)
+    || deliveryProductImages[deliveryItemKey(selectedDeliveryItem)] || "";
+  const selectedArrangementName = deliveryArrangementName(selectedDeliveryItem)
+    || deliveryProductNames[deliveryItemKey(selectedDeliveryItem)] || "";
 
   const selectedDispatchItem = selectedDeliveryItem || filteredDispatchItems[0] || null;
   const courierSearchTerm = normalizeSearchText(courierSearch);
@@ -3264,14 +3320,9 @@ export function DeliveryPage({
     return domiciliarios.filter(item => normalizeSearchText(item?.nombre || item?.nombreDomiciliario || item?.login).includes(courierSearchTerm));
   }, [domiciliarios, courierSearchTerm]);
   const courierDirectoryRows = courierDirectoryItems;
-  const dispatchKpis = useMemo(() => {
-    const base = { pendiente: 0, asignado: 0, "en-camino": 0, entregado: 0, "no-entregado": 0, reprogramado: 0 };
-    dispatchFilteredBaseItems.forEach(item => {
-      const key = deliveryStatusMeta(item).key;
-      base[key] = (base[key] || 0) + 1;
-    });
-    return base;
-  }, [dispatchFilteredBaseItems]);
+  const dispatchViewCounts = useMemo(() => Object.fromEntries(
+    DISPATCH_VIEWS.map(view => [view.key, dispatchFilteredBaseItems.filter(item => deliveryMatchesOperationalView(item, view.key)).length])
+  ), [dispatchFilteredBaseItems]);
   const deliveryMetrics = useMemo(() => {
     const resumen = {
       ...DEFAULT_DELIVERY_METRICS_SUMMARY,
@@ -3367,15 +3418,7 @@ export function DeliveryPage({
   }, [deliveryMetrics]);
   const deliveryNoveltyBoard = useMemo(() => {
     const searchTerm = normalizeSearchText(noveltySearch);
-    const detailSource = [
-      metricsPayload?.novedadesDetalle,
-      metricsPayload?.detalleNovedades,
-      metricsPayload?.pedidosConNovedad,
-      metricsPayload?.pedidosNovedades,
-      metricsPayload?.novedadesPedidos,
-      metricsPayload?.novedadesPorPedido,
-      adminItems,
-    ].find(source => Array.isArray(source) && source.length > 0) || [];
+    const detailSource = noveltyPayload.items;
     const allRows = detailSource
       .map((raw, index) => {
         const label = formatDeliveryNoveltyLabel(
@@ -3396,25 +3439,8 @@ export function DeliveryPage({
           || raw?.estado_resolucion
           || ""
         );
-        const orderCode = String(raw?.pedido || raw?.numeroPedido || raw?.numero_pedido || raw?.pedidoNumero || raw?.codigoPedido || raw?.idPedido || raw?.idEntrega || "-").trim();
-        const localResolutionKeys = [
-          raw?.idNovedad,
-          raw?.id_novedad,
-          raw?.idEntrega,
-          raw?.id_entrega,
-          raw?.idPedido,
-          raw?.id_pedido,
-          orderCode,
-        ].filter(value => value != null && String(value).trim()).map(value => String(value).trim());
-        const noveltyResolved = raw?.novedadResuelta === true
-          || raw?.resuelta === true
-          || raw?.resuelto === true
-          || raw?.fechaResolucion
-          || raw?.fecha_resolucion
-          || localResolutionKeys.some(key => resolvedNoveltyKeys.includes(key));
-        const localResolutionObservation = localResolutionKeys
-          .map(key => resolvedNoveltyObservations[key])
-          .find(Boolean);
+        const orderCode = deliveryOrderCodeLabel(raw);
+        const noveltyResolved = raw?.estado === "resuelta";
         const status = noveltyResolved || noveltyStatusText.includes("resuelt") || noveltyStatusText.includes("cerrad") || noveltyStatusText.includes("solucion")
           ? { label: "Resuelta", tone: "resolved" }
           : noveltyStatusText.includes("seguimiento")
@@ -3422,10 +3448,9 @@ export function DeliveryPage({
             : { label: "Abierta", tone: "pending" };
         const client = String(raw?.cliente || raw?.nombreCliente || raw?.destinatario || raw?.nombreDestinatario || "Cliente sin nombre").trim();
         const phone = String(raw?.telefono || raw?.telefonoCliente || raw?.telefonoDestino || raw?.celular || "").trim();
-        const courier = String(raw?.domiciliario || raw?.nombreDomiciliario || raw?.repartidor || "Sin asignar").trim();
+        const courier = String(raw?.domiciliario || raw?.nombreDomiciliario || raw?.repartidor || (raw?.domiciliarioID ? `Domiciliario ${raw.domiciliarioID}` : "Sin asignar")).trim();
         const observation = String(
-          localResolutionObservation
-          || raw?.observacionResolucion
+          raw?.observacionResolucion
           || raw?.observacion_resolucion
           || raw?.observacionesResolucion
           || raw?.observaciones_resolucion
@@ -3438,17 +3463,19 @@ export function DeliveryPage({
           || raw?.mensaje
           || "Sin observacion registrada."
         ).trim();
-        const eventDate = raw?.fecha || raw?.fechaEntrega || raw?.fechaNovedad || raw?.fecha_novedad;
+        const eventDate = raw?.reportadaEn || raw?.fecha || raw?.fechaEntrega || raw?.fechaNovedad || raw?.fecha_novedad;
         const eventTime = raw?.hora || raw?.horaEntrega || formatTimeOnly(eventDate);
         const time = [formatDateOnly(eventDate), eventTime].filter(Boolean).join(" · ") || "-";
         const searchable = normalizeSearchText(`${orderCode} ${client} ${phone} ${courier} ${label} ${observation} ${status.label}`);
         const item = {
           ...raw,
+          idEntrega: raw?.idEntrega || raw?.id_entrega,
+          idPedido: raw?.pedidoID || raw?.idPedido,
           estado: raw?.estado || raw?.estadoEntrega || raw?.estado_entrega || raw?.estadoPedido || raw?.estado_pedido || status.label,
           estadoEntrega: raw?.estadoEntrega || raw?.estado_entrega || raw?.estado || status.label,
           estadoEntregaNombre: raw?.estadoEntregaNombre || raw?.estadoEntrega || raw?.estado_entrega || raw?.estado || status.label,
           cliente: raw?.cliente || raw?.nombreCliente || client,
-          destinatario: raw?.destinatario || raw?.nombreDestinatario || client,
+          destinatario: raw?.destinatario || raw?.nombreDestinatario || "",
           telefonoDestino: raw?.telefonoDestino || raw?.telefono || raw?.telefonoCliente || phone,
           domiciliario: raw?.domiciliario || raw?.nombreDomiciliario || courier,
           fechaEntregaProgramada: raw?.fechaEntregaProgramada || raw?.fechaEntrega || raw?.fecha || raw?.fechaNovedad,
@@ -3475,7 +3502,7 @@ export function DeliveryPage({
           searchable,
         };
       })
-      .filter(item => (item.orderCode !== "-" || item.label) && isOpenDeliveryNovelty(item.raw) && item.status.tone !== "resolved");
+      ;
 
     const filteredRows = allRows.filter(row => {
       if (searchTerm && !row.searchable.includes(searchTerm)) return false;
@@ -3485,17 +3512,7 @@ export function DeliveryPage({
     });
 
     const hasPedidoDetail = detailSource.length > 0;
-    const statusCounts = hasPedidoDetail ? allRows.reduce(
-      (acc, row) => {
-        acc[row.status.tone] = (acc[row.status.tone] || 0) + row.total;
-        return acc;
-      },
-      { pending: 0, tracking: 0, resolved: 0 }
-    ) : {
-      pending: deliveryNoveltyInsights.totalNoEntregados,
-      tracking: 0,
-      resolved: Math.max(deliveryNoveltyInsights.totalNovedades - deliveryNoveltyInsights.totalNoEntregados, 0),
-    };
+    const statusCounts = { pending: Number(noveltyPayload.abiertas || 0), resolved: Number(noveltyPayload.resueltas || 0) };
     const typeCounts = hasPedidoDetail
       ? Array.from(allRows.reduce((map, row) => {
         const current = map.get(row.typeKey) || {
@@ -3508,16 +3525,8 @@ export function DeliveryPage({
         map.set(row.typeKey, current);
         return map;
       }, new Map()).values()).sort((a, b) => b.count - a.count || a.label.localeCompare(b.label))
-      : deliveryNoveltyInsights.rows.map(row => ({
-        ...deliveryNoveltyTypeMeta(row.label),
-        key: normalizeSearchText(row.label),
-        label: row.label,
-        count: row.total,
-      }));
-    const criticalSource = hasPedidoDetail ? allRows : deliveryNoveltyInsights.rows.map(row => ({
-      ...row,
-      type: deliveryNoveltyTypeMeta(row.label),
-    }));
+      : [];
+    const criticalSource = allRows.filter(row => row.status.tone !== "resolved");
 
     return {
       rows: filteredRows,
@@ -3525,12 +3534,12 @@ export function DeliveryPage({
       statusCounts,
       typeCounts,
       hasPedidoDetail,
-      total: hasPedidoDetail ? allRows.length : deliveryNoveltyInsights.totalNovedades,
+      total: statusCounts.pending + statusCounts.resolved,
       critical: criticalSource
         .filter(row => ["cliente-no-responde", "direccion-incorrecta", "rechazo"].includes(row.type?.key))
         .reduce((acc, row) => acc + (row.total || 1), 0),
     };
-  }, [adminItems, deliveryNoveltyInsights, metricsPayload, noveltySearch, noveltyStatusFilter, noveltyTypeFilter, resolvedNoveltyKeys, resolvedNoveltyObservations]);
+  }, [noveltyPayload, noveltySearch, noveltyStatusFilter, noveltyTypeFilter]);
   const deliveryMetricStates = useMemo(() => {
     const deliveryRows = [
       { key: "entregados", label: "Entregados", value: metricNumber(deliveryMetrics.resumen.entregados), tone: "is-success", Icon: CheckCircle2 },
@@ -4088,6 +4097,9 @@ export function DeliveryPage({
           </div>
           <div className="orders-header-side">
             <div className="header-actions">
+              <span className={`dispatch-connection ${isOffline ? "is-offline" : ""}`} role="status">
+                <span aria-hidden="true" />{isOffline ? "Sin internet" : availableCoords ? "GPS activo" : "En línea"}
+              </span>
               {adminRole ? (
                 <button
                   type="button"
@@ -4125,9 +4137,7 @@ export function DeliveryPage({
             {error ? <p className="orders-message delivery-error">{error}</p> : null}
             {loading ? <p className="orders-message">Cargando domicilios...</p> : null}
 
-            <nav className="dispatch-view-tabs" aria-label="Vista operativa">
-              {DISPATCH_VIEWS.map(view => <button key={view.key} type="button" aria-pressed={dispatchView === view.key} disabled={Boolean(actionKey)} onClick={() => { setDispatchView(view.key); setStatusFilter("todos"); }}>{view.label}</button>)}
-            </nav>
+
 
             <section className={`delivery-dispatch-controls dispatch-compact-filters ${dispatchFiltersOpen ? "is-expanded" : ""}`}>
               <label className="filter-field delivery-dispatch-search">
@@ -4147,9 +4157,9 @@ export function DeliveryPage({
               <button className="dispatch-filters-toggle" type="button" aria-expanded={dispatchFiltersOpen} onClick={() => setDispatchFiltersOpen(value => !value)}>Filtros</button>
               <label className="filter-field">
                 <span>Zona de entrega</span>
-                <select aria-label="Filtrar domicilios por barrio" value={dispatchBarrio} onChange={event => setDispatchBarrio(event.target.value)} disabled={Boolean(actionKey)}>
+                <select aria-label="Filtrar domicilios por zona" value={dispatchZona} onChange={event => setDispatchZona(event.target.value)} disabled={Boolean(actionKey)}>
                   <option value="">Todas las zonas</option>
-                  {[...new Set(dispatchItems.map(item => String(item.barrio || item.barrionombre || item.barrioNombre || "").trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b, "es")).map(barrio => <option key={barrio} value={barrio}>{barrio}</option>)}
+                  {[...new Set(dispatchItems.map(deliveryZoneLabel))].sort((a, b) => a.localeCompare(b, "es", { numeric: true })).map(zona => <option key={zona} value={zona}>{zona}</option>)}
                 </select>
               </label>
               <div className="filter-field">
@@ -4179,33 +4189,23 @@ export function DeliveryPage({
                   onChange={event => { if (event.target.value) { setFechaFiltro(event.target.value); setFiltro("todos"); } }}
                 />
               </div>
-              <button type="button" className="dispatch-reset" disabled={Boolean(actionKey)} onClick={() => { setDeliverySearch(""); setDispatchBarrio(""); setFiltro("hoy"); setFechaFiltro(todayIso()); setStatusFilter("todos"); setDispatchView("operativos"); }}>Restablecer</button>
-              <div className={`delivery-signal ${isOffline ? "is-offline" : "is-online"}`}>
-                {isOffline ? "Sin internet" : availableCoords ? "GPS activo" : "Operacion en linea"}
-              </div>
-            </section>
-            <p className="dispatch-filter-summary" role="status">{adminOrderSearchActive ? "Búsqueda por número: se ignoran la fecha, la vista operativa y el estado. La zona sigue activa." : `${DISPATCH_VIEWS.find(view => view.key === dispatchView)?.label} · ${fechaFiltro} · ${statusFilter === "todos" ? "Todos los estados" : DELIVERY_STATUS_FILTERS.find(item => item.key === statusFilter)?.label}`} · {dispatchBarrio || "Todas las zonas"}</p>
+              <button type="button" className="dispatch-reset" disabled={Boolean(actionKey)} onClick={() => { setDeliverySearch(""); setDispatchZona(""); setFiltro("hoy"); setFechaFiltro(todayIso()); }}>Restablecer</button>
 
-            <div className="orders-header-metrics delivery-header-metrics delivery-status-filters" aria-label="Filtros por estado de domicilios">
-              {DELIVERY_STATUS_FILTERS.map(item => {
-                const Icon = item.icon;
-                return (
-                  <button
-                    key={item.key}
-                    type="button"
-                    className={`orders-header-metric-card delivery-status-filter is-${item.key} ${statusFilter === item.key ? "is-active" : ""}`}
-                    onClick={() => setStatusFilter(item.key)}
-                    aria-pressed={statusFilter === item.key}
-                  >
-                    <span className="orders-header-metric-icon" aria-hidden="true"><Icon size={18} strokeWidth={2} /></span>
-                    <strong>{item.key === "todos" ? dispatchFilteredBaseItems.length : (dispatchKpis[item.key] || 0)}</strong>
-                    <span>{item.label}</span>
-                  </button>
-                );
-              })}
-            </div>
+            </section>
+            {adminOrderSearchActive && <p className="dispatch-filter-summary" role="status">La búsqueda por número incluye todas las fechas y estados. El filtro de zona sigue activo.</p>}
+
 
             <DeliveryDispatchBoard
+              toolbar={<div className="dispatch-integrated-toolbar">
+                <nav className="dispatch-view-tabs dispatch-unified-tabs" aria-label="Vista operativa">
+                  {DISPATCH_VIEWS.map(view => (
+                    <button key={view.key} type="button" aria-pressed={(adminOrderSearchActive ? "todos" : dispatchView) === view.key} disabled={Boolean(actionKey) || adminOrderSearchActive} onClick={() => { setDispatchView(view.key); setStatusFilter("todos"); }}>
+                      <span>{view.label}</span><strong>{dispatchViewCounts[view.key]}</strong>
+                    </button>
+                  ))}
+                </nav>
+              </div>}
+
               rows={filteredDispatchItems.map(item => {
                 const meta = deliveryStatusMeta(item);
                 const address = deliveryAddressParts(item);
@@ -4213,7 +4213,10 @@ export function DeliveryPage({
                 return {
                   id: delivery.idEntrega || deliveryItemKey(item), item: delivery,
                   code: deliveryOrderCodeLabel(item),
+                  arrangement: deliveryArrangementName(item) || deliveryProductNames[deliveryItemKey(item)] || "",
                   time: deliveryTimeLabel(item), date: deliveryDateTimeLabel(item),
+                  deliveryDate: deliveryDateLabel(item),
+                  zone: deliveryZoneLabel(item),
                   recipient: item.destinatario || item.nombreDestinatario || item.cliente || "Sin destinatario",
                   address: address.primary,
                   neighborhood: item.barrio || item.barrionombre || item.barrioNombre || address.secondary || "Sin barrio",
@@ -4222,6 +4225,8 @@ export function DeliveryPage({
                   late: !["entregado", "no-entregado"].includes(meta.key) && isDeliveryTimeLate(item),
                   surprise: isSurpriseDelivery(item),
                   eligible: isBatchEligible(item),
+                  reassignEligible: isBatchReassignEligible(item),
+                  courierId: deliveryCourierIdValue(item),
                 };
               })}
               couriers={domiciliarios.filter(item => courierIdValue(item) != null).map(item => ({
@@ -4230,7 +4235,7 @@ export function DeliveryPage({
                 visibleLoad: dispatchFilteredBaseItems.filter(order => deliveryCourierIdValue(order) === courierIdValue(item)
                   && ["asignado", "en-camino"].includes(deliveryStatusMeta(order).key)).length,
               }))}
-              contextKey={`${empresaId}:${sucursalId}:${modo}:${filtro}:${fechaFiltro}:${normalizeSearchText(effectiveDeliverySearch)}:${statusFilter}:${dispatchBarrio}:${dispatchView}`}
+              contextKey={`${empresaId}:${sucursalId}:${modo}:${filtro}:${fechaFiltro}:${normalizeSearchText(effectiveDeliverySearch)}:${statusFilter}:${dispatchZona}:${dispatchView}`}
               canAssign={adminRole} busy={Boolean(actionKey)} loading={loading} offline={isOffline}
               onOpen={openDeliveryDetail} onMap={openMaps}
               onEvidence={openEvidenceModal} onNovelty={setNoveltiesModalItem}
@@ -4720,7 +4725,7 @@ export function DeliveryPage({
               <article className="delivery-novelty-summary-card is-total">
                 <span className="delivery-novelty-summary-icon"><AlertTriangle size={21} /></span>
                 <div>
-                  <span>Abiertas</span>
+                  <span>Total de novedades</span>
                   <strong>{deliveryNoveltyBoard.total}</strong>
                 </div>
               </article>
@@ -4741,7 +4746,7 @@ export function DeliveryPage({
               <article className="delivery-novelty-summary-card is-critical">
                 <span className="delivery-novelty-summary-icon"><AlertTriangle size={21} /></span>
                 <div>
-                  <span>Criticas</span>
+                  <span>Críticas en esta página</span>
                   <strong>{deliveryNoveltyBoard.critical}</strong>
                 </div>
               </article>
@@ -4753,15 +4758,13 @@ export function DeliveryPage({
                   {[
                     { key: "todos", label: "Todos" },
                     { key: "pending", label: "Sin resolver" },
-                    { key: "tracking", label: "En seguimiento" },
                     { key: "resolved", label: "Resueltas" },
-                    { key: "novedades", label: "Novedades" },
                   ].map(item => (
                     <button
                       type="button"
                       key={item.key}
                       className={noveltyStatusFilter === item.key ? "is-active" : ""}
-                      onClick={() => setNoveltyStatusFilter(item.key)}
+                      onClick={() => { setNoveltyStatusFilter(item.key); setNoveltyOffset(0); }}
                     >
                       {item.label}
                     </button>
@@ -4775,7 +4778,7 @@ export function DeliveryPage({
                       type="search"
                       value={noveltySearch}
                       onChange={event => setNoveltySearch(event.target.value)}
-                      placeholder="Buscar pedido, cliente o novedad..."
+                      placeholder="Buscar en esta página..."
                     />
                   </label>
                   <label>
@@ -4807,10 +4810,9 @@ export function DeliveryPage({
                   </label>
                   <label>
                     <CheckCircle2 size={15} />
-                    <select value={noveltyStatusFilter} onChange={event => setNoveltyStatusFilter(event.target.value)}>
+                    <select value={noveltyStatusFilter} onChange={event => { setNoveltyStatusFilter(event.target.value); setNoveltyOffset(0); }}>
                       <option value="todos">Todos</option>
                       <option value="pending">Pendientes</option>
-                      <option value="tracking">En seguimiento</option>
                       <option value="resolved">Resueltas</option>
                     </select>
                   </label>
@@ -4821,7 +4823,7 @@ export function DeliveryPage({
                     <p className="orders-message delivery-performance-empty">
                       {deliveryNoveltyBoard.hasPedidoDetail
                         ? "No hay novedades por pedido para los filtros seleccionados."
-                        : "El endpoint de metricas no envio detalle por pedido para novedades."}
+                        : "No hay novedades para los filtros seleccionados."}
                     </p>
                   ) : deliveryNoveltyBoard.rows.map(row => {
                     const Icon = row.type.Icon;
@@ -4830,7 +4832,7 @@ export function DeliveryPage({
                         <div className="delivery-novelty-icon"><Icon size={19} /></div>
                         <div className="delivery-novelty-order">
                           <strong>{row.label}</strong>
-                          <span>Pedido <b>{row.orderCode}</b></span>
+                          <span>Pedido <b>{row.orderCode === "-" ? "Número no disponible" : row.orderCode}</b></span>
                           <small><Clock3 size={12} /> {row.time}</small>
                         </div>
                         <div className="delivery-novelty-cell">
@@ -4845,6 +4847,11 @@ export function DeliveryPage({
                         <div className="delivery-novelty-cell delivery-novelty-observation">
                           <span>Observacion</span>
                           <strong>{row.observation}</strong>
+                          {row.status.tone === "resolved" && <small>
+                            {({ entregar: "Entregado", nuevo_intento: "Nuevo intento", devolver_disponibles: "Devuelto a disponibles" })[row.raw.accionResolucion] || row.raw.accionResolucion || "Resuelta"}
+                            {row.raw.resueltaPor ? ` · ${row.raw.resueltaPor}` : ""}
+                            {row.raw.resueltaEn ? ` · ${formatDateOnly(row.raw.resueltaEn)} ${formatTimeOnly(row.raw.resueltaEn)}` : ""}
+                          </small>}
                         </div>
                         <div className="delivery-novelty-actions">
                           <button type="button" className="btn-outline" onClick={() => openDeliveryDetail(row.item)}>
@@ -4855,7 +4862,7 @@ export function DeliveryPage({
                               <CheckCircle2 size={14} /> Resuelta
                             </button>
                           ) : (
-                            <button type="button" className="btn-primary" onClick={() => onOpenResolveNovelty(row)}>
+                            <button type="button" className="btn-primary" disabled={Boolean(actionKey)} onClick={() => onOpenResolveNovelty(row)}>
                               <CheckCircle2 size={14} /> Resolver
                             </button>
                           )}
@@ -4869,18 +4876,12 @@ export function DeliveryPage({
                 </div>
 
                 <div className="delivery-novelties-footer">
-                  <span>Mostrando {deliveryNoveltyBoard.rows.length === 0 ? 0 : 1} a {deliveryNoveltyBoard.rows.length} de {deliveryNoveltyBoard.allRows.length} novedades</span>
+                  <span>{deliveryNoveltyBoard.rows.length} visibles en esta página · {noveltyPayload.total} novedades</span>
                   <div className="delivery-novelties-pagination">
-                    <button type="button" className="btn-outline">{"<"}</button>
-                    <button type="button" className="is-active">1</button>
-                    <button type="button">2</button>
-                    <button type="button">3</button>
-                    <button type="button">{">"}</button>
+                    <button type="button" className="btn-outline" disabled={loading || noveltyOffset === 0} onClick={() => setNoveltyOffset(value => Math.max(0, value - noveltyPageSize))}>Anterior</button>
+                    <span>Página {Math.floor(noveltyOffset / noveltyPageSize) + 1}</span>
+                    <button type="button" className="btn-outline" disabled={loading || noveltyOffset + noveltyPageSize >= noveltyPayload.total} onClick={() => setNoveltyOffset(value => value + noveltyPageSize)}>Siguiente</button>
                   </div>
-                  <select aria-label="Novedades por pagina" defaultValue="5">
-                    <option value="5">5 por pagina</option>
-                    <option value="10">10 por pagina</option>
-                  </select>
                 </div>
               </article>
 
@@ -5610,6 +5611,7 @@ export function DeliveryPage({
                       type="button"
                       key={option.key}
                       className={active ? "is-active" : ""}
+                      disabled={Boolean(actionKey)}
                       onClick={() => setStatusForm(current => ({ ...current, estado: option.key }))}
                       aria-pressed={active}
                     >
@@ -5725,13 +5727,13 @@ export function DeliveryPage({
               </div>
 
               <div className="delivery-novelty-resolve-head">
-                <h4>Que paso despues de la novedad</h4>
-                <button type="button" className="delivery-modal-close" onClick={onCloseResolveNovelty} aria-label="Cerrar modal">
+                <h4>Resolver novedad</h4>
+                <button type="button" className="delivery-modal-close" disabled={Boolean(actionKey)} onClick={onCloseResolveNovelty} aria-label="Cerrar modal">
                   <X size={18} />
                 </button>
               </div>
 
-              <div className="delivery-novelty-resolution-options" role="radiogroup" aria-label="Resultado de la novedad">
+              <div className="delivery-novelty-resolution-options" role="group" aria-label="Resultado de la novedad">
                 {[
                   {
                     key: "entregar",
@@ -5740,16 +5742,16 @@ export function DeliveryPage({
                     copy: "Cierra la novedad y marca el pedido como entregado.",
                   },
                   {
-                    key: "reintentar",
+                    key: "nuevo_intento",
                     icon: Route,
                     title: "Reintentar entrega",
-                    copy: "El pedido vuelve a Mis pedidos para continuar la ruta.",
+                    copy: "Crea un nuevo intento y conserva al domiciliario si est? asignado.",
                   },
                   {
-                    key: "disponibles",
+                    key: "devolver_disponibles",
                     icon: Truck,
                     title: "Devolver a disponibles",
-                    copy: "El pedido vuelve a la bolsa de pedidos disponibles.",
+                    copy: "Libera al domiciliario y deja la entrega pendiente de asignación.",
                   },
                 ].map(option => {
                   const Icon = option.icon;
@@ -5776,28 +5778,35 @@ export function DeliveryPage({
               </div>
 
               <div className="delivery-novelty-resolution-form">
-                <label>
+                <label hidden={noveltyResolveForm.accion !== "entregar"}>
                   <span>Nombre de quien recibe (opcional)</span>
                   <input
                     type="text"
+                    disabled={Boolean(actionKey)}
                     value={noveltyResolveForm.recibidoNombre}
                     onChange={event => setNoveltyResolveForm(current => ({ ...current, recibidoNombre: event.target.value }))}
                     placeholder="Nombre del recibido"
                   />
                 </label>
-                <label>
+                <label hidden={noveltyResolveForm.accion !== "entregar"}>
                   <span>Documento (opcional)</span>
                   <input
                     type="text"
+                    disabled={Boolean(actionKey)}
                     value={noveltyResolveForm.recibidoDocumento}
                     onChange={event => setNoveltyResolveForm(current => ({ ...current, recibidoDocumento: event.target.value }))}
                     placeholder="Documento de quien recibe"
                   />
                 </label>
+                {noveltyResolveForm.accion !== "entregar" && <label>
+                  <span>Reprogramar para (opcional, hora de Colombia)</span>
+                  <input type="datetime-local" value={noveltyResolveForm.reprogramarPara || ""} disabled={Boolean(actionKey)} onChange={event => setNoveltyResolveForm(current => ({ ...current, reprogramarPara: event.target.value }))} />
+                </label>}
                 <label>
                   <span>Observaciones *</span>
                   <textarea
                     rows="4"
+                    disabled={Boolean(actionKey)}
                     value={noveltyResolveForm.observacion}
                     onChange={event => setNoveltyResolveForm(current => ({ ...current, observacion: event.target.value }))}
                     placeholder="Notas internas"
@@ -5805,17 +5814,17 @@ export function DeliveryPage({
                 </label>
               </div>
 
-              {noveltyResolveError ? <p className="delivery-novelty-resolve-error">{noveltyResolveError}</p> : null}
+              {noveltyResolveError ? <p role="alert" className="delivery-novelty-resolve-error">{noveltyResolveError}</p> : null}
 
               <div className="delivery-novelty-resolve-actions">
-                <button type="button" className="btn-outline" onClick={onCloseResolveNovelty}>Cancelar</button>
+                <button type="button" className="btn-outline" disabled={Boolean(actionKey)} onClick={onCloseResolveNovelty}>Cancelar</button>
                 <button
                   type="button"
                   className="btn-primary"
                   onClick={onSaveResolveNovelty}
-                  disabled={actionKey === `resolver-novedad-${resolvingNoveltyRow.item?.idEntrega || resolvingNoveltyRow.raw?.idEntrega}`}
+                  disabled={actionKey === `resolver-novedad-${noveltyDeliveryId(resolvingNoveltyRow)}`}
                 >
-                  {actionKey === `resolver-novedad-${resolvingNoveltyRow.item?.idEntrega || resolvingNoveltyRow.raw?.idEntrega}` ? "Guardando..." : "Guardar resolucion"}
+                  {actionKey === `resolver-novedad-${noveltyDeliveryId(resolvingNoveltyRow)}` ? "Guardando..." : noveltyResolveForm.accion === "entregar" ? "Confirmar entrega y resolver" : noveltyResolveForm.accion === "nuevo_intento" ? "Crear nuevo intento y resolver" : "Devolver a disponibles y resolver"}
                 </button>
               </div>
             </article>
@@ -5832,16 +5841,27 @@ export function DeliveryPage({
         </div>
 
         <div className="orders-drawer-body">
+          {noveltyDetailLoading && <p role="status">Cargando información completa del pedido...</p>}
+          {noveltyDetailError && <div role="alert"><p>{noveltyDetailError}</p><button type="button" className="btn-outline" onClick={() => openDeliveryDetail(selectedDeliveryItem)}>Reintentar</button></div>}
           {!deliveryDrawerOpen || !selectedDeliveryItem ? (
             <p className="order-drawer-empty">Selecciona un pedido para ver detalle.</p>
           ) : (
             <>
               <section className="order-block">
                 <h4>Detalle del pedido</h4>
+                <DeliveryArrangementImage
+                  key={`${deliveryItemKey(selectedDeliveryItem)}:${selectedArrangementImage}`}
+                  src={selectedArrangementImage}
+                  name={selectedArrangementName}
+                />
                 <div className="delivery-detail-list">
                   <p><span>Número del pedido</span><strong>{deliveryOrderCodeLabel(selectedDeliveryItem)}</strong></p>
-                  <p><span>Arreglo</span><strong>{deliveryArrangementName(selectedDeliveryItem) || "-"}</strong></p>
-                  <p><span>Cliente</span><strong>{selectedDeliveryItem.cliente || selectedDeliveryItem.destinatario || "-"}</strong></p>
+                  <p><span>Arreglo</span><strong>{selectedArrangementName || "-"}</strong></p>
+                  <p><span>Cliente</span><strong>{selectedDeliveryItem.cliente || "-"}</strong></p>
+                  {modo === "novedades" && <>
+                    <p><span>Teléfono del cliente</span><strong>{selectedDeliveryItem.telefonoCliente || "-"}</strong></p>
+                    <p><span>Correo del cliente</span><strong>{selectedDeliveryItem.emailCliente || "-"}</strong></p>
+                  </>}
                   <p><span>Destinatario</span><strong>{selectedDeliveryItem.destinatario || "-"}</strong></p>
                   <p><span>Dirección</span><strong>{selectedDeliveryItem.direccion || "-"}</strong></p>
                   <p><span>Barrio</span><strong>{selectedDeliveryItem.barrio || "-"}</strong></p>
@@ -5851,6 +5871,7 @@ export function DeliveryPage({
                   <p><span>Domiciliario</span><strong>{selectedDeliveryItem.domiciliario || "-"}</strong></p>
                   <p><span>Teléfono</span><strong>{selectedDeliveryItem.telefonoDestino || "-"}</strong></p>
                   <p><span>Mensaje</span><strong>{selectedDeliveryItem.mensaje || "-"}</strong></p>
+                  {modo === "novedades" && <p><span>Firma de tarjeta</span><strong>{selectedDeliveryItem.firmaTarjeta || "-"}</strong></p>}
                   <p><span>Observaciones personalizados</span><strong>{selectedDeliveryItem.observacion || "-"}</strong></p>
                 </div>
 

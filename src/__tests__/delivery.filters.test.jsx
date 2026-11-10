@@ -14,6 +14,9 @@ import {
 describe("filtros de domicilios", () => {
   it("organiza las vistas operativas con los estados existentes", () => {
     const delivered = { estadoEntregaCodigo: "ENTREGADO" };
+    expect(deliveryMatchesOperationalView({ estadoEntregaCodigo: "ASIGNADO" }, "operativos")).toBe(true);
+    expect(deliveryMatchesOperationalView({ estadoEntregaCodigo: "NOENTREGADO" }, "operativos")).toBe(false);
+    expect(deliveryMatchesOperationalView({ estadoEntregaCodigo: "REPROGRAMADO" }, "operativos")).toBe(false);
     expect(deliveryMatchesOperationalView(delivered, "operativos")).toBe(false);
     expect(deliveryMatchesOperationalView(delivered, "finalizados")).toBe(true);
     expect(deliveryMatchesOperationalView(delivered, "todos")).toBe(true);

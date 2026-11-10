@@ -30,6 +30,34 @@ const reset = async () => {
 
 try {
   await reset();
+  await expect(page.getByLabel("Operación del lote")).toHaveCount(0);
+  for (const code of [98070, 98071]) await page.getByRole("checkbox", { name: `Seleccionar pedido ${code}`, exact: true }).check();
+  await page.getByRole("button", { name: "Reasignar domiciliario", exact: true }).click();
+  await expect(page.getByLabel("Domiciliario del lote").locator('option[value="101"]')).toHaveJSProperty("disabled", true);
+  await page.getByLabel("Domiciliario del lote").selectOption("102");
+  await page.getByRole("button", { name: "Revisar reasignación (2)", exact: true }).click();
+  await expect(page.getByText("Juan Pérez → Camila Rojas", { exact: false })).toHaveCount(2);
+  await page.getByRole("button", { name: "Confirmar reasignación (2)", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "2 de 2 reasignados" })).toBeVisible();
+  for (const code of [98070, 98071]) {
+    await expect(page.locator(".dispatch-table tbody tr").filter({ has: page.getByRole("button", { name: `#${code}`, exact: true }) })).toContainText("Camila Rojas");
+  }
+  console.log("PASS: reasignación múltiple, revisión y bloqueo del responsable actual.");
+
+  await reset();
+  for (const code of [98047, 98070]) await page.getByRole("checkbox", { name: `Seleccionar pedido ${code}`, exact: true }).check();
+  await page.getByRole("button", { name: "Asignar y reasignar", exact: true }).click();
+  await page.getByLabel("Domiciliario del lote").selectOption("102");
+  await page.getByRole("button", { name: "Revisar cambios (2)", exact: true }).click();
+  await expect(page.getByText("Sin asignar → Camila Rojas", { exact: false })).toBeVisible();
+  await expect(page.getByText("Juan Pérez → Camila Rojas", { exact: false })).toBeVisible();
+  await page.getByRole("button", { name: "Confirmar cambios (2)", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "2 de 2 actualizados" })).toBeVisible();
+  await expect(page.getByText("#98047 Asignado correctamente.", { exact: true })).toBeVisible();
+  await expect(page.getByText("#98070 Reasignado correctamente.", { exact: true })).toBeVisible();
+  console.log("PASS: selección mixta con asignación y reasignación automáticas.");
+
+  await reset();
   await expect(page.getByLabel("Domiciliario del lote")).toHaveCount(0);
   await select([98047, 98051, 98056]);
   await expect(page.getByRole("checkbox", { name: "Seleccionar todos los pedidos elegibles visibles" })).toHaveJSProperty("indeterminate", true);
@@ -37,7 +65,7 @@ try {
   await page.screenshot({ path: join(tmpdir(), "domicilios-lote-local.png"), fullPage: true });
   await confirm(3);
   await expect(page.getByRole("heading", { name: "3 de 3 asignados" })).toBeVisible();
-  await expect(page.getByRole("checkbox", { name: "Seleccionar pedido 98047", exact: true })).toBeDisabled();
+  await expect(page.getByRole("checkbox", { name: "Seleccionar pedido 98047", exact: true })).toBeEnabled();
   console.log("PASS: selección múltiple, carga visible, revisión y asignación exitosa.");
 
   await reset();
@@ -60,7 +88,7 @@ try {
   await page.getByRole("button", { name: "Asignar domiciliario", exact: true }).click();
   await confirm(2);
   await expect(page.getByRole("heading", { name: "1 de 2 asignados" })).toBeVisible();
-  await expect(page.getByText("Ya no está disponible para asignar. Actualiza la lista.", { exact: false })).toBeVisible();
+  await expect(page.getByText("El pedido cambió o ya no está disponible. Actualiza la lista.", { exact: false })).toBeVisible();
   console.log("PASS: conflicto con otro administrador sin sobrescribir la asignación.");
 
   await reset();
@@ -71,11 +99,11 @@ try {
   await expect(page.getByRole("button", { name: "Asignar domiciliario", exact: true })).toHaveCount(0);
   console.log("PASS: cambiar filtros descarta la selección y la confirmación anterior.");
   await reset();
-  await page.getByLabel("Filtrar domicilios por barrio").selectOption("Chapinero");
+  await page.getByLabel("Filtrar domicilios por zona").selectOption("Zona 1");
   await expect(page.locator(".dispatch-table tbody tr")).toHaveCount(3);
   await page.getByRole("checkbox", { name: "Seleccionar todos los pedidos elegibles visibles" }).check();
   await expect(page.getByRole("button", { name: "Limpiar selección (3)", exact: true })).toBeEnabled();
-  await page.getByLabel("Filtrar domicilios por barrio").selectOption("Chicó");
+  await page.getByLabel("Filtrar domicilios por zona").selectOption("Zona 2");
   await expect(page.getByRole("button", { name: "Asignar domiciliario", exact: true })).toHaveCount(0);
   console.log("PASS: agrupación por barrio y selección de todos los elegibles visibles.");
   await page.setViewportSize({ width: 1024, height: 900 });
@@ -92,10 +120,10 @@ try {
   await expect(page.getByRole("button", { name: "Cambiar estado", exact: true })).toBeFocused();
   await page.keyboard.press("Escape");
   await expect(trigger).toBeFocused();
-  await page.getByRole("navigation", { name: "Vista operativa" }).getByRole("button", { name: "Finalizados", exact: true }).click();
+  await page.getByRole("navigation", { name: "Vista operativa" }).getByRole("button", { name: /^Entregados/ }).click();
   await expect(page.locator(".dispatch-table tbody tr")).toHaveCount(1);
   await expect(page.getByRole("checkbox", { name: "Seleccionar pedido 98072", exact: true })).toBeDisabled();
-  await page.getByRole("navigation", { name: "Vista operativa" }).getByRole("button", { name: "Todos", exact: true }).click();
+  await page.getByRole("navigation", { name: "Vista operativa" }).getByRole("button", { name: /^Todos/ }).click();
   await expect(page.locator(".dispatch-table tbody tr")).toHaveCount(9);
   await page.screenshot({ path: join(tmpdir(), "domicilios-desktop-local.png"), fullPage: true });
   await page.setViewportSize({ width: 390, height: 844 });
@@ -105,7 +133,7 @@ try {
   expect(headerButtons.every(width => width > 100)).toBe(true);
   await expect(page.getByRole("button", { name: "Filtros", exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Filtros", exact: true }).click();
-  await expect(page.getByLabel("Filtrar domicilios por barrio")).toBeVisible();
+  await expect(page.getByLabel("Filtrar domicilios por zona")).toBeVisible();
   await page.locator(".dispatch-table-scroll").evaluate(element => { element.scrollLeft = 0; });
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await page.screenshot({ path: join(tmpdir(), "domicilios-mobile-local.png"), fullPage: true });

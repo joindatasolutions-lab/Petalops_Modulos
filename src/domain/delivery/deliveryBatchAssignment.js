@@ -1,6 +1,6 @@
 // The current API assigns one delivery at a time. Preserve each result so a
 // retry never silently repeats successful assignments.
-export async function assignDeliveryBatch({ items, freshItems, isEligible, assign }) {
+export async function assignDeliveryBatch({ items, freshItems, isEligible, isUnchanged = () => true, reassign = false, assign }) {
   const current = new Map(freshItems.map(item => [String(item.idEntrega), item]));
   const results = [];
   const seen = new Set();
@@ -9,13 +9,14 @@ export async function assignDeliveryBatch({ items, freshItems, isEligible, assig
     if (seen.has(id)) continue;
     seen.add(id);
     const fresh = current.get(id);
-    if (!fresh || !isEligible(fresh)) {
-      results.push({ item, status: "conflict", message: "Ya no está disponible para asignar. Actualiza la lista." });
+    if (!fresh || !isEligible(fresh) || !isUnchanged(fresh, item)) {
+      results.push({ item, status: "conflict", message: "El pedido cambió o ya no está disponible. Actualiza la lista." });
       continue;
     }
     try {
       await assign(fresh);
-      results.push({ item, status: "success", message: "Asignado correctamente." });
+      const wasReassigned = typeof reassign === "function" ? reassign(item) : reassign;
+      results.push({ item, status: "success", message: wasReassigned ? "Reasignado correctamente." : "Asignado correctamente." });
     } catch (error) {
       results.push({ item, status: Number(error?.status) === 409 ? "conflict" : "error", message: error?.detail || error?.message || "No fue posible asignar. Actualiza antes de reintentar." });
     }

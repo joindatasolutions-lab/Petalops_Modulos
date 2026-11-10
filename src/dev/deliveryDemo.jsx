@@ -20,6 +20,7 @@ let items = names.map((nombre, index) => ({
   numeroPedido: [98047, 98051, 98056, 98060, 98063, 98068, 98070, 98071][index],
   destinatario: nombre, cliente: `Cliente ${index + 1}`, telefonoDestino: "3000000000",
   direccion: `Calle ${63 + index * 3} # 15-20`, barrio: index < 3 ? "Chapinero" : "Chicó",
+  zonaId: index < 3 ? 1 : 2,
   fechaEntrega: date, fechaEntregaProgramada: `${date}T${11 + Math.floor(index / 4)}:${String((index % 4) * 15).padStart(2, "0")}:00-05:00`,
   horaEntrega: `${11 + Math.floor(index / 4)}:${String((index % 4) * 15).padStart(2, "0")}`,
   estado: index < 6 ? "Pendiente" : "Asignado",
@@ -44,7 +45,7 @@ const api = {
     await new Promise(resolve => setTimeout(resolve, 180));
     const item = items.find(row => row.idEntrega === entregaId);
     if (failAssignment && item.numeroPedido === 98051) throw new Error("Fallo simulado: no se guardó la asignación.");
-    if (item.domiciliarioID) throw new Error("Este pedido ya fue asignado por otro administrador.");
+    if (!["PENDIENTE", "ASIGNADO"].includes(item.estadoEntregaCodigo)) throw new Error("El pedido ya no permite cambiar de domiciliario.");
     const courier = couriers.find(row => row.idDomiciliario === domiciliarioID && row.activo);
     if (!courier) throw new Error("Domiciliario no disponible.");
     Object.assign(item, { domiciliarioID, domiciliario: courier.nombre, estado: "Asignado", estadoEntregaCodigo: "ASIGNADO", estadoEntregaNombre: "Asignado" });

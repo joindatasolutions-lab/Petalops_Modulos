@@ -1678,6 +1678,18 @@ export function createApiClient(config) {
       return requestJson(`/domicilios?${params.toString()}`);
     },
 
+    async obtenerDetalleDomicilio(entregaId) {
+      return requestJson(`/domicilios/${encodeURIComponent(entregaId)}`);
+    },
+
+    async listarNovedadesDomicilios({ sucursalId, estado, pedidoID, limite = 50, offset = 0 } = {}) {
+      const params = new URLSearchParams({ limite: String(limite), offset: String(offset) });
+      if (sucursalId != null) params.set("sucursalID", String(sucursalId));
+      if (estado) params.set("estado", estado);
+      if (pedidoID != null) params.set("pedidoID", String(pedidoID));
+      return requestJson(`/domicilios/novedades?${params}`);
+    },
+
     async obtenerMetricasDomicilios({ empresaId, sucursalId, fechaDesde, fechaHasta, anio, mes, dia, domiciliarioID, agruparPor = "dia" }) {
       const params = new URLSearchParams();
       params.set("empresaID", String(empresaId));
@@ -1838,6 +1850,8 @@ export function createApiClient(config) {
 
     async resolverNovedadEntrega({
       entregaId,
+      accion = "entregar",
+      reprogramarPara,
       usuarioCambio,
       observaciones,
       evidenciaFotoUrl,
@@ -1850,6 +1864,8 @@ export function createApiClient(config) {
       evidenciaFotoFile,
     }) {
       const form = new FormData();
+      form.append("accion", accion);
+      if (reprogramarPara) form.append("reprogramarPara", reprogramarPara);
       form.append("usuarioCambio", usuarioCambio);
       form.append("observaciones", observaciones || "");
       if (evidenciaFotoUrl) form.append("evidenciaFotoUrl", evidenciaFotoUrl);

@@ -1,5 +1,17 @@
 # Probar el despacho administrativo localmente
 
+## Resolución e historial de novedades
+
+La pestaña Novedades consume `GET /domicilios/novedades`, con 50 reportes por página y filtros de estado en servidor. Los contadores Abiertas/Resueltas vienen de esa respuesta; búsqueda, tipos y críticas se limitan a la página actual. El número visible es `numeroPedido`, nunca `pedidoID`: cuando falta se consulta `GET /domicilios/{idEntrega}`, con hasta cinco consultas simultáneas y deduplicadas por intento.
+
+Ver detalle consulta además `GET /pedido/{pedidoID}/detalle` y muestra cliente y destinatario por separado, contactos, dirección, barrio, fecha/hora, mensaje, firma de tarjeta y observaciones. Si falla, muestra el error con opción de reintentar. Las respuestas de un pedido anterior no reemplazan el detalle que está abierto.
+
+Resolver envía multipart a `PUT /domicilios/{idEntrega}/resolver-novedad`, con observación obligatoria y acción `entregar`, `nuevo_intento` o `devolver_disponibles`. Las dos últimas permiten reprogramación opcional con zona `-05:00`. La pantalla vuelve a consultar historial y contadores después del éxito. Las resueltas muestran acción, responsable y fecha cuando están disponibles.
+
+El backend debe tener desplegado el contrato de resolución y configuradas las transiciones por empresa mediante su script `sql/alter_domicilio_resolver_novedad.sql`. Este frontend no aplica migraciones. No reconstruye reportes históricos ausentes en la auditoría.
+
+Con Vite en el puerto 5178, `node scripts/delivery-novelties.smoke.mjs` verifica las tres acciones, formularios multipart, número de pedido e historial tras recargar, interceptando todas las llamadas API y sin escrituras reales.
+
 Desde la raíz del repositorio:
 
 ```sh
@@ -13,6 +25,8 @@ no inicia sesión, no almacena tokens y no se conecta a la API de producción.
 El build de producción no incluye esta página. Reiniciar la demo restaura los datos.
 
 ## Recorrido
+
+Selecciona directamente uno o varios pedidos. La acción cambia automáticamente a **Asignar domiciliario**, **Reasignar domiciliario** o **Asignar y reasignar**, según los pedidos seleccionados. Elige un responsable distinto de los actuales y revisa los cambios antes de confirmar. Los pedidos en ruta o finalizados no se pueden seleccionar. El lote consulta nuevamente los pedidos y omite los que cambiaron de estado o responsable; el backend valida las transiciones y la capacidad al guardar cada entrega.
 
 1. Selecciona #98047, #98051 y #98056, o filtra por Chapinero y marca la casilla del encabezado.
 2. Pulsa **Asignar domiciliario** en la barra de selección. Elige Juan Pérez en el diálogo. Se muestran sus entregas activas **en el contexto filtrado** y la carga visible resultante.
@@ -35,7 +49,7 @@ La demo se concentra en el tablero y la asignación. No simula los cambios de
 estado, regularizaciones ni todas las operaciones de las otras pestañas.
 La tabla compacta ocupa todo el ancho. En móvil tiene desplazamiento horizontal y el botón **Filtros** despliega zona, período y fecha. El menú de acciones se abre por encima de la tabla, sin cambiar la altura de las filas; admite Tab, flechas, Inicio/Fin, Escape y clic fuera.
 
-**Por gestionar** excluye entregados; **Finalizados** contiene entregados; **Incidencias** contiene no entregados y reprogramados; **Todos** permite consultar el conjunto completo de la fecha. Las tarjetas cuentan el contexto de la vista, fecha, búsqueda y zona; filtran localmente por estado. La tarjeta **Todos** vuelve al conjunto de esa vista. Buscar un número mantiene el comportamiento existente de ampliar fecha/estado/vista, indicado en pantalla. **Restablecer** vuelve a hoy, por gestionar y todas las zonas.
+La barra ?nica muestra **Por gestionar** (pendientes y asignados), **En camino**, **Incidencias** (no entregados y reprogramados), **Entregados** y **Todos**. Sus contadores usan fecha, b?squeda y zona, sin reducirse al seleccionar un grupo. Se mantiene en una l?nea con desplazamiento horizontal en m?vil. Buscar un n?mero ampl?a fecha/estado/vista y activa Todos, indicado en pantalla. **Restablecer**, junto a los filtros superiores, limpia b?squeda y zona y vuelve a hoy; conserva la vista operativa.
 
 La demo incluye un administrador vinculado al domiciliario Juan Pérez: ese vínculo no debe ocultar los pedidos sin asignar. Incluye un pedido entregado (#98072) para comprobar Todos/Finalizados; no es seleccionable.
 
