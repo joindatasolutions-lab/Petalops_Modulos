@@ -18,6 +18,6 @@ export function calculateCashBalance({ base = 0, efectivo = 0, gasto = 0, guarda
     esperado, diferencia,
     sobrante: diferencia == null ? null : Math.max(0, diferencia),
     faltante: diferencia == null ? null : Math.max(0, -diferencia),
-    nuevaBase: contado == null ? null : roundMoney(contado - Number(guardado)),
+    nuevaBase: roundMoney((contado == null ? esperado : contado) - Number(guardado)),
   };
 }

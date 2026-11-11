@@ -53,4 +53,33 @@ describe("apiClient caja: correccion de gastos", () => {
     expect(parsed.searchParams.get("sucursalID")).toBe("2");
     expect(options.method).toBe("DELETE");
   });
+
+  it("guarda caja menor sin convertir un cierre sin arqueo en conteo fisico", async () => {
+    const { api, fetchMock } = setupApi();
+    await api.guardarCierreCaja({
+      empresaId: 3,
+      sucursalId: 3,
+      fecha: "2026-11-07",
+      base: 60100,
+      efectivo: 514000,
+      gasto: 22000,
+      totalEfectivo: 552100,
+      totalContado: null,
+      guardado: 500000,
+      nuevaBase: 52100,
+      observacion: "",
+      usuarioId: 9,
+    });
+
+    const [url, options] = fetchMock.mock.calls[0];
+    expect(new URL(url).pathname).toBe("/contabilidad/caja/cierre");
+    expect(options.method).toBe("PUT");
+    expect(JSON.parse(options.body)).toMatchObject({
+      empresaID: 3,
+      sucursalID: 3,
+      totalContado: null,
+      guardado: 500000,
+      nuevaBase: 52100,
+    });
+  });
 });

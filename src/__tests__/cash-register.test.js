@@ -27,6 +27,11 @@ describe("Caja: arqueo y diferencias", () => {
     expect(calculateCashBalance({ base: 100000 }).diferencia).toBeNull();
     expect(calculateCashBalance({ base: 100000, contado: 0 }).faltante).toBe(100000);
   });
+  it("calcula la nueva base sin inventar un arqueo cuando se registra caja menor", () => {
+    expect(calculateCashBalance({ base: 60100, efectivo: 514000, gasto: 22000, guardado: 500000 })).toEqual({
+      esperado: 552100, diferencia: null, faltante: null, sobrante: null, nuevaBase: 52100,
+    });
+  });
   it.each([-1, 0.5, "abc", Infinity])("rechaza cantidades inválidas: %s", cantidad => {
     expect(() => calculateCashCount({ 1000: cantidad })).toThrow();
   });

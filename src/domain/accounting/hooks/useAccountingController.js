@@ -788,11 +788,9 @@ export function useAccountingController({ session, canViewUsuariosGlobal = false
       setInfo("No se puede operar una caja futura.");
       return;
     }
-    if (String(cashForm.totalContado ?? "").trim() === "") {
-      setInfo("Ingresa el total fisico contado para realizar el arqueo.");
-      return;
-    }
-    const values = [baseValue, efectivoValue, gastoValue, totalContadoValue, guardadoValue];
+    const closingHasCount = String(cashForm.totalContado ?? "").trim() !== "";
+    const values = [baseValue, efectivoValue, gastoValue, guardadoValue];
+    if (closingHasCount) values.push(totalContadoValue);
     if (values.some(value => !Number.isFinite(value) || value < 0)) {
       setInfo("Base, efectivo, gastos, total contado y caja menor deben ser valores mayores o iguales a cero.");
       return;
@@ -801,8 +799,11 @@ export function useAccountingController({ session, canViewUsuariosGlobal = false
       setInfo("Los gastos no pueden superar la base inicial mas los ingresos en efectivo.");
       return;
     }
-    if (guardadoValue > totalContadoValue) {
-      setInfo("La caja menor no puede superar el total fisico contado.");
+    const efectivoDisponible = closingHasCount ? totalContadoValue : totalEfectivoCaja;
+    if (guardadoValue > efectivoDisponible) {
+      setInfo(closingHasCount
+        ? "La caja menor no puede superar el total fisico contado."
+        : "La caja menor no puede superar el efectivo esperado disponible.");
       return;
     }
 
@@ -816,7 +817,7 @@ export function useAccountingController({ session, canViewUsuariosGlobal = false
         efectivo: efectivoValue,
         gasto: gastoValue,
         totalEfectivo: totalEfectivoCaja,
-        totalContado: totalContadoValue,
+        totalContado: closingHasCount ? totalContadoValue : null,
         guardado: guardadoValue,
         nuevaBase: nuevaBaseValue,
         observacion: cashForm.observacion || "",
