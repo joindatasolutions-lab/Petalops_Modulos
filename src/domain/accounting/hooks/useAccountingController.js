@@ -727,6 +727,54 @@ export function useAccountingController({ session, canViewUsuariosGlobal = false
     }
   };
 
+  const updateCashExpense = async ({ id, concepto, descripcion, monto }) => {
+    const amount = parseMoneyInput(monto);
+    if (!id || !String(concepto || "").trim() || !Number.isFinite(amount) || amount <= 0) {
+      setInfo("Selecciona un concepto e ingresa un valor mayor que cero.");
+      return false;
+    }
+
+    setCashExpenseSaving(true);
+    setError("");
+    try {
+      await api.actualizarGastoCaja({
+        gastoId: id,
+        empresaId,
+        sucursalId,
+        fecha: cashForm.fecha,
+        concepto: String(concepto).trim(),
+        descripcion: String(descripcion || "").trim(),
+        monto: amount,
+        usuarioId: session?.userID || session?.usuarioID || session?.idUsuario || null,
+      });
+      await Promise.all([loadCashExpenses(), loadCashDay(), loadCashClosings()]);
+      setInfo(`Gasto actualizado y caja recalculada para ${cashForm.fecha}.`);
+      return true;
+    } catch (nextError) {
+      setError(nextError?.detail || nextError?.message || "No fue posible actualizar el gasto de caja.");
+      return false;
+    } finally {
+      setCashExpenseSaving(false);
+    }
+  };
+
+  const deleteCashExpense = async ({ id }) => {
+    if (!id) return false;
+    setCashExpenseSaving(true);
+    setError("");
+    try {
+      await api.eliminarGastoCaja({ gastoId: id, empresaId, sucursalId });
+      await Promise.all([loadCashExpenses(), loadCashDay(), loadCashClosings()]);
+      setInfo(`Gasto eliminado y caja recalculada para ${cashForm.fecha}.`);
+      return true;
+    } catch (nextError) {
+      setError(nextError?.detail || nextError?.message || "No fue posible eliminar el gasto de caja.");
+      return false;
+    } finally {
+      setCashExpenseSaving(false);
+    }
+  };
+
   const saveCashClosing = async () => {
     if (!cashForm.fecha) {
       setInfo("Selecciona una fecha para guardar el cierre.");
@@ -909,6 +957,7 @@ export function useAccountingController({ session, canViewUsuariosGlobal = false
     cashLoading,
     clearAllArrangements,
     createCashExpense,
+    deleteCashExpense,
     clearDeliveryPersonOrdersDetail,
     deliveryPersonMetricRows,
     deliveryPersonOrdersDetail,
@@ -972,4 +1021,5 @@ export function useAccountingController({ session, canViewUsuariosGlobal = false
     topArrangementByUnits,
     topPaymentAccount,
     totalEfectivoCaja,
+    updateCashExpense,
   };}

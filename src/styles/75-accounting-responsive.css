@@ -1102,7 +1102,7 @@
   border-bottom: 1px solid #eef2f7;
   display: grid;
   gap: 12px;
-  grid-template-columns: 38px minmax(0, 1fr) 110px 130px;
+  grid-template-columns: 38px minmax(0, 1fr) 110px 130px 78px;
   padding: 11px 16px;
 }
 .accounting-page-view .cash-expense-item:last-child { border-bottom: 0; }
@@ -1122,6 +1122,23 @@
 .accounting-page-view .cash-expense-item small,
 .accounting-page-view .cash-expense-item time { color: #64748b; font-size: 11px; margin-top: 3px; }
 .accounting-page-view .cash-expense-item b { color: #b91c1c; font-size: 14px; text-align: right; }
+.accounting-page-view .cash-expense-actions { display: flex; gap: 6px; justify-content: flex-end; }
+.accounting-page-view .cash-expense-action {
+  align-items: center;
+  background: #ffffff;
+  border: 1px solid #dbe3ed;
+  border-radius: 8px;
+  color: #475569;
+  cursor: pointer;
+  display: inline-flex;
+  height: 32px;
+  justify-content: center;
+  width: 32px;
+}
+.accounting-page-view .cash-expense-action:hover { border-color: #f2a4c3; color: #d11e65; }
+.accounting-page-view .cash-expense-action.is-delete { color: #b91c1c; }
+.accounting-page-view .cash-expense-action.is-delete:hover { background: #fff1f2; border-color: #fda4af; }
+.accounting-page-view .cash-expense-action:disabled { cursor: not-allowed; opacity: 0.55; }
 
 .cash-expense-modal-backdrop {
   align-items: center;
@@ -1195,6 +1212,23 @@
 .cash-expense-value input { border-left: 0; border-radius: 0 6px 6px 0; }
 .cash-expense-modal footer { display: flex; gap: 10px; justify-content: flex-end; margin-top: 4px; }
 .cash-expense-modal footer button { align-items: center; display: inline-flex; gap: 7px; justify-content: center; min-width: 138px; }
+.cash-expense-delete-modal { width: min(100%, 500px); }
+.cash-expense-modal-icon.is-danger { background: #fff1f2; color: #dc2626; }
+.cash-expense-delete-summary {
+  background: #fff7f8;
+  border: 1px solid #fecdd3;
+  border-radius: 8px;
+  display: grid;
+  gap: 4px;
+  margin-top: 18px;
+  padding: 14px;
+}
+.cash-expense-delete-summary strong { color: #172033; }
+.cash-expense-delete-summary span { color: #b91c1c; font-size: 17px; font-weight: 850; }
+.cash-expense-delete-summary small { color: #64748b; }
+.cash-expense-delete-modal > footer { display: flex; gap: 10px; justify-content: flex-end; margin-top: 18px; }
+.cash-expense-delete-modal > footer button { align-items: center; display: inline-flex; gap: 7px; justify-content: center; }
+.cash-expense-delete-modal .cash-delete-confirm { background: #dc2626; border-color: #dc2626; }
 
 @media (max-width: 1280px) {
   .accounting-page-view .cash-workspace-kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); }
@@ -1227,7 +1261,10 @@
   .accounting-page-view .cash-expense-input-row { grid-template-columns: minmax(0, 1fr); }
   .accounting-page-view .cash-expense-item { grid-template-columns: 34px minmax(0, 1fr) auto; padding: 10px 12px; }
   .accounting-page-view .cash-expense-item time { display: none; }
+  .accounting-page-view .cash-expense-actions { grid-column: 2 / -1; }
   .cash-expense-modal { padding: 16px; }
   .cash-expense-modal footer { flex-direction: column-reverse; }
   .cash-expense-modal footer button { width: 100%; }
+  .cash-expense-delete-modal > footer { flex-direction: column-reverse; }
+  .cash-expense-delete-modal > footer button { width: 100%; }
 }

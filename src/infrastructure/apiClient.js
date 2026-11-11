@@ -1576,6 +1576,31 @@ export function createApiClient(config) {
       });
     },
 
+    async actualizarGastoCaja({ gastoId, empresaId, sucursalId, fecha, concepto, descripcion, monto, usuarioId }) {
+      return requestJson(`/contabilidad/caja/gastos/${gastoId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          empresaID: empresaId,
+          sucursalID: sucursalId,
+          fecha,
+          concepto,
+          descripcion: descripcion || "",
+          monto,
+          usuarioID: usuarioId ?? null,
+        }),
+      });
+    },
+
+    async eliminarGastoCaja({ gastoId, empresaId, sucursalId }) {
+      const params = new URLSearchParams();
+      params.set("empresaID", String(empresaId));
+      params.set("sucursalID", String(sucursalId));
+      return requestJson(`/contabilidad/caja/gastos/${gastoId}?${params.toString()}`, {
+        method: "DELETE",
+      });
+    },
+
     async guardarCierreCaja({ empresaId, sucursalId, fecha, base, efectivo, gasto, totalEfectivo, totalContado, guardado, nuevaBase, observacion, usuarioId }) {
       return requestJson("/contabilidad/caja/cierre", {
         method: "PUT",

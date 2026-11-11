@@ -716,6 +716,13 @@ export function normalizeCashClosingRow(raw, fallbackFecha = "") {
   const guardado = roundMoney(source.guardado ?? source.montoGuardado ?? source.monto_guardado);
   const rawTotalContado = source.totalContado ?? source.total_contado;
   const totalContado = rawTotalContado == null ? null : roundMoney(rawTotalContado);
+  const diferencia = totalContado == null
+    ? null
+    : roundMoney(totalContado - totalEfectivo);
+  const arqueo = source.arqueo
+    ?? source.arqueoDenominaciones
+    ?? source.arqueo_denominaciones
+    ?? null;
   const sobrante = roundMoney(source.sobrante ?? (totalContado == null ? 0 : Math.max(totalContado - totalEfectivo, 0)));
   const faltante = roundMoney(source.faltante ?? (totalContado == null ? 0 : Math.max(totalEfectivo - totalContado, 0)));
   const nuevaBase = roundMoney(source.nuevaBase ?? source.nueva_base ?? ((totalContado ?? totalEfectivo) - guardado));
@@ -729,6 +736,8 @@ export function normalizeCashClosingRow(raw, fallbackFecha = "") {
     guardado,
     nuevaBase,
     totalContado,
+    diferencia,
+    arqueo,
     sobrante,
     faltante,
     observacion,

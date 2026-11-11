@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState } from "react";
 import {
   ArrowDown, ArrowUp, Banknote, Calculator, CheckCircle2, CircleAlert, Coins,
-  Eye, Landmark, ListChecks, LockKeyhole, Plus, Receipt, Save, Trash2, WalletCards, X,
+  Eye, Landmark, ListChecks, LockKeyhole, Pencil, Plus, Receipt, Save, Trash2, WalletCards, X,
 } from "lucide-react";
 
 import { formatearCOP } from "../../../../shared/utils.js";
@@ -39,15 +39,17 @@ function CashKpi({ icon: Icon, label, value, tone }) {
 
 export function AccountingCashView({
   activeView, canEditCashClosing, cashDashboardTotals, cashExpenses, cashExpensesLoading,
-  cashExpenseSaving, cashForm, cashHistoryRows, cashLoading, createCashExpense,
+  cashExpenseSaving, cashForm, cashHistoryRows, cashLoading, createCashExpense, deleteCashExpense,
   efectivoValue, exportCaja, nuevaBaseValue, saveCashClosing, saving, setCashForm,
-  todayCashDate, totalEfectivoCaja,
+  todayCashDate, totalEfectivoCaja, updateCashExpense,
 }) {
   const [denominationCounts, setDenominationCounts] = useState({});
   const [activeSection, setActiveSection] = useState("cierre");
   const [expandedHistoryDate, setExpandedHistoryDate] = useState("");
   const [expenseModalOpen, setExpenseModalOpen] = useState(false);
   const [expenseForm, setExpenseForm] = useState({ concepto: "", descripcion: "", monto: "" });
+  const [editingExpenseId, setEditingExpenseId] = useState(null);
+  const [expensePendingDelete, setExpensePendingDelete] = useState(null);
   const closeRef = useRef(null);
   const countRef = useRef(null);
   const historyRef = useRef(null);
@@ -90,12 +92,42 @@ export function AccountingCashView({
     refs[section]?.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
+  const openCreateExpense = () => {
+    setEditingExpenseId(null);
+    setExpenseForm({ concepto: "", descripcion: "", monto: "" });
+    setExpenseModalOpen(true);
+  };
+
+  const openEditExpense = item => {
+    setEditingExpenseId(item.id);
+    setExpenseForm({
+      concepto: item.concepto || "",
+      descripcion: item.descripcion || "",
+      monto: item.monto == null ? "" : String(item.monto),
+    });
+    setExpenseModalOpen(true);
+  };
+
+  const closeExpenseModal = () => {
+    if (cashExpenseSaving) return;
+    setExpenseModalOpen(false);
+    setEditingExpenseId(null);
+    setExpenseForm({ concepto: "", descripcion: "", monto: "" });
+  };
+
   const submitExpense = async event => {
     event.preventDefault();
-    const saved = await createCashExpense(expenseForm);
+    const saved = editingExpenseId
+      ? await updateCashExpense({ id: editingExpenseId, ...expenseForm })
+      : await createCashExpense(expenseForm);
     if (!saved) return;
-    setExpenseForm({ concepto: "", descripcion: "", monto: "" });
-    setExpenseModalOpen(false);
+    closeExpenseModal();
+  };
+
+  const confirmDeleteExpense = async () => {
+    if (!expensePendingDelete) return;
+    const deleted = await deleteCashExpense(expensePendingDelete);
+    if (deleted) setExpensePendingDelete(null);
   };
 
   if (activeView !== "caja") return null;
@@ -136,7 +168,7 @@ export function AccountingCashView({
             <label>Total contado (arqueo)<input type="text" value={hasTotalContado ? `$ ${formatearCOP(totalContadoValue)}` : "Pendiente de conteo"} readOnly /></label>
             <label>Ingresos en efectivo<input type="text" value={`$ ${formatearCOP(efectivoValue)}`} readOnly /></label>
             <label>Diferencia<input className={diferenciaCaja === 0 ? "is-balanced" : "is-difference"} type="text" value={`${diferenciaCaja < 0 ? "-" : ""}$ ${formatearCOP(Math.abs(diferenciaCaja))}`} readOnly /></label>
-            <label>Gastos en efectivo<span className="cash-expense-input-row"><input type="text" value={`$ ${formatearCOP(parseMoneyInput(cashForm.gasto))}`} readOnly /><button type="button" className="btn-outline" onClick={() => setExpenseModalOpen(true)} disabled={!canEditCashClosing}><Plus size={16} />Agregar gasto</button></span></label>
+            <label>Gastos en efectivo<span className="cash-expense-input-row"><input type="text" value={`$ ${formatearCOP(parseMoneyInput(cashForm.gasto))}`} readOnly /><button type="button" className="btn-outline" onClick={openCreateExpense} disabled={!canEditCashClosing}><Plus size={16} />Agregar gasto</button></span></label>
             <label ref={pettyCashRef}>Caja menor<input type="number" min="0" step="0.01" value={cashForm.guardado} onChange={event => setCashForm(current => ({ ...current, guardado: event.target.value }))} disabled={!canEditCashClosing} /></label>
             <label>Nueva base<input type="text" value={`$ ${formatearCOP(nuevaBaseValue)}`} readOnly /></label>
             <label>Resultado del arqueo<input type="text" value={faltanteValue > 0 ? `Faltante: $ ${formatearCOP(faltanteValue)}` : sobranteValue > 0 ? `Sobrante: $ ${formatearCOP(sobranteValue)}` : "Caja cuadrada"} readOnly /></label>
@@ -170,7 +202,7 @@ export function AccountingCashView({
       <section className="cash-expenses-card" ref={expensesRef}>
         <div className="cash-history-head">
           <div><h3>Movimientos de gastos</h3><p>Gastos pagados en efectivo para el {formatCashDate(cashForm.fecha)}.</p></div>
-          <button type="button" className="btn-outline" onClick={() => setExpenseModalOpen(true)} disabled={!canEditCashClosing}><Plus size={16} />Agregar gasto</button>
+          <button type="button" className="btn-outline" onClick={openCreateExpense} disabled={!canEditCashClosing}><Plus size={16} />Agregar gasto</button>
         </div>
         <div className="cash-expense-list">
           {cashExpensesLoading ? <p>Cargando gastos...</p> : cashExpenses.length === 0 ? <p>No hay gastos registrados para esta fecha.</p> : cashExpenses.map(item => (
@@ -179,6 +211,10 @@ export function AccountingCashView({
               <span><strong>{item.concepto}</strong><small>{item.descripcion || "Sin descripcion"}</small></span>
               <time>{item.fecha}</time>
               <b>$ {formatearCOP(item.monto)}</b>
+              <span className="cash-expense-actions">
+                <button type="button" className="cash-expense-action" onClick={() => openEditExpense(item)} disabled={!canEditCashClosing || cashExpenseSaving} title="Editar gasto" aria-label={`Editar gasto ${item.concepto}`}><Pencil size={15} /></button>
+                <button type="button" className="cash-expense-action is-delete" onClick={() => setExpensePendingDelete(item)} disabled={!canEditCashClosing || cashExpenseSaving} title="Eliminar gasto" aria-label={`Eliminar gasto ${item.concepto}`}><Trash2 size={15} /></button>
+              </span>
             </article>
           ))}
         </div>
@@ -212,20 +248,34 @@ export function AccountingCashView({
       </section>
 
       {expenseModalOpen ? (
-        <div className="cash-expense-modal-backdrop" role="presentation" onMouseDown={event => event.target === event.currentTarget && !cashExpenseSaving && setExpenseModalOpen(false)}>
+        <div className="cash-expense-modal-backdrop" role="presentation" onMouseDown={event => event.target === event.currentTarget && closeExpenseModal()}>
           <section className="cash-expense-modal" role="dialog" aria-modal="true" aria-labelledby="cash-expense-title">
             <header>
               <span className="cash-expense-modal-icon" aria-hidden="true"><WalletCards size={25} /></span>
-              <div><h2 id="cash-expense-title">Agregar gasto</h2><p>Registrar un gasto pagado en efectivo</p></div>
-              <button type="button" className="cash-modal-close" onClick={() => setExpenseModalOpen(false)} disabled={cashExpenseSaving} title="Cerrar"><X size={20} /></button>
+              <div><h2 id="cash-expense-title">{editingExpenseId ? "Editar gasto" : "Agregar gasto"}</h2><p>{editingExpenseId ? "Corregir un gasto y recalcular la caja" : "Registrar un gasto pagado en efectivo"}</p></div>
+              <button type="button" className="cash-modal-close" onClick={closeExpenseModal} disabled={cashExpenseSaving} title="Cerrar"><X size={20} /></button>
             </header>
             <form onSubmit={submitExpense}>
               <label>Fecha<input type="date" value={cashForm.fecha} readOnly /></label>
               <label>Concepto<select value={expenseForm.concepto} onChange={event => setExpenseForm(current => ({ ...current, concepto: event.target.value }))} required><option value="">Seleccione un concepto</option><option>Insumos</option><option>Transporte</option><option>Servicios</option><option>Alimentacion</option><option>Mantenimiento</option><option>Otros</option></select></label>
               <label>Descripcion (opcional)<textarea value={expenseForm.descripcion} onChange={event => setExpenseForm(current => ({ ...current, descripcion: event.target.value }))} placeholder="Detalle del gasto" maxLength={500} /></label>
               <label>Valor<span className="cash-expense-value"><b>$</b><input type="number" min="1" step="0.01" value={expenseForm.monto} onChange={event => setExpenseForm(current => ({ ...current, monto: event.target.value }))} required /></span></label>
-              <footer><button type="button" className="btn-outline" onClick={() => setExpenseModalOpen(false)} disabled={cashExpenseSaving}>Cancelar</button><button type="submit" className="btn-primary" disabled={cashExpenseSaving}><LockKeyhole size={16} />{cashExpenseSaving ? "Guardando..." : "Guardar gasto"}</button></footer>
+              <footer><button type="button" className="btn-outline" onClick={closeExpenseModal} disabled={cashExpenseSaving}>Cancelar</button><button type="submit" className="btn-primary" disabled={cashExpenseSaving}><LockKeyhole size={16} />{cashExpenseSaving ? "Guardando..." : editingExpenseId ? "Guardar cambios" : "Guardar gasto"}</button></footer>
             </form>
+          </section>
+        </div>
+      ) : null}
+
+      {expensePendingDelete ? (
+        <div className="cash-expense-modal-backdrop" role="presentation" onMouseDown={event => event.target === event.currentTarget && !cashExpenseSaving && setExpensePendingDelete(null)}>
+          <section className="cash-expense-modal cash-expense-delete-modal" role="alertdialog" aria-modal="true" aria-labelledby="cash-expense-delete-title">
+            <header>
+              <span className="cash-expense-modal-icon is-danger" aria-hidden="true"><Trash2 size={24} /></span>
+              <div><h2 id="cash-expense-delete-title">Eliminar gasto</h2><p>Esta accion recalculara inmediatamente los valores de caja.</p></div>
+              <button type="button" className="cash-modal-close" onClick={() => setExpensePendingDelete(null)} disabled={cashExpenseSaving} title="Cerrar"><X size={20} /></button>
+            </header>
+            <div className="cash-expense-delete-summary"><strong>{expensePendingDelete.concepto}</strong><span>$ {formatearCOP(expensePendingDelete.monto)}</span><small>{expensePendingDelete.descripcion || "Sin descripcion"}</small></div>
+            <footer><button type="button" className="btn-outline" onClick={() => setExpensePendingDelete(null)} disabled={cashExpenseSaving}>Conservar gasto</button><button type="button" className="btn-primary cash-delete-confirm" onClick={confirmDeleteExpense} disabled={cashExpenseSaving}><Trash2 size={16} />{cashExpenseSaving ? "Eliminando..." : "Eliminar gasto"}</button></footer>
           </section>
         </div>
       ) : null}
