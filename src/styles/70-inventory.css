@@ -3422,6 +3422,29 @@
   grid-column: 1 / -1;
 }
 
+.inventory-page-view .inventory-provider-form .inventory-provider-actions {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: flex-end;
+  margin-top: 6px;
+  width: 100%;
+}
+
+.inventory-page-view .inventory-provider-form .inventory-provider-actions > .btn-primary,
+.inventory-page-view .inventory-provider-form .inventory-provider-actions > .btn-outline {
+  align-items: center;
+  display: inline-flex;
+  flex: 0 0 auto;
+  height: auto;
+  justify-content: center;
+  min-height: 42px;
+  min-width: 128px;
+  padding: 9px 16px;
+  width: auto;
+}
+
 .inventory-page-view .inventory-provider-form input:not([type="checkbox"]),
 .inventory-page-view .inventory-provider-form select {
   min-height: 42px !important;
@@ -3512,6 +3535,19 @@
     grid-column: auto;
   }
 
+  .inventory-page-view .inventory-provider-form .inventory-provider-actions {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+
+  .inventory-page-view .inventory-provider-form .inventory-provider-actions > .btn-primary,
+  .inventory-page-view .inventory-provider-form .inventory-provider-actions > .btn-outline {
+    min-height: 44px;
+    min-width: 0;
+    padding-inline: 12px;
+    width: 100%;
+  }
+
   .inventory-page-view .inventory-import-summary { grid-template-columns: 1fr 1fr; }
   .inventory-page-view .inventory-import-summary article:last-child { grid-column: 1 / -1; }
 
@@ -3530,8 +3566,11 @@
 }
 
 @media (max-width: 420px) {
+  .inventory-page-view .inventory-provider-form .inventory-provider-actions,
   .inventory-page-view .inventory-import-actions { grid-template-columns: 1fr; }
+  .inventory-page-view .inventory-provider-form .inventory-provider-actions > .btn-primary,
   .inventory-page-view .inventory-import-actions > .btn-primary { order: 1; }
+  .inventory-page-view .inventory-provider-form .inventory-provider-actions > .btn-outline,
   .inventory-page-view .inventory-import-actions > .btn-outline { order: 2; }
 }
 

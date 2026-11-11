@@ -2320,7 +2320,7 @@ export function InventoryPage({
                   />
                   <span>Dejar proveedor activo</span>
                 </label>
-                <div className="order-actions inventory-provider-actions">
+                <div className="inventory-provider-actions">
                   <button type="submit" className="btn-primary" disabled={savingProveedor}>
                     {savingProveedor ? "Guardando..." : editingProveedorId ? "Guardar cambios" : "Crear proveedor"}
                   </button>
