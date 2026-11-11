@@ -2381,7 +2381,7 @@ export function InventoryPage({
                 </div>
               ) : null}
 
-              <div className="order-actions inventory-provider-actions">
+              <div className="inventory-import-actions">
                 <button type="button" className="btn-primary" onClick={submitInventoryImport} disabled={importParsing || importSaving || !importPreview?.items?.length || Boolean(importResult)}>
                   <Upload size={16} strokeWidth={2.2} /> {importSaving ? "Importando..." : "Importar filas válidas"}
                 </button>
