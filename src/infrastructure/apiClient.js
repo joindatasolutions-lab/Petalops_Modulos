@@ -733,6 +733,21 @@ export function createApiClient(config) {
       });
     },
 
+    async importarInventario({ empresaId, categoria, items, crearProveedores = true }) {
+      return requestJson("/inventario/importar", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          empresaID: empresaId,
+          categoria,
+          crearProveedores,
+          items,
+        })
+      });
+    },
+
     async actualizarItemInventario({ inventarioId, payload }) {
       return requestJson(`/inventario/${inventarioId}`, {
         method: "PUT",

@@ -55,9 +55,10 @@ export function isExpired(fechaVencimiento) {
   return new Date(fechaVencimiento).getTime() < Date.now();
 }
 export function filterInventoryItems(items, { stockFiltro = "", subcategoriaFiltro = "", metricFilter = "" } = {}) {
+  const normalizedStockFilter = stockFiltro === "critical" ? "out" : stockFiltro;
   return (Array.isArray(items) ? items : []).filter(item => {
     const level = stockLevel(item);
-    if (stockFiltro && level.key !== stockFiltro) return false;
+    if (normalizedStockFilter && level.key !== normalizedStockFilter) return false;
     if (subcategoriaFiltro && normalizeInventorySubcategory(item.subcategoria).toLowerCase() !== normalizeInventorySubcategory(subcategoriaFiltro).toLowerCase()) return false;
     if (metricFilter === "bajoStock" && level.key !== "low") return false;
     if (metricFilter === "agotados" && level.key !== "out") return false;

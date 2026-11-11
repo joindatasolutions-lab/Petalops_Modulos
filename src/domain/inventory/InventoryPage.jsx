@@ -34,12 +34,33 @@ import {
   TrendingUp,
   TriangleAlert,
   Truck,
+  Upload,
   UtensilsCrossed,
   X,
 } from "lucide-react";
 import { COLOR_OPTIONS, MODULES, MOTIVOS_AJUSTE, MOTIVOS_DANO_BY_MODULE, MOTIVOS_SALIDA, MOVIMIENTO_TIPO_OPTIONS, initialProveedorForm } from "./inventoryConfig.jsx";
 import { buildBasesMetrics, buildCreateItemPayload, buildExpiryAlerts, buildInventoryMetrics, buildProveedorForm, buildProveedorPayload, buildRecetaResumen, buildSimulacionPedido, filterInventoryItems, filterProviders, filterRecipeIngredientItems, inventoryRowClass, isExpired, isNearExpiry, normalizeInventorySubcategory, statusClass } from "./inventoryDomain.js";
+import { parseInventoryWorkbook } from "./inventoryImport.js";
 export { filterInventoryItems } from "./inventoryDomain.js";
+
+function inventoryOptionKey(value) {
+  return String(value || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().toLowerCase();
+}
+
+function mergeInventoryOptions(...groups) {
+  const options = new Map();
+  groups.flat().filter(Boolean).forEach(value => {
+    const text = String(value).trim();
+    const key = inventoryOptionKey(text);
+    if (key && !options.has(key)) options.set(key, text);
+  });
+  return [...options.values()];
+}
+
+function canonicalInventoryOption(value, options) {
+  const key = inventoryOptionKey(value);
+  return options.find(option => inventoryOptionKey(option) === key) || value;
+}
 
 // ─── Configuración de módulos ────────────────────────────────────────────────
 
@@ -70,6 +91,13 @@ export function InventoryPage({
   const [openInventoryMenuId, setOpenInventoryMenuId] = useState(null);
   const [headerActionsOpen, setHeaderActionsOpen] = useState(false);
   const headerActionsRef = useRef(null);
+  const importFileRef = useRef(null);
+  const [importModalOpen, setImportModalOpen] = useState(false);
+  const [importPreview, setImportPreview] = useState(null);
+  const [importResult, setImportResult] = useState(null);
+  const [importFileName, setImportFileName] = useState("");
+  const [importParsing, setImportParsing] = useState(false);
+  const [importSaving, setImportSaving] = useState(false);
 
   // ── Datos ──
   const inventarioRequestIdRef = useRef(0);
@@ -496,6 +524,68 @@ export function InventoryPage({
     if (moduloActivo === "movimientos") loadAllItems().catch(() => {});
   };
 
+  const openImportModal = () => {
+    setImportPreview(null);
+    setImportResult(null);
+    setImportFileName("");
+    setError("");
+    setImportModalOpen(true);
+  };
+
+  const closeImportModal = () => {
+    if (importParsing || importSaving) return;
+    setImportModalOpen(false);
+    setImportPreview(null);
+    setImportResult(null);
+    setImportFileName("");
+    if (importFileRef.current) importFileRef.current.value = "";
+  };
+
+  const selectImportFile = async event => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    setImportParsing(true);
+    setImportResult(null);
+    setError("");
+    try {
+      const preview = await parseInventoryWorkbook(file);
+      setImportFileName(file.name);
+      setImportPreview(preview);
+    } catch (nextError) {
+      setImportFileName(file.name);
+      setImportPreview(null);
+      setError(nextError?.message || "No fue posible leer el archivo de Excel.");
+    } finally {
+      setImportParsing(false);
+    }
+  };
+
+  const submitInventoryImport = async () => {
+    if (!moduloConfig?.categoria || !importPreview?.items?.length) return;
+    setImportSaving(true);
+    setError("");
+    try {
+      const result = await api.importarInventario({
+        empresaId,
+        categoria: moduloConfig.categoria,
+        items: importPreview.items.map(item => ({
+          ...item,
+          color: canonicalInventoryOption(item.color, COLOR_OPTIONS),
+          unidadMedida: canonicalInventoryOption(item.unidadMedida, moduloConfig.unidades || []),
+          subcategoria: canonicalInventoryOption(item.subcategoria, moduloConfig.subcategorias || []),
+        })),
+        crearProveedores: true,
+      });
+      setImportResult(result);
+      await Promise.all([loadInventario(), loadInventarioMetricas(), loadMovimientos(), loadProveedores()]);
+      setInfo(`Importación terminada. Creados: ${result.creados || 0}. Omitidos: ${result.omitidos || 0}.`);
+    } catch (nextError) {
+      setError(nextError?.detail || nextError?.message || "No fue posible importar el inventario.");
+    } finally {
+      setImportSaving(false);
+    }
+  };
+
   // ── Submit crear item ──
   const submitCreate = async event => {
     event.preventDefault();
@@ -835,8 +925,18 @@ export function InventoryPage({
 
   // ── Helpers de label ──
   const moduloLabel = useMemo(() => moduloConfig?.label || "", [moduloConfig]);
-  const subcategoriasModulo = useMemo(() => moduloConfig?.subcategorias || [], [moduloConfig]);
-  const unidadesModulo = useMemo(() => moduloConfig?.unidades || [], [moduloConfig]);
+  const subcategoriasModulo = useMemo(
+    () => mergeInventoryOptions(moduloConfig?.subcategorias || [], items.map(item => item.subcategoria)),
+    [items, moduloConfig]
+  );
+  const unidadesModulo = useMemo(
+    () => mergeInventoryOptions(moduloConfig?.unidades || [], items.map(item => item.unidadMedida)),
+    [items, moduloConfig]
+  );
+  const coloresModulo = useMemo(
+    () => mergeInventoryOptions(COLOR_OPTIONS.filter(Boolean), items.map(item => item.color)),
+    [items]
+  );
   const ActiveModuleIcon = moduloConfig?.icon || Boxes;
   const nuevoItemLabel = moduloLabel === "Arreglos" ? "Nuevo arreglo" : moduloLabel === "Flores" ? "Nueva flor" : moduloLabel === "Bases" ? "Nueva base" : moduloLabel === "Materiales" ? "Nuevo material" : moduloLabel === "Adicionales" ? "Nuevo adicional" : "Nuevo producto";
   const runHeaderAction = action => {
@@ -910,6 +1010,11 @@ export function InventoryPage({
                     {moduloActivo !== "movimientos" && moduloActivo !== "proveedores" && vistaActiva === "lista" ? (
                       <button type="button" role="menuitem" onClick={() => runHeaderAction(() => { setEditingInventoryId(null); setCreateForm(initialCreateForm); setVistaActiva("crear"); })}>
                         <PackagePlus size={18} strokeWidth={2} aria-hidden="true" /><span>{nuevoItemLabel}</span>
+                      </button>
+                    ) : null}
+                    {moduloConfig?.categoria && vistaActiva === "lista" ? (
+                      <button type="button" role="menuitem" onClick={() => runHeaderAction(openImportModal)}>
+                        <Upload size={18} strokeWidth={2} aria-hidden="true" /><span>Importar desde Excel</span>
                       </button>
                     ) : null}
                     {moduloActivo === "proveedores" && vistaActiva === "lista" ? (
@@ -1315,7 +1420,7 @@ export function InventoryPage({
                       <span>Color</span>
                       <select value={createForm.color} onChange={e => setCreateForm(f => ({ ...f, color: e.target.value }))}>
                         <option value="">Sin color</option>
-                        {COLOR_OPTIONS.filter(Boolean).map(c => <option key={c} value={c}>{c}</option>)}
+                        {coloresModulo.map(c => <option key={c} value={c}>{c}</option>)}
                       </select>
                     </label>
                     <label className="inventory-field">
@@ -2224,6 +2329,64 @@ export function InventoryPage({
                   </button>
                 </div>
               </form>
+            </section>
+          </div>
+        ) : null}
+
+        {importModalOpen ? (
+          <div className="inventory-provider-modal-overlay" role="presentation" onClick={closeImportModal}>
+            <section className="inventory-provider-modal inventory-import-modal" role="dialog" aria-modal="true" aria-labelledby="inventory-import-title" onClick={event => event.stopPropagation()}>
+              <div className="inventory-provider-modal-head">
+                <div>
+                  <h4 id="inventory-import-title"><Upload size={19} strokeWidth={2.2} /> Importar {moduloLabel} desde Excel</h4>
+                  <p>Las columnas se reconocen aunque estén en mayúsculas, minúsculas o tengan tildes.</p>
+                </div>
+                <button type="button" className="btn-outline inventory-provider-modal-close" onClick={closeImportModal} disabled={importParsing || importSaving} aria-label="Cerrar"><X size={16} strokeWidth={2} /></button>
+              </div>
+
+              <button type="button" className="inventory-import-file-picker" onClick={() => importFileRef.current?.click()} disabled={importParsing || importSaving}>
+                <Upload size={28} strokeWidth={1.9} aria-hidden="true" />
+                <strong>{importParsing ? "Leyendo archivo..." : importFileName || "Seleccionar archivo de Excel"}</strong>
+                <span>Formatos permitidos: .xlsx y .xls</span>
+              </button>
+              <input ref={importFileRef} type="file" accept=".xlsx,.xls" hidden onChange={selectImportFile} />
+
+              <div className="inventory-import-note">
+                <strong>Categoría de destino: {moduloLabel}</strong>
+                <span>Los proveedores se reutilizan por nombre; si no existen, se crearán para este negocio. Los códigos existentes no se duplicarán.</span>
+              </div>
+
+              {error ? <div className="inventory-import-errors"><strong>{String(error)}</strong></div> : null}
+
+              {importPreview ? (
+                <div className="inventory-import-summary">
+                  <article><strong>{importPreview.items.length}</strong><span>Filas listas</span></article>
+                  <article className={importPreview.errors.length ? "has-warning" : ""}><strong>{importPreview.errors.length}</strong><span>Filas por corregir</span></article>
+                  <article><strong>{importPreview.sheetName}</strong><span>Hoja leída</span></article>
+                </div>
+              ) : null}
+
+              {importResult ? (
+                <div className="inventory-import-result">
+                  <CheckCircle2 size={20} strokeWidth={2.2} />
+                  <div><strong>Importación finalizada</strong><span>Creados: {importResult.creados || 0} · Omitidos: {importResult.omitidos || 0} · Proveedores nuevos: {importResult.proveedoresCreados || 0}</span></div>
+                </div>
+              ) : null}
+
+              {(importPreview?.errors?.length || importResult?.errores?.length) ? (
+                <div className="inventory-import-errors">
+                  <strong>Filas que requieren revisión</strong>
+                  <ul>{[...(importPreview?.errors || []), ...(importResult?.errores || [])].slice(0, 12).map((item, index) => <li key={`${item.fila}-${item.codigo || "fila"}-${index}`}><b>Fila {item.fila}{item.codigo ? ` · ${item.codigo}` : ""}:</b> {item.mensaje}</li>)}</ul>
+                  {[...(importPreview?.errors || []), ...(importResult?.errores || [])].length > 12 ? <small>Se muestran las primeras 12 observaciones.</small> : null}
+                </div>
+              ) : null}
+
+              <div className="order-actions inventory-provider-actions">
+                <button type="button" className="btn-primary" onClick={submitInventoryImport} disabled={importParsing || importSaving || !importPreview?.items?.length || Boolean(importResult)}>
+                  <Upload size={16} strokeWidth={2.2} /> {importSaving ? "Importando..." : "Importar filas válidas"}
+                </button>
+                <button type="button" className="btn-outline" onClick={closeImportModal} disabled={importParsing || importSaving}>{importResult ? "Finalizar" : "Cancelar"}</button>
+              </div>
             </section>
           </div>
         ) : null}

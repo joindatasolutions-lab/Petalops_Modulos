@@ -83,3 +83,36 @@ describe("apiClient inventario: proveedores", () => {
     });
   });
 });
+
+describe("apiClient inventario: importación Excel", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("envía la categoría activa y las filas normalizadas", async () => {
+    const fetchMock = vi.fn(async () => ({
+      ok: true,
+      json: async () => ({ status: "ok", creados: 1, omitidos: 0 }),
+    }));
+    vi.stubGlobal("fetch", fetchMock);
+    vi.stubGlobal("localStorage", { getItem: () => "token-test" });
+
+    const api = createApiClient({ apiBaseUrl: "https://api.test" });
+    await api.importarInventario({
+      empresaId: 3,
+      categoria: "Flores",
+      crearProveedores: true,
+      items: [{ fila: 2, codigo: "FL-001", nombre: "Rosa" }],
+    });
+
+    const [url, options] = fetchMock.mock.calls[0];
+    expect(new URL(url).pathname).toBe("/inventario/importar");
+    expect(options.method).toBe("POST");
+    expect(JSON.parse(options.body)).toEqual({
+      empresaID: 3,
+      categoria: "Flores",
+      crearProveedores: true,
+      items: [{ fila: 2, codigo: "FL-001", nombre: "Rosa" }],
+    });
+  });
+});
