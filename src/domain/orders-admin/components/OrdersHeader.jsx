@@ -65,7 +65,9 @@ export function OrdersHeader({
   const periodSuffix = isToday ? "hoy" : isMonth ? "este mes" : "del período";
   const salesLabel = `Ventas ${periodSuffix}`;
   const ordersLabel = `Pedidos ${periodSuffix}`;
-  const dateBasis = filters.filtrarPorEntrega || filters.soloEntregasHoy ? "Fecha de entrega" : "Fecha de creación";
+  const dateBasis = filters.filtrarPorEntrega || filters.soloEntregasHoy
+    ? "Fecha de entrega"
+    : "Fecha de aprobación para ventas y fecha de creación para pendientes";
   return (
     <header className="orders-admin-header orders-page-header orders-kpi-header">
       <div className="orders-page-heading">
